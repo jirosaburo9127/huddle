@@ -254,7 +254,7 @@ export const MessageItem = memo(function MessageItem({
 
         {/* ホバー時アクションボタン */}
         {!isEditing && !isThreadView && (
-          <div className="absolute -top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex bg-sidebar/95 backdrop-blur-sm border border-border/60 rounded-lg px-0.5 py-0.5 shadow-xl">
+          <div className="absolute top-1 right-3 opacity-0 group-hover:opacity-100 transition-opacity flex bg-sidebar/95 backdrop-blur-sm border border-border/60 rounded-lg px-0.5 py-0.5 shadow-lg">
             {/* リアクションボタン */}
             {onReact && (
               <div className="relative">

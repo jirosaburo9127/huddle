@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 import type { Workspace, Channel } from "@/lib/supabase/types";
 import { CreateChannelModal } from "@/components/create-channel-modal";
 import { CreateDmModal } from "@/components/create-dm-modal";
-import { ThemeSelector } from "@/components/theme-selector";
 import { signOut } from "@/lib/actions";
 
 type MemberProfile = {
@@ -270,31 +269,35 @@ export function Sidebar({
             )}
         </div>
 
-        {/* 下部: テーマ切り替え & ログアウト */}
-        <div className="flex items-center justify-between px-3 py-3 border-t border-border/50">
-          <ThemeSelector />
-          <form action={signOut}>
-            <button
-              type="submit"
-              className="text-muted hover:text-foreground transition-colors p-2 rounded-lg hover:bg-sidebar-hover"
-              title="ログアウト"
-            >
-              {/* ドアアイコン */}
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                />
-              </svg>
-            </button>
-          </form>
+        {/* 下部: ユーザー名 + 設定 */}
+        <div className="flex items-center gap-2 px-3 py-3 border-t border-border/50">
+          {(() => {
+            const me = members.find((m) => m.user_id === currentUserId);
+            const profile = me?.profiles;
+            const p = Array.isArray(profile) ? profile[0] : profile;
+            const name = p?.display_name || "ユーザー";
+            const initial = name[0].toUpperCase();
+            return (
+              <>
+                <span className="w-7 h-7 rounded-full bg-accent/20 flex items-center justify-center text-[11px] font-bold text-accent shrink-0">
+                  {p?.avatar_url ? (
+                    <img src={p.avatar_url} alt={name} className="w-7 h-7 rounded-full object-cover" />
+                  ) : initial}
+                </span>
+                <span className="text-sm text-foreground truncate flex-1">{name}</span>
+              </>
+            );
+          })()}
+          <Link
+            href={`/${workspaceSlug}/settings`}
+            className="text-muted hover:text-foreground transition-colors p-1.5 rounded-lg hover:bg-white/[0.04] shrink-0"
+            title="設定"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </Link>
         </div>
       </aside>
 
