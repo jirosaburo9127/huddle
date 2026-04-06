@@ -3,11 +3,12 @@
 import { useState, useRef } from "react";
 
 type Props = {
-  channelName: string;
+  channelName?: string;
   onSend: (content: string) => void | Promise<void>;
+  placeholder?: string;
 };
 
-export function MessageInput({ channelName, onSend }: Props) {
+export function MessageInput({ channelName, onSend, placeholder }: Props) {
   const [content, setContent] = useState("");
   const [sending, setSending] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -63,7 +64,7 @@ export function MessageInput({ channelName, onSend }: Props) {
           onChange={(e) => setContent(e.target.value)}
           onKeyDown={handleKeyDown}
           onInput={handleInput}
-          placeholder={`#${channelName} にメッセージを送信`}
+          placeholder={placeholder || (channelName ? `#${channelName} にメッセージを送信` : "メッセージを入力")}
           rows={1}
           className="flex-1 resize-none bg-transparent text-sm text-foreground placeholder-muted focus:outline-none max-h-[200px]"
         />

@@ -8,6 +8,8 @@ type Props = {
   currentUserId: string;
   onEdit: (messageId: string, newContent: string) => Promise<void>;
   onDelete: (messageId: string) => Promise<void>;
+  onOpenThread?: (message: MessageWithProfile) => void;
+  isThreadView?: boolean;
 };
 
 export const MessageItem = memo(function MessageItem({
@@ -15,6 +17,8 @@ export const MessageItem = memo(function MessageItem({
   currentUserId,
   onEdit,
   onDelete,
+  onOpenThread,
+  isThreadView,
 }: Props) {
   const profile = message.profiles;
   const isOwn = message.user_id === currentUserId;
@@ -155,37 +159,55 @@ export const MessageItem = memo(function MessageItem({
           )}
 
           {/* スレッド返信数 */}
-          {message.reply_count > 0 && (
-            <button className="mt-1 text-xs text-accent hover:underline">
+          {message.reply_count > 0 && !isThreadView && (
+            <button
+              onClick={() => onOpenThread?.(message)}
+              className="mt-1 text-xs text-accent hover:underline"
+            >
               {message.reply_count}件の返信
             </button>
           )}
         </div>
 
         {/* ホバー時アクションボタン */}
-        {isOwn && !isEditing && (
+        {!isEditing && !isThreadView && (
           <div className="absolute -top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-0.5 bg-sidebar border border-border rounded-lg px-1 py-0.5 shadow-lg">
+            {/* 返信ボタン */}
             <button
-              onClick={() => {
-                setIsEditing(true);
-                setEditContent(message.content);
-              }}
+              onClick={() => onOpenThread?.(message)}
               className="p-1 text-muted hover:text-foreground rounded transition-colors"
-              title="編集"
+              title="返信"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
               </svg>
             </button>
-            <button
-              onClick={() => setIsDeleting(true)}
-              className="p-1 text-muted hover:text-mention rounded transition-colors"
-              title="削除"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-            </button>
+            {/* 編集・削除は自分のメッセージのみ */}
+            {isOwn && (
+              <>
+                <button
+                  onClick={() => {
+                    setIsEditing(true);
+                    setEditContent(message.content);
+                  }}
+                  className="p-1 text-muted hover:text-foreground rounded transition-colors"
+                  title="編集"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => setIsDeleting(true)}
+                  className="p-1 text-muted hover:text-mention rounded transition-colors"
+                  title="削除"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              </>
+            )}
           </div>
         )}
       </div>

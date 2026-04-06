@@ -6,6 +6,7 @@ import type { RealtimePostgresInsertPayload, RealtimePostgresUpdatePayload } fro
 import type { Channel, Message, MessageWithProfile } from "@/lib/supabase/types";
 import { MessageItem } from "./message-item";
 import { MessageInput } from "./message-input";
+import { ThreadPanel } from "./thread-panel";
 
 type Props = {
   channel: Channel;
@@ -15,10 +16,31 @@ type Props = {
 
 export function ChannelView({ channel, initialMessages, currentUserId }: Props) {
   const [messages, setMessages] = useState<MessageWithProfile[]>(initialMessages);
+  const [activeThread, setActiveThread] = useState<MessageWithProfile | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const prevMessageCountRef = useRef(initialMessages.length);
   const supabaseRef = useRef(createClient());
   const supabase = supabaseRef.current;
+
+  // スレッドを開く
+  const handleOpenThread = useCallback((msg: MessageWithProfile) => {
+    setActiveThread(msg);
+  }, []);
+
+  // スレッド返信数の変更を親メッセージに反映
+  const handleReplyCountChange = useCallback((parentId: string, delta: number) => {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === parentId ? { ...m, reply_count: m.reply_count + delta } : m
+      )
+    );
+    // activeThreadも更新
+    setActiveThread((prev) =>
+      prev && prev.id === parentId
+        ? { ...prev, reply_count: prev.reply_count + delta }
+        : prev
+    );
+  }, []);
 
   // 新着メッセージ追加時のみ自動スクロール
   useEffect(() => {
@@ -79,7 +101,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
           setMessages((prev) =>
             prev.map((m) =>
               m.id === updated.id
-                ? { ...m, content: updated.content, edited_at: updated.edited_at, deleted_at: updated.deleted_at }
+                ? { ...m, content: updated.content, edited_at: updated.edited_at, deleted_at: updated.deleted_at, reply_count: updated.reply_count }
                 : m
             )
           );
@@ -179,61 +201,81 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
 
     setMessages((prev) => [...prev, optimisticMsg]);
 
-    const { error } = await supabase.from("messages").insert({
+    const { data, error } = await supabase.from("messages").insert({
       channel_id: channel.id,
       user_id: user.id,
       content,
-    });
+    }).select().single();
 
     if (error) {
       // 失敗時は楽観的更新を取り消し
       setMessages((prev) => prev.filter((m) => m.id !== optimisticMsg.id));
+    } else if (data) {
+      // 楽観的メッセージのIDをDB側のIDに置き換え
+      setMessages((prev) =>
+        prev.map((m) => m.id === optimisticMsg.id ? { ...m, id: data.id, created_at: data.created_at } : m)
+      );
     }
   }
 
   return (
-    <div className="flex flex-col h-full">
-      {/* チャンネルヘッダー */}
-      <header className="flex items-center px-4 py-3 border-b border-border bg-header shrink-0">
-        <div className="flex items-center gap-2 pl-10 lg:pl-0">
-          <span className="text-muted font-medium">#</span>
-          <h1 className="font-bold text-lg">{channel.name}</h1>
-        </div>
-        {channel.topic && (
-          <span className="ml-4 text-sm text-muted truncate hidden sm:inline">
-            {channel.topic}
-          </span>
-        )}
-      </header>
+    <div className="flex h-full">
+      {/* チャンネルエリア */}
+      <div className="flex flex-col h-full flex-1 min-w-0">
+        {/* チャンネルヘッダー */}
+        <header className="flex items-center px-4 py-3 border-b border-border bg-header shrink-0">
+          <div className="flex items-center gap-2 pl-10 lg:pl-0">
+            <span className="text-muted font-medium">#</span>
+            <h1 className="font-bold text-lg">{channel.name}</h1>
+          </div>
+          {channel.topic && (
+            <span className="ml-4 text-sm text-muted truncate hidden sm:inline">
+              {channel.topic}
+            </span>
+          )}
+        </header>
 
-      {/* メッセージ一覧 */}
-      <div className="flex-1 overflow-y-auto px-4 py-4">
-        {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-muted">
-            <p className="text-lg font-medium">#{channel.name} へようこそ</p>
-            <p className="text-sm mt-1">最初のメッセージを送信しましょう</p>
-          </div>
-        ) : (
-          <div className="space-y-0.5">
-            {messages.map((message) => (
-              <MessageItem
-                key={message.id}
-                message={message}
-                currentUserId={currentUserId}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-              />
-            ))}
-          </div>
-        )}
-        <div ref={messagesEndRef} />
+        {/* メッセージ一覧 */}
+        <div className="flex-1 overflow-y-auto px-4 py-4">
+          {messages.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-muted">
+              <p className="text-lg font-medium">#{channel.name} へようこそ</p>
+              <p className="text-sm mt-1">最初のメッセージを送信しましょう</p>
+            </div>
+          ) : (
+            <div className="space-y-0.5">
+              {messages.map((message) => (
+                <MessageItem
+                  key={message.id}
+                  message={message}
+                  currentUserId={currentUserId}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                  onOpenThread={handleOpenThread}
+                />
+              ))}
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* メッセージ入力 */}
+        <MessageInput
+          channelName={channel.name}
+          onSend={handleSend}
+        />
       </div>
 
-      {/* メッセージ入力 */}
-      <MessageInput
-        channelName={channel.name}
-        onSend={handleSend}
-      />
+      {/* スレッドパネル */}
+      {activeThread && (
+        <ThreadPanel
+          parentMessage={activeThread}
+          currentUserId={currentUserId}
+          channelId={channel.id}
+          onClose={() => setActiveThread(null)}
+          onReplyCountChange={handleReplyCountChange}
+        />
+      )}
     </div>
   );
 }
