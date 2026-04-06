@@ -36,7 +36,7 @@ export default async function ChannelPage({
   const [{ data: messages }, { data: membership }] = await Promise.all([
     supabase
       .from("messages")
-      .select("*, profiles(*)")
+      .select("*, profiles(*), reactions(*)")
       .eq("channel_id", channel.id)
       .is("parent_id", null)
       .is("deleted_at", null)

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { RealtimePostgresInsertPayload, RealtimePostgresUpdatePayload } from "@supabase/supabase-js";
-import type { Channel, Message, MessageWithProfile } from "@/lib/supabase/types";
+import type { Channel, Message, MessageWithProfile, Reaction } from "@/lib/supabase/types";
 import { MessageItem } from "./message-item";
 import { MessageInput } from "./message-input";
 import { ThreadPanel } from "./thread-panel";
@@ -174,6 +174,60 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     }
   }, [supabase]);
 
+  // リアクション追加/削除（トグル）
+  const handleReact = useCallback(async (messageId: string, emoji: string) => {
+    const existingReaction = messages.find((m) => m.id === messageId)
+      ?.reactions?.find((r) => r.emoji === emoji && r.user_id === currentUserId);
+
+    if (existingReaction) {
+      // 削除（トグル）
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId
+            ? { ...m, reactions: m.reactions?.filter((r) => r.id !== existingReaction.id) }
+            : m
+        )
+      );
+      await supabase.from("reactions").delete().eq("id", existingReaction.id);
+    } else {
+      // 追加
+      const optimisticReaction: Reaction = {
+        id: crypto.randomUUID(),
+        message_id: messageId,
+        user_id: currentUserId,
+        emoji,
+        created_at: new Date().toISOString(),
+      };
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId
+            ? { ...m, reactions: [...(m.reactions || []), optimisticReaction] }
+            : m
+        )
+      );
+      const { data } = await supabase
+        .from("reactions")
+        .insert({ message_id: messageId, user_id: currentUserId, emoji })
+        .select()
+        .single();
+      if (data) {
+        // IDをDB側のものに置き換え
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === messageId
+              ? {
+                  ...m,
+                  reactions: m.reactions?.map((r) =>
+                    r.id === optimisticReaction.id ? { ...r, id: data.id } : r
+                  ),
+                }
+              : m
+          )
+        );
+      }
+    }
+  }, [supabase, currentUserId, messages]);
+
   // メッセージ送信
   async function handleSend(content: string) {
     const { data: { user } } = await supabase.auth.getUser();
@@ -270,6 +324,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
                       onEdit={handleEdit}
                       onDelete={handleDelete}
                       onOpenThread={handleOpenThread}
+                      onReact={handleReact}
                       isConsecutive={isConsecutive}
                     />
                   </div>

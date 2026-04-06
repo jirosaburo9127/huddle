@@ -1,7 +1,8 @@
 "use client";
 
-import { memo, useState, useRef, useEffect } from "react";
-import type { MessageWithProfile } from "@/lib/supabase/types";
+import { memo, useState, useRef, useEffect, useMemo } from "react";
+import type { MessageWithProfile, Reaction } from "@/lib/supabase/types";
+import { EmojiPicker } from "./emoji-picker";
 
 type Props = {
   message: MessageWithProfile;
@@ -9,6 +10,7 @@ type Props = {
   onEdit: (messageId: string, newContent: string) => Promise<void>;
   onDelete: (messageId: string) => Promise<void>;
   onOpenThread?: (message: MessageWithProfile) => void;
+  onReact?: (messageId: string, emoji: string) => Promise<void>;
   isThreadView?: boolean;
   isConsecutive?: boolean;
 };
@@ -19,6 +21,7 @@ export const MessageItem = memo(function MessageItem({
   onEdit,
   onDelete,
   onOpenThread,
+  onReact,
   isThreadView,
   isConsecutive,
 }: Props) {
@@ -34,7 +37,30 @@ export const MessageItem = memo(function MessageItem({
   const [editContent, setEditContent] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const editTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // リアクションを絵文字ごとにグループ化
+  const groupedReactions = useMemo(() => {
+    const reactions = message.reactions || [];
+    const map = new Map<string, Reaction[]>();
+    for (const r of reactions) {
+      const list = map.get(r.emoji) || [];
+      list.push(r);
+      map.set(r.emoji, list);
+    }
+    return Array.from(map.entries()).map(([emoji, list]) => ({
+      emoji,
+      count: list.length,
+      reacted: list.some((r) => r.user_id === currentUserId),
+    }));
+  }, [message.reactions, currentUserId]);
+
+  // 絵文字ピッカーで選択時
+  function handleEmojiSelect(emoji: string) {
+    setShowEmojiPicker(false);
+    onReact?.(message.id, emoji);
+  }
 
   // 編集モード開始時にフォーカス
   useEffect(() => {
@@ -186,6 +212,45 @@ export const MessageItem = memo(function MessageItem({
             </>
           )}
 
+          {/* リアクションバッジ */}
+          {(groupedReactions.length > 0 || onReact) && !isEditing && (
+            <div className="flex flex-wrap items-center gap-1 mt-1">
+              {groupedReactions.map(({ emoji, count, reacted }) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={() => onReact?.(message.id, emoji)}
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border cursor-pointer transition-colors ${
+                    reacted
+                      ? "bg-accent/10 border-accent/30 text-accent"
+                      : "bg-white/[0.03] border-border/50 text-muted hover:border-accent/30"
+                  }`}
+                >
+                  <span>{emoji}</span>
+                  <span>{count}</span>
+                </button>
+              ))}
+              {/* 絵文字追加ボタン */}
+              {onReact && (
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowEmojiPicker((v) => !v)}
+                    className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs border border-border/50 text-muted hover:border-accent/30 hover:text-accent cursor-pointer transition-colors"
+                  >
+                    +
+                  </button>
+                  {showEmojiPicker && (
+                    <EmojiPicker
+                      onSelect={handleEmojiSelect}
+                      onClose={() => setShowEmojiPicker(false)}
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* スレッド返信数 */}
           {message.reply_count > 0 && !isThreadView && (
             <button
@@ -200,6 +265,26 @@ export const MessageItem = memo(function MessageItem({
         {/* ホバー時アクションボタン */}
         {!isEditing && !isThreadView && (
           <div className="absolute -top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-0.5 bg-sidebar/95 backdrop-blur-sm border border-border/60 rounded-xl px-1.5 py-1 shadow-xl">
+            {/* リアクションボタン */}
+            {onReact && (
+              <div className="relative">
+                <button
+                  onClick={() => setShowEmojiPicker((v) => !v)}
+                  className="p-1 text-muted hover:text-foreground rounded transition-colors"
+                  title="リアクション"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </button>
+                {showEmojiPicker && (
+                  <EmojiPicker
+                    onSelect={handleEmojiSelect}
+                    onClose={() => setShowEmojiPicker(false)}
+                  />
+                )}
+              </div>
+            )}
             {/* 返信ボタン */}
             <button
               onClick={() => onOpenThread?.(message)}

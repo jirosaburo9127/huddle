@@ -6,7 +6,7 @@ import type {
   RealtimePostgresInsertPayload,
   RealtimePostgresUpdatePayload,
 } from "@supabase/supabase-js";
-import type { Message, MessageWithProfile } from "@/lib/supabase/types";
+import type { Message, MessageWithProfile, Reaction } from "@/lib/supabase/types";
 import { MessageItem } from "./message-item";
 import { MessageInput } from "./message-input";
 
@@ -47,7 +47,7 @@ export function ThreadPanel({
     async function fetchReplies() {
       const { data } = await supabase
         .from("messages")
-        .select("*, profiles(*)")
+        .select("*, profiles(*), reactions(*)")
         .eq("parent_id", parentMessage.id)
         .order("created_at", { ascending: true });
 
@@ -193,6 +193,66 @@ export function ThreadPanel({
     [supabase]
   );
 
+  // リアクション追加/削除（トグル）
+  const handleReact = useCallback(
+    async (messageId: string, emoji: string) => {
+      // 親メッセージまたは返信のどちらかからリアクションを探す
+      const targetMsg =
+        messageId === parentMessage.id
+          ? parentMessage
+          : replies.find((m) => m.id === messageId);
+      const existingReaction = targetMsg?.reactions?.find(
+        (r) => r.emoji === emoji && r.user_id === currentUserId
+      );
+
+      const updateReactions = (
+        prev: MessageWithProfile[],
+        msgId: string,
+        updater: (reactions: Reaction[]) => Reaction[]
+      ) =>
+        prev.map((m) =>
+          m.id === msgId ? { ...m, reactions: updater(m.reactions || []) } : m
+        );
+
+      if (existingReaction) {
+        // 削除（トグル）
+        setReplies((prev) =>
+          updateReactions(prev, messageId, (rs) =>
+            rs.filter((r) => r.id !== existingReaction.id)
+          )
+        );
+        await supabase.from("reactions").delete().eq("id", existingReaction.id);
+      } else {
+        // 追加
+        const optimisticReaction: Reaction = {
+          id: crypto.randomUUID(),
+          message_id: messageId,
+          user_id: currentUserId,
+          emoji,
+          created_at: new Date().toISOString(),
+        };
+        setReplies((prev) =>
+          updateReactions(prev, messageId, (rs) => [...rs, optimisticReaction])
+        );
+        const { data } = await supabase
+          .from("reactions")
+          .insert({ message_id: messageId, user_id: currentUserId, emoji })
+          .select()
+          .single();
+        if (data) {
+          setReplies((prev) =>
+            updateReactions(prev, messageId, (rs) =>
+              rs.map((r) =>
+                r.id === optimisticReaction.id ? { ...r, id: data.id } : r
+              )
+            )
+          );
+        }
+      }
+    },
+    [supabase, currentUserId, parentMessage, replies]
+  );
+
   // 返信送信
   async function handleSend(content: string) {
     const {
@@ -280,6 +340,7 @@ export function ThreadPanel({
           currentUserId={currentUserId}
           onEdit={handleEdit}
           onDelete={handleDelete}
+          onReact={handleReact}
           isThreadView
         />
 
@@ -310,6 +371,7 @@ export function ThreadPanel({
                 currentUserId={currentUserId}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
+                onReact={handleReact}
                 isThreadView
                 isConsecutive={isConsecutive}
               />
