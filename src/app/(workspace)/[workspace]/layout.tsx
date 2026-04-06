@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/supabase/auth";
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/sidebar";
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
@@ -12,7 +13,7 @@ export default async function WorkspaceLayout({
 }) {
   const { workspace: workspaceSlug } = await params;
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getAuthUser();
 
   if (!user) redirect("/login");
 
@@ -25,28 +26,31 @@ export default async function WorkspaceLayout({
 
   if (!workspace) redirect("/");
 
-  // チャンネル一覧取得
-  const { data: channels } = await supabase
-    .from("channels")
-    .select("*")
-    .eq("workspace_id", workspace.id)
-    .eq("is_dm", false)
-    .order("created_at", { ascending: true });
+  // チャンネル・DM・メンバー・未読数を並列取得
+  const [
+    { data: channels },
+    { data: dmChannels },
+    { data: membersRaw },
+    { data: unreadData },
+  ] = await Promise.all([
+    supabase
+      .from("channels")
+      .select("*")
+      .eq("workspace_id", workspace.id)
+      .eq("is_dm", false)
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("channels")
+      .select("*, channel_members(user_id, profiles(display_name, avatar_url, status, last_seen_at))")
+      .eq("workspace_id", workspace.id)
+      .eq("is_dm", true),
+    supabase
+      .from("workspace_members")
+      .select("user_id, profiles(id, display_name, avatar_url, status)")
+      .eq("workspace_id", workspace.id),
+    supabase.rpc("get_unread_counts", { p_user_id: user.id }),
+  ]);
 
-  // DM一覧取得
-  const { data: dmChannels } = await supabase
-    .from("channels")
-    .select("*, channel_members(user_id, profiles(display_name, avatar_url, status, last_seen_at))")
-    .eq("workspace_id", workspace.id)
-    .eq("is_dm", true);
-
-  // ワークスペースメンバー取得
-  const { data: membersRaw } = await supabase
-    .from("workspace_members")
-    .select("user_id, profiles(id, display_name, avatar_url, status)")
-    .eq("workspace_id", workspace.id);
-
-  // Supabaseのjoin型をSidebarのProps型に合わせてキャスト
   const members = (membersRaw || []) as unknown as Array<{
     user_id: string;
     profiles: {
@@ -57,29 +61,11 @@ export default async function WorkspaceLayout({
     };
   }>;
 
-  // 各チャンネルの未読メッセージ数を取得
-  const { data: memberships } = await supabase
-    .from("channel_members")
-    .select("channel_id, last_read_at")
-    .eq("user_id", user.id);
-
+  // 未読数をRecord形式に変換
   const unreadCounts: Record<string, number> = {};
-  if (memberships) {
-    const results = await Promise.all(
-      memberships.map(async (m) => {
-        if (!m.last_read_at) return { channel_id: m.channel_id, count: 0 };
-        const { count } = await supabase
-          .from("messages")
-          .select("*", { count: "exact", head: true })
-          .eq("channel_id", m.channel_id)
-          .gt("created_at", m.last_read_at)
-          .is("parent_id", null)
-          .is("deleted_at", null);
-        return { channel_id: m.channel_id, count: count || 0 };
-      })
-    );
-    for (const r of results) {
-      if (r.count > 0) unreadCounts[r.channel_id] = r.count;
+  if (unreadData) {
+    for (const row of unreadData as Array<{ channel_id: string; unread_count: number }>) {
+      unreadCounts[row.channel_id] = row.unread_count;
     }
   }
 
