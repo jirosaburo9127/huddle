@@ -5,27 +5,44 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { Workspace, Channel } from "@/lib/supabase/types";
 import { CreateChannelModal } from "@/components/create-channel-modal";
+import { CreateDmModal } from "@/components/create-dm-modal";
 import { ThemeSelector } from "@/components/theme-selector";
 import { signOut } from "@/lib/actions";
+
+type MemberProfile = {
+  id: string;
+  display_name: string;
+  avatar_url: string | null;
+  status: string | null;
+};
+
+type WorkspaceMember = {
+  user_id: string;
+  profiles: MemberProfile | MemberProfile[];
+};
 
 type SidebarProps = {
   workspace: Workspace;
   channels: Channel[];
   dmChannels: Channel[];
-  members: unknown[];
+  members: WorkspaceMember[];
   currentUserId: string;
   workspaceSlug: string;
+  unreadCounts?: Record<string, number>;
 };
 
 export function Sidebar({
   workspace,
   channels,
   dmChannels,
+  members,
   currentUserId,
   workspaceSlug,
+  unreadCounts = {},
 }: SidebarProps) {
   const pathname = usePathname();
   const [showCreateChannel, setShowCreateChannel] = useState(false);
+  const [showCreateDm, setShowCreateDm] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -107,6 +124,9 @@ export function Sidebar({
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-background/50 rounded-xl px-3 py-2 text-sm border border-border/50 focus:border-accent focus:bg-input-bg placeholder-muted/60 transition-all outline-none"
           />
+          <p className="text-[10px] text-muted/50 mt-1 ml-1">
+            ⌘K でメッセージ検索
+          </p>
         </div>
 
         {/* チャンネル・DM一覧 */}
@@ -128,6 +148,7 @@ export function Sidebar({
           {filteredChannels.map((channel) => {
             const href = `/${workspaceSlug}/${channel.slug}`;
             const isActive = pathname === href;
+            const unreadCount = unreadCounts[channel.id] || 0;
             return (
               <Link
                 key={channel.id}
@@ -147,55 +168,90 @@ export function Sidebar({
                 >
                   #
                 </span>
-                <span className="truncate">{channel.name}</span>
+                <span className={`truncate ${unreadCount > 0 && !isActive ? "font-semibold text-foreground" : ""}`}>
+                  {channel.name}
+                </span>
+                {/* 未読バッジ */}
+                {unreadCount > 0 && (
+                  <span className="ml-auto bg-accent text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
               </Link>
             );
           })}
 
-          {/* DM一覧 */}
-          {filteredDmChannels.length > 0 && (
-            <>
-              <div className="px-3 mt-4 mb-1">
-                <span className="text-xs font-semibold uppercase text-muted tracking-wider">
-                  ダイレクトメッセージ
-                </span>
-              </div>
-              {filteredDmChannels.map((dm) => {
-                const href = `/${workspaceSlug}/${dm.slug}`;
-                const isActive = pathname === href;
-                const dmWithMembers = dm as unknown as {
-                  channel_members: Array<{
-                    user_id: string;
-                    profiles: { display_name: string };
-                  }>;
-                };
-                const otherMembers = dmWithMembers.channel_members?.filter(
-                  (m) => m.user_id !== currentUserId
-                );
-                const name =
-                  otherMembers?.[0]?.profiles?.display_name || "DM";
+          {/* DMセクション */}
+          <div className="px-3 mt-4 mb-1 flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase text-muted tracking-wider">
+              ダイレクトメッセージ
+            </span>
+            <button
+              onClick={() => setShowCreateDm(true)}
+              className="text-muted hover:text-accent text-lg leading-none transition-colors"
+              title="新しいメッセージ"
+            >
+              +
+            </button>
+          </div>
 
-                return (
-                  <Link
-                    key={dm.id}
-                    href={href}
-                    onClick={() => setSidebarOpen(false)}
-                    className={`
-                      flex items-center px-3 py-2 text-sm rounded-xl mx-2 transition-colors
-                      ${
-                        isActive
-                          ? "bg-accent/10 text-accent"
-                          : "text-muted hover:text-foreground hover:bg-white/[0.04]"
-                      }
-                    `}
-                  >
-                    <span className="mr-2 w-2 h-2 rounded-full bg-online inline-block shrink-0" />
-                    <span className="truncate">{name}</span>
-                  </Link>
-                );
-              })}
-            </>
-          )}
+          {/* DM一覧 */}
+          {filteredDmChannels.map((dm) => {
+            const href = `/${workspaceSlug}/${dm.slug}`;
+            const isActive = pathname === href;
+            const dmWithMembers = dm as unknown as {
+              channel_members: Array<{
+                user_id: string;
+                profiles: {
+                  display_name: string;
+                  avatar_url: string | null;
+                  status: string | null;
+                };
+              }>;
+            };
+            const otherMember = dmWithMembers.channel_members?.find(
+              (m) => m.user_id !== currentUserId
+            );
+            const name =
+              otherMember?.profiles?.display_name || "DM";
+            const avatarUrl = otherMember?.profiles?.avatar_url;
+            const isOnline = otherMember?.profiles?.status === "online";
+
+            return (
+              <Link
+                key={dm.id}
+                href={href}
+                onClick={() => setSidebarOpen(false)}
+                className={`
+                  flex items-center gap-2 px-3 py-2 text-sm rounded-xl mx-2 transition-colors
+                  ${
+                    isActive
+                      ? "bg-accent/10 text-accent"
+                      : "text-muted hover:text-foreground hover:bg-white/[0.04]"
+                  }
+                `}
+              >
+                {/* アバター + オンラインドット */}
+                <span className="relative shrink-0">
+                  {avatarUrl ? (
+                    <img
+                      src={avatarUrl}
+                      alt={name}
+                      className="w-5 h-5 rounded-full object-cover"
+                    />
+                  ) : (
+                    <span className="w-5 h-5 rounded-full bg-accent/20 flex items-center justify-center text-[10px] font-medium text-accent">
+                      {name.charAt(0).toUpperCase()}
+                    </span>
+                  )}
+                  {isOnline && (
+                    <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-online border border-sidebar" />
+                  )}
+                </span>
+                <span className="truncate">{name}</span>
+              </Link>
+            );
+          })}
 
           {/* 検索結果が空の場合 */}
           {searchQuery.trim() &&
@@ -241,6 +297,17 @@ export function Sidebar({
           workspaceId={workspace.id}
           workspaceSlug={workspaceSlug}
           onClose={() => setShowCreateChannel(false)}
+        />
+      )}
+
+      {/* DM作成モーダル */}
+      {showCreateDm && (
+        <CreateDmModal
+          workspaceId={workspace.id}
+          workspaceSlug={workspaceSlug}
+          currentUserId={currentUserId}
+          members={members as Array<{ user_id: string; profiles: MemberProfile }>}
+          onClose={() => setShowCreateDm(false)}
         />
       )}
     </>

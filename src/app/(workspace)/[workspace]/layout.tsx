@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/sidebar";
+import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
 
 export default async function WorkspaceLayout({
   children,
@@ -40,10 +41,47 @@ export default async function WorkspaceLayout({
     .eq("is_dm", true);
 
   // ワークスペースメンバー取得
-  const { data: members } = await supabase
+  const { data: membersRaw } = await supabase
     .from("workspace_members")
     .select("user_id, profiles(id, display_name, avatar_url, status)")
     .eq("workspace_id", workspace.id);
+
+  // Supabaseのjoin型をSidebarのProps型に合わせてキャスト
+  const members = (membersRaw || []) as unknown as Array<{
+    user_id: string;
+    profiles: {
+      id: string;
+      display_name: string;
+      avatar_url: string | null;
+      status: string | null;
+    };
+  }>;
+
+  // 各チャンネルの未読メッセージ数を取得
+  const { data: memberships } = await supabase
+    .from("channel_members")
+    .select("channel_id, last_read_at")
+    .eq("user_id", user.id);
+
+  const unreadCounts: Record<string, number> = {};
+  if (memberships) {
+    const results = await Promise.all(
+      memberships.map(async (m) => {
+        if (!m.last_read_at) return { channel_id: m.channel_id, count: 0 };
+        const { count } = await supabase
+          .from("messages")
+          .select("*", { count: "exact", head: true })
+          .eq("channel_id", m.channel_id)
+          .gt("created_at", m.last_read_at)
+          .is("parent_id", null)
+          .is("deleted_at", null);
+        return { channel_id: m.channel_id, count: count || 0 };
+      })
+    );
+    for (const r of results) {
+      if (r.count > 0) unreadCounts[r.channel_id] = r.count;
+    }
+  }
 
   return (
     <div className="flex h-full">
@@ -54,10 +92,13 @@ export default async function WorkspaceLayout({
         members={members || []}
         currentUserId={user.id}
         workspaceSlug={workspaceSlug}
+        unreadCounts={unreadCounts}
       />
-      <main className="flex-1 flex flex-col min-w-0">
-        {children}
-      </main>
+      <KeyboardShortcuts workspaceId={workspace.id} workspaceSlug={workspaceSlug}>
+        <main className="flex-1 flex flex-col min-w-0">
+          {children}
+        </main>
+      </KeyboardShortcuts>
     </div>
   );
 }

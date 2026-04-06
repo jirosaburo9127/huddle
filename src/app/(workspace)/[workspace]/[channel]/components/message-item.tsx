@@ -37,7 +37,7 @@ export const MessageItem = memo(function MessageItem({
   const [editContent, setEditContent] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [emojiPickerLocation, setEmojiPickerLocation] = useState<"action" | "inline" | null>(null);
   const editTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   // リアクションを絵文字ごとにグループ化
@@ -58,7 +58,7 @@ export const MessageItem = memo(function MessageItem({
 
   // 絵文字ピッカーで選択時
   function handleEmojiSelect(emoji: string) {
-    setShowEmojiPicker(false);
+    setEmojiPickerLocation(null);
     onReact?.(message.id, emoji);
   }
 
@@ -235,15 +235,15 @@ export const MessageItem = memo(function MessageItem({
                 <div className="relative">
                   <button
                     type="button"
-                    onClick={() => setShowEmojiPicker((v) => !v)}
+                    onClick={() => setEmojiPickerLocation((v) => v === "inline" ? null : "inline")}
                     className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs border border-border/50 text-muted hover:border-accent/30 hover:text-accent cursor-pointer transition-colors"
                   >
                     +
                   </button>
-                  {showEmojiPicker && (
+                  {emojiPickerLocation === "inline" && (
                     <EmojiPicker
                       onSelect={handleEmojiSelect}
-                      onClose={() => setShowEmojiPicker(false)}
+                      onClose={() => setEmojiPickerLocation(null)}
                     />
                   )}
                 </div>
@@ -269,7 +269,7 @@ export const MessageItem = memo(function MessageItem({
             {onReact && (
               <div className="relative">
                 <button
-                  onClick={() => setShowEmojiPicker((v) => !v)}
+                  onClick={() => setEmojiPickerLocation((v) => v === "action" ? null : "action")}
                   className="p-1 text-muted hover:text-foreground rounded transition-colors"
                   title="リアクション"
                 >
@@ -277,10 +277,10 @@ export const MessageItem = memo(function MessageItem({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </button>
-                {showEmojiPicker && (
+                {emojiPickerLocation === "action" && (
                   <EmojiPicker
                     onSelect={handleEmojiSelect}
-                    onClose={() => setShowEmojiPicker(false)}
+                    onClose={() => setEmojiPickerLocation(null)}
                   />
                 )}
               </div>
