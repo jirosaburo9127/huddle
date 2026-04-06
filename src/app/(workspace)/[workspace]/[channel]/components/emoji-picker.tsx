@@ -38,7 +38,7 @@ export function EmojiPicker({ onSelect, onClose }: Props) {
   return (
     <div
       ref={ref}
-      className="absolute bottom-full mb-2 left-0 w-72 rounded-2xl bg-sidebar border border-border shadow-xl p-3 z-[60] animate-fade-in"
+      className="absolute top-full mt-2 right-0 w-72 rounded-2xl bg-sidebar border border-border shadow-xl p-3 z-[60] animate-fade-in"
     >
       {EMOJI_LIST.map((group, gi) => (
         <div key={group.category}>
