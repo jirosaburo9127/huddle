@@ -43,6 +43,20 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     );
   }, []);
 
+  // オンライン状態の更新（60秒ごと）
+  useEffect(() => {
+    const updatePresence = async () => {
+      await supabase
+        .from("profiles")
+        .update({ last_seen_at: new Date().toISOString() })
+        .eq("id", currentUserId);
+    };
+    updatePresence();
+    const interval = setInterval(updatePresence, 60000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUserId]);
+
   // 新着メッセージ追加時のみ自動スクロール
   useEffect(() => {
     if (messages.length > prevMessageCountRef.current) {

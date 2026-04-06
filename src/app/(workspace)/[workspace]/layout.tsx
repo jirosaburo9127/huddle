@@ -36,7 +36,7 @@ export default async function WorkspaceLayout({
   // DM一覧取得
   const { data: dmChannels } = await supabase
     .from("channels")
-    .select("*, channel_members(user_id, profiles(display_name, avatar_url, status))")
+    .select("*, channel_members(user_id, profiles(display_name, avatar_url, status, last_seen_at))")
     .eq("workspace_id", workspace.id)
     .eq("is_dm", true);
 

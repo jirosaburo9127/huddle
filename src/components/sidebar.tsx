@@ -206,6 +206,7 @@ export function Sidebar({
                   display_name: string;
                   avatar_url: string | null;
                   status: string | null;
+                  last_seen_at: string | null;
                 };
               }>;
             };
@@ -215,7 +216,11 @@ export function Sidebar({
             const name =
               otherMember?.profiles?.display_name || "DM";
             const avatarUrl = otherMember?.profiles?.avatar_url;
-            const isOnline = otherMember?.profiles?.status === "online";
+            // 5分以内のアクティビティでオンライン判定
+            const lastSeen = otherMember?.profiles?.last_seen_at;
+            const isOnline = lastSeen
+              ? Date.now() - new Date(lastSeen).getTime() < 5 * 60 * 1000
+              : false;
 
             return (
               <Link
@@ -244,9 +249,11 @@ export function Sidebar({
                       {name.charAt(0).toUpperCase()}
                     </span>
                   )}
-                  {isOnline && (
-                    <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-online border border-sidebar" />
-                  )}
+                  <span
+                    className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-sidebar ${
+                      isOnline ? "bg-online" : "bg-muted/50"
+                    }`}
+                  />
                 </span>
                 <span className="truncate">{name}</span>
               </Link>

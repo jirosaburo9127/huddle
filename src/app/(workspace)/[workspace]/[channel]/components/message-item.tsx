@@ -32,6 +32,10 @@ export const MessageItem = memo(function MessageItem({
     minute: "2-digit",
   });
   const initial = (profile?.display_name || "?")[0].toUpperCase();
+  // オンライン判定: last_seen_atが5分以内
+  const isOnline = profile?.last_seen_at
+    ? Date.now() - new Date(profile.last_seen_at).getTime() < 5 * 60 * 1000
+    : false;
 
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState("");
@@ -145,7 +149,7 @@ export const MessageItem = memo(function MessageItem({
             </span>
           </div>
         ) : (
-          <div className="shrink-0 w-9 h-9 rounded-full bg-accent/20 flex items-center justify-center text-accent text-[13px] font-bold mt-0.5">
+          <div className="relative shrink-0 w-9 h-9 rounded-full bg-accent/20 flex items-center justify-center text-accent text-[13px] font-bold mt-0.5">
             {profile?.avatar_url ? (
               <img
                 src={profile.avatar_url}
@@ -154,6 +158,10 @@ export const MessageItem = memo(function MessageItem({
               />
             ) : (
               initial
+            )}
+            {/* オンラインドット */}
+            {isOnline && (
+              <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-online border-2 border-background" />
             )}
           </div>
         )}
