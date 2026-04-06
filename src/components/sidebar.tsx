@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import type { Workspace, Channel } from "@/lib/supabase/types";
 import { CreateChannelModal } from "@/components/create-channel-modal";
 import { CreateDmModal } from "@/components/create-dm-modal";
+import { ThemeSelector } from "@/components/theme-selector";
 import { signOut } from "@/lib/actions";
 
 type MemberProfile = {
@@ -42,6 +43,7 @@ export function Sidebar({
   const pathname = usePathname();
   const [showCreateChannel, setShowCreateChannel] = useState(false);
   const [showCreateDm, setShowCreateDm] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -288,8 +290,8 @@ export function Sidebar({
               </>
             );
           })()}
-          <Link
-            href={`/${workspaceSlug}/settings`}
+          <button
+            onClick={() => setShowSettings(true)}
             className="text-muted hover:text-foreground transition-colors p-1.5 rounded-lg hover:bg-white/[0.04] shrink-0"
             title="設定"
           >
@@ -297,7 +299,7 @@ export function Sidebar({
               <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
-          </Link>
+          </button>
         </div>
       </aside>
 
@@ -319,6 +321,40 @@ export function Sidebar({
           members={members as Array<{ user_id: string; profiles: MemberProfile }>}
           onClose={() => setShowCreateDm(false)}
         />
+      )}
+
+      {/* 設定モーダル */}
+      {showSettings && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowSettings(false)}>
+          <div className="w-full max-w-md rounded-2xl bg-sidebar border border-border p-6 space-y-6 animate-fade-in" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold">設定</h2>
+              <button onClick={() => setShowSettings(false)} className="p-1 text-muted hover:text-foreground rounded transition-colors">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* テーマ */}
+            <div>
+              <h3 className="text-sm font-semibold text-foreground mb-3">テーマ</h3>
+              <ThemeSelector />
+            </div>
+
+            {/* ログアウト */}
+            <div className="pt-2 border-t border-border/50">
+              <form action={signOut}>
+                <button
+                  type="submit"
+                  className="px-4 py-2 text-sm rounded-xl border border-mention/30 text-mention hover:bg-mention/10 transition-colors"
+                >
+                  ログアウト
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );
