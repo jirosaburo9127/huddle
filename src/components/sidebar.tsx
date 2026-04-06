@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import type { Workspace, Channel } from "@/lib/supabase/types";
 import { CreateChannelModal } from "@/components/create-channel-modal";
 import { CreateDmModal } from "@/components/create-dm-modal";
+import { InviteModal } from "@/components/invite-modal";
 import { ThemeSelector } from "@/components/theme-selector";
 import { signOut } from "@/lib/actions";
 
@@ -43,6 +44,7 @@ export function Sidebar({
   const pathname = usePathname();
   const [showCreateChannel, setShowCreateChannel] = useState(false);
   const [showCreateDm, setShowCreateDm] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -262,6 +264,27 @@ export function Sidebar({
             );
           })}
 
+          {/* メンバー招待ボタン */}
+          <button
+            onClick={() => setShowInviteModal(true)}
+            className="flex items-center gap-2 px-3 py-2 text-sm text-muted hover:text-accent mx-2 rounded-xl hover:bg-white/[0.04] transition-colors w-full mt-2"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
+              />
+            </svg>
+            メンバーを招待
+          </button>
+
           {/* 検索結果が空の場合 */}
           {searchQuery.trim() &&
             filteredChannels.length === 0 &&
@@ -332,6 +355,14 @@ export function Sidebar({
           currentUserId={currentUserId}
           members={members as Array<{ user_id: string; profiles: MemberProfile }>}
           onClose={() => setShowCreateDm(false)}
+        />
+      )}
+
+      {/* 招待モーダル */}
+      {showInviteModal && (
+        <InviteModal
+          workspaceId={workspace.id}
+          onClose={() => setShowInviteModal(false)}
         />
       )}
 

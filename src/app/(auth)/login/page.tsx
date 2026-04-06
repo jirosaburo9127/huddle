@@ -1,14 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 
 export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const searchParams = useSearchParams();
+  const inviteToken = searchParams.get("invite");
   const supabase = createClient();
 
   async function handleSubmit(e: React.FormEvent) {
@@ -27,8 +38,8 @@ export default function LoginPage() {
         return;
       }
 
-      // 完全リロードでクッキーを確実に反映
-      window.location.href = "/";
+      // 招待トークンがあれば招待ページへ、なければホームへ
+      window.location.href = inviteToken ? `/invite/${inviteToken}` : "/";
     } catch (err) {
       setError(err instanceof Error ? err.message : "ログインに失敗しました");
     } finally {

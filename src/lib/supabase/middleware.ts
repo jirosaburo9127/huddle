@@ -33,18 +33,21 @@ export async function updateSession(request: NextRequest) {
     // 認証チェック失敗時は未認証として扱う
   }
 
-  // 未認証ユーザーをログインページにリダイレクト
+  // 認証不要ページの判定
   const isAuthPage =
     request.nextUrl.pathname.startsWith("/login") ||
     request.nextUrl.pathname.startsWith("/signup");
 
-  if (!user && !isAuthPage) {
+  // 招待ページは認証済み・未認証どちらもアクセス可能
+  const isInvitePage = request.nextUrl.pathname.startsWith("/invite");
+
+  if (!user && !isAuthPage && !isInvitePage) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
-  // 認証済みユーザーがauth系ページにアクセスしたらリダイレクト
+  // 認証済みユーザーがauth系ページにアクセスしたらリダイレクト（招待ページは除外）
   if (user && isAuthPage) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
