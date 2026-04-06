@@ -7,6 +7,7 @@ import type { Channel, Message, MessageWithProfile } from "@/lib/supabase/types"
 import { MessageItem } from "./message-item";
 import { MessageInput } from "./message-input";
 import { ThreadPanel } from "./thread-panel";
+import { DateSeparator } from "./date-separator";
 
 type Props = {
   channel: Channel;
@@ -243,17 +244,37 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
               <p className="text-sm mt-1">最初のメッセージを送信しましょう</p>
             </div>
           ) : (
-            <div className="space-y-0.5">
-              {messages.map((message) => (
-                <MessageItem
-                  key={message.id}
-                  message={message}
-                  currentUserId={currentUserId}
-                  onEdit={handleEdit}
-                  onDelete={handleDelete}
-                  onOpenThread={handleOpenThread}
-                />
-              ))}
+            <div>
+              {messages.map((message, index) => {
+                const prev = index > 0 ? messages[index - 1] : null;
+                // 日付セパレーター: 前のメッセージと日付が異なる場合に表示
+                const currentDate = new Date(message.created_at).toDateString();
+                const prevDate = prev ? new Date(prev.created_at).toDateString() : null;
+                const showDateSeparator = !prev || currentDate !== prevDate;
+                // 連続メッセージ判定: 同一ユーザーかつ5分以内
+                const isConsecutive =
+                  !showDateSeparator &&
+                  prev !== null &&
+                  prev.user_id === message.user_id &&
+                  !prev.deleted_at &&
+                  new Date(message.created_at).getTime() - new Date(prev.created_at).getTime() < 5 * 60 * 1000;
+
+                return (
+                  <div key={message.id}>
+                    {showDateSeparator && (
+                      <DateSeparator date={message.created_at} />
+                    )}
+                    <MessageItem
+                      message={message}
+                      currentUserId={currentUserId}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                      onOpenThread={handleOpenThread}
+                      isConsecutive={isConsecutive}
+                    />
+                  </div>
+                );
+              })}
             </div>
           )}
           <div ref={messagesEndRef} />

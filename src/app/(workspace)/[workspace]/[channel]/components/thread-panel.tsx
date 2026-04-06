@@ -293,17 +293,28 @@ export function ThreadPanel({
         </div>
 
         {/* 返信一覧 */}
-        <div className="space-y-0.5">
-          {replies.map((reply) => (
-            <MessageItem
-              key={reply.id}
-              message={reply}
-              currentUserId={currentUserId}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-              isThreadView
-            />
-          ))}
+        <div>
+          {replies.map((reply, index) => {
+            const prev = index > 0 ? replies[index - 1] : null;
+            // 連続メッセージ判定: 同一ユーザーかつ5分以内
+            const isConsecutive =
+              prev !== null &&
+              prev.user_id === reply.user_id &&
+              !prev.deleted_at &&
+              new Date(reply.created_at).getTime() - new Date(prev.created_at).getTime() < 5 * 60 * 1000;
+
+            return (
+              <MessageItem
+                key={reply.id}
+                message={reply}
+                currentUserId={currentUserId}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+                isThreadView
+                isConsecutive={isConsecutive}
+              />
+            );
+          })}
         </div>
         <div ref={repliesEndRef} />
       </div>

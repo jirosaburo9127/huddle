@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { Workspace, Channel } from "@/lib/supabase/types";
 import { CreateChannelModal } from "@/components/create-channel-modal";
+import { ThemeSelector } from "@/components/theme-selector";
 import { signOut } from "@/lib/actions";
 
 type SidebarProps = {
@@ -128,8 +129,9 @@ export function Sidebar({
           )}
         </div>
 
-        {/* ユーザーメニュー */}
-        <div className="px-3 py-3 border-t border-border">
+        {/* テーマ切り替え & ユーザーメニュー */}
+        <div className="px-3 py-3 border-t border-border space-y-2">
+          <ThemeSelector />
           <form action={signOut}>
             <button
               type="submit"

@@ -10,6 +10,7 @@ type Props = {
   onDelete: (messageId: string) => Promise<void>;
   onOpenThread?: (message: MessageWithProfile) => void;
   isThreadView?: boolean;
+  isConsecutive?: boolean;
 };
 
 export const MessageItem = memo(function MessageItem({
@@ -19,6 +20,7 @@ export const MessageItem = memo(function MessageItem({
   onDelete,
   onOpenThread,
   isThreadView,
+  isConsecutive,
 }: Props) {
   const profile = message.profiles;
   const isOwn = message.user_id === currentUserId;
@@ -48,18 +50,22 @@ export const MessageItem = memo(function MessageItem({
   // 削除済みメッセージ
   if (message.deleted_at) {
     return (
-      <div className="flex gap-3 px-2 py-1.5 rounded-lg">
-        <div className="shrink-0 w-9 h-9 rounded-lg bg-border/30 flex items-center justify-center text-muted text-sm mt-0.5">
-          {initial}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-baseline gap-2">
-            <span className="font-bold text-sm text-muted">
-              {profile?.display_name || "不明なユーザー"}
-            </span>
-            <span className="text-xs text-muted">{time}</span>
+      <div className={`flex gap-3 px-2 rounded-lg ${isConsecutive ? "py-0.5 pl-[60px]" : "pt-3 pb-1"}`}>
+        {!isConsecutive && (
+          <div className="shrink-0 w-9 h-9 rounded-full bg-border/30 flex items-center justify-center text-muted text-[13px] mt-0.5">
+            {initial}
           </div>
-          <p className="text-sm text-muted italic">このメッセージは削除されました</p>
+        )}
+        <div className="min-w-0 flex-1">
+          {!isConsecutive && (
+            <div className="flex items-baseline gap-2">
+              <span className="font-semibold text-[13px] text-muted">
+                {profile?.display_name || "不明なユーザー"}
+              </span>
+              <span className="text-[11px] text-muted/70">{time}</span>
+            </div>
+          )}
+          <p className="text-[15px] leading-relaxed text-muted italic">このメッセージは削除されました</p>
         </div>
       </div>
     );
@@ -99,31 +105,47 @@ export const MessageItem = memo(function MessageItem({
 
   return (
     <>
-      <div className="group relative flex gap-3 px-2 py-1.5 rounded-lg hover:bg-sidebar-hover/30 transition-colors">
-        {/* アバター */}
-        <div className="shrink-0 w-9 h-9 rounded-lg bg-accent/20 flex items-center justify-center text-accent text-sm font-bold mt-0.5">
-          {profile?.avatar_url ? (
-            <img
-              src={profile.avatar_url}
-              alt={profile.display_name}
-              className="w-9 h-9 rounded-lg object-cover"
-            />
-          ) : (
-            initial
-          )}
-        </div>
+      <div
+        className={`group relative flex gap-3 px-2 rounded-lg hover:bg-white/[0.02] transition-colors ${
+          isConsecutive ? "py-0.5" : "pt-3 pb-1"
+        }`}
+      >
+        {/* アバター or 左マージン（連続メッセージ時） */}
+        {isConsecutive ? (
+          <div className="shrink-0 w-9 flex items-center justify-center">
+            {/* ホバー時に時刻を表示 */}
+            <span className="text-[11px] text-muted/70 opacity-0 group-hover:opacity-100 transition-opacity select-none">
+              {time}
+            </span>
+          </div>
+        ) : (
+          <div className="shrink-0 w-9 h-9 rounded-full bg-accent/20 flex items-center justify-center text-accent text-[13px] font-bold mt-0.5">
+            {profile?.avatar_url ? (
+              <img
+                src={profile.avatar_url}
+                alt={profile.display_name}
+                className="w-9 h-9 rounded-full object-cover"
+              />
+            ) : (
+              initial
+            )}
+          </div>
+        )}
 
         {/* メッセージ本文 */}
         <div className="min-w-0 flex-1">
-          <div className="flex items-baseline gap-2">
-            <span className={`font-bold text-sm ${isOwn ? "text-accent" : "text-foreground"}`}>
-              {profile?.display_name || "不明なユーザー"}
-            </span>
-            <span className="text-xs text-muted">{time}</span>
-            {message.edited_at && (
-              <span className="text-xs text-muted">(編集済み)</span>
-            )}
-          </div>
+          {/* ユーザー名と時刻（先頭メッセージのみ） */}
+          {!isConsecutive && (
+            <div className="flex items-baseline gap-2">
+              <span className={`font-semibold text-[13px] ${isOwn ? "text-accent" : "text-foreground"}`}>
+                {profile?.display_name || "不明なユーザー"}
+              </span>
+              <span className="text-[11px] text-muted/70">{time}</span>
+              {message.edited_at && (
+                <span className="text-[11px] text-muted/70">(編集済み)</span>
+              )}
+            </div>
+          )}
 
           {isEditing ? (
             <div className="mt-1">
@@ -132,7 +154,7 @@ export const MessageItem = memo(function MessageItem({
                 value={editContent}
                 onChange={(e) => setEditContent(e.target.value)}
                 onKeyDown={handleEditKeyDown}
-                className="w-full resize-none rounded-lg border border-border bg-input-bg px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none"
+                className="w-full resize-none rounded-lg border border-border bg-input-bg px-3 py-2 text-[15px] leading-relaxed text-foreground focus:border-accent focus:outline-none"
                 rows={2}
               />
               <div className="flex items-center gap-2 mt-1">
@@ -153,9 +175,15 @@ export const MessageItem = memo(function MessageItem({
               </div>
             </div>
           ) : (
-            <p className="text-sm text-foreground/90 whitespace-pre-wrap break-words">
-              {message.content}
-            </p>
+            <>
+              <p className="text-[15px] leading-relaxed text-foreground whitespace-pre-wrap break-words">
+                {message.content}
+              </p>
+              {/* 連続メッセージで編集済みの場合、本文の後に表示 */}
+              {isConsecutive && message.edited_at && (
+                <span className="text-[11px] text-muted/70">(編集済み)</span>
+              )}
+            </>
           )}
 
           {/* スレッド返信数 */}
@@ -171,14 +199,14 @@ export const MessageItem = memo(function MessageItem({
 
         {/* ホバー時アクションボタン */}
         {!isEditing && !isThreadView && (
-          <div className="absolute -top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-0.5 bg-sidebar border border-border rounded-lg px-1 py-0.5 shadow-lg">
+          <div className="absolute -top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-0.5 bg-sidebar/95 backdrop-blur-sm border border-border/60 rounded-xl px-1.5 py-1 shadow-xl">
             {/* 返信ボタン */}
             <button
               onClick={() => onOpenThread?.(message)}
               className="p-1 text-muted hover:text-foreground rounded transition-colors"
               title="返信"
             >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
               </svg>
             </button>
@@ -193,7 +221,7 @@ export const MessageItem = memo(function MessageItem({
                   className="p-1 text-muted hover:text-foreground rounded transition-colors"
                   title="編集"
                 >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                   </svg>
                 </button>
@@ -202,7 +230,7 @@ export const MessageItem = memo(function MessageItem({
                   className="p-1 text-muted hover:text-mention rounded transition-colors"
                   title="削除"
                 >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                   </svg>
                 </button>
