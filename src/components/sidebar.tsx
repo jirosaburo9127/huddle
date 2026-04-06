@@ -154,6 +154,7 @@ export function Sidebar({
               <Link
                 key={channel.id}
                 href={href}
+                prefetch
                 onClick={() => setSidebarOpen(false)}
                 className={`
                   flex items-center px-3 py-2 text-sm rounded-xl mx-2 transition-colors

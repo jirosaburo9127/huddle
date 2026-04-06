@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAuthUser } from "@/lib/supabase/auth";
 import { redirect } from "next/navigation";
 import { ChannelView } from "./components/channel-view";
+import type { Channel, MessageWithProfile } from "@/lib/supabase/types";
 
 export default async function ChannelPage({
   params,
@@ -14,62 +15,23 @@ export default async function ChannelPage({
 
   if (!user) redirect("/login");
 
-  // ワークスペース取得
-  const { data: workspace } = await supabase
-    .from("workspaces")
-    .select("*")
-    .eq("slug", workspaceSlug)
-    .single();
+  // RPC1回でチャンネル取得+メッセージ取得+メンバーシップ確認+last_read_at更新を実行
+  const { data, error } = await supabase.rpc("get_channel_with_messages", {
+    p_workspace_slug: workspaceSlug,
+    p_channel_slug: channelSlug,
+    p_user_id: user.id,
+  });
 
-  if (!workspace) redirect("/");
+  if (error || !data) redirect(`/`);
 
-  // チャンネル取得
-  const { data: channel } = await supabase
-    .from("channels")
-    .select("*")
-    .eq("workspace_id", workspace.id)
-    .eq("slug", channelSlug)
-    .single();
+  const result = data as { channel: Channel; messages: MessageWithProfile[] };
 
-  if (!channel) redirect(`/${workspaceSlug}/general`);
-
-  // メッセージ取得とメンバーシップ確認を並列実行
-  const [{ data: messages }, { data: membership }] = await Promise.all([
-    supabase
-      .from("messages")
-      .select("*, profiles(*), reactions(*)")
-      .eq("channel_id", channel.id)
-      .is("parent_id", null)
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .limit(50),
-    supabase
-      .from("channel_members")
-      .select("user_id")
-      .eq("channel_id", channel.id)
-      .eq("user_id", user.id)
-      .single(),
-  ]);
-
-  if (!membership && !channel.is_private) {
-    await supabase.from("channel_members").insert({
-      channel_id: channel.id,
-      user_id: user.id,
-    });
-  }
-
-  // last_read_at更新（バックグラウンドで実行、待たない）
-  supabase
-    .from("channel_members")
-    .update({ last_read_at: new Date().toISOString() })
-    .eq("channel_id", channel.id)
-    .eq("user_id", user.id)
-    .then(() => {});
+  if (!result.channel) redirect(`/${workspaceSlug}/general`);
 
   return (
     <ChannelView
-      channel={channel}
-      initialMessages={(messages || []).reverse()}
+      channel={result.channel}
+      initialMessages={result.messages || []}
       currentUserId={user.id}
     />
   );
