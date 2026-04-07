@@ -382,14 +382,22 @@ export const MessageItem = memo(function MessageItem({
                     <span className="text-base">{emoji}</span>
                     <span>{count}</span>
                   </button>
-                  {/* カスタムツールチップ */}
+                  {/* PC: ホバーツールチップ */}
                   {names.length > 0 && (
-                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 rounded-lg bg-foreground text-background text-xs font-medium whitespace-nowrap opacity-0 group-hover/reaction:opacity-100 pointer-events-none transition-opacity duration-100 z-20">
+                    <div className="hidden lg:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 rounded-lg bg-foreground text-background text-xs font-medium whitespace-nowrap opacity-0 group-hover/reaction:opacity-100 pointer-events-none transition-opacity duration-100 z-20">
                       {names.join("、")}
                       <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-foreground" />
                     </div>
                   )}
                 </div>
+              ))}
+            </div>
+          )}
+          {/* モバイル: リアクションした人の名前をバッジ下に表示 */}
+          {groupedReactions.length > 0 && !isEditing && (
+            <div className="lg:hidden mt-0.5 flex flex-wrap gap-x-3">
+              {groupedReactions.filter((g) => g.names.length > 0).map(({ emoji, names }) => (
+                <span key={emoji} className="text-[12px] text-muted">{emoji} {names.join("、")}</span>
               ))}
             </div>
           )}
