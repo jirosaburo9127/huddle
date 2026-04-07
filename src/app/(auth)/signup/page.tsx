@@ -106,9 +106,9 @@ function SignupForm() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              minLength={6}
+              minLength={8}
               className="w-full rounded-lg border border-border bg-input-bg px-3 py-2 text-foreground placeholder-muted focus:border-accent focus:outline-none"
-              placeholder="6文字以上"
+              placeholder="8文字以上（英大文字・小文字・数字を含む）"
             />
           </div>
 

@@ -248,6 +248,8 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
 
   // メッセージ送信
   async function handleSend(content: string) {
+    if (content.length > 4000) return;
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
