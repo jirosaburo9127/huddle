@@ -55,7 +55,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-title" content="Huddle" />
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
       </head>
-      <body className="h-full">
+      <body className="h-full overflow-x-hidden">
         <ThemeProvider />
         <ServiceWorkerRegister />
         {children}
