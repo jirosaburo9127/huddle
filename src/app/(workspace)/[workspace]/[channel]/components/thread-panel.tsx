@@ -9,6 +9,7 @@ import type {
 import type { Message, MessageWithProfile, Reaction } from "@/lib/supabase/types";
 import { MessageItem } from "./message-item";
 import { MessageInput } from "./message-input";
+import { showMessageNotification } from "@/lib/notification";
 
 type Props = {
   parentMessage: MessageWithProfile;
@@ -89,6 +90,14 @@ export function ThreadPanel({
           setReplies((prev) => {
             if (prev.some((m) => m.id === newReply.id)) return prev;
             return [...prev, newReply];
+          });
+
+          // スレッド返信の通知
+          showMessageNotification({
+            senderName: profile?.display_name || "不明",
+            channelName: "スレッド",
+            content: payload.new.content,
+            url: window.location.pathname,
           });
         }
       )

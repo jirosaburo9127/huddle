@@ -10,6 +10,7 @@ import { ThreadPanel } from "./thread-panel";
 import { DateSeparator } from "./date-separator";
 import { ChannelMembersModal } from "@/components/channel-members-modal";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
+import { showMessageNotification } from "@/lib/notification";
 
 type Props = {
   channel: Channel;
@@ -104,6 +105,14 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
             // 重複チェック
             if (prev.some((m) => m.id === newMessage.id)) return prev;
             return [...prev, newMessage];
+          });
+
+          // 通知表示
+          showMessageNotification({
+            senderName: profile?.display_name || "不明",
+            channelName: channel.name,
+            content: payload.new.content,
+            url: window.location.pathname,
           });
         }
       )
