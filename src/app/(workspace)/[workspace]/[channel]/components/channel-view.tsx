@@ -295,7 +295,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
         <header className="flex items-center px-4 py-3 border-b border-border bg-header shrink-0">
           <div className="flex items-center gap-2 pl-10 lg:pl-0">
             <span className="text-muted font-medium">#</span>
-            <h1 className="font-bold text-lg">{channel.name}</h1>
+            <h1 className="font-bold text-xl">{channel.name}</h1>
           </div>
           {channel.topic && (
             <span className="ml-4 text-sm text-muted truncate hidden sm:inline">
@@ -353,6 +353,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
         <MessageInput
           channelName={channel.name}
           onSend={handleSend}
+          channelId={channel.id}
         />
       </div>
 

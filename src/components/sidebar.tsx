@@ -114,8 +114,8 @@ export function Sidebar({
       >
         {/* ヘッダー: アプリ名 + ワークスペース名 */}
         <div className="px-4 py-3 border-b border-border/50">
-          <h1 className="font-bold text-xl text-accent">Huddle</h1>
-          <p className="text-sm text-muted truncate">{workspace.name}</p>
+          <h1 className="font-bold text-2xl text-accent">Huddle</h1>
+          <p className="text-[15px] text-muted truncate">{workspace.name}</p>
         </div>
 
         {/* 検索バー */}
@@ -125,7 +125,7 @@ export function Sidebar({
             placeholder="チャンネルを検索..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-background/50 rounded-xl px-3 py-2 text-sm border border-border/50 focus:border-accent focus:bg-input-bg placeholder-muted/60 transition-all outline-none"
+            className="w-full bg-background/50 rounded-xl px-3 py-2 text-[15px] border border-border/50 focus:border-accent focus:bg-input-bg placeholder-muted/60 transition-all outline-none"
           />
           <p className="text-[10px] text-muted/50 mt-1 ml-1">
             ⌘K でメッセージ検索
@@ -136,7 +136,7 @@ export function Sidebar({
         <div className="flex-1 overflow-y-auto py-2">
           {/* チャンネルセクション */}
           <div className="px-3 mb-1 flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase text-muted tracking-wider">
+            <span className="text-[13px] font-semibold uppercase text-muted tracking-wider">
               チャンネル
             </span>
             <button
@@ -159,7 +159,7 @@ export function Sidebar({
                 prefetch
                 onClick={() => setSidebarOpen(false)}
                 className={`
-                  flex items-center px-3 py-2 text-sm rounded-xl mx-2 transition-colors
+                  flex items-center px-3 py-2 text-[15px] rounded-xl mx-2 transition-colors
                   ${
                     isActive
                       ? "bg-accent/10 text-accent"
@@ -187,7 +187,7 @@ export function Sidebar({
 
           {/* DMセクション */}
           <div className="px-3 mt-4 mb-1 flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase text-muted tracking-wider">
+            <span className="text-[13px] font-semibold uppercase text-muted tracking-wider">
               ダイレクトメッセージ
             </span>
             <button
@@ -232,7 +232,7 @@ export function Sidebar({
                 href={href}
                 onClick={() => setSidebarOpen(false)}
                 className={`
-                  flex items-center gap-2 px-3 py-2 text-sm rounded-xl mx-2 transition-colors
+                  flex items-center gap-2 px-3 py-2 text-[15px] rounded-xl mx-2 transition-colors
                   ${
                     isActive
                       ? "bg-accent/10 text-accent"
@@ -310,7 +310,7 @@ export function Sidebar({
                     <img src={p.avatar_url} alt={name} className="w-7 h-7 rounded-full object-cover" />
                   ) : initial}
                 </span>
-                <span className="text-sm text-foreground truncate flex-1">{name}</span>
+                <span className="text-[15px] text-foreground truncate flex-1">{name}</span>
               </>
             );
           })()}
