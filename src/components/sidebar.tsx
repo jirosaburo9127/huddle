@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { Workspace, Channel } from "@/lib/supabase/types";
@@ -11,6 +11,7 @@ import { BookmarkModal } from "@/components/bookmark-modal";
 import { ThemeSelector } from "@/components/theme-selector";
 import { signOut } from "@/lib/actions";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
+import { createClient } from "@/lib/supabase/client";
 
 type MemberProfile = {
   id: string;
@@ -55,6 +56,84 @@ export function Sidebar({
   const wsSwitcherRef = useRef<HTMLDivElement>(null);
   const { sidebarOpen, setSidebarOpen } = useMobileNavStore();
   const [searchQuery, setSearchQuery] = useState("");
+
+  // プロフィール編集用のstate
+  const [profileDisplayName, setProfileDisplayName] = useState("");
+  const [profileAvatarUrl, setProfileAvatarUrl] = useState<string | null>(null);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileToast, setProfileToast] = useState(false);
+  const [profileUploading, setProfileUploading] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  // 設定モーダルが開いたらプロフィールを取得
+  const loadProfile = useCallback(async () => {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("profiles")
+      .select("display_name, avatar_url")
+      .eq("id", currentUserId)
+      .single();
+    if (data) {
+      setProfileDisplayName(data.display_name || "");
+      setProfileAvatarUrl(data.avatar_url);
+    }
+  }, [currentUserId]);
+
+  useEffect(() => {
+    if (showSettings) {
+      loadProfile();
+    }
+  }, [showSettings, loadProfile]);
+
+  // アバター画像アップロード処理
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setProfileUploading(true);
+    try {
+      const supabase = createClient();
+      const ext = file.name.split(".").pop() || "png";
+      const path = `avatars/${currentUserId}-${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from("chat-files")
+        .upload(path, file, { upsert: true });
+      if (uploadError) throw uploadError;
+      const { data: urlData } = supabase.storage
+        .from("chat-files")
+        .getPublicUrl(path);
+      setProfileAvatarUrl(urlData.publicUrl);
+    } catch (err) {
+      console.error("アバターアップロードエラー:", err);
+    } finally {
+      setProfileUploading(false);
+      // inputをリセットして同じファイルも再選択可能にする
+      if (avatarInputRef.current) {
+        avatarInputRef.current.value = "";
+      }
+    }
+  };
+
+  // プロフィール保存処理
+  const handleProfileSave = async () => {
+    if (!profileDisplayName.trim()) return;
+    setProfileSaving(true);
+    try {
+      const supabase = createClient();
+      await supabase
+        .from("profiles")
+        .update({
+          display_name: profileDisplayName.trim(),
+          avatar_url: profileAvatarUrl,
+        })
+        .eq("id", currentUserId);
+      setProfileToast(true);
+      setTimeout(() => setProfileToast(false), 2000);
+    } catch (err) {
+      console.error("プロフィール保存エラー:", err);
+    } finally {
+      setProfileSaving(false);
+    }
+  };
 
   // ワークスペース切り替えドロップダウンの外側クリックで閉じる
   useEffect(() => {
@@ -434,6 +513,74 @@ export function Sidebar({
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
+            </div>
+
+            {/* プロフィール */}
+            <div>
+              <h3 className="text-sm font-semibold text-foreground mb-3">プロフィール</h3>
+              <div className="flex items-center gap-4 mb-4">
+                {/* アバター（クリックで変更） */}
+                <button
+                  type="button"
+                  onClick={() => avatarInputRef.current?.click()}
+                  className="relative w-16 h-16 rounded-full shrink-0 overflow-hidden bg-accent/20 flex items-center justify-center hover:opacity-80 transition-opacity group"
+                  disabled={profileUploading}
+                >
+                  {profileAvatarUrl ? (
+                    <img
+                      src={profileAvatarUrl}
+                      alt="アバター"
+                      className="w-16 h-16 rounded-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-2xl font-bold text-accent">
+                      {profileDisplayName ? profileDisplayName[0].toUpperCase() : "?"}
+                    </span>
+                  )}
+                  {/* ホバー時のオーバーレイ */}
+                  <span className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </span>
+                  {profileUploading && (
+                    <span className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-full">
+                      <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    </span>
+                  )}
+                </button>
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleAvatarUpload}
+                />
+                <div className="flex-1">
+                  <label className="text-xs text-muted mb-1 block">表示名</label>
+                  <input
+                    type="text"
+                    value={profileDisplayName}
+                    onChange={(e) => setProfileDisplayName(e.target.value)}
+                    placeholder="表示名を入力"
+                    className="w-full bg-background/50 rounded-xl px-3 py-2 text-sm border border-border/50 focus:border-accent focus:bg-input-bg placeholder-muted/60 transition-all outline-none"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleProfileSave}
+                  disabled={profileSaving || !profileDisplayName.trim()}
+                  className="px-4 py-2 text-sm rounded-xl bg-accent text-white hover:bg-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {profileSaving ? "保存中..." : "保存"}
+                </button>
+                {profileToast && (
+                  <span className="text-sm text-green-400 animate-fade-in">保存しました</span>
+                )}
+              </div>
             </div>
 
             {/* テーマ */}
