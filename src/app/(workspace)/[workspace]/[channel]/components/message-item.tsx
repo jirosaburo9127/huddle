@@ -342,18 +342,17 @@ export const MessageItem = memo(function MessageItem({
             </button>
           )}
 
-          {/* ホバー時アクションバー（Chatwork風：メッセージ本文の下にインライン表示） */}
           {/* アクションバー（PC: ホバー、モバイル: タップでトグル） */}
           {!isEditing && !isThreadView && (
-          <div className={`transition-opacity mt-1 flex items-center gap-0.5 flex-wrap ${showActions ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
+          <div className={`transition-opacity mt-2 flex items-center gap-1 flex-wrap ${showActions ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
             {/* リアクション */}
             {onReact && (
               <div className="relative">
                 <button
                   onClick={(e) => { e.stopPropagation(); setEmojiPickerLocation((v) => v === "action" ? null : "action"); }}
-                  className="flex items-center gap-1 px-2 py-0.5 text-[13px] text-muted hover:text-accent border border-transparent hover:border-border/50 rounded transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-muted hover:text-accent bg-white/[0.03] border border-border/50 hover:border-accent/40 rounded-lg transition-colors"
                 >
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   リアクション
@@ -369,9 +368,9 @@ export const MessageItem = memo(function MessageItem({
             {/* 返信 */}
             <button
               onClick={(e) => { e.stopPropagation(); onOpenThread?.(message); }}
-              className="flex items-center gap-1 px-2 py-0.5 text-[13px] text-muted hover:text-accent border border-transparent hover:border-border/50 rounded transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-muted hover:text-accent bg-white/[0.03] border border-border/50 hover:border-accent/40 rounded-lg transition-colors"
             >
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
               </svg>
               返信
@@ -381,18 +380,18 @@ export const MessageItem = memo(function MessageItem({
               <>
                 <button
                   onClick={(e) => { e.stopPropagation(); setIsEditing(true); setEditContent(message.content); }}
-                  className="flex items-center gap-1 px-2 py-0.5 text-[13px] text-muted hover:text-accent border border-transparent hover:border-border/50 rounded transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-muted hover:text-accent bg-white/[0.03] border border-border/50 hover:border-accent/40 rounded-lg transition-colors"
                 >
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                   </svg>
                   編集
                 </button>
                 <button
                   onClick={(e) => { e.stopPropagation(); setIsDeleting(true); }}
-                  className="flex items-center gap-1 px-2 py-0.5 text-[13px] text-muted hover:text-mention border border-transparent hover:border-border/50 rounded transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-muted hover:text-mention bg-white/[0.03] border border-border/50 hover:border-mention/30 rounded-lg transition-colors"
                 >
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                   </svg>
                   削除
