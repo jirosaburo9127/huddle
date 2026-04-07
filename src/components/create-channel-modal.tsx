@@ -23,7 +23,8 @@ export function CreateChannelModal({ workspaceId, workspaceSlug, onClose }: Prop
     setLoading(true);
     setError("");
 
-    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    const asciiSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    const slug = asciiSlug || `ch-${crypto.randomUUID().slice(0, 8)}`;
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
