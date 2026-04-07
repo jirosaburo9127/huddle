@@ -1,8 +1,38 @@
-import { createClient } from "@/lib/supabase/server";
-import { getAuthUser } from "@/lib/supabase/auth";
-import { redirect } from "next/navigation";
-import { Sidebar } from "@/components/sidebar";
-import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
+import { Suspense } from "react";
+import { WorkspaceShell } from "@/components/sidebar-loader";
+
+// サイドバーのスケルトンUI（データ取得中に表示）
+function SidebarSkeleton() {
+  return (
+    <aside className="fixed inset-y-0 left-0 z-50 w-full sm:w-64 bg-sidebar flex flex-col border-r border-border -translate-x-full lg:relative lg:translate-x-0">
+      {/* ヘッダースケルトン */}
+      <div className="px-4 py-3 border-b border-border/50">
+        <div className="h-8 w-24 bg-white/[0.06] rounded-lg animate-pulse" />
+        <div className="h-5 w-36 bg-white/[0.04] rounded-lg animate-pulse mt-1" />
+      </div>
+      {/* 検索バースケルトン */}
+      <div className="px-3 py-2">
+        <div className="h-10 bg-white/[0.04] rounded-xl animate-pulse" />
+      </div>
+      {/* チャンネル一覧スケルトン */}
+      <div className="flex-1 overflow-y-auto py-2 space-y-2 px-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="h-9 bg-white/[0.04] rounded-xl animate-pulse" />
+        ))}
+      </div>
+    </aside>
+  );
+}
+
+// ワークスペース全体のフォールバック（サイドバースケルトン + メインコンテンツ領域）
+function WorkspaceSkeleton() {
+  return (
+    <>
+      <SidebarSkeleton />
+      <main className="flex-1 flex flex-col min-w-0" />
+    </>
+  );
+}
 
 export default async function WorkspaceLayout({
   children,
@@ -12,53 +42,14 @@ export default async function WorkspaceLayout({
   params: Promise<{ workspace: string }>;
 }) {
   const { workspace: workspaceSlug } = await params;
-  const supabase = await createClient();
-  const user = await getAuthUser();
-
-  if (!user) redirect("/login");
-
-  // RPC1回で全データ取得（5クエリ→1クエリに集約）
-  const { data, error } = await supabase.rpc("get_workspace_data", {
-    p_workspace_slug: workspaceSlug,
-    p_user_id: user.id,
-  });
-
-  if (error || !data) redirect("/");
-
-  const result = data as {
-    workspace: { id: string; name: string; slug: string; created_at: string };
-    channels: Array<{ id: string; workspace_id: string; name: string; slug: string; is_private: boolean; is_dm: boolean; topic: string | null; created_by: string; created_at: string }>;
-    dm_channels: Array<{ id: string; workspace_id: string; name: string; slug: string; is_private: boolean; is_dm: boolean; topic: string | null; created_by: string; created_at: string; channel_members: Array<{ user_id: string; profiles: { display_name: string; avatar_url: string | null; status: string | null; last_seen_at: string | null } }> | null }>;
-    members: Array<{ user_id: string; profiles: { id: string; display_name: string; avatar_url: string | null; status: string | null } }>;
-    unread_counts: Array<{ channel_id: string; unread_count: number }>;
-    all_workspaces: Array<{ id: string; name: string; slug: string }>;
-  };
-
-  if (!result.workspace) redirect("/");
-
-  // 未読数をRecord形式に変換
-  const unreadCounts: Record<string, number> = {};
-  for (const row of result.unread_counts || []) {
-    unreadCounts[row.channel_id] = row.unread_count;
-  }
 
   return (
     <div className="flex h-full">
-      <Sidebar
-        workspace={result.workspace}
-        channels={result.channels || []}
-        dmChannels={result.dm_channels || []}
-        members={result.members || []}
-        currentUserId={user.id}
-        workspaceSlug={workspaceSlug}
-        unreadCounts={unreadCounts}
-        allWorkspaces={result.all_workspaces || []}
-      />
-      <KeyboardShortcuts workspaceId={result.workspace.id} workspaceSlug={workspaceSlug}>
-        <main className="flex-1 flex flex-col min-w-0">
+      <Suspense fallback={<WorkspaceSkeleton />}>
+        <WorkspaceShell workspaceSlug={workspaceSlug}>
           {children}
-        </main>
-      </KeyboardShortcuts>
+        </WorkspaceShell>
+      </Suspense>
     </div>
   );
 }

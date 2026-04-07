@@ -2,6 +2,15 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ["@supabase/supabase-js", "@supabase/ssr"],
+  // 画像最適化: Supabase Storageのリモート画像を許可
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "emfngqketrieioxusuhg.supabase.co",
+      },
+    ],
+  },
   async headers() {
     return [
       {

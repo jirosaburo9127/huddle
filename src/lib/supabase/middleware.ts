@@ -16,6 +16,11 @@ export async function updateSession(request: NextRequest) {
   // 静的アセットはそのまま通す
   if (isStaticAsset) return supabaseResponse;
 
+  // 認証不要ページではSupabaseクライアント生成もスキップして即座にレスポンス
+  if (isAuthPage || isInvitePage) {
+    return supabaseResponse;
+  }
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -36,13 +41,6 @@ export async function updateSession(request: NextRequest) {
       },
     }
   );
-
-  // 認証不要ページではセッション更新のみ（getUser呼ばない）
-  if (isAuthPage || isInvitePage) {
-    // セッションリフレッシュのためにgetSessionは呼ぶ（getUserより軽量）
-    await supabase.auth.getSession();
-    return supabaseResponse;
-  }
 
   // 認証が必要なページのみgetUserを呼ぶ
   let user = null;
