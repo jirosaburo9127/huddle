@@ -306,7 +306,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
               </svg>
             </button>
             <span className="text-muted font-medium">#</span>
-            <h1 className="font-bold text-xl">{channel.name}</h1>
+            <h1 className="font-bold text-2xl">{channel.name}</h1>
           </div>
           {channel.topic && (
             <span className="ml-4 text-sm text-muted truncate hidden sm:inline">

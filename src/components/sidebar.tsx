@@ -87,8 +87,8 @@ export function Sidebar({
       >
         {/* ヘッダー: アプリ名 + ワークスペース名 */}
         <div className="px-4 py-3 border-b border-border/50">
-          <h1 className="font-bold text-2xl text-accent">Huddle</h1>
-          <p className="text-base text-muted truncate">{workspace.name}</p>
+          <h1 className="font-bold text-3xl text-accent">Huddle</h1>
+          <p className="text-lg text-muted truncate">{workspace.name}</p>
         </div>
 
         {/* 検索バー */}
@@ -132,7 +132,7 @@ export function Sidebar({
                 prefetch
                 onClick={() => setSidebarOpen(false)}
                 className={`
-                  flex items-center px-3 py-2 text-base rounded-xl mx-2 transition-colors
+                  flex items-center px-3 py-2 text-lg rounded-xl mx-2 transition-colors
                   ${
                     isActive
                       ? "bg-accent/10 text-accent"
@@ -205,7 +205,7 @@ export function Sidebar({
                 href={href}
                 onClick={() => setSidebarOpen(false)}
                 className={`
-                  flex items-center gap-2 px-3 py-2 text-base rounded-xl mx-2 transition-colors
+                  flex items-center gap-2 px-3 py-2 text-lg rounded-xl mx-2 transition-colors
                   ${
                     isActive
                       ? "bg-accent/10 text-accent"

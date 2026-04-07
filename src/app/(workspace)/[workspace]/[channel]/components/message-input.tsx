@@ -164,7 +164,7 @@ export function MessageInput({ channelName, onSend, placeholder, channelId }: Pr
           onInput={handleInput}
           placeholder={placeholder || (channelName ? `#${channelName} にメッセージを送信` : "メッセージを入力")}
           rows={1}
-          className="flex-1 resize-none bg-transparent text-base text-foreground placeholder-muted focus:outline-none max-h-[200px]"
+          className="flex-1 resize-none bg-transparent text-lg text-foreground placeholder-muted focus:outline-none max-h-[200px]"
         />
         <button
           type="submit"

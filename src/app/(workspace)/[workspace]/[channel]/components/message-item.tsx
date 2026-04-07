@@ -95,7 +95,7 @@ function MessageContent({
 
   // 通常のテキストメッセージ
   return (
-    <p className="text-[17px] leading-relaxed text-foreground whitespace-pre-wrap break-words">
+    <p className="text-lg leading-[1.7] text-foreground whitespace-pre-wrap break-words">
       {content}
     </p>
   );
@@ -177,13 +177,13 @@ export const MessageItem = memo(function MessageItem({
         <div className="min-w-0 flex-1">
           {!isConsecutive && (
             <div className="flex items-baseline gap-2">
-              <span className="font-semibold text-[15px] text-muted">
+              <span className="font-semibold text-base text-muted">
                 {profile?.display_name || "不明なユーザー"}
               </span>
-              <span className="text-[13px] text-muted/70">{time}</span>
+              <span className="text-sm text-muted/70">{time}</span>
             </div>
           )}
-          <p className="text-[17px] leading-relaxed text-muted italic">このメッセージは削除されました</p>
+          <p className="text-lg leading-[1.7] text-muted italic">このメッセージは削除されました</p>
         </div>
       </div>
     );
@@ -225,7 +225,7 @@ export const MessageItem = memo(function MessageItem({
     <>
       <div
         className={`group relative flex gap-3 px-2 rounded-lg hover:bg-white/[0.02] transition-colors ${
-          isConsecutive ? "py-0.5" : "pt-2 pb-0.5"
+          isConsecutive ? "py-1" : "pt-3 pb-1"
         }`}
         onClick={() => setShowActions((v) => !v)}
       >
@@ -260,12 +260,12 @@ export const MessageItem = memo(function MessageItem({
           {/* ユーザー名と時刻（先頭メッセージのみ） */}
           {!isConsecutive && (
             <div className="flex items-baseline gap-2">
-              <span className={`font-semibold text-[15px] ${isOwn ? "text-accent" : "text-foreground"}`}>
+              <span className={`font-semibold text-base ${isOwn ? "text-accent" : "text-foreground"}`}>
                 {profile?.display_name || "不明なユーザー"}
               </span>
-              <span className="text-[13px] text-muted/70">{time}</span>
+              <span className="text-sm text-muted/70">{time}</span>
               {message.edited_at && (
-                <span className="text-[13px] text-muted/70">(編集済み)</span>
+                <span className="text-sm text-muted/70">(編集済み)</span>
               )}
             </div>
           )}
