@@ -24,6 +24,8 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
   const [messages, setMessages] = useState<MessageWithProfile[]>(initialMessages);
   const [activeThread, setActiveThread] = useState<MessageWithProfile | null>(null);
   const [showMembersModal, setShowMembersModal] = useState(false);
+  const [showDeleteChannel, setShowDeleteChannel] = useState(false);
+  const [deletingChannel, setDeletingChannel] = useState(false);
   const [showDecisionsOnly, setShowDecisionsOnly] = useState(false);
   const [showWiki, setShowWiki] = useState(false);
   const [hasWiki, setHasWiki] = useState(false);
@@ -447,6 +449,18 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
                 </svg>
               </button>
             )}
+            {/* チャンネル削除ボタン（generalとDM以外） */}
+            {!channel.is_dm && channel.slug !== "general" && (
+              <button
+                onClick={() => setShowDeleteChannel(true)}
+                className="p-1.5 text-muted hover:text-mention rounded-lg hover:bg-white/[0.04] transition-colors"
+                title="チャンネルを削除"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            )}
           </div>
         </header>
 
@@ -563,6 +577,39 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
           isPrivate={channel.is_private}
           onClose={() => setShowMembersModal(false)}
         />
+      )}
+
+      {/* チャンネル削除確認ダイアログ */}
+      {showDeleteChannel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowDeleteChannel(false)}>
+          <div className="w-full max-w-sm rounded-2xl bg-sidebar border border-border p-6 space-y-4 animate-fade-in" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-bold">チャンネルを削除</h3>
+            <p className="text-sm text-muted">
+              <span className="font-semibold text-foreground">#{channel.name}</span> を削除しますか？メッセージも全て削除されます。この操作は取り消せません。
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowDeleteChannel(false)}
+                className="rounded-xl px-4 py-2 text-sm text-muted hover:text-foreground transition-colors"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={async () => {
+                  setDeletingChannel(true);
+                  await supabase.from("channels").delete().eq("id", channel.id);
+                  // URLからWSスラグを取得してgeneralにリダイレクト
+                  const wsSlug = window.location.pathname.split("/")[1];
+                  window.location.href = `/${wsSlug}/general`;
+                }}
+                disabled={deletingChannel}
+                className="rounded-xl bg-mention px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 transition-colors"
+              >
+                {deletingChannel ? "削除中..." : "削除"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
