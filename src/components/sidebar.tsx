@@ -259,7 +259,7 @@ export function Sidebar({
               otherMember?.profiles?.display_name || "DM";
             const avatarUrl = otherMember?.profiles?.avatar_url;
             // ステータス取得
-            const memberStatus = otherMember?.profiles?.status as PulseStatus | null;
+            const memberStatus = otherMember?.profiles?.status as string | null;
             // 5分以内のアクティビティでオンライン判定
             const lastSeen = otherMember?.profiles?.last_seen_at;
             const isOnline = lastSeen
