@@ -133,6 +133,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
           const newMessage = {
             ...payload.new,
             profiles: profile,
+            reactions: [],
           } as unknown as MessageWithProfile;
 
           setMessages((prev) => {

@@ -175,6 +175,7 @@ export const MessageItem = memo(function MessageItem({
   const [emojiPickerLocation, setEmojiPickerLocation] = useState<"action" | "inline" | null>(null);
   const [imageError, setImageError] = useState(false);
   const [showActions, setShowActions] = useState(false);
+  const [mobileEmojiOpen, setMobileEmojiOpen] = useState(false);
   const editTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   // リアクションを絵文字ごとにグループ化
@@ -507,7 +508,7 @@ export const MessageItem = memo(function MessageItem({
               {/* リアクション */}
               {onReact && (
                 <button
-                  onClick={() => { setShowActions(false); setEmojiPickerLocation("action"); }}
+                  onClick={() => setMobileEmojiOpen(true)}
                   className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
                 >
                   <span className="w-12 h-12 rounded-full border-2 border-muted/40 flex items-center justify-center">
@@ -517,6 +518,23 @@ export const MessageItem = memo(function MessageItem({
                   </span>
                   <span className="text-xs text-foreground">リアクション</span>
                 </button>
+              )}
+              {/* モバイル絵文字グリッド（アクションモーダル内） */}
+              {mobileEmojiOpen && onReact && (
+                <div className="col-span-3 border-t border-border/50 pt-3 mt-1">
+                  <p className="text-sm font-medium text-foreground mb-2">リアクションを選択</p>
+                  <div className="grid grid-cols-8 gap-2">
+                    {["👍", "❤️", "😂", "🎉", "🔥", "👀", "💯", "✅", "😊", "😄", "🤔", "😮", "😢", "🥳", "👏", "🙌", "🤝", "💪", "🙏", "⭐", "💡", "🚀", "⚡", "🎯"].map((emoji) => (
+                      <button
+                        key={emoji}
+                        onClick={() => { setShowActions(false); setMobileEmojiOpen(false); onReact(message.id, emoji); }}
+                        className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-white/[0.06] text-xl transition-colors"
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
               {/* 決定事項トグル（モバイル） */}
               {onDecision && (
@@ -579,26 +597,6 @@ export const MessageItem = memo(function MessageItem({
         </div>
       )}
 
-      {/* 絵文字ピッカーモーダル（モバイル用） */}
-      {emojiPickerLocation === "action" && (
-        <div className="lg:hidden fixed inset-0 z-[60] flex items-end justify-center" onClick={(e) => { e.stopPropagation(); setEmojiPickerLocation(null); }}>
-          <div className="absolute inset-0 bg-black/40" />
-          <div className="relative w-full max-w-sm mx-4 mb-6 rounded-2xl bg-sidebar border border-border p-4 animate-slide-up" onClick={(e) => e.stopPropagation()}>
-            <p className="text-sm font-medium text-foreground mb-3">リアクションを選択</p>
-            <div className="grid grid-cols-8 gap-2">
-              {["👍", "❤️", "😂", "🎉", "🔥", "👀", "💯", "✅", "😊", "😄", "🤔", "😮", "😢", "🥳", "😎", "👏", "🙌", "🤝", "💪", "🙏", "⭐", "💡", "🚀", "⚡"].map((emoji) => (
-                <button
-                  key={emoji}
-                  onClick={() => handleEmojiSelect(emoji)}
-                  className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-white/[0.06] text-xl transition-colors"
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* 削除確認ダイアログ */}
       {isDeleting && (
