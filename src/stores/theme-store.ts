@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
 // テーマ名の型定義
-type ThemeName = "midnight" | "dawn" | "forest";
+type ThemeName = "midnight" | "dawn" | "warm";
 
 type ThemeStore = {
   theme: ThemeName;

@@ -83,21 +83,21 @@ body {
   --color-mention: #ef4444;
 }
 
-/* Forest（ダークグリーン） */
-[data-theme="forest"] {
-  --color-background: #0f1512;
-  --color-surface: #1a2220;
-  --color-sidebar: #141e1a;
-  --color-sidebar-hover: #1e2e28;
-  --color-sidebar-active: #283832;
-  --color-header: #121a16;
-  --color-input-bg: #1a2822;
-  --color-border: #2a3a34;
-  --color-border-subtle: #1f2e28;
-  --color-foreground: #e0ede8;
-  --color-muted: #6b8078;
-  --color-accent: #34d399;
-  --color-accent-hover: #4ade80;
-  --color-online: #34d399;
-  --color-mention: #f87171;
+/* Warm（あったかベージュ） */
+[data-theme="warm"] {
+  --color-background: #f5f0e8;
+  --color-surface: #faf7f2;
+  --color-sidebar: #ebe5d9;
+  --color-sidebar-hover: #dfd8ca;
+  --color-sidebar-active: #d4ccbc;
+  --color-header: #f5f0e8;
+  --color-input-bg: #ebe5d9;
+  --color-border: #cdc5b4;
+  --color-border-subtle: #ddd6c8;
+  --color-foreground: #2c2418;
+  --color-muted: #8a7e6e;
+  --color-accent: #b07030;
+  --color-accent-hover: #9a6028;
+  --color-online: #5a9a60;
+  --color-mention: #c05040;
 }

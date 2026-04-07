@@ -5,7 +5,7 @@ import { useThemeStore } from "@/stores/theme-store";
 const themes = [
   { name: "midnight" as const, color: "#16161e", label: "Midnight", description: "ダークモード" },
   { name: "dawn" as const, color: "#f7f7fa", label: "Dawn", description: "ライトモード" },
-  { name: "forest" as const, color: "#141e1a", label: "Forest", description: "グリーンダーク" },
+  { name: "warm" as const, color: "#f5f0e8", label: "Warm", description: "あったかベージュ" },
 ] as const;
 
 export function ThemeSelector() {
