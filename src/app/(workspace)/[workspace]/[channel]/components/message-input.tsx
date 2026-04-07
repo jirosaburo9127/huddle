@@ -1,25 +1,128 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 // ファイルサイズ上限: 10MB
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
+
+type MemberProfile = {
+  id: string;
+  display_name: string;
+  avatar_url: string | null;
+};
+
+type MentionMember = {
+  user_id: string;
+  profiles: MemberProfile;
+};
 
 type Props = {
   channelName?: string;
   onSend: (content: string) => void | Promise<void>;
   placeholder?: string;
   channelId?: string; // ファイルアップロード用
+  workspaceId?: string; // メンション用
 };
 
-export function MessageInput({ channelName, onSend, placeholder, channelId }: Props) {
+export function MessageInput({ channelName, onSend, placeholder, channelId, workspaceId }: Props) {
   const [content, setContent] = useState("");
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // メンション関連state
+  const [members, setMembers] = useState<MentionMember[]>([]);
+  const [showMention, setShowMention] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState("");
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const [mentionStartPos, setMentionStartPos] = useState(0);
+  const [isComposing, setIsComposing] = useState(false);
+
+  // WSメンバーを取得
+  useEffect(() => {
+    if (!workspaceId) return;
+    async function fetchMembers() {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("workspace_members")
+        .select("user_id, profiles(id, display_name, avatar_url)")
+        .eq("workspace_id", workspaceId);
+      if (data) {
+        const normalized = data.map((row: { user_id: string; profiles: unknown }) => {
+          const p = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
+          return { user_id: row.user_id, profiles: p as MemberProfile };
+        });
+        setMembers(normalized);
+      }
+    }
+    fetchMembers();
+  }, [workspaceId]);
+
+  // メンションフィルタリング
+  const filteredMentionMembers = useMemo(() => {
+    if (!mentionQuery) return members;
+    const q = mentionQuery.toLowerCase();
+    return members.filter((m) =>
+      m.profiles?.display_name?.toLowerCase().includes(q)
+    );
+  }, [members, mentionQuery]);
+
+  // テキスト変更時のメンション検出
+  const handleContentChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setContent(value);
+
+    // IME入力中はサジェストを表示しない
+    if (isComposing) return;
+
+    const cursorPos = e.target.selectionStart ?? value.length;
+    // カーソル位置から逆方向に@を探す
+    const textBeforeCursor = value.slice(0, cursorPos);
+    const atIndex = textBeforeCursor.lastIndexOf("@");
+
+    if (atIndex >= 0) {
+      // @の前がスペースまたは行頭であることを確認
+      const charBefore = atIndex > 0 ? textBeforeCursor[atIndex - 1] : " ";
+      if (charBefore === " " || charBefore === "\n" || atIndex === 0) {
+        const query = textBeforeCursor.slice(atIndex + 1);
+        // クエリにスペースが含まれていない場合のみサジェスト表示
+        if (!query.includes(" ") && !query.includes("\n")) {
+          setShowMention(true);
+          setMentionQuery(query);
+          setMentionStartPos(atIndex);
+          setMentionIndex(0);
+          return;
+        }
+      }
+    }
+    setShowMention(false);
+  }, [isComposing]);
+
+  // メンション選択時の挿入
+  const insertMention = useCallback((member: MentionMember) => {
+    const name = member.profiles.display_name;
+    const before = content.slice(0, mentionStartPos);
+    const after = content.slice(
+      mentionStartPos + 1 + mentionQuery.length // @+クエリ文字列分
+    );
+    const newContent = `${before}@${name} ${after}`;
+    setContent(newContent);
+    setShowMention(false);
+    setMentionQuery("");
+
+    // カーソルをメンション直後に移動
+    requestAnimationFrame(() => {
+      if (textareaRef.current) {
+        const pos = mentionStartPos + name.length + 2; // @+name+space
+        textareaRef.current.selectionStart = pos;
+        textareaRef.current.selectionEnd = pos;
+        textareaRef.current.focus();
+      }
+    });
+  }, [content, mentionStartPos, mentionQuery]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -45,6 +148,35 @@ export function MessageInput({ channelName, onSend, placeholder, channelId }: Pr
   function handleKeyDown(e: React.KeyboardEvent) {
     // IME変換中のEnterは無視（日本語入力の確定操作）
     if (e.nativeEvent.isComposing) return;
+
+    // メンションサジェスト表示中のキーボード操作
+    if (showMention && filteredMentionMembers.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setMentionIndex((prev) =>
+          prev < filteredMentionMembers.length - 1 ? prev + 1 : 0
+        );
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setMentionIndex((prev) =>
+          prev > 0 ? prev - 1 : filteredMentionMembers.length - 1
+        );
+        return;
+      }
+      if (e.key === "Enter" || e.key === "Tab") {
+        e.preventDefault();
+        insertMention(filteredMentionMembers[mentionIndex]);
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setShowMention(false);
+        return;
+      }
+    }
+
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSubmit(e);
@@ -105,7 +237,7 @@ export function MessageInput({ channelName, onSend, placeholder, channelId }: Pr
   }
 
   return (
-    <div className="shrink-0 px-4 pb-4">
+    <div className="shrink-0 px-4 pb-4 relative">
       {/* アップロードエラー表示 */}
       {uploadError && (
         <div className="mb-2 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400 flex items-center justify-between">
@@ -118,6 +250,43 @@ export function MessageInput({ channelName, onSend, placeholder, channelId }: Pr
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
+        </div>
+      )}
+
+      {/* メンションサジェストリスト */}
+      {showMention && filteredMentionMembers.length > 0 && (
+        <div className="absolute bottom-full left-0 mb-1 w-64 max-h-48 overflow-y-auto rounded-xl bg-sidebar border border-border shadow-xl z-50">
+          {filteredMentionMembers.map((member, index) => (
+            <button
+              key={member.user_id}
+              type="button"
+              onMouseDown={(e) => {
+                // blurを防止してからメンション挿入
+                e.preventDefault();
+                insertMention(member);
+              }}
+              className={`flex items-center gap-2 px-3 py-2 text-sm w-full text-left cursor-pointer transition-colors ${
+                index === mentionIndex
+                  ? "bg-accent/10"
+                  : "hover:bg-white/[0.04]"
+              }`}
+            >
+              {member.profiles.avatar_url ? (
+                <img
+                  src={member.profiles.avatar_url}
+                  alt={member.profiles.display_name}
+                  className="w-6 h-6 rounded-full object-cover shrink-0"
+                />
+              ) : (
+                <div className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center shrink-0">
+                  <span className="text-[10px] font-medium text-accent">
+                    {member.profiles.display_name.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+              )}
+              <span className="truncate text-foreground">{member.profiles.display_name}</span>
+            </button>
+          ))}
         </div>
       )}
 
@@ -159,9 +328,11 @@ export function MessageInput({ channelName, onSend, placeholder, channelId }: Pr
         <textarea
           ref={textareaRef}
           value={content}
-          onChange={(e) => setContent(e.target.value)}
+          onChange={handleContentChange}
           onKeyDown={handleKeyDown}
           onInput={handleInput}
+          onCompositionStart={() => setIsComposing(true)}
+          onCompositionEnd={() => setIsComposing(false)}
           placeholder={placeholder || (channelName ? `#${channelName} にメッセージを送信` : "メッセージを入力")}
           rows={1}
           maxLength={4000}

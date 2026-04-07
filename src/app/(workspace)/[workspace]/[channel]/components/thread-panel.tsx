@@ -15,6 +15,7 @@ type Props = {
   parentMessage: MessageWithProfile;
   currentUserId: string;
   channelId: string;
+  workspaceId?: string;
   onClose: () => void;
   onReplyCountChange: (parentId: string, delta: number) => void;
   onDecision?: (messageId: string, isDecision: boolean) => Promise<void>;
@@ -26,6 +27,7 @@ export function ThreadPanel({
   parentMessage,
   currentUserId,
   channelId,
+  workspaceId,
   onClose,
   onReplyCountChange,
   onDecision,
@@ -404,7 +406,7 @@ export function ThreadPanel({
       </div>
 
       {/* 返信入力 */}
-      <MessageInput onSend={handleSend} placeholder="返信を入力" channelId={channelId} />
+      <MessageInput onSend={handleSend} placeholder="返信を入力" channelId={channelId} workspaceId={workspaceId} />
     </div>
   );
 }

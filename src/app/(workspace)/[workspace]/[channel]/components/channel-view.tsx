@@ -543,6 +543,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
           channelName={channel.name}
           onSend={handleSend}
           channelId={channel.id}
+          workspaceId={channel.workspace_id}
         />
       </div>
 
@@ -552,6 +553,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
           parentMessage={activeThread}
           currentUserId={currentUserId}
           channelId={channel.id}
+          workspaceId={channel.workspace_id}
           onClose={() => setActiveThread(null)}
           onReplyCountChange={handleReplyCountChange}
           onDecision={handleDecision}

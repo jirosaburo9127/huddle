@@ -78,6 +78,12 @@ function parseMarkdown(text: string): string {
     '<a href="$1" target="_blank" rel="noopener noreferrer" class="text-accent hover:underline">$1</a>'
   );
 
+  // @メンション（全角・半角文字をハイライト）
+  html = html.replace(
+    /@([\w\u3000-\u9FFF\uF900-\uFAFF]+)/g,
+    '<span class="text-accent font-semibold">@$1</span>'
+  );
+
   return html;
 }
 

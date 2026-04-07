@@ -8,6 +8,7 @@ import { CreateChannelModal } from "@/components/create-channel-modal";
 import { CreateDmModal } from "@/components/create-dm-modal";
 import { InviteModal } from "@/components/invite-modal";
 import { BookmarkModal } from "@/components/bookmark-modal";
+import { WsMembersModal } from "@/components/ws-members-modal";
 import { ThemeSelector } from "@/components/theme-selector";
 import { signOut } from "@/lib/actions";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
@@ -51,6 +52,7 @@ export function Sidebar({
   const [showCreateDm, setShowCreateDm] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showBookmarkModal, setShowBookmarkModal] = useState(false);
+  const [showWsMembers, setShowWsMembers] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showWsSwitcher, setShowWsSwitcher] = useState(false);
   const wsSwitcherRef = useRef<HTMLDivElement>(null);
@@ -186,7 +188,8 @@ export function Sidebar({
         {/* ヘッダー: アプリ名 + ワークスペース切り替え */}
         <div className="px-4 py-3 border-b border-border/50">
           <h1 className="font-bold text-3xl text-accent">Huddle</h1>
-          <div className="relative" ref={wsSwitcherRef}>
+          <div className="flex items-center gap-1">
+          <div className="relative flex-1 min-w-0" ref={wsSwitcherRef}>
             <button
               onClick={() => setShowWsSwitcher((prev) => !prev)}
               className="flex items-center gap-1 text-lg text-muted hover:text-foreground transition-colors truncate w-full text-left"
@@ -224,6 +227,17 @@ export function Sidebar({
                 </div>
               </div>
             )}
+          </div>
+          {/* WSメンバー一覧ボタン */}
+          <button
+            onClick={() => setShowWsMembers(true)}
+            className="shrink-0 p-1.5 text-muted hover:text-foreground rounded-lg hover:bg-white/[0.04] transition-colors"
+            title="ワークスペースメンバー"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+          </button>
           </div>
         </div>
 
@@ -499,6 +513,14 @@ export function Sidebar({
           currentUserId={currentUserId}
           workspaceSlug={workspaceSlug}
           onClose={() => setShowBookmarkModal(false)}
+        />
+      )}
+
+      {/* WSメンバー一覧モーダル */}
+      {showWsMembers && (
+        <WsMembersModal
+          members={members}
+          onClose={() => setShowWsMembers(false)}
         />
       )}
 
