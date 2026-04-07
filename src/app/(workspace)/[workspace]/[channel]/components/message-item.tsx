@@ -72,6 +72,10 @@ function parseMarkdown(text: string): string {
   // 太字（**...**）
   html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
 
+  // 危険なURLスキームをブロック（javascript:, vbscript:, data:（画像以外））
+  html = html.replace(/(?:javascript|vbscript):/gi, "blocked:");
+  html = html.replace(/data:(?!image\/)/gi, "blocked:");
+
   // URLの自動リンク化（コードブロック/インラインコード内を除く）
   html = html.replace(
     /(?<!["=])(https?:\/\/[^\s<]+)/g,

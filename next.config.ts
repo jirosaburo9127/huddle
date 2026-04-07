@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  poweredByHeader: false,
   serverExternalPackages: ["@supabase/supabase-js", "@supabase/ssr"],
   // 画像最適化: Supabase Storageのリモート画像を許可
   images: {
@@ -31,6 +32,29 @@ const nextConfig: NextConfig = {
           {
             key: "Permissions-Policy",
             value: "camera=(), microphone=(), geolocation=()",
+          },
+          {
+            key: "Content-Security-Policy",
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+              "connect-src 'self' https://emfngqketrieioxusuhg.supabase.co wss://emfngqketrieioxusuhg.supabase.co",
+              "img-src 'self' https://emfngqketrieioxusuhg.supabase.co data: blob:",
+              "style-src 'self' 'unsafe-inline'",
+              "font-src 'self' https://fonts.gstatic.com",
+              "frame-ancestors 'none'",
+              "base-uri 'self'",
+              "form-action 'self'",
+              "upgrade-insecure-requests",
+            ].join("; "),
+          },
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=31536000; includeSubDomains",
+          },
+          {
+            key: "X-DNS-Prefetch-Control",
+            value: "on",
           },
         ],
       },

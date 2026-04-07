@@ -175,7 +175,7 @@ enable_manual_linking = false
 minimum_password_length = 8
 # Passwords that do not meet the following requirements will be rejected as weak. Supported values
 # are: `letters_digits`, `lower_upper_letters_digits`, `lower_upper_letters_digits_symbols`
-password_requirements = ""
+password_requirements = "lower_upper_letters_digits"
 
 # Configure passkey sign-ins.
 # [auth.passkey]
@@ -259,10 +259,10 @@ max_frequency = "5s"
 # 4152127777 = "123456"
 
 # Configure logged in session timeouts.
+# NOTE: セッションタイムアウトはSupabase Proプラン以上が必要
+# Proプランに移行後、以下のコメントを外してconfig pushで反映
 # [auth.sessions]
-# Force log out after the specified duration.
 # timebox = "24h"
-# Force log out if the user has been inactive longer than the specified duration.
 # inactivity_timeout = "8h"
 
 # This hook runs before a new user is created and allows developers to reject the request based on the incoming user object.

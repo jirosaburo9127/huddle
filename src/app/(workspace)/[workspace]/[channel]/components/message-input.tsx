@@ -6,6 +6,34 @@ import { createClient } from "@/lib/supabase/client";
 // ファイルサイズ上限: 10MB
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
+// 許可するMIMEタイプ
+const ALLOWED_MIME_TYPES = [
+  "image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml",
+  "application/pdf",
+  "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint", "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "text/plain", "text/csv",
+  "application/zip", "application/x-zip-compressed",
+  "application/json", "application/xml", "text/xml",
+];
+
+// ブロックする危険な拡張子
+const BLOCKED_EXTENSIONS = [
+  ".exe", ".sh", ".bat", ".cmd", ".com", ".msi",
+  ".js", ".py", ".rb", ".php", ".ps1", ".vbs",
+  ".scr", ".pif", ".hta", ".cpl", ".jar", ".wsf",
+];
+
+// ファイル名のサニタイズ（パストラバーサル・特殊文字除去）
+function sanitizeFileName(name: string): string {
+  return name
+    .replace(/[/\\:*?"<>|]/g, "_") // 危険な文字を置換
+    .replace(/\.\./g, "_")          // ディレクトリトラバーサル防止
+    .replace(/^\./g, "_")           // 隠しファイル防止
+    .slice(0, 200);                 // ファイル名の長さ制限
+}
+
 type MemberProfile = {
   id: string;
   display_name: string;
@@ -203,7 +231,23 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
     // ファイルサイズチェック
     if (file.size > MAX_FILE_SIZE) {
       setUploadError("ファイルサイズは10MB以下にしてください");
-      // input をリセット
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    // MIMEタイプチェック
+    if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+      setUploadError("このファイル形式はアップロードできません");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    // 拡張子チェック（実行ファイルブロック）
+    const ext = file.name.lastIndexOf(".") >= 0
+      ? file.name.slice(file.name.lastIndexOf(".")).toLowerCase()
+      : "";
+    if (BLOCKED_EXTENSIONS.includes(ext)) {
+      setUploadError("実行ファイルはアップロードできません");
       if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
@@ -213,7 +257,8 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
 
     try {
       const supabase = createClient();
-      const path = `${channelId || "general"}/${crypto.randomUUID()}-${file.name}`;
+      const safeName = sanitizeFileName(file.name);
+      const path = `${channelId || "general"}/${crypto.randomUUID()}-${safeName}`;
 
       const { error: uploadErr } = await supabase.storage
         .from("chat-files")
