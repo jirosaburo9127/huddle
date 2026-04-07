@@ -191,6 +191,7 @@ export const MessageItem = memo(function MessageItem({
       emoji,
       count: list.length,
       reacted: list.some((r) => r.user_id === currentUserId),
+      names: list.map((r) => r.display_name || "").filter(Boolean),
     }));
   }, [message.reactions, currentUserId]);
 
@@ -367,11 +368,12 @@ export const MessageItem = memo(function MessageItem({
           {/* リアクションバッジ */}
           {groupedReactions.length > 0 && !isEditing && (
             <div className="flex flex-wrap items-center gap-1 mt-1">
-              {groupedReactions.map(({ emoji, count, reacted }) => (
+              {groupedReactions.map(({ emoji, count, reacted, names }) => (
                 <button
                   key={emoji}
                   type="button"
                   onClick={() => onReact?.(message.id, emoji)}
+                  title={names.length > 0 ? names.join("、") : undefined}
                   className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border cursor-pointer transition-colors ${
                     reacted
                       ? "bg-accent/10 border-accent/30 text-accent"

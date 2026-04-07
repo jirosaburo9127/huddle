@@ -48,6 +48,7 @@ export type Reaction = {
   user_id: string;
   emoji: string;
   created_at: string;
+  display_name?: string;
 };
 
 export type ChannelMember = {

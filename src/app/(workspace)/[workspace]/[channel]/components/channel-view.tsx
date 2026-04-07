@@ -253,12 +253,15 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
       await supabase.from("reactions").delete().eq("id", existingReaction.id);
     } else {
       // 追加
+      // 自分の表示名を取得（楽観的リアクション用）
+      const myProfile = messages.find((m) => m.user_id === currentUserId)?.profiles;
       const optimisticReaction: Reaction = {
         id: crypto.randomUUID(),
         message_id: messageId,
         user_id: currentUserId,
         emoji,
         created_at: new Date().toISOString(),
+        display_name: myProfile?.display_name || "",
       };
       setMessages((prev) =>
         prev.map((m) =>
