@@ -143,6 +143,90 @@ function MessageContent({
   );
 }
 
+// リアクションバッジコンポーネント（PC: ホバーツールチップ、モバイル: 長押しモーダル）
+function ReactionBadges({
+  reactions,
+  onReact,
+}: {
+  reactions: Array<{ emoji: string; count: number; reacted: boolean; names: string[] }>;
+  onReact?: (emoji: string) => void;
+}) {
+  const [longPressNames, setLongPressNames] = useState<{ emoji: string; names: string[] } | null>(null);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function handleTouchStart(emoji: string, names: string[]) {
+    longPressTimer.current = setTimeout(() => {
+      setLongPressNames({ emoji, names });
+    }, 500);
+  }
+
+  function handleTouchEnd() {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  }
+
+  return (
+    <>
+      <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+        {reactions.map(({ emoji, count, reacted, names }) => (
+          <div key={emoji} className="relative group/reaction">
+            <button
+              type="button"
+              onClick={() => onReact?.(emoji)}
+              onTouchStart={() => handleTouchStart(emoji, names)}
+              onTouchEnd={handleTouchEnd}
+              onTouchCancel={handleTouchEnd}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm border cursor-pointer transition-colors ${
+                reacted
+                  ? "bg-accent/10 border-accent/30 text-accent"
+                  : "bg-white/[0.03] border-border/50 text-muted hover:border-accent/30"
+              }`}
+            >
+              <span className="text-base">{emoji}</span>
+              <span>{count}</span>
+            </button>
+            {/* PC: ホバーツールチップ */}
+            {names.length > 0 && (
+              <div className="hidden lg:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 rounded-lg bg-foreground text-background text-xs font-medium whitespace-nowrap opacity-0 group-hover/reaction:opacity-100 pointer-events-none transition-opacity duration-100 z-20">
+                {names.join("、")}
+                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-foreground" />
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      {/* モバイル: 長押しモーダル */}
+      {longPressNames && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center lg:hidden"
+          onClick={() => setLongPressNames(null)}
+        >
+          <div className="absolute inset-0 bg-black/40" />
+          <div className="relative bg-sidebar border border-border rounded-2xl px-5 py-4 max-w-xs w-full mx-4 animate-fade-in" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-2xl">{longPressNames.emoji}</span>
+              <span className="text-base font-semibold text-foreground">リアクションした人</span>
+            </div>
+            <div className="space-y-2">
+              {longPressNames.names.map((name) => (
+                <div key={name} className="text-sm text-foreground">{name}</div>
+              ))}
+            </div>
+            <button
+              onClick={() => setLongPressNames(null)}
+              className="mt-4 w-full py-2 text-sm text-muted hover:text-foreground rounded-xl border border-border/50 transition-colors"
+            >
+              閉じる
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 export const MessageItem = memo(function MessageItem({
   message,
   currentUserId,
@@ -367,39 +451,10 @@ export const MessageItem = memo(function MessageItem({
 
           {/* リアクションバッジ */}
           {groupedReactions.length > 0 && !isEditing && (
-            <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-              {groupedReactions.map(({ emoji, count, reacted, names }) => (
-                <div key={emoji} className="relative group/reaction">
-                  <button
-                    type="button"
-                    onClick={() => onReact?.(message.id, emoji)}
-                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm border cursor-pointer transition-colors ${
-                      reacted
-                        ? "bg-accent/10 border-accent/30 text-accent"
-                        : "bg-white/[0.03] border-border/50 text-muted hover:border-accent/30"
-                    }`}
-                  >
-                    <span className="text-base">{emoji}</span>
-                    <span>{count}</span>
-                  </button>
-                  {/* PC: ホバーツールチップ */}
-                  {names.length > 0 && (
-                    <div className="hidden lg:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 rounded-lg bg-foreground text-background text-xs font-medium whitespace-nowrap opacity-0 group-hover/reaction:opacity-100 pointer-events-none transition-opacity duration-100 z-20">
-                      {names.join("、")}
-                      <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-foreground" />
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-          {/* モバイル: リアクションした人の名前をバッジ下に表示 */}
-          {groupedReactions.length > 0 && !isEditing && (
-            <div className="lg:hidden mt-0.5 flex flex-wrap gap-x-3">
-              {groupedReactions.filter((g) => g.names.length > 0).map(({ emoji, names }) => (
-                <span key={emoji} className="text-[12px] text-muted">{emoji} {names.join("、")}</span>
-              ))}
-            </div>
+            <ReactionBadges
+              reactions={groupedReactions}
+              onReact={onReact ? (emoji: string) => onReact(message.id, emoji) : undefined}
+            />
           )}
 
           {/* スレッド返信数 */}
