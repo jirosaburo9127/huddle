@@ -225,7 +225,7 @@ export const MessageItem = memo(function MessageItem({
     <>
       <div
         className={`group relative flex gap-3 px-2 rounded-lg hover:bg-white/[0.02] transition-colors ${
-          isConsecutive ? "py-0.5" : "pt-3 pb-1"
+          isConsecutive ? "py-0.5" : "pt-2 pb-0.5"
         }`}
         onClick={() => setShowActions((v) => !v)}
       >
@@ -342,17 +342,16 @@ export const MessageItem = memo(function MessageItem({
             </button>
           )}
 
-          {/* アクションバー（PC: ホバー、モバイル: タップでトグル） */}
+          {/* PC: インラインアクションバー（ホバーで表示） */}
           {!isEditing && !isThreadView && (
-          <div className={`transition-opacity mt-2 flex items-center gap-1 flex-wrap ${showActions ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
-            {/* リアクション */}
+          <div className="hidden lg:flex transition-opacity mt-1 items-center gap-1 flex-wrap opacity-0 group-hover:opacity-100">
             {onReact && (
               <div className="relative">
                 <button
                   onClick={(e) => { e.stopPropagation(); setEmojiPickerLocation((v) => v === "action" ? null : "action"); }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-muted hover:text-accent bg-white/[0.03] border border-border/50 hover:border-accent/40 rounded-lg transition-colors"
+                  className="flex items-center gap-1 px-2 py-0.5 text-[13px] text-muted hover:text-accent border border-transparent hover:border-border/50 rounded transition-colors"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   リアクション
@@ -365,33 +364,31 @@ export const MessageItem = memo(function MessageItem({
                 )}
               </div>
             )}
-            {/* 返信 */}
             <button
               onClick={(e) => { e.stopPropagation(); onOpenThread?.(message); }}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-muted hover:text-accent bg-white/[0.03] border border-border/50 hover:border-accent/40 rounded-lg transition-colors"
+              className="flex items-center gap-1 px-2 py-0.5 text-[13px] text-muted hover:text-accent border border-transparent hover:border-border/50 rounded transition-colors"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
               </svg>
               返信
             </button>
-            {/* 編集・削除は自分のメッセージのみ */}
             {isOwn && (
               <>
                 <button
                   onClick={(e) => { e.stopPropagation(); setIsEditing(true); setEditContent(message.content); }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-muted hover:text-accent bg-white/[0.03] border border-border/50 hover:border-accent/40 rounded-lg transition-colors"
+                  className="flex items-center gap-1 px-2 py-0.5 text-[13px] text-muted hover:text-accent border border-transparent hover:border-border/50 rounded transition-colors"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                   </svg>
                   編集
                 </button>
                 <button
                   onClick={(e) => { e.stopPropagation(); setIsDeleting(true); }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-muted hover:text-mention bg-white/[0.03] border border-border/50 hover:border-mention/30 rounded-lg transition-colors"
+                  className="flex items-center gap-1 px-2 py-0.5 text-[13px] text-muted hover:text-mention border border-transparent hover:border-border/50 rounded transition-colors"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                   </svg>
                   削除
@@ -402,6 +399,87 @@ export const MessageItem = memo(function MessageItem({
         )}
         </div>
       </div>
+
+      {/* モバイル: Chatwork風アクションモーダル */}
+      {showActions && !isEditing && !isThreadView && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center lg:hidden"
+          onClick={(e) => { e.stopPropagation(); setShowActions(false); }}
+        >
+          <div className="absolute inset-0 bg-black/40" />
+          <div
+            className="relative w-full max-w-sm mx-4 mb-6 rounded-2xl bg-sidebar border border-border p-5 animate-slide-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="grid grid-cols-3 gap-3">
+              {/* 返信 */}
+              <button
+                onClick={() => { setShowActions(false); onOpenThread?.(message); }}
+                className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
+              >
+                <span className="w-12 h-12 rounded-full border-2 border-muted/40 flex items-center justify-center">
+                  <svg className="w-5 h-5 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                  </svg>
+                </span>
+                <span className="text-xs text-foreground">返信</span>
+              </button>
+              {/* リアクション */}
+              {onReact && (
+                <button
+                  onClick={() => { setShowActions(false); setEmojiPickerLocation("action"); }}
+                  className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
+                >
+                  <span className="w-12 h-12 rounded-full border-2 border-muted/40 flex items-center justify-center">
+                    <svg className="w-5 h-5 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </span>
+                  <span className="text-xs text-foreground">リアクション</span>
+                </button>
+              )}
+              {/* 編集 */}
+              {isOwn && (
+                <button
+                  onClick={() => { setShowActions(false); setIsEditing(true); setEditContent(message.content); }}
+                  className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
+                >
+                  <span className="w-12 h-12 rounded-full border-2 border-muted/40 flex items-center justify-center">
+                    <svg className="w-5 h-5 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                  </span>
+                  <span className="text-xs text-foreground">編集</span>
+                </button>
+              )}
+              {/* 削除 */}
+              {isOwn && (
+                <button
+                  onClick={() => { setShowActions(false); setIsDeleting(true); }}
+                  className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
+                >
+                  <span className="w-12 h-12 rounded-full border-2 border-mention/40 flex items-center justify-center">
+                    <svg className="w-5 h-5 text-mention" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </span>
+                  <span className="text-xs text-mention">削除</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 絵文字ピッカーモーダル（モバイル用） */}
+      {emojiPickerLocation === "action" && (
+        <div className="lg:hidden fixed inset-0 z-50 flex items-end justify-center" onClick={(e) => { e.stopPropagation(); setEmojiPickerLocation(null); }}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div className="relative w-full max-w-sm mx-4 mb-6 rounded-2xl bg-sidebar border border-border p-4 animate-slide-up" onClick={(e) => e.stopPropagation()}>
+            <EmojiPicker onSelect={handleEmojiSelect} onClose={() => setEmojiPickerLocation(null)} />
+          </div>
+        </div>
+      )}
 
       {/* 削除確認ダイアログ */}
       {isDeleting && (
