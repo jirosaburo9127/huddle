@@ -10,6 +10,7 @@ import { InviteModal } from "@/components/invite-modal";
 import { BookmarkModal } from "@/components/bookmark-modal";
 import { WsMembersModal } from "@/components/ws-members-modal";
 import { ThemeSelector } from "@/components/theme-selector";
+import { MfaSetup } from "@/components/mfa-setup";
 import { signOut } from "@/lib/actions";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
 import { createClient } from "@/lib/supabase/client";
@@ -603,6 +604,12 @@ export function Sidebar({
                   <span className="text-sm text-green-400 animate-fade-in">保存しました</span>
                 )}
               </div>
+            </div>
+
+            {/* 2段階認証 */}
+            <div>
+              <h3 className="text-sm font-semibold text-foreground mb-3">2段階認証</h3>
+              <MfaSetup />
             </div>
 
             {/* テーマ */}
