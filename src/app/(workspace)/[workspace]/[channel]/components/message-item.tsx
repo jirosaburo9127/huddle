@@ -394,9 +394,9 @@ export const MessageItem = memo(function MessageItem({
             </button>
           )}
 
-          {/* PC: インラインアクションバー（ホバーで表示） */}
+          {/* PC: アクションバー（ホバーで表示、メッセージ右上に浮かせる） */}
           {!isEditing && !isThreadView && (
-          <div className="hidden lg:flex transition-opacity mt-1 items-center gap-1 flex-wrap opacity-0 group-hover:opacity-100">
+          <div className="hidden lg:flex absolute -top-2 right-3 z-10 transition-opacity items-center gap-0.5 bg-sidebar/95 backdrop-blur-sm border border-border/60 rounded-lg px-1 py-0.5 shadow-lg opacity-0 group-hover:opacity-100">
             {onReact && (
               <div className="relative">
                 <button
@@ -581,10 +581,21 @@ export const MessageItem = memo(function MessageItem({
 
       {/* 絵文字ピッカーモーダル（モバイル用） */}
       {emojiPickerLocation === "action" && (
-        <div className="lg:hidden fixed inset-0 z-50 flex items-end justify-center" onClick={(e) => { e.stopPropagation(); setEmojiPickerLocation(null); }}>
+        <div className="lg:hidden fixed inset-0 z-[60] flex items-end justify-center" onClick={(e) => { e.stopPropagation(); setEmojiPickerLocation(null); }}>
           <div className="absolute inset-0 bg-black/40" />
           <div className="relative w-full max-w-sm mx-4 mb-6 rounded-2xl bg-sidebar border border-border p-4 animate-slide-up" onClick={(e) => e.stopPropagation()}>
-            <EmojiPicker onSelect={handleEmojiSelect} onClose={() => setEmojiPickerLocation(null)} />
+            <p className="text-sm font-medium text-foreground mb-3">リアクションを選択</p>
+            <div className="grid grid-cols-8 gap-2">
+              {["👍", "❤️", "😂", "🎉", "🔥", "👀", "💯", "✅", "😊", "😄", "🤔", "😮", "😢", "🥳", "😎", "👏", "🙌", "🤝", "💪", "🙏", "⭐", "💡", "🚀", "⚡"].map((emoji) => (
+                <button
+                  key={emoji}
+                  onClick={() => handleEmojiSelect(emoji)}
+                  className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-white/[0.06] text-xl transition-colors"
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}
