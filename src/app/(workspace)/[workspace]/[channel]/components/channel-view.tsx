@@ -26,6 +26,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
   const [showMembersModal, setShowMembersModal] = useState(false);
   const [showDecisionsOnly, setShowDecisionsOnly] = useState(false);
   const [showWiki, setShowWiki] = useState(false);
+  const [hasWiki, setHasWiki] = useState(false);
   const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const prevMessageCountRef = useRef(initialMessages.length);
@@ -65,6 +66,20 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUserId]);
+
+  // Wikiの存在チェック
+  useEffect(() => {
+    async function checkWiki() {
+      const { data } = await supabase
+        .from("channel_notes")
+        .select("id")
+        .eq("channel_id", channel.id)
+        .single();
+      setHasWiki(!!data);
+    }
+    checkWiki();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channel.id]);
 
   // ブックマーク一覧を取得
   useEffect(() => {
@@ -431,6 +446,22 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
           </div>
         </header>
 
+        {/* Wikiバナー */}
+        {hasWiki && !showWiki && (
+          <div className="px-4 py-2 border-b border-border/50 bg-accent/5 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm text-foreground">
+              <span>📋</span>
+              <span>このチャンネルの使い方が書かれています</span>
+            </div>
+            <button
+              onClick={() => setShowWiki(true)}
+              className="text-sm text-accent hover:underline font-medium shrink-0"
+            >
+              読む
+            </button>
+          </div>
+        )}
+
         {/* メッセージ一覧 */}
         <div className="flex-1 overflow-y-auto px-4 py-4">
           {messages.length === 0 ? (
@@ -515,7 +546,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
       {showWiki && !activeThread && (
         <ChannelWiki
           channelId={channel.id}
-          onClose={() => setShowWiki(false)}
+          onClose={() => { setShowWiki(false); setHasWiki(true); }}
         />
       )}
 
