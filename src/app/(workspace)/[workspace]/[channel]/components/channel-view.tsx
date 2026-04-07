@@ -8,6 +8,7 @@ import { MessageItem } from "./message-item";
 import { MessageInput } from "./message-input";
 import { ThreadPanel } from "./thread-panel";
 import { DateSeparator } from "./date-separator";
+import { ChannelWiki } from "./channel-wiki";
 import { ChannelMembersModal } from "@/components/channel-members-modal";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
 import { showMessageNotification } from "@/lib/notification";
@@ -23,6 +24,9 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
   const [messages, setMessages] = useState<MessageWithProfile[]>(initialMessages);
   const [activeThread, setActiveThread] = useState<MessageWithProfile | null>(null);
   const [showMembersModal, setShowMembersModal] = useState(false);
+  const [showDecisionsOnly, setShowDecisionsOnly] = useState(false);
+  const [showWiki, setShowWiki] = useState(false);
+  const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const prevMessageCountRef = useRef(initialMessages.length);
   const supabaseRef = useRef(createClient());
@@ -59,6 +63,21 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     updatePresence();
     const interval = setInterval(updatePresence, 60000);
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUserId]);
+
+  // ブックマーク一覧を取得
+  useEffect(() => {
+    async function fetchBookmarks() {
+      const { data } = await supabase
+        .from("bookmarks")
+        .select("message_id")
+        .eq("user_id", currentUserId);
+      if (data) {
+        setBookmarkedIds(new Set(data.map((b: { message_id: string }) => b.message_id)));
+      }
+    }
+    fetchBookmarks();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUserId]);
 
@@ -129,7 +148,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
           setMessages((prev) =>
             prev.map((m) =>
               m.id === updated.id
-                ? { ...m, content: updated.content, edited_at: updated.edited_at, deleted_at: updated.deleted_at, reply_count: updated.reply_count }
+                ? { ...m, content: updated.content, edited_at: updated.edited_at, deleted_at: updated.deleted_at, is_decision: updated.is_decision ?? m.is_decision, reply_count: updated.reply_count }
                 : m
             )
           );
@@ -255,6 +274,45 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     }
   }, [supabase, currentUserId, messages]);
 
+  // 決定事項マーカーのトグル
+  const handleDecision = useCallback(async (messageId: string, isDecision: boolean) => {
+    // 楽観的更新
+    setMessages((prev) =>
+      prev.map((m) => (m.id === messageId ? { ...m, is_decision: isDecision } : m))
+    );
+    await supabase
+      .from("messages")
+      .update({ is_decision: isDecision })
+      .eq("id", messageId);
+  }, [supabase]);
+
+  // ブックマークのトグル
+  const handleBookmark = useCallback(async (messageId: string) => {
+    const isCurrentlyBookmarked = bookmarkedIds.has(messageId);
+    // 楽観的更新
+    setBookmarkedIds((prev) => {
+      const next = new Set(prev);
+      if (isCurrentlyBookmarked) {
+        next.delete(messageId);
+      } else {
+        next.add(messageId);
+      }
+      return next;
+    });
+
+    if (isCurrentlyBookmarked) {
+      await supabase
+        .from("bookmarks")
+        .delete()
+        .eq("user_id", currentUserId)
+        .eq("message_id", messageId);
+    } else {
+      await supabase
+        .from("bookmarks")
+        .insert({ user_id: currentUserId, message_id: messageId });
+    }
+  }, [supabase, currentUserId, bookmarkedIds]);
+
   // メッセージ送信
   async function handleSend(content: string) {
     if (content.length > 4000) return;
@@ -271,6 +329,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
       content,
       edited_at: null,
       deleted_at: null,
+      is_decision: false,
       reply_count: 0,
       created_at: new Date().toISOString(),
       profiles: {
@@ -326,18 +385,50 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
               </span>
             )}
           </div>
-          {/* メンバー管理ボタン（DMでは非表示） */}
-          {!channel.is_dm && (
+          <div className="flex items-center gap-1 shrink-0">
+            {/* 決定事項フィルタ */}
             <button
-              onClick={() => setShowMembersModal(true)}
-              className="p-1.5 text-muted hover:text-foreground rounded-lg hover:bg-white/[0.04] transition-colors shrink-0"
-              title="メンバー管理"
+              onClick={() => setShowDecisionsOnly((v) => !v)}
+              className={`p-1.5 rounded-lg transition-colors ${
+                showDecisionsOnly
+                  ? "text-accent bg-accent/10"
+                  : "text-muted hover:text-foreground hover:bg-white/[0.04]"
+              }`}
+              title={showDecisionsOnly ? "全メッセージ表示" : "決定事項のみ表示"}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </button>
-          )}
+            {/* Wikiボタン */}
+            {!channel.is_dm && (
+              <button
+                onClick={() => setShowWiki((v) => !v)}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  showWiki
+                    ? "text-accent bg-accent/10"
+                    : "text-muted hover:text-foreground hover:bg-white/[0.04]"
+                }`}
+                title="Wiki"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+              </button>
+            )}
+            {/* メンバー管理ボタン（DMでは非表示） */}
+            {!channel.is_dm && (
+              <button
+                onClick={() => setShowMembersModal(true)}
+                className="p-1.5 text-muted hover:text-foreground rounded-lg hover:bg-white/[0.04] transition-colors"
+                title="メンバー管理"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+              </button>
+            )}
+          </div>
         </header>
 
         {/* メッセージ一覧 */}
@@ -349,8 +440,18 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
             </div>
           ) : (
             <div>
-              {messages.map((message, index) => {
-                const prev = index > 0 ? messages[index - 1] : null;
+              {/* 決定事項フィルタ表示中のバナー */}
+              {showDecisionsOnly && (
+                <div className="flex items-center gap-2 px-3 py-2 mb-2 rounded-lg bg-accent/10 border border-accent/20 text-sm text-accent">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  決定事項のみ表示中
+                  <button onClick={() => setShowDecisionsOnly(false)} className="ml-auto text-xs hover:underline">解除</button>
+                </div>
+              )}
+              {(showDecisionsOnly ? messages.filter((m) => m.is_decision) : messages).map((message, index, arr) => {
+                const prev = index > 0 ? arr[index - 1] : null;
                 // 日付セパレーター: 前のメッセージと日付が異なる場合に表示
                 const currentDate = new Date(message.created_at).toDateString();
                 const prevDate = prev ? new Date(prev.created_at).toDateString() : null;
@@ -375,6 +476,9 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
                       onDelete={handleDelete}
                       onOpenThread={handleOpenThread}
                       onReact={handleReact}
+                      onDecision={handleDecision}
+                      onBookmark={handleBookmark}
+                      isBookmarked={bookmarkedIds.has(message.id)}
                       isConsecutive={isConsecutive}
                     />
                   </div>
@@ -401,6 +505,17 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
           channelId={channel.id}
           onClose={() => setActiveThread(null)}
           onReplyCountChange={handleReplyCountChange}
+          onDecision={handleDecision}
+          onBookmark={handleBookmark}
+          bookmarkedIds={bookmarkedIds}
+        />
+      )}
+
+      {/* Wikiパネル */}
+      {showWiki && !activeThread && (
+        <ChannelWiki
+          channelId={channel.id}
+          onClose={() => setShowWiki(false)}
         />
       )}
 

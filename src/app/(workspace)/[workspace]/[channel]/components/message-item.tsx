@@ -11,6 +11,9 @@ type Props = {
   onDelete: (messageId: string) => Promise<void>;
   onOpenThread?: (message: MessageWithProfile) => void;
   onReact?: (messageId: string, emoji: string) => Promise<void>;
+  onDecision?: (messageId: string, isDecision: boolean) => Promise<void>;
+  onBookmark?: (messageId: string) => Promise<void>;
+  isBookmarked?: boolean;
   isThreadView?: boolean;
   isConsecutive?: boolean;
 };
@@ -42,7 +45,43 @@ function extractFileName(url: string): string {
   }
 }
 
-// メッセージ本文のレンダリング（ファイルURL対応）
+// HTMLタグをエスケープ（XSS対策）
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+// MarkdownをパースしてHTML文字列に変換（最小対応）
+function parseMarkdown(text: string): string {
+  // まずHTMLタグをエスケープ
+  let html = escapeHtml(text);
+
+  // コードブロック（```...```）
+  html = html.replace(/```([\s\S]*?)```/g, (_match, code: string) => {
+    return `<pre class="bg-white/[0.06] rounded-lg p-3 my-1 overflow-x-auto"><code class="text-sm font-mono">${code.trim()}</code></pre>`;
+  });
+
+  // インラインコード（`...`）
+  html = html.replace(/`([^`\n]+)`/g, (_match, code: string) => {
+    return `<code class="bg-white/[0.06] px-1.5 py-0.5 rounded text-sm font-mono">${code}</code>`;
+  });
+
+  // 太字（**...**）
+  html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+
+  // URLの自動リンク化（コードブロック/インラインコード内を除く）
+  html = html.replace(
+    /(?<!["=])(https?:\/\/[^\s<]+)/g,
+    '<a href="$1" target="_blank" rel="noopener noreferrer" class="text-accent hover:underline">$1</a>'
+  );
+
+  return html;
+}
+
+// メッセージ本文のレンダリング（ファイルURL対応 + Markdown）
 function MessageContent({
   content,
   imageError,
@@ -93,11 +132,14 @@ function MessageContent({
     );
   }
 
-  // 通常のテキストメッセージ
+  // Markdownパース済みHTML
+  const html = parseMarkdown(content);
+
   return (
-    <p className="text-lg leading-[1.7] text-foreground whitespace-pre-wrap break-words">
-      {content}
-    </p>
+    <div
+      className="text-lg leading-[1.7] text-foreground whitespace-pre-wrap break-words [&_pre]:whitespace-pre [&_pre]:my-2"
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
   );
 }
 
@@ -108,6 +150,9 @@ export const MessageItem = memo(function MessageItem({
   onDelete,
   onOpenThread,
   onReact,
+  onDecision,
+  onBookmark,
+  isBookmarked,
   isThreadView,
   isConsecutive,
 }: Props) {
@@ -311,6 +356,13 @@ export const MessageItem = memo(function MessageItem({
             </>
           )}
 
+          {/* 決定事項マーカー */}
+          {message.is_decision && !isEditing && (
+            <div className="flex items-center gap-1.5 mt-1 px-2 py-1 rounded-lg bg-accent/10 border border-accent/20 text-sm text-accent">
+              ✅ 決定事項
+            </div>
+          )}
+
           {/* リアクションバッジ */}
           {groupedReactions.length > 0 && !isEditing && (
             <div className="flex flex-wrap items-center gap-1 mt-1">
@@ -373,6 +425,34 @@ export const MessageItem = memo(function MessageItem({
               </svg>
               返信
             </button>
+            {/* 決定事項トグル */}
+            {onDecision && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onDecision(message.id, !message.is_decision); }}
+                className={`flex items-center gap-1 px-2 py-0.5 text-[13px] border border-transparent hover:border-border/50 rounded transition-colors ${
+                  message.is_decision ? "text-accent" : "text-muted hover:text-accent"
+                }`}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                決定
+              </button>
+            )}
+            {/* ブックマーク */}
+            {onBookmark && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onBookmark(message.id); }}
+                className={`flex items-center gap-1 px-2 py-0.5 text-[13px] border border-transparent hover:border-border/50 rounded transition-colors ${
+                  isBookmarked ? "text-accent" : "text-muted hover:text-accent"
+                }`}
+              >
+                <svg className="w-3.5 h-3.5" fill={isBookmarked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                </svg>
+                保存
+              </button>
+            )}
             {isOwn && (
               <>
                 <button
@@ -436,6 +516,34 @@ export const MessageItem = memo(function MessageItem({
                     </svg>
                   </span>
                   <span className="text-xs text-foreground">リアクション</span>
+                </button>
+              )}
+              {/* 決定事項トグル（モバイル） */}
+              {onDecision && (
+                <button
+                  onClick={() => { setShowActions(false); onDecision(message.id, !message.is_decision); }}
+                  className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
+                >
+                  <span className={`w-12 h-12 rounded-full border-2 flex items-center justify-center ${message.is_decision ? "border-accent/40" : "border-muted/40"}`}>
+                    <svg className={`w-5 h-5 ${message.is_decision ? "text-accent" : "text-foreground"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </span>
+                  <span className={`text-xs ${message.is_decision ? "text-accent" : "text-foreground"}`}>決定</span>
+                </button>
+              )}
+              {/* ブックマーク（モバイル） */}
+              {onBookmark && (
+                <button
+                  onClick={() => { setShowActions(false); onBookmark(message.id); }}
+                  className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
+                >
+                  <span className={`w-12 h-12 rounded-full border-2 flex items-center justify-center ${isBookmarked ? "border-accent/40" : "border-muted/40"}`}>
+                    <svg className={`w-5 h-5 ${isBookmarked ? "text-accent" : "text-foreground"}`} fill={isBookmarked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                    </svg>
+                  </span>
+                  <span className={`text-xs ${isBookmarked ? "text-accent" : "text-foreground"}`}>保存</span>
                 </button>
               )}
               {/* 編集 */}

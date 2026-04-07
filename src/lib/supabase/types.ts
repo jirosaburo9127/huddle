@@ -37,6 +37,7 @@ export type Message = {
   content: string;
   edited_at: string | null;
   deleted_at: string | null;
+  is_decision: boolean;
   reply_count: number;
   created_at: string;
 };

@@ -17,6 +17,9 @@ type Props = {
   channelId: string;
   onClose: () => void;
   onReplyCountChange: (parentId: string, delta: number) => void;
+  onDecision?: (messageId: string, isDecision: boolean) => Promise<void>;
+  onBookmark?: (messageId: string) => Promise<void>;
+  bookmarkedIds?: Set<string>;
 };
 
 export function ThreadPanel({
@@ -25,6 +28,9 @@ export function ThreadPanel({
   channelId,
   onClose,
   onReplyCountChange,
+  onDecision,
+  onBookmark,
+  bookmarkedIds,
 }: Props) {
   const [replies, setReplies] = useState<MessageWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -278,6 +284,7 @@ export function ThreadPanel({
       content,
       edited_at: null,
       deleted_at: null,
+      is_decision: false,
       reply_count: 0,
       created_at: new Date().toISOString(),
       profiles: {
@@ -350,6 +357,9 @@ export function ThreadPanel({
           onEdit={handleEdit}
           onDelete={handleDelete}
           onReact={handleReact}
+          onDecision={onDecision}
+          onBookmark={onBookmark}
+          isBookmarked={bookmarkedIds?.has(parentMessage.id)}
           isThreadView
         />
 
@@ -381,6 +391,9 @@ export function ThreadPanel({
                 onEdit={handleEdit}
                 onDelete={handleDelete}
                 onReact={handleReact}
+                onDecision={onDecision}
+                onBookmark={onBookmark}
+                isBookmarked={bookmarkedIds?.has(reply.id)}
                 isThreadView
                 isConsecutive={isConsecutive}
               />

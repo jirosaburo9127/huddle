@@ -1,15 +1,26 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { Workspace, Channel } from "@/lib/supabase/types";
+import { createClient } from "@/lib/supabase/client";
 import { CreateChannelModal } from "@/components/create-channel-modal";
 import { CreateDmModal } from "@/components/create-dm-modal";
 import { InviteModal } from "@/components/invite-modal";
+import { BookmarkModal } from "@/components/bookmark-modal";
 import { ThemeSelector } from "@/components/theme-selector";
 import { signOut } from "@/lib/actions";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
+
+// Quick Pulse ステータス定義
+type PulseStatus = "available" | "focusing" | "away";
+
+const PULSE_OPTIONS: { value: PulseStatus; label: string; icon: string; className: string }[] = [
+  { value: "available", label: "話せます", icon: "🟢", className: "bg-online/20 text-online border-online/30" },
+  { value: "focusing", label: "集中中", icon: "🟡", className: "bg-yellow-500/20 text-yellow-500 border-yellow-500/30" },
+  { value: "away", label: "離席", icon: "⚫", className: "bg-muted/20 text-muted border-muted/30" },
+];
 
 type MemberProfile = {
   id: string;
@@ -48,11 +59,39 @@ export function Sidebar({
   const [showCreateChannel, setShowCreateChannel] = useState(false);
   const [showCreateDm, setShowCreateDm] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showBookmarkModal, setShowBookmarkModal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showWsSwitcher, setShowWsSwitcher] = useState(false);
+  const [currentStatus, setCurrentStatus] = useState<PulseStatus | null>(null);
   const wsSwitcherRef = useRef<HTMLDivElement>(null);
   const { sidebarOpen, setSidebarOpen } = useMobileNavStore();
   const [searchQuery, setSearchQuery] = useState("");
+  const supabase = createClient();
+
+  // 初回ステータス取得
+  useEffect(() => {
+    async function fetchStatus() {
+      const { data } = await supabase
+        .from("profiles")
+        .select("status")
+        .eq("id", currentUserId)
+        .single();
+      if (data?.status) {
+        setCurrentStatus(data.status as PulseStatus);
+      }
+    }
+    fetchStatus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUserId]);
+
+  // ステータス更新
+  const handleStatusChange = useCallback(async (status: PulseStatus) => {
+    setCurrentStatus(status);
+    await supabase
+      .from("profiles")
+      .update({ status })
+      .eq("id", currentUserId);
+  }, [supabase, currentUserId]);
 
   // ワークスペース切り替えドロップダウンの外側クリックで閉じる
   useEffect(() => {
@@ -162,6 +201,17 @@ export function Sidebar({
 
         {/* チャンネル・DM一覧 */}
         <div className="flex-1 overflow-y-auto py-2">
+          {/* ブックマークリンク */}
+          <button
+            onClick={() => setShowBookmarkModal(true)}
+            className="flex items-center gap-2 px-3 py-2 text-sm text-muted hover:text-accent mx-2 rounded-xl hover:bg-white/[0.04] transition-colors w-full mb-2"
+          >
+            <svg className="w-4 h-4" fill="currentColor" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+            </svg>
+            ブックマーク
+          </button>
+
           {/* チャンネルセクション */}
           <div className="px-3 mb-1 flex items-center justify-between">
             <span className="text-[13px] font-semibold uppercase text-muted tracking-wider">
@@ -248,11 +298,21 @@ export function Sidebar({
             const name =
               otherMember?.profiles?.display_name || "DM";
             const avatarUrl = otherMember?.profiles?.avatar_url;
+            // ステータス取得
+            const memberStatus = otherMember?.profiles?.status as PulseStatus | null;
             // 5分以内のアクティビティでオンライン判定
             const lastSeen = otherMember?.profiles?.last_seen_at;
             const isOnline = lastSeen
               ? Date.now() - new Date(lastSeen).getTime() < 5 * 60 * 1000
               : false;
+            // ステータスに応じたドットカラー
+            const statusDotColor = memberStatus === "focusing"
+              ? "bg-yellow-500"
+              : memberStatus === "away"
+                ? "bg-muted/50"
+                : isOnline
+                  ? "bg-online"
+                  : "bg-muted/50";
 
             return (
               <Link
@@ -282,9 +342,7 @@ export function Sidebar({
                     </span>
                   )}
                   <span
-                    className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-sidebar ${
-                      isOnline ? "bg-online" : "bg-muted/50"
-                    }`}
+                    className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-sidebar ${statusDotColor}`}
                   />
                 </span>
                 <span className="truncate">{name}</span>
@@ -323,46 +381,63 @@ export function Sidebar({
             )}
         </div>
 
-        {/* 下部: ユーザー名 + 設定 */}
-        <div className="flex items-center gap-2 px-3 py-3 border-t border-border/50">
-          {(() => {
-            const me = members.find((m) => m.user_id === currentUserId);
-            const profile = me?.profiles;
-            const p = Array.isArray(profile) ? profile[0] : profile;
-            const name = p?.display_name || "ユーザー";
-            const initial = name[0].toUpperCase();
-            return (
-              <>
-                <span className="w-7 h-7 rounded-full bg-accent/20 flex items-center justify-center text-[11px] font-bold text-accent shrink-0">
-                  {p?.avatar_url ? (
-                    <img src={p.avatar_url} alt={name} className="w-7 h-7 rounded-full object-cover" />
-                  ) : initial}
-                </span>
-                <span className="text-base text-foreground truncate flex-1">{name}</span>
-              </>
-            );
-          })()}
-          <button
-            onClick={() => setShowSettings(true)}
-            className="text-muted hover:text-foreground transition-colors p-1.5 rounded-lg hover:bg-white/[0.04] shrink-0"
-            title="設定"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          </button>
-          <form action={signOut}>
+        {/* 下部: ユーザー名 + ステータス + 設定 */}
+        <div className="px-3 py-3 border-t border-border/50 space-y-2">
+          <div className="flex items-center gap-2">
+            {(() => {
+              const me = members.find((m) => m.user_id === currentUserId);
+              const profile = me?.profiles;
+              const p = Array.isArray(profile) ? profile[0] : profile;
+              const name = p?.display_name || "ユーザー";
+              const initial = name[0].toUpperCase();
+              return (
+                <>
+                  <span className="w-7 h-7 rounded-full bg-accent/20 flex items-center justify-center text-[11px] font-bold text-accent shrink-0">
+                    {p?.avatar_url ? (
+                      <img src={p.avatar_url} alt={name} className="w-7 h-7 rounded-full object-cover" />
+                    ) : initial}
+                  </span>
+                  <span className="text-base text-foreground truncate flex-1">{name}</span>
+                </>
+              );
+            })()}
             <button
-              type="submit"
+              onClick={() => setShowSettings(true)}
               className="text-muted hover:text-foreground transition-colors p-1.5 rounded-lg hover:bg-white/[0.04] shrink-0"
-              title="ログアウト"
+              title="設定"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
             </button>
-          </form>
+            <form action={signOut}>
+              <button
+                type="submit"
+                className="text-muted hover:text-foreground transition-colors p-1.5 rounded-lg hover:bg-white/[0.04] shrink-0"
+                title="ログアウト"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+              </button>
+            </form>
+          </div>
+          {/* Quick Pulse ステータスボタン */}
+          <div className="flex items-center gap-1">
+            {PULSE_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => handleStatusChange(opt.value)}
+                className={`flex-1 flex items-center justify-center gap-1 px-1.5 py-1 text-[11px] rounded-lg border transition-all ${opt.className} ${
+                  currentStatus === opt.value ? "ring-1 ring-current" : "opacity-60 hover:opacity-100"
+                }`}
+              >
+                <span>{opt.icon}</span>
+                <span className="truncate">{opt.label}</span>
+              </button>
+            ))}
+          </div>
         </div>
       </aside>
 
@@ -391,6 +466,15 @@ export function Sidebar({
         <InviteModal
           workspaceId={workspace.id}
           onClose={() => setShowInviteModal(false)}
+        />
+      )}
+
+      {/* ブックマークモーダル */}
+      {showBookmarkModal && (
+        <BookmarkModal
+          currentUserId={currentUserId}
+          workspaceSlug={workspaceSlug}
+          onClose={() => setShowBookmarkModal(false)}
         />
       )}
 
