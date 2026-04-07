@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { Workspace, Channel } from "@/lib/supabase/types";
-import { createClient } from "@/lib/supabase/client";
 import { CreateChannelModal } from "@/components/create-channel-modal";
 import { CreateDmModal } from "@/components/create-dm-modal";
 import { InviteModal } from "@/components/invite-modal";
@@ -12,15 +11,6 @@ import { BookmarkModal } from "@/components/bookmark-modal";
 import { ThemeSelector } from "@/components/theme-selector";
 import { signOut } from "@/lib/actions";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
-
-// Quick Pulse ステータス定義
-type PulseStatus = "available" | "focusing" | "away";
-
-const PULSE_OPTIONS: { value: PulseStatus; label: string; icon: string; className: string }[] = [
-  { value: "available", label: "話せます", icon: "🟢", className: "bg-online/20 text-online border-online/30" },
-  { value: "focusing", label: "集中中", icon: "🟡", className: "bg-yellow-500/20 text-yellow-500 border-yellow-500/30" },
-  { value: "away", label: "離席", icon: "⚫", className: "bg-muted/20 text-muted border-muted/30" },
-];
 
 type MemberProfile = {
   id: string;
@@ -62,36 +52,9 @@ export function Sidebar({
   const [showBookmarkModal, setShowBookmarkModal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showWsSwitcher, setShowWsSwitcher] = useState(false);
-  const [currentStatus, setCurrentStatus] = useState<PulseStatus | null>(null);
   const wsSwitcherRef = useRef<HTMLDivElement>(null);
   const { sidebarOpen, setSidebarOpen } = useMobileNavStore();
   const [searchQuery, setSearchQuery] = useState("");
-  const supabase = createClient();
-
-  // 初回ステータス取得
-  useEffect(() => {
-    async function fetchStatus() {
-      const { data } = await supabase
-        .from("profiles")
-        .select("status")
-        .eq("id", currentUserId)
-        .single();
-      if (data?.status) {
-        setCurrentStatus(data.status as PulseStatus);
-      }
-    }
-    fetchStatus();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUserId]);
-
-  // ステータス更新
-  const handleStatusChange = useCallback(async (status: PulseStatus) => {
-    setCurrentStatus(status);
-    await supabase
-      .from("profiles")
-      .update({ status })
-      .eq("id", currentUserId);
-  }, [supabase, currentUserId]);
 
   // ワークスペース切り替えドロップダウンの外側クリックで閉じる
   useEffect(() => {
@@ -194,9 +157,6 @@ export function Sidebar({
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-background/50 rounded-xl px-3 py-2 text-base border border-border/50 focus:border-accent focus:bg-input-bg placeholder-muted/60 transition-all outline-none"
           />
-          <p className="text-[10px] text-muted/50 mt-1 ml-1">
-            ⌘K でメッセージ検索
-          </p>
         </div>
 
         {/* チャンネル・DM一覧 */}
@@ -422,21 +382,6 @@ export function Sidebar({
                 </svg>
               </button>
             </form>
-          </div>
-          {/* Quick Pulse ステータスボタン */}
-          <div className="flex items-center gap-1">
-            {PULSE_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => handleStatusChange(opt.value)}
-                className={`flex-1 flex items-center justify-center gap-1 px-1.5 py-1 text-[11px] rounded-lg border transition-all ${opt.className} ${
-                  currentStatus === opt.value ? "ring-1 ring-current" : "opacity-60 hover:opacity-100"
-                }`}
-              >
-                <span>{opt.icon}</span>
-                <span className="truncate">{opt.label}</span>
-              </button>
-            ))}
           </div>
         </div>
       </aside>

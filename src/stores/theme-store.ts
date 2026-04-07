@@ -12,7 +12,7 @@ type ThemeStore = {
 export const useThemeStore = create<ThemeStore>()(
   persist(
     (set) => ({
-      theme: "midnight",
+      theme: "dawn",
       setTheme: (theme) => set({ theme }),
     }),
     { name: "huddle-theme" }
