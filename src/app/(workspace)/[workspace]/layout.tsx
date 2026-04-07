@@ -26,12 +26,13 @@ export default async function WorkspaceLayout({
 
   if (!workspace) redirect("/");
 
-  // チャンネル・DM・メンバー・未読数を並列取得
+  // チャンネル・DM・メンバー・未読数・全WS所属を並列取得
   const [
     { data: channels },
     { data: dmChannels },
     { data: membersRaw },
     { data: unreadData },
+    { data: allWorkspacesRaw },
   ] = await Promise.all([
     supabase
       .from("channels")
@@ -49,7 +50,19 @@ export default async function WorkspaceLayout({
       .select("user_id, profiles(id, display_name, avatar_url, status)")
       .eq("workspace_id", workspace.id),
     supabase.rpc("get_unread_counts", { p_user_id: user.id }),
+    supabase
+      .from("workspace_members")
+      .select("workspace_id, workspaces(id, name, slug)")
+      .eq("user_id", user.id),
   ]);
+
+  // 全ワークスペース一覧を整形
+  const allWorkspaces = (allWorkspacesRaw || [])
+    .map((row) => {
+      const ws = row.workspaces as unknown as { id: string; name: string; slug: string } | null;
+      return ws ? { id: ws.id, name: ws.name, slug: ws.slug } : null;
+    })
+    .filter((ws): ws is { id: string; name: string; slug: string } => ws !== null);
 
   const members = (membersRaw || []) as unknown as Array<{
     user_id: string;
@@ -79,6 +92,7 @@ export default async function WorkspaceLayout({
         currentUserId={user.id}
         workspaceSlug={workspaceSlug}
         unreadCounts={unreadCounts}
+        allWorkspaces={allWorkspaces}
       />
       <KeyboardShortcuts workspaceId={workspace.id} workspaceSlug={workspaceSlug}>
         <main className="flex-1 flex flex-col min-w-0">

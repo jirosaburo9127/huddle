@@ -2,11 +2,17 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { createWorkspace } from "@/lib/actions";
 
-export default async function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ create?: string }>;
+}) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) redirect("/login");
+
+  const { create } = await searchParams;
 
   // ユーザーが所属するワークスペースを取得
   const { data: memberships } = await supabase
@@ -15,15 +21,15 @@ export default async function HomePage() {
     .eq("user_id", user.id)
     .limit(1);
 
-  // ワークスペースがあればリダイレクト
-  if (memberships && memberships.length > 0) {
+  // create=true でなければ、既存WSにリダイレクト
+  if (create !== "true" && memberships && memberships.length > 0) {
     const workspace = memberships[0].workspaces as unknown as { slug: string };
     if (workspace?.slug) {
       redirect(`/${workspace.slug}/general`);
     }
   }
 
-  // なければワークスペース作成画面
+  // ワークスペース作成画面
   return (
     <div className="flex min-h-full items-center justify-center px-4">
       <div className="w-full max-w-sm space-y-8">
@@ -54,6 +60,18 @@ export default async function HomePage() {
             ワークスペースを作成
           </button>
         </form>
+
+        {/* 既存WSがある場合は戻るリンクを表示 */}
+        {create === "true" && memberships && memberships.length > 0 && (
+          <div className="text-center">
+            <a
+              href="/"
+              className="text-sm text-muted hover:text-accent transition-colors"
+            >
+              ← ワークスペースに戻る
+            </a>
+          </div>
+        )}
       </div>
     </div>
   );

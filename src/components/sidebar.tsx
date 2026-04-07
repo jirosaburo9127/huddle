@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { Workspace, Channel } from "@/lib/supabase/types";
@@ -31,6 +31,7 @@ type SidebarProps = {
   currentUserId: string;
   workspaceSlug: string;
   unreadCounts?: Record<string, number>;
+  allWorkspaces: Array<{ id: string; name: string; slug: string }>;
 };
 
 export function Sidebar({
@@ -41,14 +42,30 @@ export function Sidebar({
   currentUserId,
   workspaceSlug,
   unreadCounts = {},
+  allWorkspaces,
 }: SidebarProps) {
   const pathname = usePathname();
   const [showCreateChannel, setShowCreateChannel] = useState(false);
   const [showCreateDm, setShowCreateDm] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showWsSwitcher, setShowWsSwitcher] = useState(false);
+  const wsSwitcherRef = useRef<HTMLDivElement>(null);
   const { sidebarOpen, setSidebarOpen } = useMobileNavStore();
   const [searchQuery, setSearchQuery] = useState("");
+
+  // ワークスペース切り替えドロップダウンの外側クリックで閉じる
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (wsSwitcherRef.current && !wsSwitcherRef.current.contains(e.target as Node)) {
+        setShowWsSwitcher(false);
+      }
+    }
+    if (showWsSwitcher) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showWsSwitcher]);
 
   // 検索クエリでチャンネルとDMをフィルタリング
   const filteredChannels = useMemo(() => {
@@ -85,10 +102,48 @@ export function Sidebar({
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
         `}
       >
-        {/* ヘッダー: アプリ名 + ワークスペース名 */}
+        {/* ヘッダー: アプリ名 + ワークスペース切り替え */}
         <div className="px-4 py-3 border-b border-border/50">
           <h1 className="font-bold text-3xl text-accent">Huddle</h1>
-          <p className="text-lg text-muted truncate">{workspace.name}</p>
+          <div className="relative" ref={wsSwitcherRef}>
+            <button
+              onClick={() => setShowWsSwitcher((prev) => !prev)}
+              className="flex items-center gap-1 text-lg text-muted hover:text-foreground transition-colors truncate w-full text-left"
+            >
+              <span className="truncate">{workspace.name}</span>
+              <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {/* ワークスペース切り替えドロップダウン */}
+            {showWsSwitcher && (
+              <div className="absolute left-0 top-full mt-1 w-full bg-sidebar border border-border rounded-xl shadow-lg z-50 py-1 animate-fade-in">
+                {allWorkspaces.map((ws) => (
+                  <Link
+                    key={ws.id}
+                    href={`/${ws.slug}/general`}
+                    onClick={() => setShowWsSwitcher(false)}
+                    className={`block px-3 py-2 text-sm truncate transition-colors rounded-lg mx-1 ${
+                      ws.id === workspace.id
+                        ? "text-accent bg-accent/10 font-semibold"
+                        : "text-foreground hover:bg-white/[0.04]"
+                    }`}
+                  >
+                    {ws.name}
+                  </Link>
+                ))}
+                <div className="border-t border-border/50 mt-1 pt-1">
+                  <Link
+                    href="/?create=true"
+                    onClick={() => setShowWsSwitcher(false)}
+                    className="block px-3 py-2 text-sm text-muted hover:text-accent transition-colors rounded-lg mx-1 hover:bg-white/[0.04]"
+                  >
+                    + 新しいワークスペースを作成
+                  </Link>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* 検索バー */}
