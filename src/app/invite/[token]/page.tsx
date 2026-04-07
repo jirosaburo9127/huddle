@@ -83,8 +83,8 @@ export default function InvitePage() {
         return;
       }
 
-      // 参加成功 → ワークスペースにリダイレクト
-      window.location.href = `/${data.workspace_slug}`;
+      // 参加成功 → ワークスペースのgeneralチャンネルにリダイレクト
+      window.location.href = `/${data.workspace_slug}/general`;
     } catch {
       setError("参加処理中にエラーが発生しました");
       setJoining(false);
