@@ -9,6 +9,7 @@ import { CreateDmModal } from "@/components/create-dm-modal";
 import { InviteModal } from "@/components/invite-modal";
 import { ThemeSelector } from "@/components/theme-selector";
 import { signOut } from "@/lib/actions";
+import { useMobileNavStore } from "@/stores/mobile-nav-store";
 
 type MemberProfile = {
   id: string;
@@ -46,7 +47,7 @@ export function Sidebar({
   const [showCreateDm, setShowCreateDm] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { sidebarOpen, setSidebarOpen } = useMobileNavStore();
   const [searchQuery, setSearchQuery] = useState("");
 
   // 検索クエリでチャンネルとDMをフィルタリング
@@ -76,38 +77,10 @@ export function Sidebar({
 
   return (
     <>
-      {/* モバイルハンバーガー */}
-      <button
-        onClick={() => setSidebarOpen(true)}
-        className="fixed top-3 left-3 z-50 rounded-lg bg-sidebar/90 backdrop-blur-sm p-2 lg:hidden"
-      >
-        <svg
-          className="h-5 w-5 text-foreground"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M4 6h16M4 12h16M4 18h16"
-          />
-        </svg>
-      </button>
-
-      {/* オーバーレイ */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      {/* サイドバー */}
+      {/* サイドバー（モバイルではフルスクリーン表示） */}
       <aside
         className={`
-          fixed inset-y-0 left-0 z-50 w-64 bg-sidebar flex flex-col border-r border-border
+          fixed inset-y-0 left-0 z-50 w-full sm:w-64 bg-sidebar flex flex-col border-r border-border
           transform transition-transform lg:relative lg:translate-x-0
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
         `}
@@ -115,7 +88,7 @@ export function Sidebar({
         {/* ヘッダー: アプリ名 + ワークスペース名 */}
         <div className="px-4 py-3 border-b border-border/50">
           <h1 className="font-bold text-2xl text-accent">Huddle</h1>
-          <p className="text-[15px] text-muted truncate">{workspace.name}</p>
+          <p className="text-base text-muted truncate">{workspace.name}</p>
         </div>
 
         {/* 検索バー */}
@@ -125,7 +98,7 @@ export function Sidebar({
             placeholder="チャンネルを検索..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-background/50 rounded-xl px-3 py-2 text-[15px] border border-border/50 focus:border-accent focus:bg-input-bg placeholder-muted/60 transition-all outline-none"
+            className="w-full bg-background/50 rounded-xl px-3 py-2 text-base border border-border/50 focus:border-accent focus:bg-input-bg placeholder-muted/60 transition-all outline-none"
           />
           <p className="text-[10px] text-muted/50 mt-1 ml-1">
             ⌘K でメッセージ検索
@@ -159,7 +132,7 @@ export function Sidebar({
                 prefetch
                 onClick={() => setSidebarOpen(false)}
                 className={`
-                  flex items-center px-3 py-2 text-[15px] rounded-xl mx-2 transition-colors
+                  flex items-center px-3 py-2 text-base rounded-xl mx-2 transition-colors
                   ${
                     isActive
                       ? "bg-accent/10 text-accent"
@@ -232,7 +205,7 @@ export function Sidebar({
                 href={href}
                 onClick={() => setSidebarOpen(false)}
                 className={`
-                  flex items-center gap-2 px-3 py-2 text-[15px] rounded-xl mx-2 transition-colors
+                  flex items-center gap-2 px-3 py-2 text-base rounded-xl mx-2 transition-colors
                   ${
                     isActive
                       ? "bg-accent/10 text-accent"
@@ -310,7 +283,7 @@ export function Sidebar({
                     <img src={p.avatar_url} alt={name} className="w-7 h-7 rounded-full object-cover" />
                   ) : initial}
                 </span>
-                <span className="text-[15px] text-foreground truncate flex-1">{name}</span>
+                <span className="text-base text-foreground truncate flex-1">{name}</span>
               </>
             );
           })()}
