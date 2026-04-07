@@ -177,7 +177,10 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
       }
     }
 
-    if (e.key === "Enter" && !e.shiftKey) {
+    // PC: Enterで送信（Shift+Enterで改行）
+    // モバイル: Enterは常に改行（送信ボタンで送信）
+    const isMobile = typeof window !== "undefined" && window.innerWidth < 1024;
+    if (e.key === "Enter" && !e.shiftKey && !isMobile) {
       e.preventDefault();
       handleSubmit(e);
     }
