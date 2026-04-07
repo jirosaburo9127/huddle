@@ -83,6 +83,13 @@ export default function InvitePage() {
         return;
       }
 
+      // リダイレクト前にslugを検証（不正なslugによるオープンリダイレクト防止）
+      const isValidSlug = /^[a-z0-9\-]+$/.test(data.workspace_slug);
+      if (!isValidSlug) {
+        setError("無効なワークスペースです");
+        setJoining(false);
+        return;
+      }
       // 参加成功 → ワークスペースのgeneralチャンネルにリダイレクト
       window.location.href = `/${data.workspace_slug}/general`;
     } catch {

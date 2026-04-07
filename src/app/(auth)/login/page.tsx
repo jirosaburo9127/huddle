@@ -31,7 +31,7 @@ async function redirectToWorkspace(
 
   if (memberships && memberships.length > 0) {
     const ws = memberships[0].workspaces as unknown as { slug: string };
-    if (ws?.slug) {
+    if (ws?.slug && /^[a-z0-9\-]+$/.test(ws.slug)) {
       window.location.href = `/${ws.slug}/general`;
       return;
     }
@@ -53,20 +53,58 @@ function LoginForm() {
   const [mfaCode, setMfaCode] = useState("");
   const [mfaVerifying, setMfaVerifying] = useState(false);
 
+  // クライアントサイドRate Limiting用state
+  const [failCount, setFailCount] = useState(0);
+  const [lockUntil, setLockUntil] = useState(0);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+
+    // Rate Limiting: ロック中は試行を拒否
+    if (Date.now() < lockUntil) {
+      setError("しばらくしてからお試しください");
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) {
-        setError(error.message);
+        // 汎用エラーメッセージ（Supabaseの詳細を隠す）
+        setError("メールアドレスまたはパスワードが正しくありません");
+
+        // 連続失敗カウント更新
+        setFailCount((prev) => {
+          const newCount = prev + 1;
+          if (newCount >= 5) {
+            setLockUntil(Date.now() + 15000); // 15秒ロック
+            setError("ログイン試行回数が上限に達しました。しばらくしてからお試しください");
+            return 0;
+          }
+          return newCount;
+        });
         return;
+      }
+
+      // ログイン成功: 失敗カウントをリセット
+      setFailCount(0);
+
+      // 監査ログ（fire-and-forget: awaitしない）
+      if (data.user) {
+        supabase
+          .from("audit_logs")
+          .insert({
+            user_id: data.user.id,
+            action: "login_success",
+            target_type: "auth",
+          })
+          .then(() => {});
       }
 
       // MFAチャレンジが必要か確認
@@ -83,8 +121,8 @@ function LoginForm() {
 
       // MFA不要 or 完了 → 通常のリダイレクト
       await redirectToWorkspace(supabase, inviteToken);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "ログインに失敗しました");
+    } catch {
+      setError("ログインに失敗しました");
     } finally {
       setLoading(false);
     }
@@ -133,10 +171,8 @@ function LoginForm() {
 
       // 検証成功 → リダイレクト
       await redirectToWorkspace(supabase, inviteToken);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "認証に失敗しました"
-      );
+    } catch {
+      setError("認証に失敗しました");
     } finally {
       setMfaVerifying(false);
     }

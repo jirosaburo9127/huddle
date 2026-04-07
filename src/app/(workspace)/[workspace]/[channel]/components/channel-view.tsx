@@ -600,9 +600,13 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
                 onClick={async () => {
                   setDeletingChannel(true);
                   await supabase.from("channels").delete().eq("id", channel.id);
-                  // URLからWSスラグを取得してgeneralにリダイレクト
+                  // URLからWSスラグを取得してgeneralにリダイレクト（slugバリデーション付き）
                   const wsSlug = window.location.pathname.split("/")[1];
-                  window.location.href = `/${wsSlug}/general`;
+                  if (/^[a-z0-9\-]+$/.test(wsSlug)) {
+                    window.location.href = `/${wsSlug}/general`;
+                  } else {
+                    window.location.href = "/";
+                  }
                 }}
                 disabled={deletingChannel}
                 className="rounded-xl bg-mention px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 transition-colors"

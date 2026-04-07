@@ -38,14 +38,19 @@ function SignupForm() {
       });
 
       if (error) {
-        setError(error.message);
+        // Supabaseの詳細エラーを隠し、汎用メッセージを表示
+        if (error.message.includes("already")) {
+          setError("このメールアドレスは既に登録されています");
+        } else {
+          setError("アカウントの作成に失敗しました");
+        }
         return;
       }
 
       // 招待トークンがあれば招待ページへ、なければホームへ
       window.location.href = inviteToken ? `/invite/${inviteToken}` : "/";
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "サインアップに失敗しました");
+    } catch {
+      setError("サインアップに失敗しました");
     } finally {
       setLoading(false);
     }
