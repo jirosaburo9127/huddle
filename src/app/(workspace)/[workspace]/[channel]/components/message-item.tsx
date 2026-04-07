@@ -367,22 +367,29 @@ export const MessageItem = memo(function MessageItem({
 
           {/* リアクションバッジ */}
           {groupedReactions.length > 0 && !isEditing && (
-            <div className="flex flex-wrap items-center gap-1 mt-1">
+            <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
               {groupedReactions.map(({ emoji, count, reacted, names }) => (
-                <button
-                  key={emoji}
-                  type="button"
-                  onClick={() => onReact?.(message.id, emoji)}
-                  title={names.length > 0 ? names.join("、") : undefined}
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border cursor-pointer transition-colors ${
-                    reacted
-                      ? "bg-accent/10 border-accent/30 text-accent"
-                      : "bg-white/[0.03] border-border/50 text-muted hover:border-accent/30"
-                  }`}
-                >
-                  <span>{emoji}</span>
-                  <span>{count}</span>
-                </button>
+                <div key={emoji} className="relative group/reaction">
+                  <button
+                    type="button"
+                    onClick={() => onReact?.(message.id, emoji)}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm border cursor-pointer transition-colors ${
+                      reacted
+                        ? "bg-accent/10 border-accent/30 text-accent"
+                        : "bg-white/[0.03] border-border/50 text-muted hover:border-accent/30"
+                    }`}
+                  >
+                    <span className="text-base">{emoji}</span>
+                    <span>{count}</span>
+                  </button>
+                  {/* カスタムツールチップ */}
+                  {names.length > 0 && (
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 rounded-lg bg-foreground text-background text-xs font-medium whitespace-nowrap opacity-0 group-hover/reaction:opacity-100 pointer-events-none transition-opacity duration-100 z-20">
+                      {names.join("、")}
+                      <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-foreground" />
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
           )}
