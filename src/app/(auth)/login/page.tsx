@@ -38,8 +38,25 @@ function LoginForm() {
         return;
       }
 
-      // 招待トークンがあれば招待ページへ、なければホームへ
-      window.location.href = inviteToken ? `/invite/${inviteToken}` : "/";
+      if (inviteToken) {
+        window.location.href = `/invite/${inviteToken}`;
+        return;
+      }
+
+      // 所属WSを取得して直接遷移（"/"経由のリダイレクトを省略）
+      const { data: memberships } = await supabase
+        .from("workspace_members")
+        .select("workspace_id, workspaces(slug)")
+        .limit(1);
+
+      if (memberships && memberships.length > 0) {
+        const ws = memberships[0].workspaces as unknown as { slug: string };
+        if (ws?.slug) {
+          window.location.href = `/${ws.slug}/general`;
+          return;
+        }
+      }
+      window.location.href = "/";
     } catch (err) {
       setError(err instanceof Error ? err.message : "ログインに失敗しました");
     } finally {
