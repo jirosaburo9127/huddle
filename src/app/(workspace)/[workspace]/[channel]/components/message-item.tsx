@@ -175,10 +175,11 @@ function ReactionBadges({
             <button
               type="button"
               onClick={() => onReact?.(emoji)}
-              onTouchStart={() => handleTouchStart(emoji, names)}
+              onTouchStart={(e) => { e.preventDefault(); handleTouchStart(emoji, names); }}
               onTouchEnd={handleTouchEnd}
               onTouchCancel={handleTouchEnd}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm border cursor-pointer transition-colors ${
+              onContextMenu={(e) => e.preventDefault()}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm border cursor-pointer transition-colors select-none ${
                 reacted
                   ? "bg-accent/10 border-accent/30 text-accent"
                   : "bg-white/[0.03] border-border/50 text-muted hover:border-accent/30"
