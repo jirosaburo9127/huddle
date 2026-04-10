@@ -33,11 +33,11 @@ export async function setupPushNotifications(userId: string): Promise<void> {
       return;
     }
 
-    // 登録 (APNs/FCM への登録要求)
-    await PushNotifications.register();
-
     // 登録成功時: トークンを Supabase に保存
+    // ※リスナーは register() より先に登録する必要がある
     await PushNotifications.addListener("registration", async (token) => {
+      // eslint-disable-next-line no-console
+      console.log("[push] registration token received:", token.value.slice(0, 16) + "...");
       const supabase = createClient();
       const platform = Capacitor.getPlatform() === "ios" ? "ios" : "android";
       const { error } = await supabase.from("device_tokens").upsert(
@@ -52,6 +52,9 @@ export async function setupPushNotifications(userId: string): Promise<void> {
       if (error) {
         // eslint-disable-next-line no-console
         console.error("[push] device_tokens upsert error:", error);
+      } else {
+        // eslint-disable-next-line no-console
+        console.log("[push] device_tokens upsert success");
       }
     });
 
@@ -60,6 +63,9 @@ export async function setupPushNotifications(userId: string): Promise<void> {
       // eslint-disable-next-line no-console
       console.error("[push] registration error:", err);
     });
+
+    // 登録 (APNs/FCM への登録要求) - リスナー登録後に呼ぶ
+    await PushNotifications.register();
 
     // フォアグラウンド受信時の挙動 (画面内に通知バナーを出すなどは別途実装可)
     await PushNotifications.addListener(
