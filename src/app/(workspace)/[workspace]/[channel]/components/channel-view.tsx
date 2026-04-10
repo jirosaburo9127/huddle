@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { RealtimePostgresInsertPayload, RealtimePostgresUpdatePayload } from "@supabase/supabase-js";
 import type { Channel, Message, MessageWithProfile, Reaction } from "@/lib/supabase/types";
 import { MessageItem } from "./message-item";
-import { MessageInput } from "./message-input";
+import { MessageInput, type MentionPayload } from "./message-input";
 import { ThreadPanel } from "./thread-panel";
 import { DateSeparator } from "./date-separator";
 import { ChannelWiki } from "./channel-wiki";
@@ -412,7 +412,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
   }, [supabase, currentUserId, bookmarkedIds]);
 
   // メッセージ送信
-  async function handleSend(content: string) {
+  async function handleSend(content: string, mentions: MentionPayload) {
     if (content.length > 4000) return;
 
     const { data: { user } } = await supabase.auth.getUser();
@@ -458,6 +458,33 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
       setMessages((prev) =>
         prev.map((m) => m.id === optimisticMsg.id ? { ...m, id: data.id, created_at: data.created_at } : m)
       );
+
+      // メンション行を mentions テーブルに保存（プッシュ通知 send-push が参照する）
+      const mentionRows: Array<{
+        message_id: string;
+        mentioned_user_id: string;
+        mention_type: "user" | "here" | "channel";
+      }> = [];
+      for (const uid of mentions.userIds) {
+        mentionRows.push({
+          message_id: data.id,
+          mentioned_user_id: uid,
+          mention_type: "user",
+        });
+      }
+      // @here / @channel は全チャンネルメンバーに対して 1 行ずつ記録
+      // （send-push 側では mention_type で判定するためダミーIDでも良いが、
+      //   RLS/DB整合性の観点から自分のIDを入れておく）
+      if (mentions.broadcast) {
+        mentionRows.push({
+          message_id: data.id,
+          mentioned_user_id: user.id,
+          mention_type: mentions.broadcast,
+        });
+      }
+      if (mentionRows.length > 0) {
+        await supabase.from("mentions").insert(mentionRows);
+      }
     }
   }
 

@@ -57,9 +57,14 @@ type MentionMember = {
   profiles: MemberProfile;
 };
 
+export type MentionPayload = {
+  userIds: string[]; // 明示的に指定されたユーザーメンション
+  broadcast: "here" | "channel" | null; // @here / @channel 特殊メンション
+};
+
 type Props = {
   channelName?: string;
-  onSend: (content: string) => void | Promise<void>;
+  onSend: (content: string, mentions: MentionPayload) => void | Promise<void>;
   placeholder?: string;
   channelId?: string; // ファイルアップロード用
   workspaceId?: string; // メンション用
@@ -164,12 +169,36 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
     });
   }, [content, mentionStartPos, mentionQuery]);
 
+  // 送信時のメンション抽出: 本文中の @<display_name> を走査し、
+  // workspace members と照合してユーザーID集合を作る。@here / @channel も判定。
+  function extractMentions(text: string): MentionPayload {
+    const userIds = new Set<string>();
+    let broadcast: "here" | "channel" | null = null;
+
+    if (/(^|\s)@here(\s|$)/.test(text)) broadcast = "here";
+    else if (/(^|\s)@channel(\s|$)/.test(text)) broadcast = "channel";
+
+    // 長い display_name から順に照合（部分一致衝突を避けるため）
+    const sorted = [...members].sort(
+      (a, b) => b.profiles.display_name.length - a.profiles.display_name.length
+    );
+    for (const m of sorted) {
+      const name = m.profiles.display_name;
+      if (!name) continue;
+      const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const re = new RegExp(`(^|\\s)@${escaped}(?=\\s|$)`);
+      if (re.test(text)) userIds.add(m.user_id);
+    }
+    return { userIds: Array.from(userIds), broadcast };
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = content.trim();
     if (!trimmed || sending) return;
 
     setSending(true);
+    const mentions = extractMentions(trimmed);
     setContent("");
 
     // テキストエリアの高さをリセット
@@ -178,7 +207,7 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
     }
 
     try {
-      await onSend(trimmed);
+      await onSend(trimmed, mentions);
     } finally {
       setSending(false);
       textareaRef.current?.focus();
@@ -286,7 +315,7 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
         .from("chat-files")
         .getPublicUrl(path);
 
-      await onSend(urlData.publicUrl);
+      await onSend(urlData.publicUrl, { userIds: [], broadcast: null });
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : "アップロードに失敗しました");
     } finally {

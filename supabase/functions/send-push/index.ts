@@ -85,10 +85,20 @@ async function sendPush(
   title: string,
   body: string,
   badge: number,
-  url: string
+  url: string,
+  isMention: boolean
 ): Promise<{ ok: boolean; status: number; error?: string }> {
   try {
     const jwt = await getApnsJwt();
+    // メンション時は interruption-level を time-sensitive にして集中モードを突破する
+    const aps: Record<string, unknown> = {
+      alert: { title, body },
+      sound: "default",
+      badge,
+    };
+    if (isMention) {
+      aps["interruption-level"] = "time-sensitive";
+    }
     const response = await fetch(
       `https://${APNS_HOST}/3/device/${deviceToken}`,
       {
@@ -98,13 +108,10 @@ async function sendPush(
           "apns-topic": APNS_BUNDLE_ID,
           "apns-push-type": "alert",
           "content-type": "application/json",
+          "apns-priority": isMention ? "10" : "5",
         },
         body: JSON.stringify({
-          aps: {
-            alert: { title, body },
-            sound: "default",
-            badge,
-          },
+          aps,
           // カスタムデータ: 通知タップ時にクライアントが参照して画面遷移に使う
           url,
         }),
@@ -219,17 +226,54 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 通知タイトル: DM は送信者名のみ、チャンネルは「送信者 (#チャンネル名)」
+    // このメッセージでメンションされた user_id を取得
+    // @here / @channel は全員宛として扱う
+    const { data: mentionRows } = await supabase
+      .from("mentions")
+      .select("mentioned_user_id, mention_type")
+      .eq("message_id", record.id);
+    const mentionedUserIds = new Set<string>();
+    let isBroadcastMention = false;
+    for (const row of mentionRows || []) {
+      if (row.mention_type === "here" || row.mention_type === "channel") {
+        isBroadcastMention = true;
+      } else if (row.mentioned_user_id) {
+        mentionedUserIds.add(row.mentioned_user_id);
+      }
+    }
+
     const senderName = sender?.display_name || "メンバー";
-    const title = channel.is_dm ? senderName : `${senderName} (#${channel.name})`;
-    const body =
+    const bodyPlain =
       record.content.length > 100
         ? record.content.slice(0, 100) + "…"
         : record.content;
 
+    // 受信者ごとに通知内容を組み立てる
+    // - メンションされた人: 「🔔 sumika があなたをメンション (#general)」
+    // - DM: 送信者名のみ
+    // - 通常: 「sumika (#general)」
+    function buildTitle(isMentioned: boolean): string {
+      if (channel.is_dm) return senderName;
+      if (isMentioned) {
+        return `🔔 ${senderName} があなたをメンション (#${channel.name})`;
+      }
+      return `${senderName} (#${channel.name})`;
+    }
+
     // 並列送信
     const results = await Promise.allSettled(
-      tokens.map((t) => sendPush(t.token, title, body, 1, channelUrl))
+      tokens.map((t) => {
+        const isMentioned =
+          isBroadcastMention || mentionedUserIds.has(t.user_id);
+        return sendPush(
+          t.token,
+          buildTitle(isMentioned),
+          bodyPlain,
+          1,
+          channelUrl,
+          isMentioned
+        );
+      })
     );
 
     // 送信失敗したトークンをログ出力 (410 Gone は無効トークン → 削除推奨)
