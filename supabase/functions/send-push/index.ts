@@ -84,7 +84,8 @@ async function sendPush(
   deviceToken: string,
   title: string,
   body: string,
-  badge: number
+  badge: number,
+  url: string
 ): Promise<{ ok: boolean; status: number; error?: string }> {
   try {
     const jwt = await getApnsJwt();
@@ -104,6 +105,8 @@ async function sendPush(
             sound: "default",
             badge,
           },
+          // カスタムデータ: 通知タップ時にクライアントが参照して画面遷移に使う
+          url,
         }),
       }
     );
@@ -159,10 +162,10 @@ Deno.serve(async (req) => {
       .eq("id", record.user_id)
       .maybeSingle();
 
-    // チャンネル情報
+    // チャンネル情報 + ワークスペース slug (通知タップ時の遷移先URL生成用)
     const { data: channel } = await supabase
       .from("channels")
-      .select("id, name, is_dm")
+      .select("id, name, slug, is_dm, workspace_id, workspaces(slug)")
       .eq("id", record.channel_id)
       .maybeSingle();
 
@@ -172,6 +175,19 @@ Deno.serve(async (req) => {
         headers: { "content-type": "application/json" },
       });
     }
+
+    // 遷移先URL: /<workspace_slug>/<channel_slug>
+    // workspaces はリレーションなので型があいまい → 安全にキャスト
+    const workspaceSlug =
+      (channel as unknown as { workspaces?: { slug: string } | { slug: string }[] })
+        .workspaces &&
+      (Array.isArray(
+        (channel as unknown as { workspaces: { slug: string } | { slug: string }[] }).workspaces
+      )
+        ? (channel as unknown as { workspaces: { slug: string }[] }).workspaces[0]?.slug
+        : (channel as unknown as { workspaces: { slug: string } }).workspaces.slug);
+    const channelUrl =
+      workspaceSlug && channel.slug ? `/${workspaceSlug}/${channel.slug}` : "/";
 
     // チャンネルメンバー (送信者以外)
     const { data: members } = await supabase
@@ -213,7 +229,7 @@ Deno.serve(async (req) => {
 
     // 並列送信
     const results = await Promise.allSettled(
-      tokens.map((t) => sendPush(t.token, title, body, 1))
+      tokens.map((t) => sendPush(t.token, title, body, 1, channelUrl))
     );
 
     // 送信失敗したトークンをログ出力 (410 Gone は無効トークン → 削除推奨)

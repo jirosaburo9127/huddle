@@ -76,13 +76,18 @@ export async function setupPushNotifications(userId: string): Promise<void> {
       }
     );
 
-    // 通知タップ時の挙動
+    // 通知タップ時の挙動: APNs payload の url フィールドに従って画面遷移
     await PushNotifications.addListener(
       "pushNotificationActionPerformed",
       (action) => {
         // eslint-disable-next-line no-console
         console.log("[push] action:", action);
-        // 将来的にはこの中で url にナビゲーションする
+        const data = action.notification.data as { url?: string } | undefined;
+        const url = data?.url;
+        if (url && typeof window !== "undefined") {
+          // ハードナビゲーションで遷移（SSRコンテンツを確実に取得するため）
+          window.location.href = url;
+        }
       }
     );
   } catch (err) {
