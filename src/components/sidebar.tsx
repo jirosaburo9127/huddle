@@ -14,6 +14,9 @@ import { MfaSetup } from "@/components/mfa-setup";
 import { signOut } from "@/lib/actions";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
 import { createClient } from "@/lib/supabase/client";
+import { showMessageNotification } from "@/lib/notification";
+import type { RealtimePostgresInsertPayload } from "@supabase/supabase-js";
+import type { Message } from "@/lib/supabase/types";
 
 type MemberProfile = {
   id: string;
@@ -213,9 +216,80 @@ export function Sidebar({
     };
   }, [currentUserId, currentChannelId]);
 
-  // 切り分け中: サイドバーのRealtime購読は一時的に無効化。
-  // channel-view 側の購読が CHANNEL_ERROR にならないか確認するため。
-  // 確認後に再実装予定（zustandストア等で channel-view と統合する案も検討）。
+  // ワークスペース内のメッセージを Realtime 購読（未読バッジ更新 + 通知）
+  useEffect(() => {
+    const supabase = sidebarSupabaseRef.current;
+    const allChannels = [...channels, ...dmChannels];
+    const channelById = new Map(allChannels.map((c) => [c.id, c]));
+
+    const memberNameById = new Map<string, string>();
+    for (const m of members) {
+      const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
+      if (p?.display_name) memberNameById.set(m.user_id, p.display_name);
+    }
+
+    const subscription = supabase
+      .channel(`sidebar-unread-${workspace.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "messages",
+        },
+        (payload: RealtimePostgresInsertPayload<Message>) => {
+          const msg = payload.new;
+          if (msg.parent_id) return;
+          if (msg.user_id === currentUserId) return;
+          const ch = channelById.get(msg.channel_id);
+          if (!ch) return;
+
+          // 表示中チャンネル → 自動既読
+          if (msg.channel_id === currentChannelId) {
+            supabase
+              .from("channel_members")
+              .update({ last_read_at: new Date().toISOString() })
+              .eq("channel_id", msg.channel_id)
+              .eq("user_id", currentUserId)
+              .then(() => {});
+            return;
+          }
+
+          // 未読カウント増加
+          setUnreadState((prev) => ({
+            ...prev,
+            [msg.channel_id]: (prev[msg.channel_id] || 0) + 1,
+          }));
+
+          // 通知
+          const senderName = memberNameById.get(msg.user_id) || "メンバー";
+          let channelLabel = ch.name;
+          if (ch.is_dm) {
+            const dmCh = ch as unknown as {
+              channel_members?: Array<{
+                user_id: string;
+                profiles?: { display_name?: string };
+              }>;
+            };
+            const other = dmCh.channel_members?.find(
+              (cm) => cm.user_id !== currentUserId
+            );
+            channelLabel = other?.profiles?.display_name || "DM";
+          }
+          showMessageNotification({
+            senderName,
+            channelName: channelLabel,
+            content: msg.content,
+            url: `/${workspaceSlug}/${ch.slug}`,
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  }, [channels, dmChannels, members, currentUserId, currentChannelId, workspace.id, workspaceSlug]);
 
   // ワークスペース切り替えドロップダウンの外側クリックで閉じる
   useEffect(() => {

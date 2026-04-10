@@ -38,8 +38,6 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
   // Realtime購読では「同一ユーザーかどうか」ではなく「このタブで送ったか」で判定するのが正しい。
   // （PCとiPhoneで同じユーザーでログインしている場合に、片方の送信がもう片方に届かなくなるため）
   const sentMessageIdsRef = useRef<Set<string>>(new Set());
-  // Realtime接続ステータス（デバッグ表示用）
-  const [realtimeStatus, setRealtimeStatus] = useState<string>("connecting");
 
   // スレッドを開く
   const handleOpenThread = useCallback((msg: MessageWithProfile) => {
@@ -136,18 +134,18 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
             return;
           }
 
-          // プロフィール情報を取得
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("*")
-            .eq("id", payload.new.user_id)
-            .single();
+          // メッセージとプロフィールを一括取得（個別fetchより確実）
+          const { data: fullMessage } = await supabase
+            .from("messages")
+            .select("*, profiles(*), reactions(*)")
+            .eq("id", payload.new.id)
+            .maybeSingle();
 
-          const newMessage = {
+          const newMessage = (fullMessage ?? {
             ...payload.new,
-            profiles: profile,
+            profiles: null,
             reactions: [],
-          } as unknown as MessageWithProfile;
+          }) as unknown as MessageWithProfile;
 
           setMessages((prev) => {
             // 重複チェック
@@ -157,7 +155,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
 
           // 通知表示
           showMessageNotification({
-            senderName: profile?.display_name || "不明",
+            senderName: newMessage.profiles?.display_name || "メンバー",
             channelName: channel.name,
             content: payload.new.content,
             url: window.location.pathname,
@@ -183,15 +181,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
           );
         }
       )
-      .subscribe((status: string, err?: Error) => {
-        setRealtimeStatus(status);
-        if (err) {
-          // eslint-disable-next-line no-console
-          console.error("[Realtime] subscribe error:", err);
-        }
-        // eslint-disable-next-line no-console
-        console.log("[Realtime] status:", status);
-      });
+      .subscribe();
 
     return () => {
       supabase.removeChannel(subscription);
@@ -455,31 +445,8 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     }
   }
 
-  // Realtimeステータスのラベル＆色（デバッグ表示用）
-  const statusLabel = (() => {
-    switch (realtimeStatus) {
-      case "SUBSCRIBED":
-        return { text: "RT接続済", color: "bg-green-500" };
-      case "TIMED_OUT":
-        return { text: "RTタイムアウト", color: "bg-red-500" };
-      case "CHANNEL_ERROR":
-        return { text: "RTエラー", color: "bg-orange-500" };
-      case "CLOSED":
-        return { text: "RT切断", color: "bg-gray-500" };
-      default:
-        return { text: `RT:${realtimeStatus}`, color: "bg-yellow-500" };
-    }
-  })();
-
   return (
     <div className="flex h-full">
-      {/* Realtime接続ステータス（デバッグ用、右上に固定表示） */}
-      <div className="fixed top-2 right-2 z-50 pointer-events-none">
-        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold text-white ${statusLabel.color}`}>
-          <span className="w-1.5 h-1.5 rounded-full bg-white" />
-          {statusLabel.text}
-        </span>
-      </div>
       {/* チャンネルエリア */}
       <div className="flex flex-col h-full flex-1 min-w-0">
         {/* チャンネルヘッダー */}

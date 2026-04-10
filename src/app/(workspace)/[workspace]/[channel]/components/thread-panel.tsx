@@ -89,17 +89,17 @@ export function ThreadPanel({
             return;
           }
 
-          // プロフィール情報を取得
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("*")
-            .eq("id", payload.new.user_id)
-            .single();
+          // メッセージとプロフィールを一括取得
+          const { data: fullReply } = await supabase
+            .from("messages")
+            .select("*, profiles(*), reactions(*)")
+            .eq("id", payload.new.id)
+            .maybeSingle();
 
-          const newReply = {
+          const newReply = (fullReply ?? {
             ...payload.new,
-            profiles: profile,
-          } as unknown as MessageWithProfile;
+            profiles: null,
+          }) as unknown as MessageWithProfile;
 
           setReplies((prev) => {
             if (prev.some((m) => m.id === newReply.id)) return prev;
@@ -108,7 +108,7 @@ export function ThreadPanel({
 
           // スレッド返信の通知
           showMessageNotification({
-            senderName: profile?.display_name || "不明",
+            senderName: newReply.profiles?.display_name || "メンバー",
             channelName: "スレッド",
             content: payload.new.content,
             url: window.location.pathname,
