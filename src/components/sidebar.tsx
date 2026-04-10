@@ -15,6 +15,7 @@ import { signOut } from "@/lib/actions";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
 import { createClient } from "@/lib/supabase/client";
 import { showMessageNotification } from "@/lib/notification";
+import { setupPushNotifications } from "@/lib/push-notifications";
 import type { RealtimePostgresInsertPayload } from "@supabase/supabase-js";
 import type { Message } from "@/lib/supabase/types";
 
@@ -187,6 +188,12 @@ export function Sidebar({
       Notification.requestPermission().catch(() => {});
     }
   }, []);
+
+  // ネイティブプッシュ通知（Capacitor）のセットアップ
+  // Web ブラウザでは中で early return するので副作用なし
+  useEffect(() => {
+    setupPushNotifications(currentUserId);
+  }, [currentUserId]);
 
   // フォアグラウンド復帰時に未読カウントを再同期
   // モバイルで画面オフ→復帰した際にRealtime取りこぼしを補完
