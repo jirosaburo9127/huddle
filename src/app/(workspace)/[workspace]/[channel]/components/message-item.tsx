@@ -253,9 +253,11 @@ export const MessageItem = memo(function MessageItem({
 }: Props) {
   const profile = message.profiles;
   const isOwn = message.user_id === currentUserId;
+  // timeZone を固定して SSR/CSR の hydration mismatch を防ぐ
   const time = new Date(message.created_at).toLocaleTimeString("ja-JP", {
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "Asia/Tokyo",
   });
   const initial = (profile?.display_name || "?")[0].toUpperCase();
   // オンライン判定: last_seen_atが5分以内

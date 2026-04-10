@@ -78,11 +78,12 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
   // Wikiの存在チェック
   useEffect(() => {
     async function checkWiki() {
+      // .single() は0件で406を返すので .maybeSingle() を使う
       const { data } = await supabase
         .from("channel_notes")
         .select("id")
         .eq("channel_id", channel.id)
-        .single();
+        .maybeSingle();
       setHasWiki(!!data);
     }
     checkWiki();
