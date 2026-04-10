@@ -39,6 +39,12 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
   // （PCとiPhoneで同じユーザーでログインしている場合に、片方の送信がもう片方に届かなくなるため）
   const sentMessageIdsRef = useRef<Set<string>>(new Set());
 
+  // モバイル: チャンネルURL直アクセス（プッシュ通知タップや共有リンク）では
+  // サイドバーを閉じてチャンネルビューを前面に出す
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [channel.id, setSidebarOpen]);
+
   // スレッドを開く
   const handleOpenThread = useCallback((msg: MessageWithProfile) => {
     setActiveThread(msg);
@@ -102,6 +108,16 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     fetchBookmarks();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUserId]);
+
+  // チャンネル切替時: 最新メッセージ位置まで即スクロール（初回マウント・URL直アクセス対応）
+  useEffect(() => {
+    // レイアウト確定後にスクロールさせるため次のフレームで実行
+    const id = requestAnimationFrame(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
+    });
+    prevMessageCountRef.current = initialMessages.length;
+    return () => cancelAnimationFrame(id);
+  }, [channel.id, initialMessages.length]);
 
   // 新着メッセージ追加時のみ自動スクロール
   useEffect(() => {
