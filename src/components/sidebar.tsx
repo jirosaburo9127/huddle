@@ -212,6 +212,8 @@ export function Sidebar({
         if (row.channel_id === currentChannelId) continue;
         next[row.channel_id] = Number(row.unread_count);
       }
+      // eslint-disable-next-line no-console
+      console.log("[unread] refetchUnread:", next);
       setUnreadState(next);
     }
 
@@ -271,10 +273,15 @@ export function Sidebar({
           }
 
           // 未読カウント増加
-          setUnreadState((prev) => ({
-            ...prev,
-            [msg.channel_id]: (prev[msg.channel_id] || 0) + 1,
-          }));
+          setUnreadState((prev) => {
+            const next = {
+              ...prev,
+              [msg.channel_id]: (prev[msg.channel_id] || 0) + 1,
+            };
+            // eslint-disable-next-line no-console
+            console.log("[unread] setUnreadState:", { prev, next });
+            return next;
+          });
 
           // 通知
           const senderName = memberNameById.get(msg.user_id) || "メンバー";
