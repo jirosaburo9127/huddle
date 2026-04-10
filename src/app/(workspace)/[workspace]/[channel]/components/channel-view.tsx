@@ -182,7 +182,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
           );
         }
       )
-      .subscribe((status, err) => {
+      .subscribe((status: string, err?: Error) => {
         setRealtimeStatus(status);
         if (err) {
           // eslint-disable-next-line no-console
