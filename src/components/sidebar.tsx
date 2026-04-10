@@ -415,6 +415,19 @@ export function Sidebar({
 
         {/* チャンネル・DM一覧 */}
         <div className="flex-1 overflow-y-auto py-2">
+          {/* 進捗ダッシュボードリンク */}
+          <Link
+            href={`/${workspaceSlug}/dashboard`}
+            prefetch
+            onClick={() => setSidebarOpen(false)}
+            className="flex items-center gap-2 px-3 py-2 text-sm text-muted hover:text-accent mx-2 rounded-xl hover:bg-white/[0.04] transition-colors w-full mb-1"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 3v18h18M7 15l4-4 4 4 6-6" />
+            </svg>
+            進捗ダッシュボード
+          </Link>
+
           {/* ブックマークリンク */}
           <button
             onClick={() => setShowBookmarkModal(true)}

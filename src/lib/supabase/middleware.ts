@@ -9,6 +9,8 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname.startsWith("/login") ||
     request.nextUrl.pathname.startsWith("/signup");
   const isInvitePage = request.nextUrl.pathname.startsWith("/invite");
+  // 共有ダッシュボード（伴奏マイスター向け）はログイン不要
+  const isSharePage = request.nextUrl.pathname.startsWith("/share/");
   const isStaticAsset =
     request.nextUrl.pathname.startsWith("/_next") ||
     request.nextUrl.pathname.startsWith("/favicon");
@@ -17,7 +19,7 @@ export async function updateSession(request: NextRequest) {
   if (isStaticAsset) return supabaseResponse;
 
   // 認証不要ページではSupabaseクライアント生成もスキップして即座にレスポンス
-  if (isAuthPage || isInvitePage) {
+  if (isAuthPage || isInvitePage || isSharePage) {
     return supabaseResponse;
   }
 

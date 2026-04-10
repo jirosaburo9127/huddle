@@ -1,0 +1,258 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import {
+  createShareToken,
+  revokeShareToken,
+} from "@/lib/actions/share-tokens";
+
+type Decision = {
+  id: string;
+  content: string;
+  created_at: string;
+  channel_id: string;
+  channel_name: string;
+  channel_slug: string;
+  sender_id: string;
+  sender_name: string;
+  sender_avatar: string | null;
+};
+
+type ShareToken = {
+  id: string;
+  token: string;
+  label: string;
+  expires_at: string;
+  is_active: boolean;
+  created_at: string;
+  last_accessed_at: string | null;
+};
+
+type Props = {
+  workspace: { id: string; name: string; slug: string };
+  workspaceSlug: string;
+  decisions: Decision[];
+  stats: { decisions_total: number; decisions_this_week: number };
+  shareTokens: ShareToken[];
+  isAdmin: boolean;
+};
+
+function formatDate(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+function formatDateOnly(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+export function DashboardView({
+  workspace,
+  workspaceSlug,
+  decisions,
+  stats,
+  shareTokens,
+  isAdmin,
+}: Props) {
+  const [newLabel, setNewLabel] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [copiedToken, setCopiedToken] = useState<string | null>(null);
+  const [tokens, setTokens] = useState(shareTokens);
+
+  async function handleCreateToken() {
+    if (!newLabel.trim()) return;
+    setCreating(true);
+    setCreateError(null);
+    const result = await createShareToken(workspace.id, newLabel);
+    setCreating(false);
+    if (!result.ok) {
+      setCreateError(result.error || "作成に失敗しました");
+      return;
+    }
+    setNewLabel("");
+    // 画面をリロードしてトークン一覧を再取得（サーバー側revalidatePath済み）
+    window.location.reload();
+  }
+
+  async function handleRevoke(tokenId: string) {
+    if (!confirm("この共有リンクを無効化しますか？")) return;
+    const result = await revokeShareToken(tokenId, workspaceSlug);
+    if (result.ok) {
+      setTokens((prev) =>
+        prev.map((t) => (t.id === tokenId ? { ...t, is_active: false } : t))
+      );
+    }
+  }
+
+  function copyShareUrl(token: string) {
+    const url = `${window.location.origin}/share/${token}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiedToken(token);
+      setTimeout(() => setCopiedToken(null), 2000);
+    });
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      <header className="flex items-center px-6 py-3 border-b border-border bg-header shrink-0">
+        <h1 className="font-bold text-lg">進捗ダッシュボード</h1>
+        <span className="ml-2 text-sm text-muted">{workspace.name}</span>
+      </header>
+
+      <div className="flex-1 overflow-y-auto p-6 space-y-8 max-w-4xl">
+        {/* 集計サマリー */}
+        <section className="grid grid-cols-2 gap-4">
+          <div className="rounded-2xl border border-border bg-white/[0.02] p-5">
+            <div className="text-sm text-muted">今週の決定事項</div>
+            <div className="mt-2 text-4xl font-bold text-accent">
+              {stats.decisions_this_week}
+            </div>
+          </div>
+          <div className="rounded-2xl border border-border bg-white/[0.02] p-5">
+            <div className="text-sm text-muted">累計の決定事項</div>
+            <div className="mt-2 text-4xl font-bold text-foreground">
+              {stats.decisions_total}
+            </div>
+          </div>
+        </section>
+
+        {/* 共有リンク管理（管理者のみ） */}
+        {isAdmin && (
+          <section>
+            <h2 className="text-sm font-semibold text-foreground mb-3">
+              伴奏マイスター向け共有リンク
+            </h2>
+            <p className="text-sm text-muted mb-4">
+              このリンクを伴奏マイスターに送ると、ログインなしで決定事項を閲覧できます。
+              いつでも無効化できます。
+            </p>
+
+            <div className="flex gap-2 mb-4">
+              <input
+                type="text"
+                value={newLabel}
+                onChange={(e) => setNewLabel(e.target.value)}
+                placeholder="例: 田中先生用"
+                className="flex-1 px-3 py-2 rounded-xl border border-border bg-transparent text-foreground placeholder:text-muted"
+              />
+              <button
+                type="button"
+                onClick={handleCreateToken}
+                disabled={creating || !newLabel.trim()}
+                className="px-4 py-2 text-sm rounded-xl bg-accent text-white hover:opacity-90 disabled:opacity-50 transition-colors"
+              >
+                {creating ? "作成中..." : "共有リンク発行"}
+              </button>
+            </div>
+            {createError && (
+              <div className="text-sm text-mention mb-3">{createError}</div>
+            )}
+
+            <div className="space-y-2">
+              {tokens.length === 0 && (
+                <div className="text-sm text-muted text-center py-6">
+                  まだ共有リンクがありません
+                </div>
+              )}
+              {tokens.map((t) => {
+                const shareUrl =
+                  typeof window !== "undefined"
+                    ? `${window.location.origin}/share/${t.token}`
+                    : `/share/${t.token}`;
+                const expired = new Date(t.expires_at).getTime() < Date.now();
+                const active = t.is_active && !expired;
+                return (
+                  <div
+                    key={t.id}
+                    className="rounded-xl border border-border bg-white/[0.02] p-3"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="font-semibold truncate">
+                          {t.label}
+                          {!active && (
+                            <span className="ml-2 text-xs text-mention">
+                              無効
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-muted truncate mt-0.5">
+                          {shareUrl}
+                        </div>
+                        <div className="text-xs text-muted mt-1">
+                          有効期限: {formatDateOnly(t.expires_at)}
+                          {t.last_accessed_at && (
+                            <>
+                              {" ・ "}最終閲覧:{" "}
+                              {formatDate(t.last_accessed_at)}
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      {active && (
+                        <div className="flex gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => copyShareUrl(t.token)}
+                            className="px-3 py-1.5 text-xs rounded-lg border border-border hover:bg-white/[0.04] transition-colors"
+                          >
+                            {copiedToken === t.token ? "コピー済み" : "コピー"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRevoke(t.id)}
+                            className="px-3 py-1.5 text-xs rounded-lg border border-mention/30 text-mention hover:bg-mention/10 transition-colors"
+                          >
+                            無効化
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {/* 決定事項一覧 */}
+        <section>
+          <h2 className="text-sm font-semibold text-foreground mb-3">
+            決定事項（最新100件）
+          </h2>
+          {decisions.length === 0 ? (
+            <div className="rounded-2xl border border-border bg-white/[0.02] p-8 text-center text-muted">
+              まだ決定事項がありません。メッセージの「決定」ボタンを押すとここに集まります。
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {decisions.map((d) => (
+                <Link
+                  key={d.id}
+                  href={`/${workspaceSlug}/${d.channel_slug}`}
+                  className="block rounded-2xl border border-accent/30 bg-accent/[0.03] p-4 hover:bg-accent/[0.06] transition-colors"
+                >
+                  <div className="flex items-center gap-2 text-xs text-muted mb-1.5">
+                    <span className="text-accent font-semibold">
+                      #{d.channel_name}
+                    </span>
+                    <span>・</span>
+                    <span>{d.sender_name}</span>
+                    <span>・</span>
+                    <span>{formatDate(d.created_at)}</span>
+                  </div>
+                  <div className="text-base whitespace-pre-wrap break-words text-foreground">
+                    {d.content}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+    </div>
+  );
+}
