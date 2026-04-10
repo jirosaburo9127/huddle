@@ -3,8 +3,7 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { RealtimePostgresInsertPayload } from "@supabase/supabase-js";
-import type { Workspace, Channel, Message } from "@/lib/supabase/types";
+import type { Workspace, Channel } from "@/lib/supabase/types";
 import { CreateChannelModal } from "@/components/create-channel-modal";
 import { CreateDmModal } from "@/components/create-dm-modal";
 import { InviteModal } from "@/components/invite-modal";
@@ -15,7 +14,6 @@ import { MfaSetup } from "@/components/mfa-setup";
 import { signOut } from "@/lib/actions";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
 import { createClient } from "@/lib/supabase/client";
-import { showMessageNotification } from "@/lib/notification";
 
 type MemberProfile = {
   id: string;
@@ -215,91 +213,9 @@ export function Sidebar({
     };
   }, [currentUserId, currentChannelId]);
 
-  // ワークスペース内のチャンネル毎に Realtime 購読（未読バッジ更新 + 通知）
-  // フィルタなしの catch-all 購読は channel-view 側のフィルタ購読と
-  // Supabase Realtime 上で競合し配信が不安定になるため、必ずフィルタ付きで購読する
-  useEffect(() => {
-    const supabase = sidebarSupabaseRef.current;
-    const allChannels = [...channels, ...dmChannels];
-    const channelById = new Map(allChannels.map((c) => [c.id, c]));
-
-    // メンバー名引きやすいよう正規化
-    const memberNameById = new Map<string, string>();
-    for (const m of members) {
-      const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
-      if (p?.display_name) memberNameById.set(m.user_id, p.display_name);
-    }
-
-    const handler = (payload: RealtimePostgresInsertPayload<Message>) => {
-      const msg = payload.new;
-      // スレッド返信は未読カウント対象外
-      if (msg.parent_id) return;
-      // 自分の送信は未読扱いしない
-      if (msg.user_id === currentUserId) return;
-      // このWSのチャンネル外は無視
-      const ch = channelById.get(msg.channel_id);
-      if (!ch) return;
-
-      // 今開いているチャンネル宛なら自動既読（バッジ立てない+DB更新）
-      if (msg.channel_id === currentChannelId) {
-        supabase
-          .from("channel_members")
-          .update({ last_read_at: new Date().toISOString() })
-          .eq("channel_id", msg.channel_id)
-          .eq("user_id", currentUserId)
-          .then(() => {});
-        return;
-      }
-      // 未読カウントを増やす
-      setUnreadState((prev) => ({
-        ...prev,
-        [msg.channel_id]: (prev[msg.channel_id] || 0) + 1,
-      }));
-
-      // 通知を表示
-      const senderName = memberNameById.get(msg.user_id) || "メンバー";
-      // DMの場合は相手の名前をチャンネル名にする
-      let channelLabel = ch.name;
-      if (ch.is_dm) {
-        const dmCh = ch as unknown as {
-          channel_members?: Array<{
-            user_id: string;
-            profiles?: { display_name?: string };
-          }>;
-        };
-        const other = dmCh.channel_members?.find(
-          (cm) => cm.user_id !== currentUserId
-        );
-        channelLabel = other?.profiles?.display_name || "DM";
-      }
-      showMessageNotification({
-        senderName,
-        channelName: channelLabel,
-        content: msg.content,
-        url: `/${workspaceSlug}/${ch.slug}`,
-      });
-    };
-
-    // 1つのRealtimeチャンネルに、各chat channelごとのフィルタ付き購読をぶら下げる
-    let realtimeChannel = supabase.channel(`sidebar-unread:${workspace.id}`);
-    for (const ch of allChannels) {
-      realtimeChannel = realtimeChannel.on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "messages",
-          filter: `channel_id=eq.${ch.id}`,
-        },
-        handler
-      );
-    }
-    realtimeChannel.subscribe();
-
-    return () => {
-      supabase.removeChannel(realtimeChannel);
-    };
-  }, [channels, dmChannels, members, currentUserId, currentChannelId, workspace.id, workspaceSlug]);
+  // 切り分け中: サイドバーのRealtime購読は一時的に無効化。
+  // channel-view 側の購読が CHANNEL_ERROR にならないか確認するため。
+  // 確認後に再実装予定（zustandストア等で channel-view と統合する案も検討）。
 
   // ワークスペース切り替えドロップダウンの外側クリックで閉じる
   useEffect(() => {
