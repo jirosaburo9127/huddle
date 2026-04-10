@@ -15,6 +15,13 @@ const APNS_KEY_ID = Deno.env.get("APNS_KEY_ID")!;
 const APNS_TEAM_ID = Deno.env.get("APNS_TEAM_ID")!;
 const APNS_BUNDLE_ID = Deno.env.get("APNS_BUNDLE_ID")!;
 const APNS_PRIVATE_KEY = Deno.env.get("APNS_PRIVATE_KEY")!;
+// 送信先エンドポイント: development (Xcode Debugビルド) or production (TestFlight/App Store)
+// デフォルトは development (sandbox)。TestFlight配布時に "production" に切り替える。
+const APNS_ENV = Deno.env.get("APNS_ENV") ?? "development";
+const APNS_HOST =
+  APNS_ENV === "production"
+    ? "api.push.apple.com"
+    : "api.sandbox.push.apple.com";
 
 // JWT は最大1時間有効。再生成コストを抑えるため50分キャッシュ
 let cachedJwt: { token: string; expiresAt: number } | null = null;
@@ -82,7 +89,7 @@ async function sendPush(
   try {
     const jwt = await getApnsJwt();
     const response = await fetch(
-      `https://api.push.apple.com/3/device/${deviceToken}`,
+      `https://${APNS_HOST}/3/device/${deviceToken}`,
       {
         method: "POST",
         headers: {
