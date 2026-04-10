@@ -36,7 +36,14 @@ export default async function SharePage({
     p_token: token,
   });
 
-  if (error || !data) {
+  if (error) {
+    // eslint-disable-next-line no-console
+    console.error("[share] rpc error:", error);
+    notFound();
+  }
+  if (!data) {
+    // eslint-disable-next-line no-console
+    console.log("[share] token not found or expired:", token.slice(0, 8));
     notFound();
   }
 
