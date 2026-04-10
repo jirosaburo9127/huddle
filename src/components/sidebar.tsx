@@ -3,7 +3,8 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { Workspace, Channel } from "@/lib/supabase/types";
+import type { RealtimePostgresInsertPayload } from "@supabase/supabase-js";
+import type { Workspace, Channel, Message } from "@/lib/supabase/types";
 import { CreateChannelModal } from "@/components/create-channel-modal";
 import { CreateDmModal } from "@/components/create-dm-modal";
 import { InviteModal } from "@/components/invite-modal";
@@ -14,6 +15,7 @@ import { MfaSetup } from "@/components/mfa-setup";
 import { signOut } from "@/lib/actions";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
 import { createClient } from "@/lib/supabase/client";
+import { showMessageNotification } from "@/lib/notification";
 
 type MemberProfile = {
   id: string;
@@ -49,6 +51,14 @@ export function Sidebar({
   allWorkspaces,
 }: SidebarProps) {
   const pathname = usePathname();
+  // 未読カウントをローカルstate化（Realtime+クリックで更新するため）
+  const [unreadState, setUnreadState] = useState<Record<string, number>>(unreadCounts);
+  // 親からのpropが変わった場合（WS切替時）に同期
+  useEffect(() => {
+    setUnreadState(unreadCounts);
+  }, [unreadCounts]);
+  // Sidebar専用のSupabaseクライアント（毎レンダー再生成しない）
+  const sidebarSupabaseRef = useRef(createClient());
   const [showCreateChannel, setShowCreateChannel] = useState(false);
   const [showCreateDm, setShowCreateDm] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -137,6 +147,121 @@ export function Sidebar({
       setProfileSaving(false);
     }
   };
+
+  // 現在開いているチャンネルのID（pathname → slug → channel）
+  const currentChannelId = useMemo(() => {
+    const slug = pathname.split("/")[2]; // /[workspace]/[channel]
+    if (!slug) return null;
+    const found = [...channels, ...dmChannels].find((c) => c.slug === slug);
+    return found?.id ?? null;
+  }, [pathname, channels, dmChannels]);
+
+  // 表示中のチャンネルが切り替わったら未読をクリア + DB側 last_read_at を更新
+  useEffect(() => {
+    if (!currentChannelId) return;
+
+    // 楽観的にバッジを消す
+    setUnreadState((prev) => {
+      if (!prev[currentChannelId]) return prev;
+      const next = { ...prev };
+      delete next[currentChannelId];
+      return next;
+    });
+
+    // DB の last_read_at を更新（fire-and-forget）
+    const supabase = sidebarSupabaseRef.current;
+    supabase
+      .from("channel_members")
+      .update({ last_read_at: new Date().toISOString() })
+      .eq("channel_id", currentChannelId)
+      .eq("user_id", currentUserId)
+      .then(() => {});
+  }, [currentChannelId, currentUserId]);
+
+  // ブラウザ通知許可リクエスト（マウント時に一度だけ）
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (typeof Notification === "undefined") return;
+    if (Notification.permission === "default") {
+      Notification.requestPermission().catch(() => {});
+    }
+  }, []);
+
+  // ワークスペース内の全メッセージを Realtime 購読（未読バッジ更新 + 通知）
+  useEffect(() => {
+    const supabase = sidebarSupabaseRef.current;
+    const channelById = new Map(
+      [...channels, ...dmChannels].map((c) => [c.id, c])
+    );
+
+    // メンバー名引きやすいよう正規化
+    const memberNameById = new Map<string, string>();
+    for (const m of members) {
+      const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
+      if (p?.display_name) memberNameById.set(m.user_id, p.display_name);
+    }
+
+    const subscription = supabase
+      .channel(`sidebar-unread:${workspace.id}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "messages" },
+        (payload: RealtimePostgresInsertPayload<Message>) => {
+          const msg = payload.new;
+          // スレッド返信は未読カウント対象外
+          if (msg.parent_id) return;
+          // 自分の送信は未読扱いしない
+          if (msg.user_id === currentUserId) return;
+          // このWSのチャンネル外は無視
+          const ch = channelById.get(msg.channel_id);
+          if (!ch) return;
+
+          // 今開いているチャンネル宛なら自動既読（バッジ立てない+DB更新）
+          if (msg.channel_id === currentChannelId) {
+            supabase
+              .from("channel_members")
+              .update({ last_read_at: new Date().toISOString() })
+              .eq("channel_id", msg.channel_id)
+              .eq("user_id", currentUserId)
+              .then(() => {});
+            return;
+          }
+          // 未読カウントを増やす
+          setUnreadState((prev) => ({
+            ...prev,
+            [msg.channel_id]: (prev[msg.channel_id] || 0) + 1,
+          }));
+
+          // 通知を表示
+          const senderName = memberNameById.get(msg.user_id) || "メンバー";
+          // DMの場合は相手の名前をチャンネル名にする
+          let channelLabel = ch.name;
+          if (ch.is_dm) {
+            const dmCh = ch as unknown as {
+              channel_members?: Array<{
+                user_id: string;
+                profiles?: { display_name?: string };
+              }>;
+            };
+            const other = dmCh.channel_members?.find(
+              (cm) => cm.user_id !== currentUserId
+            );
+            channelLabel = other?.profiles?.display_name || "DM";
+          }
+          showMessageNotification({
+            senderName,
+            channelName: channelLabel,
+            content: msg.content,
+            url: `/${workspaceSlug}/${ch.slug}`,
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  }, [channels, dmChannels, members, currentUserId, currentChannelId, workspace.id, workspaceSlug]);
 
   // ワークスペース切り替えドロップダウンの外側クリックで閉じる
   useEffect(() => {
@@ -283,7 +408,7 @@ export function Sidebar({
           {filteredChannels.map((channel) => {
             const href = `/${workspaceSlug}/${channel.slug}`;
             const isActive = pathname === href;
-            const unreadCount = unreadCounts[channel.id] || 0;
+            const unreadCount = unreadState[channel.id] || 0;
             return (
               <Link
                 key={channel.id}
@@ -367,6 +492,7 @@ export function Sidebar({
                 : isOnline
                   ? "bg-online"
                   : "bg-muted/50";
+            const dmUnread = unreadState[dm.id] || 0;
 
             return (
               <Link
@@ -399,7 +525,17 @@ export function Sidebar({
                     className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-sidebar ${statusDotColor}`}
                   />
                 </span>
-                <span className="truncate">{name}</span>
+                <span
+                  className={`truncate ${dmUnread > 0 && !isActive ? "font-semibold text-foreground" : ""}`}
+                >
+                  {name}
+                </span>
+                {/* 未読バッジ */}
+                {dmUnread > 0 && (
+                  <span className="ml-auto bg-accent text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                    {dmUnread > 99 ? "99+" : dmUnread}
+                  </span>
+                )}
               </Link>
             );
           })}
