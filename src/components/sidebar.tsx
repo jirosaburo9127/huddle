@@ -212,8 +212,6 @@ export function Sidebar({
         if (row.channel_id === currentChannelId) continue;
         next[row.channel_id] = Number(row.unread_count);
       }
-      // eslint-disable-next-line no-console
-      console.log("[unread] refetchUnread:", next);
       setUnreadState(next);
     }
 
@@ -248,14 +246,6 @@ export function Sidebar({
         },
         (payload: RealtimePostgresInsertPayload<Message>) => {
           const msg = payload.new;
-          // eslint-disable-next-line no-console
-          console.log("[unread] realtime INSERT received:", {
-            channel_id: msg.channel_id,
-            user_id: msg.user_id,
-            parent_id: msg.parent_id,
-            currentChannelId,
-            isKnownChannel: channelById.has(msg.channel_id),
-          });
           if (msg.parent_id) return;
           if (msg.user_id === currentUserId) return;
           const ch = channelById.get(msg.channel_id);
@@ -273,15 +263,10 @@ export function Sidebar({
           }
 
           // 未読カウント増加
-          setUnreadState((prev) => {
-            const next = {
-              ...prev,
-              [msg.channel_id]: (prev[msg.channel_id] || 0) + 1,
-            };
-            // eslint-disable-next-line no-console
-            console.log("[unread] setUnreadState:", { prev, next });
-            return next;
-          });
+          setUnreadState((prev) => ({
+            ...prev,
+            [msg.channel_id]: (prev[msg.channel_id] || 0) + 1,
+          }));
 
           // 通知
           const senderName = memberNameById.get(msg.user_id) || "メンバー";
@@ -306,10 +291,7 @@ export function Sidebar({
           });
         }
       )
-      .subscribe((status: string, err?: Error) => {
-        // eslint-disable-next-line no-console
-        console.log("[unread] subscription status:", status, err);
-      });
+      .subscribe();
 
     return () => {
       supabase.removeChannel(subscription);
