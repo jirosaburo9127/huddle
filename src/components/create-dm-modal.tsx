@@ -90,22 +90,28 @@ export function CreateDmModal({
       }
 
       // 新規DMチャンネルを作成
+      // チャンネルIDをクライアント側で生成する。
+      // 理由: チャンネル作成直後は currentUser がまだ channel_members に居らず、
+      // channels_select RLS（private は channel_members 必須）が SELECT を弾くため、
+      // .insert().select() では channel が null になってしまう。
+      // ID をクライアントで持っておけば SELECT 不要で次の channel_members 追加に進める。
+      const channelId = crypto.randomUUID();
       const dmSlug = `dm-${crypto.randomUUID()}`;
-      const { data: channel, error: insertError } = await supabase
+
+      const { error: insertError } = await supabase
         .from("channels")
         .insert({
+          id: channelId,
           workspace_id: workspaceId,
           name: "dm",
           slug: dmSlug,
           is_dm: true,
           is_private: true,
           created_by: currentUserId,
-        })
-        .select()
-        .single();
+        });
 
-      if (insertError || !channel) {
-        setError(insertError?.message || "DMチャンネルの作成に失敗しました");
+      if (insertError) {
+        setError(insertError.message);
         setLoading(false);
         return;
       }
@@ -114,18 +120,20 @@ export function CreateDmModal({
       const { error: memberError } = await supabase
         .from("channel_members")
         .insert([
-          { channel_id: channel.id, user_id: currentUserId },
-          { channel_id: channel.id, user_id: targetUserId },
+          { channel_id: channelId, user_id: currentUserId },
+          { channel_id: channelId, user_id: targetUserId },
         ]);
 
       if (memberError) {
+        // ロールバック: 作成済みチャンネルを削除
+        await supabase.from("channels").delete().eq("id", channelId);
         setError(memberError.message);
         setLoading(false);
         return;
       }
 
       onClose();
-      router.push(`/${workspaceSlug}/${channel.slug}`);
+      router.push(`/${workspaceSlug}/${dmSlug}`);
       router.refresh();
     } catch {
       setError("予期しないエラーが発生しました");

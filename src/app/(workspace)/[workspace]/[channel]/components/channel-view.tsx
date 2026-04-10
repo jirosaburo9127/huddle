@@ -34,6 +34,10 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
   const prevMessageCountRef = useRef(initialMessages.length);
   const supabaseRef = useRef(createClient());
   const supabase = supabaseRef.current;
+  // このタブが自分で送信して既に楽観的反映済みのメッセージID集合。
+  // Realtime購読では「同一ユーザーかどうか」ではなく「このタブで送ったか」で判定するのが正しい。
+  // （PCとiPhoneで同じユーザーでログインしている場合に、片方の送信がもう片方に届かなくなるため）
+  const sentMessageIdsRef = useRef<Set<string>>(new Set());
 
   // スレッドを開く
   const handleOpenThread = useCallback((msg: MessageWithProfile) => {
@@ -122,8 +126,12 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
           // parent_idがあるものはスレッド返信なので無視
           if (payload.new.parent_id) return;
 
-          // 自分が送ったメッセージは楽観的更新済みなのでスキップ
-          if (payload.new.user_id === currentUserId) return;
+          // このタブで楽観的に追加済みのメッセージはスキップ（user_idでの判定はNG。
+          // 同じユーザーが別端末で送ったメッセージも届かなくなってしまうため）
+          if (sentMessageIdsRef.current.has(payload.new.id)) {
+            sentMessageIdsRef.current.delete(payload.new.id);
+            return;
+          }
 
           // プロフィール情報を取得
           const { data: profile } = await supabase
@@ -375,6 +383,8 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
       // 失敗時は楽観的更新を取り消し
       setMessages((prev) => prev.filter((m) => m.id !== optimisticMsg.id));
     } else if (data) {
+      // Realtime購読で同じメッセージが二重追加されないようにDB IDを記録
+      sentMessageIdsRef.current.add(data.id);
       // 楽観的メッセージのIDをDB側のIDに置き換え
       setMessages((prev) =>
         prev.map((m) => m.id === optimisticMsg.id ? { ...m, id: data.id, created_at: data.created_at } : m)

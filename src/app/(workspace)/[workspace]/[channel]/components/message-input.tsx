@@ -25,13 +25,25 @@ const BLOCKED_EXTENSIONS = [
   ".scr", ".pif", ".hta", ".cpl", ".jar", ".wsf",
 ];
 
-// ファイル名のサニタイズ（パストラバーサル・特殊文字除去）
+// ファイル名のサニタイズ
+// Supabase Storageのオブジェクトキーは非ASCII文字（日本語など）を許容しないため、
+// ASCII英数字・ハイフン・アンダースコア・ドット以外は全て"_"に置換する。
 function sanitizeFileName(name: string): string {
-  return name
-    .replace(/[/\\:*?"<>|]/g, "_") // 危険な文字を置換
-    .replace(/\.\./g, "_")          // ディレクトリトラバーサル防止
-    .replace(/^\./g, "_")           // 隠しファイル防止
-    .slice(0, 200);                 // ファイル名の長さ制限
+  // 拡張子を分離（最後の "." 以降）
+  const lastDot = name.lastIndexOf(".");
+  const base = lastDot >= 0 ? name.slice(0, lastDot) : name;
+  const ext = lastDot >= 0 ? name.slice(lastDot) : "";
+
+  const safeBase = base
+    .replace(/[^a-zA-Z0-9._-]/g, "_") // 非ASCII・記号を全て"_"に
+    .replace(/_+/g, "_")               // 連続した"_"を1つに
+    .replace(/^[._]+/, "")             // 先頭のドット・アンダースコアを除去
+    .slice(0, 100);                    // 長さ制限
+
+  const safeExt = ext.replace(/[^a-zA-Z0-9.]/g, "").slice(0, 10);
+
+  // baseが空になってしまった場合のフォールバック
+  return (safeBase || "file") + safeExt;
 }
 
 type MemberProfile = {

@@ -40,6 +40,8 @@ export function ThreadPanel({
   const prevReplyCountRef = useRef(0);
   const supabaseRef = useRef(createClient());
   const supabase = supabaseRef.current;
+  // 自タブで楽観的反映済みの返信ID集合（PCとiPhoneで同一ユーザーログイン時の同期問題対策）
+  const sentReplyIdsRef = useRef<Set<string>>(new Set());
 
   // 新着返信時のみ自動スクロール
   useEffect(() => {
@@ -80,8 +82,12 @@ export function ThreadPanel({
           filter: `parent_id=eq.${parentMessage.id}`,
         },
         async (payload: RealtimePostgresInsertPayload<Message>) => {
-          // 自分が送った返信は楽観的更新済みなのでスキップ
-          if (payload.new.user_id === currentUserId) return;
+          // このタブで楽観的に追加済みの返信はスキップ
+          // （user_idで判定すると別端末からの同一ユーザーの返信が届かなくなる）
+          if (sentReplyIdsRef.current.has(payload.new.id)) {
+            sentReplyIdsRef.current.delete(payload.new.id);
+            return;
+          }
 
           // プロフィール情報を取得
           const { data: profile } = await supabase
@@ -304,17 +310,33 @@ export function ThreadPanel({
 
     setReplies((prev) => [...prev, optimisticReply]);
 
-    const { error } = await supabase.from("messages").insert({
-      channel_id: channelId,
-      user_id: user.id,
-      parent_id: parentMessage.id,
-      content,
-    });
+    const { data, error } = await supabase
+      .from("messages")
+      .insert({
+        channel_id: channelId,
+        user_id: user.id,
+        parent_id: parentMessage.id,
+        content,
+      })
+      .select()
+      .single();
 
     if (error) {
       // 失敗時は楽観的更新を取り消し
       setReplies((prev) => prev.filter((m) => m.id !== optimisticReply.id));
       return;
+    }
+
+    if (data) {
+      // Realtime購読の二重追加を防ぐためDB IDを記録し、楽観的IDをDB IDに置換
+      sentReplyIdsRef.current.add(data.id);
+      setReplies((prev) =>
+        prev.map((m) =>
+          m.id === optimisticReply.id
+            ? { ...m, id: data.id, created_at: data.created_at }
+            : m
+        )
+      );
     }
 
     // reply_countはDBトリガーで自動更新される。UIも即座に反映
