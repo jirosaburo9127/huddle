@@ -116,7 +116,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
   // Realtime購読
   useEffect(() => {
     const subscription = supabase
-      .channel(`messages:${channel.id}`)
+      .channel(`room-${channel.id}`)
       .on(
         "postgres_changes",
         {
