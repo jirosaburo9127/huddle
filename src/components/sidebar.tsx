@@ -187,6 +187,34 @@ export function Sidebar({
     }
   }, []);
 
+  // フォアグラウンド復帰時に未読カウントを再同期
+  // モバイルで画面オフ→復帰した際にRealtime取りこぼしを補完
+  useEffect(() => {
+    async function refetchUnread() {
+      if (typeof document === "undefined") return;
+      if (document.visibilityState !== "visible") return;
+      const supabase = sidebarSupabaseRef.current;
+      const { data } = await supabase.rpc("get_unread_counts", {
+        p_user_id: currentUserId,
+      });
+      if (!data) return;
+      const next: Record<string, number> = {};
+      for (const row of data as Array<{ channel_id: string; unread_count: number }>) {
+        // 現在開いているチャンネルは未読カウントをスキップ
+        if (row.channel_id === currentChannelId) continue;
+        next[row.channel_id] = Number(row.unread_count);
+      }
+      setUnreadState(next);
+    }
+
+    document.addEventListener("visibilitychange", refetchUnread);
+    window.addEventListener("focus", refetchUnread);
+    return () => {
+      document.removeEventListener("visibilitychange", refetchUnread);
+      window.removeEventListener("focus", refetchUnread);
+    };
+  }, [currentUserId, currentChannelId]);
+
   // ワークスペース内の全メッセージを Realtime 購読（未読バッジ更新 + 通知）
   useEffect(() => {
     const supabase = sidebarSupabaseRef.current;

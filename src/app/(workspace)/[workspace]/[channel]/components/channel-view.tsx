@@ -188,6 +188,58 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel.id]);
 
+  // フォアグラウンド復帰時の差分取得
+  // モバイル(特にCapacitor)では画面オフ・別アプリ切替でWebSocketが切断されるため
+  // バックグラウンド中に飛んだメッセージは取りこぼす。可視化イベントを契機にDBから補完する
+  useEffect(() => {
+    async function syncMissedMessages() {
+      // 現状の最新メッセージのcreated_atを取得（state経由でクロージャ最新値を読む）
+      let latestCreatedAt: string | null = null;
+      setMessages((prev) => {
+        const lastMsg = prev[prev.length - 1];
+        latestCreatedAt = lastMsg?.created_at ?? null;
+        return prev;
+      });
+
+      const query = supabase
+        .from("messages")
+        .select("*, profiles(*), reactions(*)")
+        .eq("channel_id", channel.id)
+        .is("parent_id", null)
+        .order("created_at", { ascending: true });
+
+      const { data } = latestCreatedAt
+        ? await query.gt("created_at", latestCreatedAt)
+        : await query;
+
+      if (!data || data.length === 0) return;
+
+      setMessages((prev) => {
+        const existingIds = new Set(prev.map((m) => m.id));
+        const additions = (data as MessageWithProfile[]).filter(
+          (m) => !existingIds.has(m.id)
+        );
+        if (additions.length === 0) return prev;
+        return [...prev, ...additions];
+      });
+    }
+
+    function onVisible() {
+      if (typeof document === "undefined") return;
+      if (document.visibilityState === "visible") {
+        syncMissedMessages();
+      }
+    }
+
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channel.id]);
+
   // メッセージ編集
   const handleEdit = useCallback(async (messageId: string, newContent: string) => {
     setMessages((prev) =>
