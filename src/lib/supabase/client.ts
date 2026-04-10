@@ -1,4 +1,5 @@
 import { createBrowserClient } from "@supabase/ssr";
+import type { Session } from "@supabase/supabase-js";
 
 let client: ReturnType<typeof createBrowserClient> | null = null;
 
@@ -17,14 +18,16 @@ export function createClient() {
     const c = client;
 
     // 起動時に既存セッションがあれば即座に setAuth
-    c.auth.getSession().then(({ data }) => {
-      if (data.session?.access_token) {
-        c.realtime.setAuth(data.session.access_token);
+    void (async () => {
+      const result = await c.auth.getSession();
+      const session = result.data.session as Session | null;
+      if (session?.access_token) {
+        c.realtime.setAuth(session.access_token);
       }
-    });
+    })();
 
     // 認証イベント（ログイン・トークン更新・ログアウト）に追従
-    c.auth.onAuthStateChange((_event, session) => {
+    c.auth.onAuthStateChange((_event: string, session: Session | null) => {
       if (session?.access_token) {
         c.realtime.setAuth(session.access_token);
       }
