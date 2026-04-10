@@ -246,6 +246,14 @@ export function Sidebar({
         },
         (payload: RealtimePostgresInsertPayload<Message>) => {
           const msg = payload.new;
+          // eslint-disable-next-line no-console
+          console.log("[unread] realtime INSERT received:", {
+            channel_id: msg.channel_id,
+            user_id: msg.user_id,
+            parent_id: msg.parent_id,
+            currentChannelId,
+            isKnownChannel: channelById.has(msg.channel_id),
+          });
           if (msg.parent_id) return;
           if (msg.user_id === currentUserId) return;
           const ch = channelById.get(msg.channel_id);
@@ -291,7 +299,10 @@ export function Sidebar({
           });
         }
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        // eslint-disable-next-line no-console
+        console.log("[unread] subscription status:", status, err);
+      });
 
     return () => {
       supabase.removeChannel(subscription);
