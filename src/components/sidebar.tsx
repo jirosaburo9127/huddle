@@ -299,7 +299,7 @@ export function Sidebar({
           });
         }
       )
-      .subscribe((status, err) => {
+      .subscribe((status: string, err?: Error) => {
         // eslint-disable-next-line no-console
         console.log("[unread] subscription status:", status, err);
       });
