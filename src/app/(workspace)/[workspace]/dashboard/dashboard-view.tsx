@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
 import {
@@ -70,6 +70,31 @@ export function DashboardView({
   const [createError, setCreateError] = useState<string | null>(null);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
   const [tokens, setTokens] = useState(shareTokens);
+  // チャンネルフィルタ: null = 全て
+  const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
+
+  // 決定事項に登場するチャンネルをユニーク抽出（件数も集計）
+  const channelFacets = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; count: number }>();
+    for (const d of decisions) {
+      const existing = map.get(d.channel_id);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        map.set(d.channel_id, {
+          id: d.channel_id,
+          name: d.channel_name,
+          count: 1,
+        });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => b.count - a.count);
+  }, [decisions]);
+
+  const filteredDecisions = useMemo(() => {
+    if (!selectedChannelId) return decisions;
+    return decisions.filter((d) => d.channel_id === selectedChannelId);
+  }, [decisions, selectedChannelId]);
 
   async function handleCreateToken() {
     if (!newLabel.trim()) return;
@@ -126,16 +151,58 @@ export function DashboardView({
         <div className="max-w-4xl mx-auto p-6 space-y-8">
         {/* 決定事項一覧 */}
         <section>
-          <h2 className="text-sm font-semibold text-foreground mb-3">
-            決定事項（最新100件）
-          </h2>
-          {decisions.length === 0 ? (
+          <div className="flex items-baseline justify-between mb-3 gap-3">
+            <h2 className="text-sm font-semibold text-foreground">
+              決定事項（最新100件）
+            </h2>
+            <span className="text-xs text-muted">
+              {filteredDecisions.length}件
+            </span>
+          </div>
+
+          {/* チャンネルフィルタ（ピルバー・横スクロール可） */}
+          {channelFacets.length > 0 && (
+            <div className="flex gap-2 mb-4 overflow-x-auto pb-1 -mx-1 px-1">
+              <button
+                type="button"
+                onClick={() => setSelectedChannelId(null)}
+                className={`shrink-0 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                  selectedChannelId === null
+                    ? "bg-accent text-white border-accent"
+                    : "border-border text-muted hover:text-foreground hover:bg-white/[0.04]"
+                }`}
+              >
+                全て（{decisions.length}）
+              </button>
+              {channelFacets.map((ch) => {
+                const active = selectedChannelId === ch.id;
+                return (
+                  <button
+                    key={ch.id}
+                    type="button"
+                    onClick={() => setSelectedChannelId(ch.id)}
+                    className={`shrink-0 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                      active
+                        ? "bg-accent text-white border-accent"
+                        : "border-border text-muted hover:text-foreground hover:bg-white/[0.04]"
+                    }`}
+                  >
+                    #{ch.name}（{ch.count}）
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {filteredDecisions.length === 0 ? (
             <div className="rounded-2xl border border-border bg-white/[0.02] p-8 text-center text-muted">
-              まだ決定事項がありません。メッセージの「決定」ボタンを押すとここに集まります。
+              {decisions.length === 0
+                ? "まだ決定事項がありません。メッセージの「決定」ボタンを押すとここに集まります。"
+                : "このチャンネルの決定事項はまだありません。"}
             </div>
           ) : (
             <div className="space-y-3">
-              {decisions.map((d) => (
+              {filteredDecisions.map((d) => (
                 <Link
                   key={d.id}
                   href={`/${workspaceSlug}/${d.channel_slug}`}
