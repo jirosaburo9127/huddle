@@ -46,6 +46,12 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
   // Realtime購読では「同一ユーザーかどうか」ではなく「このタブで送ったか」で判定するのが正しい。
   // （PCとiPhoneで同じユーザーでログインしている場合に、片方の送信がもう片方に届かなくなるため）
   const sentMessageIdsRef = useRef<Set<string>>(new Set());
+  // messages の最新参照を ref で保持することで、handleReact 等の useCallback が
+  // messages の変更ごとに再生成されるのを回避する（大量メッセージでの性能劣化対策）
+  const messagesRef = useRef<MessageWithProfile[]>(initialMessages);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   // モバイル: チャンネルURL直アクセス（プッシュ通知タップや共有リンク）では
   // サイドバーを閉じてチャンネルビューを前面に出す
@@ -391,8 +397,11 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
   }, [supabase]);
 
   // リアクション追加/削除（トグル）
+  // 依存配列に messages を入れないことで、メッセージ追加のたびに
+  // 子コンポーネント (MessageItem) の props が変わって不要な再レンダーが起きるのを防ぐ。
   const handleReact = useCallback(async (messageId: string, emoji: string) => {
-    const existingReaction = messages.find((m) => m.id === messageId)
+    const currentMessages = messagesRef.current;
+    const existingReaction = currentMessages.find((m) => m.id === messageId)
       ?.reactions?.find((r) => r.emoji === emoji && r.user_id === currentUserId);
 
     if (existingReaction) {
@@ -423,7 +432,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     } else {
       // 追加
       // 自分の表示名を取得（楽観的リアクション用）
-      const myProfile = messages.find((m) => m.user_id === currentUserId)?.profiles;
+      const myProfile = currentMessages.find((m) => m.user_id === currentUserId)?.profiles;
       const optimisticReaction: Reaction = {
         id: crypto.randomUUID(),
         message_id: messageId,
@@ -460,7 +469,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
         );
       }
     }
-  }, [supabase, currentUserId, messages]);
+  }, [supabase, currentUserId]);
 
   // 決定事項マーカーのトグル
   const handleDecision = useCallback(async (messageId: string, isDecision: boolean) => {

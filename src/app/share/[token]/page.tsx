@@ -24,11 +24,28 @@ function formatDate(iso: string): string {
 }
 
 // メッセージ本文が画像URLかを判定
-const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|bmp|avif)(\?.*)?$/i;
+// セキュリティ: 外部共有(share) ページで表示するため、以下を厳格化
+//   1. https:// 限定（http や data:, javascript: 等を排除）
+//   2. Supabase Storage 公開URLのホスト限定
+//   3. ファイル拡張子が既知の画像系のみ
+//   4. SVG は <img> 内では実行されないが、XSS リスクを避けて除外
+const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|bmp|avif)(\?.*)?$/i;
+const ALLOWED_IMAGE_HOSTS = new Set([
+  "emfngqketrieioxusuhg.supabase.co",
+]);
+
 function isImageUrl(content: string): boolean {
   const trimmed = content.trim();
-  if (!/^https?:\/\//.test(trimmed)) return false;
-  return IMAGE_EXT_RE.test(trimmed);
+  let url: URL;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "https:") return false;
+  if (!ALLOWED_IMAGE_HOSTS.has(url.hostname)) return false;
+  if (!IMAGE_EXT_RE.test(url.pathname)) return false;
+  return true;
 }
 
 export default async function SharePage({

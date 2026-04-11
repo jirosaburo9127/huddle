@@ -1,7 +1,9 @@
 import { type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 
-export async function middleware(request: NextRequest) {
+// Next.js 16 から middleware は proxy 規約に改名された。
+// 機能は同じで、呼び出し規約だけ変わる。
+export async function proxy(request: NextRequest) {
   return await updateSession(request);
 }
 
