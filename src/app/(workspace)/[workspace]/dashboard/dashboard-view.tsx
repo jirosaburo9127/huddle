@@ -67,6 +67,7 @@ export function DashboardView({
 }: Props) {
   const setSidebarOpen = useMobileNavStore((s) => s.setSidebarOpen);
   const [newLabel, setNewLabel] = useState("");
+  const [showShareSection, setShowShareSection] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
@@ -141,12 +142,75 @@ export function DashboardView({
           </div>
         </section>
 
-        {/* 共有リンク管理（管理者のみ） */}
+        {/* 決定事項一覧 */}
+        <section>
+          <h2 className="text-sm font-semibold text-foreground mb-3">
+            決定事項（最新100件）
+          </h2>
+          {decisions.length === 0 ? (
+            <div className="rounded-2xl border border-border bg-white/[0.02] p-8 text-center text-muted">
+              まだ決定事項がありません。メッセージの「決定」ボタンを押すとここに集まります。
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {decisions.map((d) => (
+                <Link
+                  key={d.id}
+                  href={`/${workspaceSlug}/${d.channel_slug}`}
+                  className="block rounded-2xl border border-accent/30 bg-accent/[0.03] p-4 hover:bg-accent/[0.06] transition-colors"
+                >
+                  <div className="flex items-center gap-2 text-xs text-muted mb-1.5">
+                    <span className="text-accent font-semibold">
+                      #{d.channel_name}
+                    </span>
+                    <span>・</span>
+                    <span>{d.sender_name}</span>
+                    <span>・</span>
+                    <span>{formatDate(d.created_at)}</span>
+                  </div>
+                  {isImageUrl(d.content) ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={d.content}
+                      alt="添付画像"
+                      className="max-h-80 rounded-xl border border-border object-contain"
+                    />
+                  ) : (
+                    <div className="text-base whitespace-pre-wrap break-words text-foreground">
+                      {d.content}
+                    </div>
+                  )}
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* 共有リンク管理（管理者のみ・最下部に折りたたみ表示） */}
         {isAdmin && (
-          <section>
-            <h2 className="text-sm font-semibold text-foreground mb-3">
+          <section className="pt-4 border-t border-border">
+            <button
+              type="button"
+              onClick={() => setShowShareSection((v) => !v)}
+              className="flex items-center gap-2 text-sm font-semibold text-muted hover:text-foreground transition-colors w-full text-left"
+            >
+              <svg
+                className={`w-4 h-4 transition-transform ${showShareSection ? "rotate-90" : ""}`}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
               伴走マイスター向け共有リンク
-            </h2>
+              {tokens.length > 0 && (
+                <span className="ml-1 text-xs text-muted">({tokens.length})</span>
+              )}
+            </button>
+
+            {showShareSection && (
+            <div className="mt-4">
             <p className="text-sm text-muted mb-4">
               このリンクを伴走マイスターに送ると、ログインなしで決定事項を閲覧できます。
               いつでも無効化できます。
@@ -237,52 +301,10 @@ export function DashboardView({
                 );
               })}
             </div>
+            </div>
+            )}
           </section>
         )}
-
-        {/* 決定事項一覧 */}
-        <section>
-          <h2 className="text-sm font-semibold text-foreground mb-3">
-            決定事項（最新100件）
-          </h2>
-          {decisions.length === 0 ? (
-            <div className="rounded-2xl border border-border bg-white/[0.02] p-8 text-center text-muted">
-              まだ決定事項がありません。メッセージの「決定」ボタンを押すとここに集まります。
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {decisions.map((d) => (
-                <Link
-                  key={d.id}
-                  href={`/${workspaceSlug}/${d.channel_slug}`}
-                  className="block rounded-2xl border border-accent/30 bg-accent/[0.03] p-4 hover:bg-accent/[0.06] transition-colors"
-                >
-                  <div className="flex items-center gap-2 text-xs text-muted mb-1.5">
-                    <span className="text-accent font-semibold">
-                      #{d.channel_name}
-                    </span>
-                    <span>・</span>
-                    <span>{d.sender_name}</span>
-                    <span>・</span>
-                    <span>{formatDate(d.created_at)}</span>
-                  </div>
-                  {isImageUrl(d.content) ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={d.content}
-                      alt="添付画像"
-                      className="max-h-80 rounded-xl border border-border object-contain"
-                    />
-                  ) : (
-                    <div className="text-base whitespace-pre-wrap break-words text-foreground">
-                      {d.content}
-                    </div>
-                  )}
-                </Link>
-              ))}
-            </div>
-          )}
-        </section>
         </div>
       </div>
     </div>
