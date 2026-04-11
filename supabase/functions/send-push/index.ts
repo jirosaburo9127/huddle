@@ -198,10 +198,10 @@ Deno.serve(async (req) => {
     const channelUrl =
       workspaceSlug && channel.slug ? `/${workspaceSlug}/${channel.slug}` : "/";
 
-    // チャンネルメンバー (送信者以外)
+    // チャンネルメンバー (送信者以外) — ミュート状態も取得
     const { data: members } = await supabase
       .from("channel_members")
-      .select("user_id")
+      .select("user_id, muted")
       .eq("channel_id", record.channel_id)
       .neq("user_id", record.user_id);
 
@@ -213,6 +213,11 @@ Deno.serve(async (req) => {
     }
 
     const recipientIds = members.map((m) => m.user_id);
+    // user_id -> muted の引き当て用マップ（後段で @メンション以外は除外するのに使う）
+    const mutedByUser = new Map<string, boolean>();
+    for (const m of members) {
+      mutedByUser.set(m.user_id, Boolean(m.muted));
+    }
 
     // 各受信者の iOS デバイストークンを取得
     const { data: tokens } = await supabase
@@ -279,9 +284,25 @@ Deno.serve(async (req) => {
       return `${senderName} (#${channel.name})`;
     }
 
+    // ミュートされていて、かつ @メンションもされていないトークンは通知しない
+    // Slackと同じ動作: ミュート中でも @メンションは常に通知する
+    const targetedTokens = tokens.filter((t) => {
+      const isMentioned =
+        isBroadcastMention || mentionedUserIds.has(t.user_id);
+      if (mutedByUser.get(t.user_id) && !isMentioned) return false;
+      return true;
+    });
+
+    if (targetedTokens.length === 0) {
+      return new Response(
+        JSON.stringify({ skipped: "all recipients muted (no mention)" }),
+        { status: 200, headers: { "content-type": "application/json" } }
+      );
+    }
+
     // 並列送信
     const results = await Promise.allSettled(
-      tokens.map((t) => {
+      targetedTokens.map((t) => {
         const isMentioned =
           isBroadcastMention || mentionedUserIds.has(t.user_id);
         const badge = badgeCountByUser.get(t.user_id) ?? 1;
@@ -301,22 +322,23 @@ Deno.serve(async (req) => {
     for (let i = 0; i < results.length; i++) {
       const r = results[i];
       if (r.status === "fulfilled" && !r.value.ok) {
-        failures.push(`${tokens[i].token.slice(0, 8)}... -> ${r.value.status} ${r.value.error}`);
+        failures.push(`${targetedTokens[i].token.slice(0, 8)}... -> ${r.value.status} ${r.value.error}`);
         // 410 Gone なら DB から削除
         if (r.value.status === 410) {
           await supabase
             .from("device_tokens")
             .delete()
-            .eq("token", tokens[i].token);
+            .eq("token", targetedTokens[i].token);
         }
       } else if (r.status === "rejected") {
-        failures.push(`${tokens[i].token.slice(0, 8)}... -> rejected: ${r.reason}`);
+        failures.push(`${targetedTokens[i].token.slice(0, 8)}... -> rejected: ${r.reason}`);
       }
     }
 
     return new Response(
       JSON.stringify({
-        sent: tokens.length - failures.length,
+        sent: targetedTokens.length - failures.length,
+        muted_skipped: tokens.length - targetedTokens.length,
         failed: failures.length,
         failures: failures.length > 0 ? failures : undefined,
       }),

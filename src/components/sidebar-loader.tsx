@@ -82,6 +82,15 @@ export async function WorkspaceShell({ workspaceSlug, children }: WorkspaceShell
     unreadCounts[row.channel_id] = row.unread_count;
   }
 
+  // ミュート中のチャンネルIDを別クエリで取得
+  // get_workspace_data RPCに手を入れずに追加したいのでここで取る
+  const { data: mutedRows } = await supabase
+    .from("channel_members")
+    .select("channel_id")
+    .eq("user_id", user.id)
+    .eq("muted", true);
+  const mutedChannelIds = (mutedRows || []).map((r) => r.channel_id);
+
   return (
     <>
       <Sidebar
@@ -92,6 +101,7 @@ export async function WorkspaceShell({ workspaceSlug, children }: WorkspaceShell
         currentUserId={user.id}
         workspaceSlug={workspaceSlug}
         unreadCounts={unreadCounts}
+        mutedChannelIds={mutedChannelIds}
         allWorkspaces={result.all_workspaces || []}
       />
       <KeyboardShortcuts workspaceId={result.workspace.id} workspaceSlug={workspaceSlug}>

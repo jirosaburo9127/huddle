@@ -34,6 +34,10 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
   const [showWiki, setShowWiki] = useState(false);
   const [hasWiki, setHasWiki] = useState(false);
   const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
+  const [isMuted, setIsMuted] = useState(false);
+  const [muteUpdating, setMuteUpdating] = useState(false);
+  const [showOverflowMenu, setShowOverflowMenu] = useState(false);
+  const overflowMenuRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const prevMessageCountRef = useRef(initialMessages.length);
   const supabaseRef = useRef(createClient());
@@ -51,6 +55,70 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     // userIdを渡すことで、他チャンネルに残っている未読数とバッジを正しく同期する
     clearPushBadge(currentUserId);
   }, [channel.id, setSidebarOpen, currentUserId]);
+
+  // このチャンネルの自分のミュート状態を取得（チャンネル切替時に再取得）
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("channel_members")
+        .select("muted")
+        .eq("channel_id", channel.id)
+        .eq("user_id", currentUserId)
+        .maybeSingle();
+      if (!cancelled) {
+        setIsMuted(Boolean(data?.muted));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [channel.id, currentUserId, supabase]);
+
+  // overflow メニュー外クリックで閉じる
+  useEffect(() => {
+    if (!showOverflowMenu) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        overflowMenuRef.current &&
+        !overflowMenuRef.current.contains(e.target as Node)
+      ) {
+        setShowOverflowMenu(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showOverflowMenu]);
+
+  // ミュート ON/OFF 切替
+  const handleToggleMute = useCallback(async () => {
+    if (muteUpdating) return;
+    setMuteUpdating(true);
+    const nextMuted = !isMuted;
+    // 楽観的更新
+    setIsMuted(nextMuted);
+    const { error } = await supabase
+      .from("channel_members")
+      .update({ muted: nextMuted })
+      .eq("channel_id", channel.id)
+      .eq("user_id", currentUserId);
+    setMuteUpdating(false);
+    if (error) {
+      // ロールバック
+      setIsMuted(!nextMuted);
+      // eslint-disable-next-line no-console
+      console.error("[mute] update failed:", error);
+      return;
+    }
+    // サイドバーに通知（バッジ即時反映のため）
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("huddle:muteChanged", {
+          detail: { channelId: channel.id, muted: nextMuted },
+        })
+      );
+    }
+  }, [isMuted, muteUpdating, channel.id, currentUserId, supabase]);
 
   // スレッドを開く
   const handleOpenThread = useCallback((msg: MessageWithProfile) => {
@@ -570,6 +638,28 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
                 </svg>
               </button>
             )}
+            {/* ミュートトグルボタン（DM・通常チャンネル両方） */}
+            <button
+              onClick={handleToggleMute}
+              disabled={muteUpdating}
+              className={`p-1.5 rounded-lg transition-colors disabled:opacity-50 ${
+                isMuted
+                  ? "text-accent bg-accent/10"
+                  : "text-muted hover:text-foreground hover:bg-white/[0.04]"
+              }`}
+              title={isMuted ? "ミュート解除（@メンションは常に通知）" : "このチャンネルをミュート"}
+              aria-pressed={isMuted}
+            >
+              {isMuted ? (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+              )}
+            </button>
             {/* メンバー管理ボタン（DMでは非表示） */}
             {!channel.is_dm && (
               <button
@@ -582,17 +672,41 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
                 </svg>
               </button>
             )}
-            {/* チャンネル削除ボタン（generalとDM以外） */}
+            {/* オーバーフローメニュー（⋯）: 誤タップしやすい「削除」等の破壊的操作はここに収める */}
             {!channel.is_dm && channel.slug !== "general" && (
-              <button
-                onClick={() => setShowDeleteChannel(true)}
-                className="p-1.5 text-muted hover:text-mention rounded-lg hover:bg-white/[0.04] transition-colors"
-                title="チャンネルを削除"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </button>
+              <div className="relative" ref={overflowMenuRef}>
+                <button
+                  onClick={() => setShowOverflowMenu((v) => !v)}
+                  className="p-1.5 text-muted hover:text-foreground rounded-lg hover:bg-white/[0.04] transition-colors"
+                  title="その他"
+                  aria-haspopup="menu"
+                  aria-expanded={showOverflowMenu}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v.01M12 12v.01M12 19v.01" />
+                  </svg>
+                </button>
+                {showOverflowMenu && (
+                  <div
+                    role="menu"
+                    className="absolute right-0 mt-1 w-48 rounded-xl border border-border bg-sidebar shadow-lg z-20 py-1"
+                  >
+                    <button
+                      role="menuitem"
+                      onClick={() => {
+                        setShowOverflowMenu(false);
+                        setShowDeleteChannel(true);
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-mention hover:bg-mention/10 transition-colors"
+                    >
+                      <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                      チャンネルを削除
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </header>
