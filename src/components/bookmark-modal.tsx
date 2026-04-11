@@ -83,10 +83,19 @@ export function BookmarkModal({ currentUserId, workspaceSlug, onClose }: Props) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUserId]);
 
-  // ブックマーク解除
+  // ブックマーク解除（楽観的削除 → 失敗時はロールバック）
   async function handleRemove(bookmarkId: string) {
+    const prevBookmarks = bookmarks;
     setBookmarks((prev) => prev.filter((b) => b.id !== bookmarkId));
-    await supabase.from("bookmarks").delete().eq("id", bookmarkId);
+    const { error } = await supabase
+      .from("bookmarks")
+      .delete()
+      .eq("id", bookmarkId);
+    if (error) {
+      // eslint-disable-next-line no-console
+      console.error("[bookmark] delete failed:", error);
+      setBookmarks(prevBookmarks);
+    }
   }
 
   return (

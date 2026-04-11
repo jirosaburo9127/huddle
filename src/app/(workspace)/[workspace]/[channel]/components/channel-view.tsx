@@ -396,7 +396,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
       ?.reactions?.find((r) => r.emoji === emoji && r.user_id === currentUserId);
 
     if (existingReaction) {
-      // 削除（トグル）
+      // 削除（トグル）— 楽観的削除 → 失敗時はロールバック
       setMessages((prev) =>
         prev.map((m) =>
           m.id === messageId
@@ -404,7 +404,22 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
             : m
         )
       );
-      await supabase.from("reactions").delete().eq("id", existingReaction.id);
+      const { error: delErr } = await supabase
+        .from("reactions")
+        .delete()
+        .eq("id", existingReaction.id);
+      if (delErr) {
+        // eslint-disable-next-line no-console
+        console.error("[reaction] delete failed:", delErr);
+        // ロールバック
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === messageId
+              ? { ...m, reactions: [...(m.reactions || []), existingReaction] }
+              : m
+          )
+        );
+      }
     } else {
       // 追加
       // 自分の表示名を取得（楽観的リアクション用）
@@ -606,7 +621,13 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
         });
       }
       if (mentionRows.length > 0) {
-        await supabase.from("mentions").insert(mentionRows);
+        const { error: mentionErr } = await supabase
+          .from("mentions")
+          .insert(mentionRows);
+        if (mentionErr) {
+          // eslint-disable-next-line no-console
+          console.error("[mentions] insert failed:", mentionErr);
+        }
       }
     }
   }
