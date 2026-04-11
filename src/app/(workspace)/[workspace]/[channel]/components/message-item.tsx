@@ -515,14 +515,16 @@ export const MessageItem = memo(function MessageItem({
             {onDecision && (
               <button
                 onClick={(e) => { e.stopPropagation(); onDecision(message.id, !message.is_decision); }}
-                className={`flex items-center gap-1 px-2 py-0.5 text-[13px] border border-transparent hover:border-border/50 rounded transition-colors ${
-                  message.is_decision ? "text-accent" : "text-muted hover:text-accent"
+                className={`flex items-center gap-1 px-2 py-0.5 text-[13px] border rounded transition-all active:scale-90 ${
+                  message.is_decision
+                    ? "text-accent border-accent/40 bg-accent/10"
+                    : "text-muted hover:text-accent border-transparent hover:border-border/50"
                 }`}
               >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-3.5 h-3.5" fill={message.is_decision ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                決定
+                {message.is_decision ? "決定済" : "決定"}
               </button>
             )}
             {/* ブックマーク */}
@@ -625,14 +627,16 @@ export const MessageItem = memo(function MessageItem({
               {onDecision && (
                 <button
                   onClick={() => { setShowActions(false); onDecision(message.id, !message.is_decision); }}
-                  className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
+                  className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] active:scale-90 transition-all"
                 >
-                  <span className={`w-12 h-12 rounded-full border-2 flex items-center justify-center ${message.is_decision ? "border-accent/40" : "border-muted/40"}`}>
-                    <svg className={`w-5 h-5 ${message.is_decision ? "text-accent" : "text-foreground"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <span className={`w-12 h-12 rounded-full border-2 flex items-center justify-center ${message.is_decision ? "border-accent bg-accent/15" : "border-muted/40"}`}>
+                    <svg className={`w-5 h-5 ${message.is_decision ? "text-accent" : "text-foreground"}`} fill={message.is_decision ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </span>
-                  <span className={`text-xs ${message.is_decision ? "text-accent" : "text-foreground"}`}>決定</span>
+                  <span className={`text-xs ${message.is_decision ? "text-accent font-semibold" : "text-foreground"}`}>
+                    {message.is_decision ? "決定済" : "決定"}
+                  </span>
                 </button>
               )}
               {/* ブックマーク（モバイル） */}

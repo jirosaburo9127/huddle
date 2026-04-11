@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { RealtimePostgresInsertPayload, RealtimePostgresUpdatePayload } from "@supabase/supabase-js";
 import type { Channel, Message, MessageWithProfile, Reaction } from "@/lib/supabase/types";
+import { useRouter } from "next/navigation";
 import { MessageItem } from "./message-item";
 import { MessageInput, type MentionPayload } from "./message-input";
 import { ThreadPanel } from "./thread-panel";
@@ -12,6 +13,7 @@ import { ChannelWiki } from "./channel-wiki";
 import { ChannelMembersModal } from "@/components/channel-members-modal";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
 import { showMessageNotification } from "@/lib/notification";
+import { clearPushBadge } from "@/lib/push-notifications";
 
 type Props = {
   channel: Channel;
@@ -22,6 +24,7 @@ type Props = {
 export function ChannelView({ channel, initialMessages, currentUserId }: Props) {
   // zustand セレクタ形式: 購読範囲を setSidebarOpen のみに限定
   const setSidebarOpen = useMobileNavStore((s) => s.setSidebarOpen);
+  const router = useRouter();
   const [messages, setMessages] = useState<MessageWithProfile[]>(initialMessages);
   const [activeThread, setActiveThread] = useState<MessageWithProfile | null>(null);
   const [showMembersModal, setShowMembersModal] = useState(false);
@@ -44,6 +47,8 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
   // サイドバーを閉じてチャンネルビューを前面に出す
   useEffect(() => {
     setSidebarOpen(false);
+    // チャンネルを開いた時点でiOSアプリアイコンのバッジと配信済み通知をクリア
+    clearPushBadge();
   }, [channel.id, setSidebarOpen]);
 
   // スレッドを開く
@@ -375,15 +380,35 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
 
   // 決定事項マーカーのトグル
   const handleDecision = useCallback(async (messageId: string, isDecision: boolean) => {
+    // 決定する時のみ確認ダイアログ（解除時は確認なし）
+    if (isDecision) {
+      const ok = window.confirm(
+        "この投稿を「決定事項」としてマークしますか？\n進捗ダッシュボードに表示されます。"
+      );
+      if (!ok) return;
+    }
+
     // 楽観的更新
     setMessages((prev) =>
       prev.map((m) => (m.id === messageId ? { ...m, is_decision: isDecision } : m))
     );
-    await supabase
+    const { error } = await supabase
       .from("messages")
       .update({ is_decision: isDecision })
       .eq("id", messageId);
-  }, [supabase]);
+
+    if (error) {
+      // ロールバック
+      setMessages((prev) =>
+        prev.map((m) => (m.id === messageId ? { ...m, is_decision: !isDecision } : m))
+      );
+      alert("決定事項の更新に失敗しました");
+      return;
+    }
+
+    // 進捗ダッシュボードを再検証（次回訪問時に最新データ取得）
+    router.refresh();
+  }, [supabase, router]);
 
   // ブックマークのトグル
   const handleBookmark = useCallback(async (messageId: string) => {

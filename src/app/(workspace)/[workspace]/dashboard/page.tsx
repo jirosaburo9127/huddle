@@ -3,6 +3,9 @@ import { getAuthUser } from "@/lib/supabase/auth";
 import { redirect } from "next/navigation";
 import { DashboardView } from "./dashboard-view";
 
+// ダッシュボードは決定事項の変更を即座に反映したいので静的キャッシュを無効化
+export const dynamic = "force-dynamic";
+
 type Decision = {
   id: string;
   content: string;

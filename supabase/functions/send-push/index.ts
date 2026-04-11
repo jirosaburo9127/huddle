@@ -226,6 +226,23 @@ Deno.serve(async (req) => {
       });
     }
 
+    // 受信者ごとの未読チャンネル数（バッジ数）を一括取得
+    // get_unread_counts RPC で各ユーザーのチャンネル別未読を取得し、
+    // チャンネル数 (>0のチャンネル数) + 1（新着） をバッジにする
+    const badgeCountByUser = new Map<string, number>();
+    for (const uid of new Set(recipientIds)) {
+      const { data: unreadRows } = await supabase.rpc("get_unread_counts", {
+        p_user_id: uid,
+      });
+      const unreadChannelCount = Array.isArray(unreadRows)
+        ? (unreadRows as Array<{ unread_count: number }>).filter(
+            (r) => Number(r.unread_count) > 0
+          ).length
+        : 0;
+      // 今送ろうとしているメッセージが新しくunreadを生むため +1
+      badgeCountByUser.set(uid, unreadChannelCount + 1);
+    }
+
     // このメッセージでメンションされた user_id を取得
     // @here / @channel は全員宛として扱う
     const { data: mentionRows } = await supabase
@@ -265,11 +282,12 @@ Deno.serve(async (req) => {
       tokens.map((t) => {
         const isMentioned =
           isBroadcastMention || mentionedUserIds.has(t.user_id);
+        const badge = badgeCountByUser.get(t.user_id) ?? 1;
         return sendPush(
           t.token,
           buildTitle(isMentioned),
           bodyPlain,
-          1,
+          badge,
           channelUrl,
           isMentioned
         );

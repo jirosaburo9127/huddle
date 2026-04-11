@@ -8,6 +8,20 @@ import { createClient } from "@/lib/supabase/client";
 let registered = false;
 
 /**
+ * iOS アプリアイコンのバッジと通知センターの既配信通知をクリアする。
+ * チャンネルを開いたとき・アプリがフォアグラウンドに戻ったときに呼ぶ。
+ */
+export async function clearPushBadge(): Promise<void> {
+  if (typeof window === "undefined") return;
+  if (!Capacitor.isNativePlatform()) return;
+  try {
+    await PushNotifications.removeAllDeliveredNotifications();
+  } catch {
+    // プラグイン未対応など、失敗しても UI には影響しない
+  }
+}
+
+/**
  * プッシュ通知の権限をリクエストし、デバイストークンを Supabase に登録する。
  * - Webブラウザでは何もしない（Capacitor.isNativePlatform() で判定）
  * - 同じセッション内で複数回呼ばれても1度だけ実行される
