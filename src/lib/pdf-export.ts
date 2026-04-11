@@ -112,6 +112,48 @@ function wrapText(
   return lines;
 }
 
+// --- 画像URL判定 & PNGバイト取得 ---------------------------------------------
+
+const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|bmp|avif)(\?.*)?$/i;
+function isImageUrl(content: string): boolean {
+  const trimmed = content.trim();
+  if (!/^https?:\/\//.test(trimmed)) return false;
+  return IMAGE_EXT_RE.test(trimmed);
+}
+
+type LoadedImage = {
+  pngBytes: Uint8Array;
+  width: number;
+  height: number;
+};
+
+// URL で指定された画像を HTMLImageElement 経由で読み込み、canvas で PNGに再エンコードする。
+// これにより png/jpg/webp/gif/svg 等どのフォーマットでも一律 pdf-lib の embedPng に渡せる。
+async function loadImageAsPng(url: string): Promise<LoadedImage> {
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const el = new Image();
+    el.crossOrigin = "anonymous";
+    el.onload = () => resolve(el);
+    el.onerror = () => reject(new Error(`image load failed: ${url}`));
+    el.src = url;
+  });
+  const canvas = document.createElement("canvas");
+  canvas.width = img.naturalWidth || img.width;
+  canvas.height = img.naturalHeight || img.height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("canvas 2d context unavailable");
+  ctx.drawImage(img, 0, 0);
+  const blob: Blob = await new Promise((resolve, reject) => {
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("canvas.toBlob returned null"))), "image/png");
+  });
+  const buf = await blob.arrayBuffer();
+  return {
+    pngBytes: new Uint8Array(buf),
+    width: canvas.width,
+    height: canvas.height,
+  };
+}
+
 // --- 決定事項型 --------------------------------------------------------------
 
 export type DecisionForPdf = {
@@ -232,14 +274,54 @@ export async function generateDecisionsPdf(
     }
   };
 
+  // 画像決定を先に並列で読み込む（pdf-lib の embedPng は非同期なので後で順序通り使う）
+  const imageCache = new Map<string, LoadedImage>();
+  const imagePromises: Promise<void>[] = [];
+  for (const d of ctx.decisions) {
+    if (isImageUrl(d.content)) {
+      imagePromises.push(
+        loadImageAsPng(d.content)
+          .then((img) => {
+            imageCache.set(d.id, img);
+          })
+          .catch((err) => {
+            // eslint-disable-next-line no-console
+            console.warn("[pdf-export] image load failed:", d.content, err);
+            // 失敗した画像決定はテキスト(URL)として残る
+          })
+      );
+    }
+  }
+  await Promise.all(imagePromises);
+
   let idx = 0;
   for (const d of ctx.decisions) {
     idx += 1;
 
-    // 事前にメタ行と本文の必要高さを見積もって、分割するくらいなら新ページに送る
-    const bodyLines = wrapText(d.content, fontJp, BODY_SIZE, BODY_W);
-    const bodyHeight =
-      bodyLines.length * (BODY_SIZE + BODY_LINE_GAP) - BODY_LINE_GAP;
+    const isImage = isImageUrl(d.content);
+    const loadedImage = isImage ? imageCache.get(d.id) : undefined;
+
+    // レイアウト見積もり
+    const MAX_IMAGE_H = 260; // 画像決定の最大高（A4中盤に1つ載る程度）
+    let bodyHeight = 0;
+    let bodyLines: string[] = [];
+    let imageDisplayW = 0;
+    let imageDisplayH = 0;
+
+    if (loadedImage) {
+      // アスペクト比維持で BODY_W x MAX_IMAGE_H に収める
+      const scaleW = BODY_W / loadedImage.width;
+      const scaleH = MAX_IMAGE_H / loadedImage.height;
+      const scale = Math.min(scaleW, scaleH, 1);
+      imageDisplayW = loadedImage.width * scale;
+      imageDisplayH = loadedImage.height * scale;
+      bodyHeight = imageDisplayH;
+    } else {
+      bodyLines = wrapText(d.content, fontJp, BODY_SIZE, BODY_W);
+      bodyHeight =
+        bodyLines.length * (BODY_SIZE + BODY_LINE_GAP) - BODY_LINE_GAP;
+    }
+
     const needed =
       12 /* 区切り線とパディング */ +
       META_SIZE +
@@ -288,17 +370,29 @@ export async function generateDecisionsPdf(
     });
     cursorY -= META_SIZE + 12;
 
-    // 本文
-    for (const line of bodyLines) {
-      ensureSpace(BODY_SIZE + BODY_LINE_GAP);
-      page.drawText(line, {
+    if (loadedImage) {
+      // 画像を埋め込み
+      const embedded = await doc.embedPng(loadedImage.pngBytes);
+      page.drawImage(embedded, {
         x: BODY_L,
-        y: cursorY - BODY_SIZE,
-        size: BODY_SIZE,
-        font: fontJp,
-        color: COLOR_INK,
+        y: cursorY - imageDisplayH,
+        width: imageDisplayW,
+        height: imageDisplayH,
       });
-      cursorY -= BODY_SIZE + BODY_LINE_GAP;
+      cursorY -= imageDisplayH;
+    } else {
+      // 本文テキスト
+      for (const line of bodyLines) {
+        ensureSpace(BODY_SIZE + BODY_LINE_GAP);
+        page.drawText(line, {
+          x: BODY_L,
+          y: cursorY - BODY_SIZE,
+          size: BODY_SIZE,
+          font: fontJp,
+          color: COLOR_INK,
+        });
+        cursorY -= BODY_SIZE + BODY_LINE_GAP;
+      }
     }
     cursorY -= 14; // 次項目との間隔
   }
