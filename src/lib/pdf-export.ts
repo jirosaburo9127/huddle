@@ -12,10 +12,13 @@ import fontkit from "@pdf-lib/fontkit";
 
 // --- フォント取得 ------------------------------------------------------------
 
+// BIZ UDPGothic は日本語Universal Design フォントで業務文書に最適。
+// google/fonts リポジトリは jsdelivr の size 制限に収まっており、Regular/Bold個別の
+// TTFが配布されている（noto-cjk は巨大で jsdelivr からは 403 になる）。
 const FONT_REGULAR_URL =
-  "https://cdn.jsdelivr.net/gh/notofonts/noto-cjk@main/Sans/OTF/Japanese/NotoSansJP-Regular.otf";
+  "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/bizudpgothic/BIZUDPGothic-Regular.ttf";
 const FONT_BOLD_URL =
-  "https://cdn.jsdelivr.net/gh/notofonts/noto-cjk@main/Sans/OTF/Japanese/NotoSansJP-Bold.otf";
+  "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/bizudpgothic/BIZUDPGothic-Bold.ttf";
 
 const DB_NAME = "huddle-pdf-cache";
 const STORE_NAME = "fonts";
@@ -145,8 +148,8 @@ export async function generateDecisionsPdf(
 
   // フォントを並列取得
   const [regularBytes, boldBytes] = await Promise.all([
-    fetchFont(FONT_REGULAR_URL, "NotoSansJP-Regular.otf"),
-    fetchFont(FONT_BOLD_URL, "NotoSansJP-Bold.otf"),
+    fetchFont(FONT_REGULAR_URL, "BIZUDPGothic-Regular.ttf"),
+    fetchFont(FONT_BOLD_URL, "BIZUDPGothic-Bold.ttf"),
   ]);
 
   // subset=true で実際に使われたグリフだけPDFに埋める → 出力サイズ最小化
