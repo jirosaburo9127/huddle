@@ -383,15 +383,14 @@ export function Sidebar({
       >
         {/* ヘッダー: アプリ名 + ワークスペース切り替え */}
         <div className="px-4 py-3 border-b border-border/50">
-          {/* ロゴ（アイコン + ワードマーク） */}
-          <h1 className="flex items-center gap-2">
+          {/* ロゴ（アイコンのみ・背景透過） */}
+          <h1>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/icons/icon-192.png"
+              src="/icons/logo-transparent.png"
               alt="Huddle"
-              className="w-8 h-8 rounded-lg shrink-0"
+              className="w-10 h-10"
             />
-            <span className="font-bold text-3xl text-accent leading-none">Huddle</span>
           </h1>
           <div className="flex items-center gap-1">
           <div className="relative flex-1 min-w-0" ref={wsSwitcherRef}>
