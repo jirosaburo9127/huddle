@@ -53,7 +53,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="Huddle" />
-        {/* favicon / apple-touch-icon は src/app/icon.svg と src/app/apple-icon.png から Next.js が自動生成 */}
+        {/* favicon / apple-touch-icon は metadata.icons で /icons/icon-192.png を指定（monoクロのHuddleアプリアイコン） */}
       </head>
       <body className="h-full overflow-x-hidden">
         <ThemeProvider />
