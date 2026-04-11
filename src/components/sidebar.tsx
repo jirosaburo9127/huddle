@@ -401,7 +401,7 @@ export function Sidebar({
                 {allWorkspaces.map((ws) => (
                   <Link
                     key={ws.id}
-                    href={`/${ws.slug}/general`}
+                    href={`/${ws.slug}`}
                     onClick={() => setShowWsSwitcher(false)}
                     className={`block px-3 py-2 text-sm truncate transition-colors rounded-lg mx-1 ${
                       ws.id === workspace.id
