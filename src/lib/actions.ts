@@ -28,61 +28,22 @@ export async function createWorkspace(formData: FormData) {
     role: "owner",
   });
 
-  // #general チャンネルを自動作成
-  const { data: channel } = await supabase
-    .from("channels")
-    .insert({
-      workspace_id: workspace.id,
-      name: "general",
-      slug: "general",
-      created_by: user.id,
-    })
-    .select()
-    .single();
+  // #general チャンネルを自動作成（作成者を自動でメンバー追加）
+  // NOTE: 012以降 channels_select が招待制になったため、普通の .insert().select() は
+  // 挿入直後のSELECTが RLS に弾かれて null を返し、作成者が channel_members に
+  // 追加されないまま general にリダイレクトされて詰む。atomic RPC でまとめて処理する。
+  const { error: channelErr } = await supabase.rpc("create_channel_with_member", {
+    p_workspace_id: workspace.id,
+    p_name: "general",
+    p_slug: "general",
+    p_is_private: false,
+  });
 
-  if (channel) {
-    await supabase.from("channel_members").insert({
-      channel_id: channel.id,
-      user_id: user.id,
-    });
+  if (channelErr) {
+    throw new Error(`generalチャンネル作成失敗: ${channelErr.message}`);
   }
 
   redirect(`/${workspace.slug}/general`);
-}
-
-// チャンネル作成
-export async function createChannel(formData: FormData) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("未認証");
-
-  const name = formData.get("name") as string;
-  const workspaceId = formData.get("workspaceId") as string;
-  const isPrivate = formData.get("isPrivate") === "true";
-  const asciiSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-  const slug = asciiSlug || `ch-${crypto.randomUUID().slice(0, 8)}`;
-
-  const { data: channel, error } = await supabase
-    .from("channels")
-    .insert({
-      workspace_id: workspaceId,
-      name,
-      slug,
-      is_private: isPrivate,
-      created_by: user.id,
-    })
-    .select()
-    .single();
-
-  if (error) throw new Error(error.message);
-
-  // 作成者をメンバーに追加
-  await supabase.from("channel_members").insert({
-    channel_id: channel.id,
-    user_id: user.id,
-  });
-
-  return channel;
 }
 
 // メッセージ送信
