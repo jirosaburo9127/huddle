@@ -1,0 +1,23 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <!-- 背景: 白 -->
+  <rect width="1024" height="1024" fill="white"/>
+
+  <!-- H (ラウンド処理したブロック体) -->
+  <!-- 左の縦棒 -->
+  <rect x="140" y="150" width="210" height="724" rx="60" ry="60" fill="black"/>
+  <!-- 右の縦棒 -->
+  <rect x="674" y="150" width="210" height="724" rx="60" ry="60" fill="black"/>
+  <!-- 中央の横棒 -->
+  <rect x="350" y="430" width="324" height="180" fill="black"/>
+
+  <!-- チャット吹き出し本体（白い角丸矩形、Hの中央に大きめに配置） -->
+  <rect x="284" y="360" width="456" height="300" rx="80" ry="80" fill="white"/>
+
+  <!-- 吹き出しの尻尾（左下向き） -->
+  <path d="M 344,630 L 290,740 L 418,642 Z" fill="white"/>
+
+  <!-- 3つのドット（タイピング中のインジケータ） -->
+  <circle cx="420" cy="510" r="34" fill="black"/>
+  <circle cx="512" cy="510" r="34" fill="black"/>
+  <circle cx="604" cy="510" r="34" fill="black"/>
+</svg>
