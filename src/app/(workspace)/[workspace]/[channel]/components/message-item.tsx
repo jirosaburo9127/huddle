@@ -12,6 +12,11 @@ type Props = {
   onOpenThread?: (message: MessageWithProfile) => void;
   onReact?: (messageId: string, emoji: string) => Promise<void>;
   onDecision?: (messageId: string, isDecision: boolean) => Promise<void>;
+  onUpdateDecisionMeta?: (
+    messageId: string,
+    why: string | null,
+    due: string | null
+  ) => Promise<void>;
   onBookmark?: (messageId: string) => Promise<void>;
   isBookmarked?: boolean;
   isThreadView?: boolean;
@@ -246,6 +251,7 @@ export const MessageItem = memo(function MessageItem({
   onOpenThread,
   onReact,
   onDecision,
+  onUpdateDecisionMeta,
   onBookmark,
   isBookmarked,
   isThreadView,
@@ -273,6 +279,10 @@ export const MessageItem = memo(function MessageItem({
   const [imageError, setImageError] = useState(false);
   const [showActions, setShowActions] = useState(false);
   const [mobileEmojiOpen, setMobileEmojiOpen] = useState(false);
+  const [showDecisionMetaModal, setShowDecisionMetaModal] = useState(false);
+  const [metaWhyInput, setMetaWhyInput] = useState("");
+  const [metaDueInput, setMetaDueInput] = useState("");
+  const [metaSaving, setMetaSaving] = useState(false);
   const editTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   // リアクションを絵文字ごとにグループ化
@@ -455,10 +465,130 @@ export const MessageItem = memo(function MessageItem({
             </>
           )}
 
-          {/* 決定事項マーカー */}
+          {/* 決定事項マーカー + Why/Due + 編集 */}
           {message.is_decision && !isEditing && (
-            <div className="flex items-center gap-1.5 mt-1 px-2 py-1 rounded-lg bg-accent/10 border border-accent/20 text-sm text-accent">
-              ✅ 決定事項
+            <div className="mt-1 px-3 py-2 rounded-lg bg-accent/10 border border-accent/20 text-sm text-accent">
+              <div className="flex items-center justify-between gap-2">
+                <span className="flex items-center gap-1.5">✅ 決定事項</span>
+                {onUpdateDecisionMeta && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMetaWhyInput(message.decision_why || "");
+                      setMetaDueInput(message.decision_due || "");
+                      setShowDecisionMetaModal(true);
+                    }}
+                    className="text-xs text-accent/80 hover:text-accent underline decoration-dotted"
+                  >
+                    {message.decision_why || message.decision_due ? "編集" : "理由・期限を追記"}
+                  </button>
+                )}
+              </div>
+              {(message.decision_why || message.decision_due) && (
+                <div className="mt-2 pt-2 border-t border-accent/20 space-y-1 text-xs text-foreground/90">
+                  {message.decision_why && (
+                    <div className="flex gap-2">
+                      <span className="shrink-0 font-semibold text-muted uppercase">
+                        Why
+                      </span>
+                      <span className="whitespace-pre-wrap break-words">
+                        {message.decision_why}
+                      </span>
+                    </div>
+                  )}
+                  {message.decision_due && (
+                    <div className="flex gap-2">
+                      <span className="shrink-0 font-semibold text-muted uppercase">
+                        Due
+                      </span>
+                      <span className="whitespace-pre-wrap break-words">
+                        {message.decision_due}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 決定事項 Why/Due 編集モーダル */}
+          {showDecisionMetaModal && onUpdateDecisionMeta && (
+            <div
+              className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
+              onClick={() => !metaSaving && setShowDecisionMetaModal(false)}
+            >
+              <div
+                className="w-full max-w-md rounded-2xl bg-sidebar border border-border p-5 space-y-4"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-bold">決定事項の追記</h3>
+                  <button
+                    type="button"
+                    onClick={() => !metaSaving && setShowDecisionMetaModal(false)}
+                    className="text-muted hover:text-foreground"
+                    aria-label="閉じる"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-muted uppercase mb-1">
+                    Why（理由・背景）
+                  </label>
+                  <textarea
+                    value={metaWhyInput}
+                    onChange={(e) => setMetaWhyInput(e.target.value)}
+                    placeholder="なぜこの決定に至ったか"
+                    rows={3}
+                    className="w-full rounded-lg border border-border bg-input-bg px-3 py-2 text-sm text-foreground placeholder-muted focus:border-accent focus:outline-none resize-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-muted uppercase mb-1">
+                    Due（期限・期日）
+                  </label>
+                  <input
+                    type="text"
+                    value={metaDueInput}
+                    onChange={(e) => setMetaDueInput(e.target.value)}
+                    placeholder="例: 2026/05/15 / 月末まで / 次回MTGまで"
+                    className="w-full rounded-lg border border-border bg-input-bg px-3 py-2 text-sm text-foreground placeholder-muted focus:border-accent focus:outline-none"
+                  />
+                </div>
+                <div className="flex items-center gap-2 justify-end pt-2">
+                  <button
+                    type="button"
+                    onClick={() => !metaSaving && setShowDecisionMetaModal(false)}
+                    className="px-3 py-1.5 text-sm rounded-lg border border-border text-muted hover:text-foreground hover:bg-white/[0.04] transition-colors"
+                  >
+                    キャンセル
+                  </button>
+                  <button
+                    type="button"
+                    disabled={metaSaving}
+                    onClick={async () => {
+                      setMetaSaving(true);
+                      try {
+                        await onUpdateDecisionMeta(
+                          message.id,
+                          metaWhyInput.trim() || null,
+                          metaDueInput.trim() || null
+                        );
+                        setShowDecisionMetaModal(false);
+                      } finally {
+                        setMetaSaving(false);
+                      }
+                    }}
+                    className="px-4 py-1.5 text-sm rounded-lg bg-accent text-white hover:bg-accent-hover disabled:opacity-50 transition-colors"
+                  >
+                    {metaSaving ? "保存中…" : "保存"}
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 

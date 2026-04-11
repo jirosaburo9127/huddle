@@ -162,11 +162,14 @@ export type DecisionForPdf = {
   created_at: string;
   channel_name: string;
   sender_name: string;
+  decision_why: string | null;
+  decision_due: string | null;
 };
 
 type ExportContext = {
   workspaceName: string;
   selectedChannelName: string | null;
+  rangeLabel?: string | null;
   decisions: DecisionForPdf[];
 };
 
@@ -236,6 +239,7 @@ export async function generateDecisionsPdf(
 
   const metaText = [
     ctx.selectedChannelName ? `対象: #${ctx.selectedChannelName}` : "対象: 全チャンネル",
+    `期間: ${ctx.rangeLabel ?? "全期間"}`,
     `${ctx.decisions.length}件`,
     `出力日: ${new Date().toLocaleDateString("ja-JP", {
       year: "numeric",
@@ -303,13 +307,17 @@ export async function generateDecisionsPdf(
 
     // レイアウト見積もり
     const MAX_IMAGE_H = 260; // 画像決定の最大高（A4中盤に1つ載る程度）
+    const ANNOTATION_SIZE = 10; // Why / Due の本文サイズ
+    const ANNOTATION_GAP = 4;
+    const ANNOTATION_LABEL_W = 36; // "WHY" / "DUE" ラベル幅
+    const ANNOTATION_BODY_W = BODY_W - ANNOTATION_LABEL_W;
+
     let bodyHeight = 0;
     let bodyLines: string[] = [];
     let imageDisplayW = 0;
     let imageDisplayH = 0;
 
     if (loadedImage) {
-      // アスペクト比維持で BODY_W x MAX_IMAGE_H に収める
       const scaleW = BODY_W / loadedImage.width;
       const scaleH = MAX_IMAGE_H / loadedImage.height;
       const scale = Math.min(scaleW, scaleH, 1);
@@ -322,11 +330,24 @@ export async function generateDecisionsPdf(
         bodyLines.length * (BODY_SIZE + BODY_LINE_GAP) - BODY_LINE_GAP;
     }
 
+    // Why / Due の事前折り返しと高さ計算
+    const whyLines = d.decision_why
+      ? wrapText(d.decision_why, fontJp, ANNOTATION_SIZE, ANNOTATION_BODY_W)
+      : [];
+    const dueLines = d.decision_due
+      ? wrapText(d.decision_due, fontJp, ANNOTATION_SIZE, ANNOTATION_BODY_W)
+      : [];
+    const annotationHeight =
+      (whyLines.length + dueLines.length) *
+        (ANNOTATION_SIZE + ANNOTATION_GAP) +
+      (whyLines.length > 0 || dueLines.length > 0 ? 8 /* 区切り線 */ : 0);
+
     const needed =
       12 /* 区切り線とパディング */ +
       META_SIZE +
       8 +
       bodyHeight +
+      annotationHeight +
       16; /* 下パディング */
     ensureSpace(needed);
 
@@ -394,6 +415,49 @@ export async function generateDecisionsPdf(
         cursorY -= BODY_SIZE + BODY_LINE_GAP;
       }
     }
+
+    // Why / Due セクション
+    if (whyLines.length > 0 || dueLines.length > 0) {
+      cursorY -= 6;
+      // 区切り線（薄い）
+      page.drawLine({
+        start: { x: BODY_L, y: cursorY },
+        end: { x: PAGE_W - MARGIN_R, y: cursorY },
+        thickness: 0.4,
+        color: rgb(0.85, 0.85, 0.88),
+      });
+      cursorY -= 8;
+
+      const drawAnnotation = (label: string, lines: string[]) => {
+        if (lines.length === 0) return;
+        let first = true;
+        for (const line of lines) {
+          ensureSpace(ANNOTATION_SIZE + ANNOTATION_GAP);
+          if (first) {
+            page.drawText(label, {
+              x: BODY_L,
+              y: cursorY - ANNOTATION_SIZE,
+              size: ANNOTATION_SIZE - 1,
+              font: fontJpBold,
+              color: COLOR_MUTED,
+            });
+            first = false;
+          }
+          page.drawText(line, {
+            x: BODY_L + ANNOTATION_LABEL_W,
+            y: cursorY - ANNOTATION_SIZE,
+            size: ANNOTATION_SIZE,
+            font: fontJp,
+            color: COLOR_INK,
+          });
+          cursorY -= ANNOTATION_SIZE + ANNOTATION_GAP;
+        }
+      };
+
+      drawAnnotation("WHY", whyLines);
+      drawAnnotation("DUE", dueLines);
+    }
+
     cursorY -= 14; // 次項目との間隔
   }
 

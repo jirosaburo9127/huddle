@@ -16,6 +16,8 @@ type Decision = {
   sender_id: string;
   sender_name: string;
   sender_avatar: string | null;
+  decision_why: string | null;
+  decision_due: string | null;
 };
 
 type ShareToken = {
@@ -62,7 +64,7 @@ export default async function DashboardPage({
   const { data: decisionsRaw } = await supabase
     .from("messages")
     .select(
-      "id, content, created_at, channel_id, user_id, channels!inner(name, slug, workspace_id, is_dm), profiles!inner(id, display_name, avatar_url)"
+      "id, content, created_at, channel_id, user_id, decision_why, decision_due, channels!inner(name, slug, workspace_id, is_dm), profiles!inner(id, display_name, avatar_url)"
     )
     .eq("is_decision", true)
     .is("deleted_at", null)
@@ -78,6 +80,8 @@ export default async function DashboardPage({
       created_at: string;
       channel_id: string;
       user_id: string;
+      decision_why: string | null;
+      decision_due: string | null;
       channels: unknown;
       profiles: unknown;
     }) => {
@@ -101,6 +105,8 @@ export default async function DashboardPage({
         sender_id: row.user_id,
         sender_name: p?.display_name || "メンバー",
         sender_avatar: p?.avatar_url || null,
+        decision_why: row.decision_why,
+        decision_due: row.decision_due,
       };
     }
   );

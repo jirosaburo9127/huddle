@@ -479,6 +479,32 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     router.refresh();
   }, [supabase, router]);
 
+  // 決定事項の Why / Due 追記
+  const handleUpdateDecisionMeta = useCallback(
+    async (messageId: string, why: string | null, due: string | null) => {
+      // 楽観的更新
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId
+            ? { ...m, decision_why: why, decision_due: due }
+            : m
+        )
+      );
+      const { error } = await supabase
+        .from("messages")
+        .update({ decision_why: why, decision_due: due })
+        .eq("id", messageId);
+      if (error) {
+        // eslint-disable-next-line no-console
+        console.error("[decision-meta] update failed:", error);
+        alert("理由・期限の保存に失敗しました");
+        return;
+      }
+      router.refresh();
+    },
+    [supabase, router]
+  );
+
   // ブックマークのトグル
   const handleBookmark = useCallback(async (messageId: string) => {
     const isCurrentlyBookmarked = bookmarkedIds.has(messageId);
@@ -523,6 +549,8 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
       edited_at: null,
       deleted_at: null,
       is_decision: false,
+      decision_why: null,
+      decision_due: null,
       reply_count: 0,
       created_at: new Date().toISOString(),
       profiles: {
@@ -773,6 +801,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
                       onOpenThread={handleOpenThread}
                       onReact={handleReact}
                       onDecision={handleDecision}
+                      onUpdateDecisionMeta={handleUpdateDecisionMeta}
                       onBookmark={handleBookmark}
                       isBookmarked={bookmarkedIds.has(message.id)}
                       isConsecutive={isConsecutive}

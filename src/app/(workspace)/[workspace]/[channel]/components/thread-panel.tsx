@@ -293,6 +293,8 @@ export function ThreadPanel({
       edited_at: null,
       deleted_at: null,
       is_decision: false,
+      decision_why: null,
+      decision_due: null,
       reply_count: 0,
       created_at: new Date().toISOString(),
       profiles: {

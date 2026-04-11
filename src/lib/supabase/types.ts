@@ -38,6 +38,8 @@ export type Message = {
   edited_at: string | null;
   deleted_at: string | null;
   is_decision: boolean;
+  decision_why: string | null;
+  decision_due: string | null;
   reply_count: number;
   created_at: string;
 };

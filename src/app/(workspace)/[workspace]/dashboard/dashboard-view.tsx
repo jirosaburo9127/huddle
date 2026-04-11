@@ -27,6 +27,8 @@ type Decision = {
   sender_id: string;
   sender_name: string;
   sender_avatar: string | null;
+  decision_why: string | null;
+  decision_due: string | null;
 };
 
 type ShareToken = {
@@ -73,6 +75,9 @@ export function DashboardView({
   const [tokens, setTokens] = useState(shareTokens);
   // チャンネルフィルタ: null = 全て
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
+  // 期間フィルタ: null = 全期間
+  type DateRange = "week" | "month" | null;
+  const [dateRange, setDateRange] = useState<DateRange>(null);
 
   // 決定事項に登場するチャンネルをユニーク抽出（件数も集計）
   const channelFacets = useMemo(() => {
@@ -93,9 +98,22 @@ export function DashboardView({
   }, [decisions]);
 
   const filteredDecisions = useMemo(() => {
-    if (!selectedChannelId) return decisions;
-    return decisions.filter((d) => d.channel_id === selectedChannelId);
-  }, [decisions, selectedChannelId]);
+    let list = decisions;
+    if (selectedChannelId) {
+      list = list.filter((d) => d.channel_id === selectedChannelId);
+    }
+    if (dateRange) {
+      const now = Date.now();
+      const threshold =
+        dateRange === "week"
+          ? now - 7 * 24 * 60 * 60 * 1000
+          : now - 30 * 24 * 60 * 60 * 1000;
+      list = list.filter(
+        (d) => new Date(d.created_at).getTime() >= threshold
+      );
+    }
+    return list;
+  }, [decisions, selectedChannelId, dateRange]);
 
   const selectedChannelName = selectedChannelId
     ? channelFacets.find((c) => c.id === selectedChannelId)?.name || ""
@@ -109,20 +127,26 @@ export function DashboardView({
     setExporting(true);
     setExportError(null);
     try {
+      const rangeLabel =
+        dateRange === "week" ? "今週" : dateRange === "month" ? "今月" : null;
       const bytes = await generateDecisionsPdf({
         workspaceName: workspace.name,
         selectedChannelName,
+        rangeLabel,
         decisions: filteredDecisions.map((d) => ({
           id: d.id,
           content: d.content,
           created_at: d.created_at,
           channel_name: d.channel_name,
           sender_name: d.sender_name,
+          decision_why: d.decision_why,
+          decision_due: d.decision_due,
         })),
       });
       const dateStr = new Date().toISOString().slice(0, 10);
-      const suffix = selectedChannelName ? `_${selectedChannelName}` : "";
-      const filename = `huddle_decisions_${workspace.slug}${suffix}_${dateStr}.pdf`;
+      const chSuffix = selectedChannelName ? `_${selectedChannelName}` : "";
+      const rangeSuffix = dateRange === "week" ? "_week" : dateRange === "month" ? "_month" : "";
+      const filename = `huddle_decisions_${workspace.slug}${chSuffix}${rangeSuffix}_${dateStr}.pdf`;
       await savePdf(bytes, filename);
     } catch (err) {
       // eslint-disable-next-line no-console
@@ -243,6 +267,33 @@ export function DashboardView({
             </div>
           )}
 
+          {/* 期間フィルタ */}
+          <div className="print:hidden flex gap-2 mb-3 text-xs">
+            {(
+              [
+                { key: null, label: "全期間" },
+                { key: "week" as const, label: "今週" },
+                { key: "month" as const, label: "今月" },
+              ] as Array<{ key: DateRange; label: string }>
+            ).map((opt) => {
+              const active = dateRange === opt.key;
+              return (
+                <button
+                  key={opt.label}
+                  type="button"
+                  onClick={() => setDateRange(opt.key)}
+                  className={`px-3 py-1 rounded-lg border transition-colors ${
+                    active
+                      ? "bg-accent text-white border-accent"
+                      : "border-border text-muted hover:text-foreground hover:bg-white/[0.04]"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+
           {/* チャンネルフィルタ（ピルバー・横スクロール可） */}
           {channelFacets.length > 0 && (
             <div className="print:hidden flex gap-2 mb-4 overflow-x-auto pb-1 -mx-1 px-1">
@@ -310,6 +361,30 @@ export function DashboardView({
                   ) : (
                     <div className="text-base whitespace-pre-wrap break-words text-foreground">
                       {d.content}
+                    </div>
+                  )}
+                  {(d.decision_why || d.decision_due) && (
+                    <div className="mt-3 pt-3 border-t border-accent/20 space-y-1 text-sm">
+                      {d.decision_why && (
+                        <div className="flex gap-2">
+                          <span className="shrink-0 text-xs font-semibold text-muted uppercase mt-0.5">
+                            Why
+                          </span>
+                          <span className="text-foreground/90 whitespace-pre-wrap break-words">
+                            {d.decision_why}
+                          </span>
+                        </div>
+                      )}
+                      {d.decision_due && (
+                        <div className="flex gap-2">
+                          <span className="shrink-0 text-xs font-semibold text-muted uppercase mt-0.5">
+                            Due
+                          </span>
+                          <span className="text-foreground/90 whitespace-pre-wrap break-words">
+                            {d.decision_due}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </Link>
