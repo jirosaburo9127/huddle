@@ -1,5 +1,14 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import {
+  IsoHeroStack,
+  IsoDashboard,
+  IsoTagDoc,
+  IsoPdfExport,
+  IsoChatBubble,
+  IsoCheckCube,
+  IsoShareArrow,
+} from "./illustrations";
 
 export const metadata: Metadata = {
   title: "Huddle — 会議で決まったこと、全部どこ行った？",
@@ -46,40 +55,47 @@ export default function AboutPage() {
       </nav>
 
       {/* ───────── ① ヒーロー ───────── */}
-      <section className="px-5 pt-20 pb-24 sm:pt-28 sm:pb-32 border-b border-[#ececec]">
-        <div className="max-w-4xl mx-auto text-center">
-          <div className="inline-block text-xs font-semibold tracking-widest uppercase text-[#55555c] bg-[#f5f5f7] border border-[#ececec] rounded-full px-3 py-1 mb-8">
-            Decision Record for Teams
+      <section className="px-5 pt-16 pb-20 sm:pt-24 sm:pb-28 border-b border-[#ececec] overflow-hidden">
+        <div className="max-w-6xl mx-auto grid lg:grid-cols-2 gap-12 items-center">
+          <div className="text-center lg:text-left">
+            <div className="inline-block text-xs font-semibold tracking-widest uppercase text-[#55555c] bg-[#f5f5f7] border border-[#ececec] rounded-full px-3 py-1 mb-8">
+              Decision Record for Teams
+            </div>
+            <h1 className="text-4xl sm:text-6xl font-bold tracking-tight leading-[1.15] mb-6">
+              会議で決まったこと、
+              <br />
+              全部どこ行った？
+            </h1>
+            <p className="text-base sm:text-xl text-[#55555c] leading-[1.85] mb-10">
+              チャットで流れていった「決まったこと」を、
+              <br className="hidden sm:block" />
+              チームの資産として永久に残す。
+              <br className="hidden sm:block" />
+              それが Huddle です。
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start items-center">
+              <Link
+                href="/signup"
+                className="w-full sm:w-auto bg-[#0f0f1a] text-white text-lg font-semibold px-8 py-4 rounded-xl hover:bg-black transition-colors shadow-lg shadow-[#0f0f1a]/10"
+              >
+                14日間無料ではじめる
+              </Link>
+              <Link
+                href="/login"
+                className="w-full sm:w-auto text-[#55555c] hover:text-[#0f0f1a] transition-colors px-6 py-4 text-sm font-medium"
+              >
+                すでにアカウントをお持ちの方 →
+              </Link>
+            </div>
+            <p className="mt-6 text-xs text-[#8a8a92]">
+              クレジットカード不要 ／ いつでも解約できます
+            </p>
           </div>
-          <h1 className="text-4xl sm:text-6xl font-bold tracking-tight leading-[1.15] mb-6">
-            会議で決まったこと、
-            <br />
-            全部どこ行った？
-          </h1>
-          <p className="text-base sm:text-xl text-[#55555c] leading-[1.85] max-w-2xl mx-auto mb-10">
-            チャットの中で流れていった「決まったこと」を、
-            <br className="hidden sm:block" />
-            チームの資産として永久に残す。
-            <br className="hidden sm:block" />
-            それが Huddle です。
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
-            <Link
-              href="/signup"
-              className="w-full sm:w-auto bg-[#0f0f1a] text-white text-lg font-semibold px-8 py-4 rounded-xl hover:bg-black transition-colors shadow-lg shadow-[#0f0f1a]/10"
-            >
-              14日間無料ではじめる
-            </Link>
-            <Link
-              href="/login"
-              className="w-full sm:w-auto text-[#55555c] hover:text-[#0f0f1a] transition-colors px-6 py-4 text-sm font-medium"
-            >
-              すでにアカウントをお持ちの方 →
-            </Link>
+
+          {/* イラスト */}
+          <div className="flex justify-center lg:justify-end">
+            <IsoHeroStack className="w-full max-w-[480px] h-auto drop-shadow-[0_20px_40px_rgba(15,15,26,0.08)]" />
           </div>
-          <p className="mt-6 text-xs text-[#8a8a92]">
-            クレジットカード不要 ／ いつでも解約できます
-          </p>
         </div>
       </section>
 
@@ -158,12 +174,14 @@ export default function AboutPage() {
               title="決定事項ダッシュボード"
               body="ワークスペース全体の「決まったこと」を1箇所に集約。チャンネル別・期間別（今週・今月）のフィルタで、振り返りが一瞬で終わります。"
               tags={["自動集約", "チャンネル横断", "期間フィルタ"]}
+              illustration={<IsoDashboard className="w-full h-auto" />}
             />
             <FeatureRow
               number="02"
               title="Why / Due で背景を残す"
               body="決定事項に「なぜその結論に至ったか」と「いつまでに実行するか」を後から追記できます。3ヶ月後に見返しても文脈が失われません。"
               tags={["背景・理由", "期限", "資産化"]}
+              illustration={<IsoTagDoc className="w-full h-auto" />}
               reverse
             />
             <FeatureRow
@@ -171,6 +189,7 @@ export default function AboutPage() {
               title="PDFエクスポート / 外部共有"
               body="今週決まったことを1枚のPDFにまとめて、クライアントや顧問先に共有。ログイン不要の外部共有リンクも発行できます。"
               tags={["PDF出力", "ログイン不要の共有", "伴走マイスター向け"]}
+              illustration={<IsoPdfExport className="w-full h-auto" />}
             />
           </div>
         </div>
@@ -192,16 +211,19 @@ export default function AboutPage() {
               step="STEP 1"
               title="チャットで会話する"
               body="いつも通りチームで会話。チャンネルは招待制で、見せたい人にだけ見せられます。"
+              illustration={<IsoChatBubble className="w-full h-full" />}
             />
             <StepCard
               step="STEP 2"
               title="決定ボタンを押す"
               body="重要な結論が出たら、メッセージに「決定」ボタン。必要なら Why / Due を追記。"
+              illustration={<IsoCheckCube className="w-full h-full" />}
             />
             <StepCard
               step="STEP 3"
               title="ダッシュボードで配布"
               body="決定事項がダッシュボードに自動集約。PDF出力・外部共有リンクで展開。"
+              illustration={<IsoShareArrow className="w-full h-full" />}
             />
           </div>
         </div>
@@ -413,26 +435,31 @@ function FeatureRow({
   title,
   body,
   tags,
+  illustration,
   reverse = false,
 }: {
   number: string;
   title: string;
   body: string;
   tags: string[];
+  illustration: React.ReactNode;
   reverse?: boolean;
 }) {
   return (
     <div
       className={`flex flex-col ${
         reverse ? "md:flex-row-reverse" : "md:flex-row"
-      } gap-8 items-start`}
+      } gap-8 md:gap-12 items-center`}
     >
-      <div className="md:w-1/3">
-        <div className="text-6xl font-bold text-[#ececec] leading-none">
-          {number}
+      <div className="md:w-5/12 flex justify-center">
+        <div className="relative w-full max-w-[280px]">
+          <div className="absolute -top-4 -left-2 text-6xl font-bold text-[#ececec] leading-none select-none">
+            {number}
+          </div>
+          <div className="relative">{illustration}</div>
         </div>
       </div>
-      <div className="md:w-2/3">
+      <div className="md:w-7/12">
         <h3 className="text-2xl sm:text-3xl font-bold tracking-tight mb-3">
           {title}
         </h3>
@@ -456,18 +483,27 @@ function StepCard({
   step,
   title,
   body,
+  illustration,
 }: {
   step: string;
   title: string;
   body: string;
+  illustration: React.ReactNode;
 }) {
   return (
     <div className="bg-white border border-[#ececec] rounded-2xl p-6">
-      <div className="text-xs font-bold tracking-widest text-[#8a8a92] mb-3">
+      <div className="mb-2 flex justify-center">
+        <div className="w-32 h-28 flex items-center justify-center">
+          {illustration}
+        </div>
+      </div>
+      <div className="text-xs font-bold tracking-widest text-[#8a8a92] mb-2 text-center">
         {step}
       </div>
-      <h3 className="font-bold text-xl mb-3">{title}</h3>
-      <p className="text-sm text-[#55555c] leading-relaxed">{body}</p>
+      <h3 className="font-bold text-xl mb-3 text-center">{title}</h3>
+      <p className="text-sm text-[#55555c] leading-relaxed text-center">
+        {body}
+      </p>
     </div>
   );
 }
