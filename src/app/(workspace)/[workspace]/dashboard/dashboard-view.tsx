@@ -145,10 +145,10 @@ export function DashboardView({
         {isAdmin && (
           <section>
             <h2 className="text-sm font-semibold text-foreground mb-3">
-              伴奏マイスター向け共有リンク
+              伴走マイスター向け共有リンク
             </h2>
             <p className="text-sm text-muted mb-4">
-              このリンクを伴奏マイスターに送ると、ログインなしで決定事項を閲覧できます。
+              このリンクを伴走マイスターに送ると、ログインなしで決定事項を閲覧できます。
               いつでも無効化できます。
             </p>
 
