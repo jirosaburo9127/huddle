@@ -25,7 +25,8 @@ export default async function HomePage({
   if (create !== "true" && memberships && memberships.length > 0) {
     const workspace = memberships[0].workspaces as unknown as { slug: string };
     if (workspace?.slug) {
-      redirect(`/${workspace.slug}/general`);
+      // 既存WSのロビー（チャンネル一覧画面）へ。いきなり general を開かない。
+      redirect(`/${workspace.slug}`);
     }
   }
 

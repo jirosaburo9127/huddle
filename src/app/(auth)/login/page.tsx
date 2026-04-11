@@ -32,7 +32,8 @@ async function redirectToWorkspace(
   if (memberships && memberships.length > 0) {
     const ws = memberships[0].workspaces as unknown as { slug: string };
     if (ws?.slug && /^[a-z0-9\-]+$/.test(ws.slug)) {
-      window.location.href = `/${ws.slug}/general`;
+      // ロビー（一覧画面）に着地。いきなり general を開かない。
+      window.location.href = `/${ws.slug}`;
       return;
     }
   }
