@@ -67,6 +67,53 @@ html, body {
   animation: fade-in 0.15s ease-out;
 }
 
+/* 印刷時: 決定事項エクスポート用。body配下を全て隠し、.print-area だけを見せる */
+@media print {
+  @page {
+    size: A4;
+    margin: 16mm;
+  }
+  html, body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  body * {
+    visibility: hidden;
+  }
+  .print-area,
+  .print-area * {
+    visibility: visible;
+  }
+  .print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  /* 印刷時にカードの背景・枠を見やすく */
+  .print-area .print-card {
+    border: 1px solid #d0d0d0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .print-area a {
+    color: #000000 !important;
+    text-decoration: none !important;
+  }
+  /* 画面には出さない、印刷専用要素 */
+  .print-only {
+    display: block !important;
+    visibility: visible !important;
+  }
+}
+.print-only {
+  display: none;
+}
+
 /* Dawn（ライトモード） */
 [data-theme="dawn"] {
   --color-background: #f7f7fa;

@@ -96,6 +96,15 @@ export function DashboardView({
     return decisions.filter((d) => d.channel_id === selectedChannelId);
   }, [decisions, selectedChannelId]);
 
+  const selectedChannelName = selectedChannelId
+    ? channelFacets.find((c) => c.id === selectedChannelId)?.name || ""
+    : null;
+
+  function handleExportPdf() {
+    // ブラウザの印刷ダイアログを開く（ユーザーは「PDFに保存」を選択）
+    window.print();
+  }
+
   async function handleCreateToken() {
     if (!newLabel.trim()) return;
     setCreating(true);
@@ -150,19 +159,50 @@ export function DashboardView({
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-4xl mx-auto p-6 space-y-8">
         {/* 決定事項一覧 */}
-        <section>
-          <div className="flex items-baseline justify-between mb-3 gap-3">
+        <section className="print-area">
+          {/* 印刷専用ヘッダー（画面には出さない） */}
+          <div className="print-only mb-6" aria-hidden="true">
+            <h1 style={{ fontSize: "22px", fontWeight: "bold", marginBottom: "4px" }}>
+              {workspace.name} — 決定事項
+            </h1>
+            <div style={{ fontSize: "12px", color: "#555" }}>
+              {selectedChannelName ? `チャンネル: #${selectedChannelName} / ` : "全チャンネル / "}
+              {filteredDecisions.length}件 / 出力日:{" "}
+              {new Date().toLocaleDateString("ja-JP", {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })}
+            </div>
+            <hr style={{ marginTop: "12px", borderColor: "#ddd" }} />
+          </div>
+
+          <div className="print:hidden flex items-baseline justify-between mb-3 gap-3">
             <h2 className="text-sm font-semibold text-foreground">
               決定事項（最新100件）
             </h2>
-            <span className="text-xs text-muted">
-              {filteredDecisions.length}件
-            </span>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-muted">
+                {filteredDecisions.length}件
+              </span>
+              <button
+                type="button"
+                onClick={handleExportPdf}
+                disabled={filteredDecisions.length === 0}
+                className="text-xs px-3 py-1.5 rounded-lg border border-border text-muted hover:text-foreground hover:bg-white/[0.04] disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
+                title="現在の絞り込みで決定事項をPDFとして保存"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+                </svg>
+                PDFエクスポート
+              </button>
+            </div>
           </div>
 
           {/* チャンネルフィルタ（ピルバー・横スクロール可） */}
           {channelFacets.length > 0 && (
-            <div className="flex gap-2 mb-4 overflow-x-auto pb-1 -mx-1 px-1">
+            <div className="print:hidden flex gap-2 mb-4 overflow-x-auto pb-1 -mx-1 px-1">
               <button
                 type="button"
                 onClick={() => setSelectedChannelId(null)}
@@ -206,7 +246,7 @@ export function DashboardView({
                 <Link
                   key={d.id}
                   href={`/${workspaceSlug}/${d.channel_slug}`}
-                  className="block rounded-2xl border border-accent/30 bg-accent/[0.03] p-4 hover:bg-accent/[0.06] transition-colors"
+                  className="print-card block rounded-2xl border border-accent/30 bg-accent/[0.03] p-4 hover:bg-accent/[0.06] transition-colors"
                 >
                   <div className="flex items-center gap-2 text-xs text-muted mb-1.5">
                     <span className="text-accent font-semibold">
