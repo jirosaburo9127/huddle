@@ -15,7 +15,7 @@ import { signOut } from "@/lib/actions";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
 import { createClient } from "@/lib/supabase/client";
 import { showMessageNotification } from "@/lib/notification";
-import { setupPushNotifications } from "@/lib/push-notifications";
+import { setupPushNotifications, syncAppBadgeFromServer } from "@/lib/push-notifications";
 import type { RealtimePostgresInsertPayload } from "@supabase/supabase-js";
 import type { Message } from "@/lib/supabase/types";
 
@@ -215,6 +215,8 @@ export function Sidebar({
         next[row.channel_id] = Number(row.unread_count);
       }
       setUnreadState(next);
+      // ネイティブ（iOS）アプリアイコンのバッジもここで一緒に同期
+      syncAppBadgeFromServer(currentUserId);
     }
 
     document.addEventListener("visibilitychange", refetchUnread);

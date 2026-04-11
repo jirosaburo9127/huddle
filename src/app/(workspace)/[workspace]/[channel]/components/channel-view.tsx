@@ -48,8 +48,9 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
   useEffect(() => {
     setSidebarOpen(false);
     // チャンネルを開いた時点でiOSアプリアイコンのバッジと配信済み通知をクリア
-    clearPushBadge();
-  }, [channel.id, setSidebarOpen]);
+    // userIdを渡すことで、他チャンネルに残っている未読数とバッジを正しく同期する
+    clearPushBadge(currentUserId);
+  }, [channel.id, setSidebarOpen, currentUserId]);
 
   // スレッドを開く
   const handleOpenThread = useCallback((msg: MessageWithProfile) => {
