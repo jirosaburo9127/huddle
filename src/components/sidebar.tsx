@@ -719,7 +719,12 @@ export function Sidebar({
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
             </button>
-            <form action={signOut}>
+            <form
+              action={signOut}
+              onSubmit={(e) => {
+                if (!confirm("ログアウトしますか？")) e.preventDefault();
+              }}
+            >
               <button
                 type="submit"
                 className="text-muted hover:text-foreground transition-colors p-1.5 rounded-lg hover:bg-white/[0.04] shrink-0"
@@ -874,7 +879,12 @@ export function Sidebar({
 
             {/* ログアウト */}
             <div className="pt-2 border-t border-border/50">
-              <form action={signOut}>
+              <form
+                action={signOut}
+                onSubmit={(e) => {
+                  if (!confirm("ログアウトしますか？")) e.preventDefault();
+                }}
+              >
                 <button
                   type="submit"
                   className="px-4 py-2 text-sm rounded-xl border border-mention/30 text-mention hover:bg-mention/10 transition-colors"
