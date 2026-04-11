@@ -381,25 +381,19 @@ export function Sidebar({
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
         `}
       >
-        {/* ヘッダー: アプリ名 + ワークスペース切り替え */}
-        <div className="px-4 py-3 border-b border-border/50">
-          {/* ロゴ（アイコンのみ・背景透過） */}
-          <h1>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/icons/logo-transparent.png"
-              alt="Huddle"
-              className="w-10 h-10"
-            />
-          </h1>
+        {/* ヘッダー: 現在のワークスペースを一番目立たせる */}
+        <div className="px-4 py-4 border-b border-border/50">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-muted mb-1">
+            WORKSPACE
+          </div>
           <div className="flex items-center gap-1">
           <div className="relative flex-1 min-w-0" ref={wsSwitcherRef}>
             <button
               onClick={() => setShowWsSwitcher((prev) => !prev)}
-              className="flex items-center gap-1 text-lg text-muted hover:text-foreground transition-colors truncate w-full text-left"
+              className="flex items-center gap-1.5 text-xl font-bold text-foreground hover:text-accent transition-colors truncate w-full text-left"
             >
               <span className="truncate">{workspace.name}</span>
-              <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <svg className="w-5 h-5 shrink-0 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
               </svg>
             </button>
