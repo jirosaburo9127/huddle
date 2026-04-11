@@ -54,11 +54,11 @@ export function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname();
   // 未読カウントをローカルstate化（Realtime+クリックで更新するため）
+  // NOTE: prop → state のシンク useEffect は意図的に置いていない。
+  // サーバーアクション等で親が revalidate されると unreadCounts の参照が
+  // 毎回新しくなるため、シンクすると無限ループ（React error #185）を起こす。
+  // WS切替時は layout が再マウントされるので初期値で十分。
   const [unreadState, setUnreadState] = useState<Record<string, number>>(unreadCounts);
-  // 親からのpropが変わった場合（WS切替時）に同期
-  useEffect(() => {
-    setUnreadState(unreadCounts);
-  }, [unreadCounts]);
   // Sidebar専用のSupabaseクライアント（毎レンダー再生成しない）
   const sidebarSupabaseRef = useRef(createClient());
   const [showCreateChannel, setShowCreateChannel] = useState(false);
@@ -69,7 +69,9 @@ export function Sidebar({
   const [showSettings, setShowSettings] = useState(false);
   const [showWsSwitcher, setShowWsSwitcher] = useState(false);
   const wsSwitcherRef = useRef<HTMLDivElement>(null);
-  const { sidebarOpen, setSidebarOpen } = useMobileNavStore();
+  // zustand セレクタ形式で購読範囲を限定（不要な再レンダーを防ぐ）
+  const sidebarOpen = useMobileNavStore((s) => s.sidebarOpen);
+  const setSidebarOpen = useMobileNavStore((s) => s.setSidebarOpen);
   const [searchQuery, setSearchQuery] = useState("");
 
   // プロフィール編集用のstate

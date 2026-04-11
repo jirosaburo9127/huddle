@@ -20,7 +20,8 @@ type Props = {
 };
 
 export function ChannelView({ channel, initialMessages, currentUserId }: Props) {
-  const { setSidebarOpen } = useMobileNavStore();
+  // zustand セレクタ形式: 購読範囲を setSidebarOpen のみに限定
+  const setSidebarOpen = useMobileNavStore((s) => s.setSidebarOpen);
   const [messages, setMessages] = useState<MessageWithProfile[]>(initialMessages);
   const [activeThread, setActiveThread] = useState<MessageWithProfile | null>(null);
   const [showMembersModal, setShowMembersModal] = useState(false);
