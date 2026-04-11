@@ -26,32 +26,24 @@ export function CreateChannelModal({ workspaceId, workspaceSlug, onClose }: Prop
     const asciiSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
     const slug = asciiSlug || `ch-${crypto.randomUUID().slice(0, 8)}`;
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    // RPC で atomic にチャンネル作成 + 作成者を channel_members に追加
+    // （012 で channels_select が招待制になったため、通常の insert.select() は
+    //  新規作成直後に RLS で弾かれる。015 の SECURITY DEFINER RPC でバイパス）
+    const { data: channel, error: err } = await supabase.rpc(
+      "create_channel_with_member",
+      {
+        p_workspace_id: workspaceId,
+        p_name: name,
+        p_slug: slug,
+        p_is_private: isPrivate,
+      }
+    );
 
-    const { data: channel, error: err } = await supabase
-      .from("channels")
-      .insert({
-        workspace_id: workspaceId,
-        name,
-        slug,
-        is_private: isPrivate,
-        created_by: user.id,
-      })
-      .select()
-      .single();
-
-    if (err) {
-      setError(err.message);
+    if (err || !channel) {
+      setError(err?.message || "チャンネル作成に失敗しました");
       setLoading(false);
       return;
     }
-
-    // メンバーに追加
-    await supabase.from("channel_members").insert({
-      channel_id: channel.id,
-      user_id: user.id,
-    });
 
     onClose();
     router.push(`/${workspaceSlug}/${channel.slug}`);
