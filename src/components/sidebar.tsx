@@ -709,6 +709,18 @@ export function Sidebar({
                 </>
               );
             })()}
+            {/* LP プレビュー（アプリ内から /about に直接ジャンプ） */}
+            <a
+              href="/about"
+              className="text-muted hover:text-foreground transition-colors p-1.5 rounded-lg hover:bg-white/[0.04] shrink-0"
+              title="LPプレビュー"
+              aria-label="ランディングページを開く"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.6 9h16.8M3.6 15h16.8M11.25 3a17 17 0 000 18M12.75 3a17 17 0 010 18" />
+              </svg>
+            </a>
             <button
               onClick={() => setShowSettings(true)}
               className="text-muted hover:text-foreground transition-colors p-1.5 rounded-lg hover:bg-white/[0.04] shrink-0"
