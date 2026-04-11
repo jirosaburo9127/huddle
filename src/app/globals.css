@@ -67,6 +67,82 @@ html, body {
   animation: fade-in 0.15s ease-out;
 }
 
+/* ───── LP 用アニメーション ───── */
+@keyframes lp-fade-up {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes lp-fade-right {
+  from { opacity: 0; transform: translateX(-24px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes lp-fade-left {
+  from { opacity: 0; transform: translateX(24px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes lp-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+@keyframes lp-pulse-ring {
+  0% { transform: scale(0.95); opacity: 0.5; }
+  70% { transform: scale(1.1); opacity: 0; }
+  100% { transform: scale(1.1); opacity: 0; }
+}
+@keyframes lp-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.lp-fade-up {
+  opacity: 0;
+  animation: lp-fade-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.lp-fade-right {
+  opacity: 0;
+  animation: lp-fade-right 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.lp-fade-left {
+  opacity: 0;
+  animation: lp-fade-left 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.lp-float {
+  animation: lp-float 5s ease-in-out infinite;
+}
+.lp-delay-100 { animation-delay: 100ms; }
+.lp-delay-200 { animation-delay: 200ms; }
+.lp-delay-300 { animation-delay: 300ms; }
+.lp-delay-400 { animation-delay: 400ms; }
+.lp-delay-500 { animation-delay: 500ms; }
+.lp-delay-600 { animation-delay: 600ms; }
+.lp-delay-700 { animation-delay: 700ms; }
+
+/* スクロールで入ってきたときに発火（モダンブラウザ対応） */
+@supports (animation-timeline: view()) {
+  .lp-reveal {
+    opacity: 0;
+    animation: lp-fade-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation-timeline: view();
+    animation-range: entry 0% entry 60%;
+  }
+}
+/* 非対応ブラウザではすぐ表示する */
+@supports not (animation-timeline: view()) {
+  .lp-reveal {
+    opacity: 1;
+  }
+}
+
+/* hover 時のカードリフト */
+.lp-lift {
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.3s ease;
+}
+.lp-lift:hover {
+  transform: translateY(-4px);
+}
+
 /* 印刷時: 決定事項エクスポート用。body配下を全て隠し、.print-area だけを見せる */
 @media print {
   @page {
