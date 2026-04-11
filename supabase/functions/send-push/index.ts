@@ -108,7 +108,9 @@ async function sendPush(
           "apns-topic": APNS_BUNDLE_ID,
           "apns-push-type": "alert",
           "content-type": "application/json",
-          "apns-priority": isMention ? "10" : "5",
+          // チャットメッセージは即時配信優先なので常に 10（高優先度）。
+          // 5 だと iOS がロック中にまとめて配信して遅延することがある。
+          "apns-priority": "10",
         },
         body: JSON.stringify({
           aps,
