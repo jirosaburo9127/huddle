@@ -105,16 +105,6 @@ export default async function DashboardPage({
     }
   );
 
-  // 集計値
-  const now = Date.now();
-  const weekAgo = now - 7 * 24 * 60 * 60 * 1000;
-  const stats = {
-    decisions_total: decisions.length,
-    decisions_this_week: decisions.filter(
-      (d) => new Date(d.created_at).getTime() >= weekAgo
-    ).length,
-  };
-
   // 共有トークン一覧（管理者のみ）
   let shareTokens: ShareToken[] = [];
   if (isAdmin) {
@@ -131,7 +121,6 @@ export default async function DashboardPage({
       workspace={workspace}
       workspaceSlug={workspaceSlug}
       decisions={decisions}
-      stats={stats}
       shareTokens={shareTokens}
       isAdmin={isAdmin}
     />

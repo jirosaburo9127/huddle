@@ -42,7 +42,6 @@ type Props = {
   workspace: { id: string; name: string; slug: string };
   workspaceSlug: string;
   decisions: Decision[];
-  stats: { decisions_total: number; decisions_this_week: number };
   shareTokens: ShareToken[];
   isAdmin: boolean;
 };
@@ -61,7 +60,6 @@ export function DashboardView({
   workspace,
   workspaceSlug,
   decisions,
-  stats,
   shareTokens,
   isAdmin,
 }: Props) {
@@ -126,22 +124,6 @@ export function DashboardView({
 
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-4xl mx-auto p-6 space-y-8">
-        {/* 集計サマリー */}
-        <section className="grid grid-cols-2 gap-4">
-          <div className="rounded-2xl border border-border bg-white/[0.02] p-5">
-            <div className="text-sm text-muted">今週の決定事項</div>
-            <div className="mt-2 text-4xl font-bold text-accent">
-              {stats.decisions_this_week}
-            </div>
-          </div>
-          <div className="rounded-2xl border border-border bg-white/[0.02] p-5">
-            <div className="text-sm text-muted">累計の決定事項</div>
-            <div className="mt-2 text-4xl font-bold text-foreground">
-              {stats.decisions_total}
-            </div>
-          </div>
-        </section>
-
         {/* 決定事項一覧 */}
         <section>
           <h2 className="text-sm font-semibold text-foreground mb-3">
