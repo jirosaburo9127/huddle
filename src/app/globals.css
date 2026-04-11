@@ -12,8 +12,9 @@
   --color-border-subtle: #1f1f2e;
   --color-foreground: #e4e4ed;
   --color-muted: #6b6b80;
-  --color-accent: #7c6df0;
-  --color-accent-hover: #8b7ef7;
+  /* Midnight のアクセントはダーク背景上で白テキストが読めるダークグレーに統一 */
+  --color-accent: #3a3a4a;
+  --color-accent-hover: #4a4a5a;
   --color-online: #34d399;
   --color-mention: #f87171;
   --font-sans: var(--font-geist-sans);
@@ -79,8 +80,9 @@ html, body {
   --color-border-subtle: #dddde8;
   --color-foreground: #0f0f1a;
   --color-muted: #55556a;
-  --color-accent: #5b4cd4;
-  --color-accent-hover: #4a3cc4;
+  /* Dawn（デフォルト）は黒ベース — 紫をやめて完全モノクロ */
+  --color-accent: #0f0f1a;
+  --color-accent-hover: #000000;
   --color-online: #22c55e;
   --color-mention: #ef4444;
 }
@@ -98,8 +100,9 @@ html, body {
   --color-border-subtle: #ddd6c8;
   --color-foreground: #2c2418;
   --color-muted: #8a7e6e;
-  --color-accent: #b07030;
-  --color-accent-hover: #9a6028;
+  /* Warm もインク寄りのダークブラウンに */
+  --color-accent: #2c2418;
+  --color-accent-hover: #1a1510;
   --color-online: #5a9a60;
   --color-mention: #c05040;
 }
