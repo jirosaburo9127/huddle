@@ -123,7 +123,8 @@ export function DashboardView({
         <span className="ml-2 text-sm text-muted">{workspace.name}</span>
       </header>
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-8 max-w-4xl">
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-4xl mx-auto p-6 space-y-8">
         {/* 集計サマリー */}
         <section className="grid grid-cols-2 gap-4">
           <div className="rounded-2xl border border-border bg-white/[0.02] p-5">
@@ -282,6 +283,7 @@ export function DashboardView({
             </div>
           )}
         </section>
+        </div>
       </div>
     </div>
   );
