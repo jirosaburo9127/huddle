@@ -23,6 +23,14 @@ function formatDate(iso: string): string {
   return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
+// メッセージ本文が画像URLかを判定
+const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|bmp|avif)(\?.*)?$/i;
+function isImageUrl(content: string): boolean {
+  const trimmed = content.trim();
+  if (!/^https?:\/\//.test(trimmed)) return false;
+  return IMAGE_EXT_RE.test(trimmed);
+}
+
 export default async function SharePage({
   params,
 }: {
@@ -115,9 +123,18 @@ export default async function SharePage({
                     <span>・</span>
                     <span>{formatDate(d.created_at)}</span>
                   </div>
-                  <div className="text-base whitespace-pre-wrap break-words text-foreground">
-                    {d.content}
-                  </div>
+                  {isImageUrl(d.content) ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={d.content}
+                      alt="添付画像"
+                      className="max-h-80 rounded-xl border border-border object-contain"
+                    />
+                  ) : (
+                    <div className="text-base whitespace-pre-wrap break-words text-foreground">
+                      {d.content}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

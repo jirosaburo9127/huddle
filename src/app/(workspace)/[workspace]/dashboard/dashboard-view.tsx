@@ -2,10 +2,19 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useMobileNavStore } from "@/stores/mobile-nav-store";
 import {
   createShareToken,
   revokeShareToken,
 } from "@/lib/actions/share-tokens";
+
+// メッセージ本文が画像URLかを判定（Supabase Storage公開URLは拡張子で判別）
+const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|bmp|avif)(\?.*)?$/i;
+function isImageUrl(content: string): boolean {
+  const trimmed = content.trim();
+  if (!/^https?:\/\//.test(trimmed)) return false;
+  return IMAGE_EXT_RE.test(trimmed);
+}
 
 type Decision = {
   id: string;
@@ -56,6 +65,7 @@ export function DashboardView({
   shareTokens,
   isAdmin,
 }: Props) {
+  const setSidebarOpen = useMobileNavStore((s) => s.setSidebarOpen);
   const [newLabel, setNewLabel] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -98,6 +108,17 @@ export function DashboardView({
   return (
     <div className="flex flex-col h-full">
       <header className="flex items-center px-6 py-3 border-b border-border bg-header shrink-0">
+        {/* モバイル: サイドバーを開くボタン（元のチャンネルに戻るため） */}
+        <button
+          type="button"
+          onClick={() => setSidebarOpen(true)}
+          className="lg:hidden mr-2 p-1 text-muted hover:text-foreground rounded transition-colors"
+          aria-label="サイドバーを開く"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
         <h1 className="font-bold text-lg">進捗ダッシュボード</h1>
         <span className="ml-2 text-sm text-muted">{workspace.name}</span>
       </header>
@@ -244,9 +265,18 @@ export function DashboardView({
                     <span>・</span>
                     <span>{formatDate(d.created_at)}</span>
                   </div>
-                  <div className="text-base whitespace-pre-wrap break-words text-foreground">
-                    {d.content}
-                  </div>
+                  {isImageUrl(d.content) ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={d.content}
+                      alt="添付画像"
+                      className="max-h-80 rounded-xl border border-border object-contain"
+                    />
+                  ) : (
+                    <div className="text-base whitespace-pre-wrap break-words text-foreground">
+                      {d.content}
+                    </div>
+                  )}
                 </Link>
               ))}
             </div>
