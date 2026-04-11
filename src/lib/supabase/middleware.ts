@@ -11,15 +11,19 @@ export async function updateSession(request: NextRequest) {
   const isInvitePage = request.nextUrl.pathname.startsWith("/invite");
   // 共有ダッシュボード（伴走マイスター向け）はログイン不要
   const isSharePage = request.nextUrl.pathname.startsWith("/share/");
+  // LP / マーケティングページ
+  const isMarketingPage = request.nextUrl.pathname === "/about";
   const isStaticAsset =
     request.nextUrl.pathname.startsWith("/_next") ||
-    request.nextUrl.pathname.startsWith("/favicon");
+    request.nextUrl.pathname.startsWith("/favicon") ||
+    request.nextUrl.pathname.startsWith("/icon") ||
+    request.nextUrl.pathname.startsWith("/apple-icon");
 
   // 静的アセットはそのまま通す
   if (isStaticAsset) return supabaseResponse;
 
   // 認証不要ページではSupabaseクライアント生成もスキップして即座にレスポンス
-  if (isAuthPage || isInvitePage || isSharePage) {
+  if (isAuthPage || isInvitePage || isSharePage || isMarketingPage) {
     return supabaseResponse;
   }
 
@@ -55,7 +59,9 @@ export async function updateSession(request: NextRequest) {
 
   if (!user) {
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
+    // 未認証ユーザーがルートや保護ページに来たら LP(/about) に飛ばす
+    // ただし元から /login を明示的に開きに来たアクセスはそのまま通す
+    url.pathname = request.nextUrl.pathname === "/" ? "/about" : "/login";
     return NextResponse.redirect(url);
   }
 
