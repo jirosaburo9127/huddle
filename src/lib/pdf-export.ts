@@ -492,44 +492,89 @@ export async function savePdf(
   bytes: Uint8Array,
   filename: string
 ): Promise<void> {
-  // Capacitor（ネイティブiOS/Android）判定は動的import で Web実行時のbundle増加を避ける
-  const { Capacitor } = await import("@capacitor/core");
-  if (Capacitor.isNativePlatform()) {
-    const { Filesystem, Directory } = await import("@capacitor/filesystem");
-    const { Share } = await import("@capacitor/share");
-
-    // Uint8Array -> base64
-    let binary = "";
-    const chunkSize = 0x8000;
-    for (let i = 0; i < bytes.length; i += chunkSize) {
-      binary += String.fromCharCode(
-        ...bytes.subarray(i, i + chunkSize)
-      );
-    }
-    const base64 = btoa(binary);
-
-    const written = await Filesystem.writeFile({
-      path: filename,
-      data: base64,
-      directory: Directory.Cache,
-    });
-    await Share.share({
-      title: filename,
-      url: written.uri,
-      dialogTitle: "決定事項PDFを共有",
-    });
-    return;
-  }
-
-  // Web: Blob -> ダウンロード
-  // Uint8Array を Blob に入れるとき、Uint8Array<ArrayBufferLike> の型を BlobPart に合わせるため一度 slice する
   const blob = new Blob([bytes.slice().buffer as ArrayBuffer], {
     type: "application/pdf",
   });
+
+  const { Capacitor } = await import("@capacitor/core");
+  const isNative = Capacitor.isNativePlatform();
+
+  // [Path A] Capacitor ネイティブ + Filesystem/Share プラグインが両方存在するビルド
+  // これが本命ルート。次回TestFlightビルド以降はここに乗る。
+  if (
+    isNative &&
+    Capacitor.isPluginAvailable("Filesystem") &&
+    Capacitor.isPluginAvailable("Share")
+  ) {
+    try {
+      const { Filesystem, Directory } = await import("@capacitor/filesystem");
+      const { Share } = await import("@capacitor/share");
+
+      // Uint8Array -> base64
+      let binary = "";
+      const chunkSize = 0x8000;
+      for (let i = 0; i < bytes.length; i += chunkSize) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+      }
+      const base64 = btoa(binary);
+
+      const written = await Filesystem.writeFile({
+        path: filename,
+        data: base64,
+        directory: Directory.Cache,
+      });
+      await Share.share({
+        title: filename,
+        url: written.uri,
+        dialogTitle: "決定事項PDFを共有",
+      });
+      return;
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn("[pdf-export] native save failed, falling back:", err);
+      // ↓ フォールバックへ
+    }
+  }
+
+  // [Path B] Web Share API (Level 2) で File を渡す。
+  // iOS Capacitor の古いビルドでも navigator.share はサポートされているので、
+  // ネイティブプラグインが未登録でもここで共有シートが出る。
+  // Chrome デスクトップなどでは canShare が false になるので Path C に抜ける。
+  try {
+    const nav = navigator as Navigator & {
+      canShare?: (data: { files: File[] }) => boolean;
+      share?: (data: {
+        files?: File[];
+        title?: string;
+        text?: string;
+      }) => Promise<void>;
+    };
+    if (typeof nav.share === "function") {
+      const file = new File([blob], filename, { type: "application/pdf" });
+      if (!nav.canShare || nav.canShare({ files: [file] })) {
+        await nav.share({ files: [file], title: filename });
+        return;
+      }
+    }
+  } catch (err) {
+    // ユーザーがキャンセルした場合も AbortError で飛んでくるが、その場合は
+    // 静かに終わりたいので Path C に流さない
+    if (err instanceof Error && err.name === "AbortError") {
+      return;
+    }
+    // eslint-disable-next-line no-console
+    console.warn("[pdf-export] web share failed, falling back:", err);
+  }
+
+  // [Path C] 最後の手段: Blob URL から <a download> で保存。
+  // デスクトップブラウザはここに到達。
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
   a.download = filename;
+  // iOS WebView で download 属性が効かない場合に備えて target も付ける
+  a.target = "_blank";
+  a.rel = "noopener";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
