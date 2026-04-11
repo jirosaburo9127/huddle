@@ -152,9 +152,12 @@ export async function generateDecisionsPdf(
     fetchFont(FONT_BOLD_URL, "BIZUDPGothic-Bold.ttf"),
   ]);
 
-  // subset=true で実際に使われたグリフだけPDFに埋める → 出力サイズ最小化
-  const fontJp = await doc.embedFont(regularBytes, { subset: true });
-  const fontJpBold = await doc.embedFont(boldBytes, { subset: true });
+  // NOTE: pdf-lib の subset エンコーダーは一部 CJK フォントで文字を取りこぼす。
+  // 特に BIZ UDPGothic のような DSIG / 複雑な OpenType テーブルを持つフォントで
+  // 顕著（2026-04-11 に「rk」「H ddl」のような文字列のフラグメント化を確認）。
+  // subset: false で全グリフ埋め込みにするとファイルサイズは大きくなるが確実に動く。
+  const fontJp = await doc.embedFont(regularBytes, { subset: false });
+  const fontJpBold = await doc.embedFont(boldBytes, { subset: false });
   // Fallback: ベースラインでStandardFontを参照する必要はないが、pdf-lib のAPI噛ませ用
   void StandardFonts.Helvetica;
 
