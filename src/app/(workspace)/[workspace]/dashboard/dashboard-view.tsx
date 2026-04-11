@@ -7,6 +7,7 @@ import {
   createShareToken,
   revokeShareToken,
 } from "@/lib/actions/share-tokens";
+import { generateDecisionsPdf, savePdf } from "@/lib/pdf-export";
 
 // メッセージ本文が画像URLかを判定（Supabase Storage公開URLは拡張子で判別）
 const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|bmp|avif)(\?.*)?$/i;
@@ -100,9 +101,38 @@ export function DashboardView({
     ? channelFacets.find((c) => c.id === selectedChannelId)?.name || ""
     : null;
 
-  function handleExportPdf() {
-    // ブラウザの印刷ダイアログを開く（ユーザーは「PDFに保存」を選択）
-    window.print();
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  async function handleExportPdf() {
+    if (exporting) return;
+    setExporting(true);
+    setExportError(null);
+    try {
+      const bytes = await generateDecisionsPdf({
+        workspaceName: workspace.name,
+        selectedChannelName,
+        decisions: filteredDecisions.map((d) => ({
+          id: d.id,
+          content: d.content,
+          created_at: d.created_at,
+          channel_name: d.channel_name,
+          sender_name: d.sender_name,
+        })),
+      });
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const suffix = selectedChannelName ? `_${selectedChannelName}` : "";
+      const filename = `huddle_decisions_${workspace.slug}${suffix}_${dateStr}.pdf`;
+      await savePdf(bytes, filename);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error("[pdf-export] failed:", err);
+      setExportError(
+        err instanceof Error ? err.message : "PDF生成に失敗しました"
+      );
+    } finally {
+      setExporting(false);
+    }
   }
 
   async function handleCreateToken() {
@@ -189,17 +219,29 @@ export function DashboardView({
               <button
                 type="button"
                 onClick={handleExportPdf}
-                disabled={filteredDecisions.length === 0}
+                disabled={filteredDecisions.length === 0 || exporting}
                 className="text-xs px-3 py-1.5 rounded-lg border border-border text-muted hover:text-foreground hover:bg-white/[0.04] disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
-                title="現在の絞り込みで決定事項をPDFとして保存"
+                title={exporting ? "生成中..." : "現在の絞り込みで決定事項をPDFとして保存"}
               >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
-                </svg>
-                PDFエクスポート
+                {exporting ? (
+                  <svg className="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                ) : (
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+                  </svg>
+                )}
+                {exporting ? "生成中…" : "PDFエクスポート"}
               </button>
             </div>
           </div>
+
+          {exportError && (
+            <div className="print:hidden mb-3 text-xs text-mention bg-mention/10 border border-mention/30 rounded-lg px-3 py-2">
+              PDF生成エラー: {exportError}
+            </div>
+          )}
 
           {/* チャンネルフィルタ（ピルバー・横スクロール可） */}
           {channelFacets.length > 0 && (

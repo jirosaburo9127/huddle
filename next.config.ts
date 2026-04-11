@@ -38,7 +38,8 @@ const nextConfig: NextConfig = {
             value: [
               "default-src 'self'",
               "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-              "connect-src 'self' https://emfngqketrieioxusuhg.supabase.co wss://emfngqketrieioxusuhg.supabase.co",
+              // jsdelivr は PDFエクスポートで Noto Sans JP OTF を初回取得するため許可
+              "connect-src 'self' https://emfngqketrieioxusuhg.supabase.co wss://emfngqketrieioxusuhg.supabase.co https://cdn.jsdelivr.net",
               "img-src 'self' https://emfngqketrieioxusuhg.supabase.co data: blob:",
               "style-src 'self' 'unsafe-inline'",
               "font-src 'self' https://fonts.gstatic.com",
