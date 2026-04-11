@@ -71,11 +71,13 @@ html, body {
 @media print {
   @page {
     size: A4;
-    margin: 16mm;
+    margin: 18mm 16mm;
   }
   html, body {
     background: #ffffff !important;
-    color: #000000 !important;
+    color: #111111 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
   body * {
     visibility: hidden;
@@ -89,21 +91,116 @@ html, body {
     left: 0;
     top: 0;
     width: 100%;
+    padding: 0 !important;
+    margin: 0 !important;
     background: #ffffff !important;
-    color: #000000 !important;
+    color: #111111 !important;
+    font-family: "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif !important;
+    font-size: 11pt;
+    line-height: 1.7;
+    counter-reset: decision;
   }
-  /* 印刷時にカードの背景・枠を見やすく */
+
+  /* タイトルブロック */
+  .print-area .print-only h1 {
+    font-size: 22pt !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.02em !important;
+    color: #000 !important;
+    margin: 0 0 6px 0 !important;
+    padding: 0 !important;
+    line-height: 1.25 !important;
+  }
+  .print-area .print-only .print-meta {
+    font-size: 9.5pt !important;
+    color: #555 !important;
+    letter-spacing: 0.02em;
+  }
+  .print-area .print-only hr {
+    border: none !important;
+    border-top: 2px solid #111 !important;
+    margin: 14px 0 22px 0 !important;
+    height: 0 !important;
+  }
+
+  /* 決定事項カードをドキュメント風の段組に変換 */
   .print-area .print-card {
-    border: 1px solid #d0d0d0 !important;
-    background: #ffffff !important;
-    color: #000000 !important;
+    display: block !important;
+    border: none !important;
+    border-top: 1px solid #e0e0e0 !important;
+    background: none !important;
+    color: #111 !important;
+    padding: 18px 0 18px 52px !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    position: relative !important;
     break-inside: avoid;
     page-break-inside: avoid;
+    counter-increment: decision;
   }
+  .print-area .print-card:first-of-type {
+    border-top: none !important;
+    padding-top: 4px !important;
+  }
+  /* 番号(01, 02, ...)を左に付ける */
+  .print-area .print-card::before {
+    content: counter(decision, decimal-leading-zero);
+    position: absolute;
+    left: 0;
+    top: 22px;
+    width: 40px;
+    font-size: 14pt;
+    font-weight: 700;
+    color: #888;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.03em;
+  }
+  .print-area .print-card:first-of-type::before {
+    top: 8px;
+  }
+
+  /* カード内のメタ行（#channel・sender・date） */
+  .print-area .print-card > div:first-child {
+    font-size: 9pt !important;
+    color: #666 !important;
+    margin-bottom: 8px !important;
+    gap: 0 !important;
+    display: block !important;
+  }
+  .print-area .print-card > div:first-child span {
+    color: #666 !important;
+  }
+  .print-area .print-card > div:first-child span:first-child {
+    color: #111 !important;
+    font-weight: 700 !important;
+    font-size: 10pt !important;
+    margin-right: 8px;
+  }
+
+  /* 本文（大きめで読みやすく） */
+  .print-area .print-card > div:nth-child(2),
+  .print-area .print-card > div:nth-child(2) * {
+    font-size: 13pt !important;
+    line-height: 1.75 !important;
+    color: #111 !important;
+    font-weight: 500;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  /* 画像決定は枠だけ残して縮小 */
+  .print-area .print-card img {
+    max-width: 100% !important;
+    max-height: 200px !important;
+    border: 1px solid #ccc !important;
+    border-radius: 4px !important;
+  }
+
   .print-area a {
-    color: #000000 !important;
+    color: #111 !important;
     text-decoration: none !important;
   }
+
   /* 画面には出さない、印刷専用要素 */
   .print-only {
     display: block !important;

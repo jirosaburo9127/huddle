@@ -161,20 +161,21 @@ export function DashboardView({
         {/* 決定事項一覧 */}
         <section className="print-area">
           {/* 印刷専用ヘッダー（画面には出さない） */}
-          <div className="print-only mb-6" aria-hidden="true">
-            <h1 style={{ fontSize: "22px", fontWeight: "bold", marginBottom: "4px" }}>
-              {workspace.name} — 決定事項
-            </h1>
-            <div style={{ fontSize: "12px", color: "#555" }}>
-              {selectedChannelName ? `チャンネル: #${selectedChannelName} / ` : "全チャンネル / "}
-              {filteredDecisions.length}件 / 出力日:{" "}
+          <div className="print-only" aria-hidden="true">
+            <h1>{workspace.name} — 決定事項</h1>
+            <div className="print-meta">
+              {selectedChannelName ? `対象: #${selectedChannelName}` : "対象: 全チャンネル"}
+              {" ／ "}
+              {filteredDecisions.length}件
+              {" ／ "}
+              出力日:{" "}
               {new Date().toLocaleDateString("ja-JP", {
                 year: "numeric",
                 month: "long",
                 day: "numeric",
               })}
             </div>
-            <hr style={{ marginTop: "12px", borderColor: "#ddd" }} />
+            <hr />
           </div>
 
           <div className="print:hidden flex items-baseline justify-between mb-3 gap-3">
