@@ -267,10 +267,8 @@ Deno.serve(async (req) => {
     }
 
     const senderName = sender?.display_name || "メンバー";
-    const bodyPlain =
-      record.content.length > 100
-        ? record.content.slice(0, 100) + "…"
-        : record.content;
+    // プライバシー保護: 通知にメッセージ内容を表示しない
+    const bodyPlain = "新しいメッセージがあります";
 
     // 受信者ごとに通知内容を組み立てる
     // - メンションされた人: 「🔔 sumika があなたをメンション (#general)」
