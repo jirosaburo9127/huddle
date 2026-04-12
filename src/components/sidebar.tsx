@@ -191,16 +191,25 @@ export function Sidebar({
     return found?.id ?? null;
   }, [pathname, channels, dmChannels]);
 
-  // 表示中のチャンネルが切り替わったら未読をクリア + DB側 last_read_at を更新
-  // last_read_at は await して完了を待つ。以前は fire-and-forget だったが、
-  // visibilitychange の refetchUnread と競合して既読前の古いカウントが
-  // 再表示される問題があったため、確実に書き込んでからバッジをクリアする。
+  // 表示中のチャンネルが切り替わったら:
+  // 1. 楽観的にバッジを即消す
+  // 2. DB の last_read_at を更新
+  // 3. get_unread_counts で全チャンネルの真のカウントを取り直す（ドリフト補正）
   useEffect(() => {
     if (!currentChannelId) return;
     let cancelled = false;
 
+    // 楽観的にバッジを即消す
+    setUnreadState((prev) => {
+      if (!prev[currentChannelId]) return prev;
+      const next = { ...prev };
+      delete next[currentChannelId];
+      return next;
+    });
+
     (async () => {
       const supabase = sidebarSupabaseRef.current;
+      // last_read_at を更新
       await supabase
         .from("channel_members")
         .update({ last_read_at: new Date().toISOString() })
@@ -208,22 +217,19 @@ export function Sidebar({
         .eq("user_id", currentUserId);
 
       if (cancelled) return;
-      // DB書き込み完了後にバッジをクリア
-      setUnreadState((prev) => {
-        if (!prev[currentChannelId]) return prev;
-        const next = { ...prev };
-        delete next[currentChannelId];
-        return next;
-      });
-    })();
 
-    // 楽観的にもバッジを即消す（DB完了を待たずにUI先行で消す）
-    setUnreadState((prev) => {
-      if (!prev[currentChannelId]) return prev;
-      const next = { ...prev };
-      delete next[currentChannelId];
-      return next;
-    });
+      // サーバ真実で全バッジを再同期（Realtimeとの累積ドリフトをここでリセット）
+      const { data } = await supabase.rpc("get_unread_counts", {
+        p_user_id: currentUserId,
+      });
+      if (cancelled || !data) return;
+      const next: Record<string, number> = {};
+      for (const row of data as Array<{ channel_id: string; unread_count: number }>) {
+        if (row.channel_id === currentChannelId) continue;
+        next[row.channel_id] = Number(row.unread_count);
+      }
+      setUnreadState(next);
+    })();
 
     return () => { cancelled = true; };
   }, [currentChannelId, currentUserId]);

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { BackToAppBar } from "./back-to-app";
 import {
   IsoHeroStack,
   IsoDashboard,
@@ -26,18 +27,8 @@ export default function AboutPage() {
   return (
     <main className="min-h-screen bg-white text-[#0f0f1a] antialiased">
       {/* ───────── ナビゲーション ───────── */}
-      {/* アプリに戻るバー（ログイン済みユーザー向け） */}
-      <div className="sticky top-0 z-50 bg-[#0f0f1a] text-white text-center py-2 px-4">
-        <a
-          href="/"
-          className="text-sm font-medium hover:underline inline-flex items-center gap-1.5"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-          </svg>
-          アプリに戻る
-        </a>
-      </div>
+      {/* アプリに戻るバー */}
+      <BackToAppBar />
       <nav className="sticky top-10 z-50 bg-white/90 backdrop-blur border-b border-[#ececec]">
         <div className="max-w-5xl mx-auto flex items-center justify-between px-5 py-3">
           <Link href="/about" className="flex items-center gap-2">
