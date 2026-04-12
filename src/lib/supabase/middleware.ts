@@ -59,9 +59,10 @@ export async function updateSession(request: NextRequest) {
 
   if (!user) {
     const url = request.nextUrl.clone();
-    // 未認証ユーザーがルートや保護ページに来たら LP(/about) に飛ばす
-    // ただし元から /login を明示的に開きに来たアクセスはそのまま通す
-    url.pathname = request.nextUrl.pathname === "/" ? "/about" : "/login";
+    // 未認証ユーザーは常に /login へ
+    // (/about はLP専用の公開ページとして別途アクセス可能にしてあるが、
+    //  未認証リダイレクト先にすると Capacitor アプリでログインに戻れなくなるため /login に固定)
+    url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
