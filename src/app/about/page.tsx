@@ -38,22 +38,26 @@ export default function AboutPage() {
             <span className="font-bold text-xl tracking-tight">Huddle</span>
           </Link>
           <div className="flex items-center gap-2 sm:gap-4">
-            {/* アプリ（チャット画面）に戻るリンク */}
+            {/* アプリに戻る — モバイルでは省スペースのためアイコンのみ */}
             <a
               href="/"
-              className="text-sm text-[#55555c] hover:text-[#0f0f1a] transition-colors"
+              className="text-[#55555c] hover:text-[#0f0f1a] transition-colors p-1"
+              title="アプリに戻る"
             >
-              ← アプリに戻る
+              <span className="hidden sm:inline text-sm">← アプリに戻る</span>
+              <svg className="w-5 h-5 sm:hidden" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
             </a>
             <Link
               href="/login"
-              className="text-sm text-[#55555c] hover:text-[#0f0f1a] transition-colors"
+              className="hidden sm:inline text-sm text-[#55555c] hover:text-[#0f0f1a] transition-colors"
             >
               ログイン
             </Link>
             <Link
               href="/signup"
-              className="text-sm font-semibold bg-[#0f0f1a] text-white px-4 py-2 rounded-lg hover:bg-black transition-colors"
+              className="text-xs sm:text-sm font-semibold bg-[#0f0f1a] text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-black transition-colors whitespace-nowrap"
             >
               無料で試す
             </Link>

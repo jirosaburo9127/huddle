@@ -96,10 +96,15 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
     if (!workspaceId) return;
     async function fetchMembers() {
       const supabase = createClient();
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("workspace_members")
         .select("user_id, profiles(id, display_name, avatar_url)")
         .eq("workspace_id", workspaceId);
+      if (error) {
+        // eslint-disable-next-line no-console
+        console.error("[mention] workspace_members fetch failed:", error);
+        return;
+      }
       if (data) {
         const normalized = data.map((row: { user_id: string; profiles: unknown }) => {
           const p = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
@@ -125,8 +130,11 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
     const value = e.target.value;
     setContent(value);
 
-    // IME入力中はサジェストを表示しない
-    if (isComposing) return;
+    // IME入力中でも @ の検出は行う。
+    // 日本語IMEで変換中の中間文字はメンショントリガーにならないが、
+    // `@` 自体はIME外で確定入力されるため、isComposing に関係なく検出すべき。
+    // （以前は isComposing で全体を early return していたが、モバイルの日本語キーボードで
+    //  @を入力してもサジェストが出ない問題を引き起こしていた）
 
     const cursorPos = e.target.selectionStart ?? value.length;
     // カーソル位置から逆方向に@を探す
