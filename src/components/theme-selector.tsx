@@ -12,20 +12,20 @@ export function ThemeSelector() {
   const { theme, setTheme } = useThemeStore();
 
   return (
-    <div className="flex gap-3">
+    <div className="grid grid-cols-1 gap-2">
       {themes.map((t) => (
         <button
           key={t.name}
           type="button"
           onClick={() => setTheme(t.name)}
-          className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all cursor-pointer ${
+          className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all cursor-pointer w-full ${
             theme === t.name
               ? "border-accent bg-accent/10"
               : "border-border hover:border-accent/30"
           }`}
         >
           <span
-            className="w-8 h-8 rounded-full border border-border shrink-0"
+            className="w-7 h-7 rounded-full border border-border shrink-0"
             style={{ backgroundColor: t.color }}
           />
           <div className="text-left">

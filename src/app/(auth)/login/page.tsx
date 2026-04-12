@@ -185,7 +185,9 @@ function LoginForm() {
       <div className="flex min-h-full items-center justify-center px-4">
         <div className="w-full max-w-sm space-y-8">
           <div className="text-center">
-            <h1 className="text-3xl font-bold text-accent">Huddle</h1>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/icons/logo-transparent.png" alt="" className="w-14 h-14 mx-auto mb-3" />
+          <h1 className="text-3xl font-bold text-accent">Huddle</h1>
             <p className="mt-2 text-lg font-semibold text-foreground">
               2段階認証
             </p>
@@ -247,6 +249,8 @@ function LoginForm() {
     <div className="flex min-h-full items-center justify-center px-4">
       <div className="w-full max-w-sm space-y-8">
         <div className="text-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/icons/logo-transparent.png" alt="" className="w-14 h-14 mx-auto mb-3" />
           <h1 className="text-3xl font-bold text-accent">Huddle</h1>
           <p className="mt-2 text-muted">ログインして始めましょう</p>
         </div>

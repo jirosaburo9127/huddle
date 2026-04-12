@@ -1,6 +1,6 @@
 export default function ChannelLoading() {
   return (
-    <div className="flex flex-col h-full animate-pulse">
+    <div className="flex flex-col h-full animate-pulse page-enter">
       {/* ヘッダースケルトン */}
       <header className="flex items-center px-4 py-3 border-b border-border bg-header shrink-0">
         <div className="flex items-center gap-2 pl-10 lg:pl-0">

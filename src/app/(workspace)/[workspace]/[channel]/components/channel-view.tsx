@@ -665,7 +665,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
   }
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-full page-enter">
       {/* チャンネルエリア */}
       <div className="flex flex-col h-full flex-1 min-w-0">
         {/* チャンネルヘッダー */}
