@@ -110,7 +110,7 @@ function MessageContent({
     const url = content.trim();
     const fileName = extractFileName(url);
 
-    // 画像ファイルの場合はプレビュー表示
+    // 画像ファイルの場合はプレビュー表示（タップでアプリ内ライトボックス）
     if (isImageFile(url) && !imageError) {
       return (
         <div className="mt-1">
@@ -118,7 +118,10 @@ function MessageContent({
             src={url}
             alt={fileName}
             className="max-w-xs max-h-80 rounded-xl cursor-pointer hover:opacity-90 transition-opacity"
-            onClick={() => window.open(url, "_blank")}
+            onClick={(e) => {
+              e.stopPropagation();
+              setLightboxUrl(url);
+            }}
             onError={onImageError}
           />
           <span className="text-xs text-muted mt-1 block">{fileName}</span>
@@ -279,6 +282,7 @@ export const MessageItem = memo(function MessageItem({
   const [imageError, setImageError] = useState(false);
   const [showActions, setShowActions] = useState(false);
   const [mobileEmojiOpen, setMobileEmojiOpen] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [showDecisionMetaModal, setShowDecisionMetaModal] = useState(false);
   const [metaWhyInput, setMetaWhyInput] = useState("");
   const [metaDueInput, setMetaDueInput] = useState("");
@@ -842,6 +846,35 @@ export const MessageItem = memo(function MessageItem({
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* 画像ライトボックス（アプリ内フルスクリーン表示） */}
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-[70] bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setLightboxUrl(null)}
+        >
+          {/* 閉じるボタン */}
+          <button
+            type="button"
+            onClick={() => setLightboxUrl(null)}
+            className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+            aria-label="閉じる"
+          >
+            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+          {/* 画像 — ピンチズーム可能に */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={lightboxUrl}
+            alt="拡大画像"
+            className="max-w-full max-h-full object-contain rounded-lg select-none"
+            style={{ touchAction: "pinch-zoom" }}
+            onClick={(e) => e.stopPropagation()}
+          />
         </div>
       )}
     </>
