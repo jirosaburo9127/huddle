@@ -101,10 +101,12 @@ function MessageContent({
   content,
   imageError,
   onImageError,
+  onImageClick,
 }: {
   content: string;
   imageError: boolean;
   onImageError: () => void;
+  onImageClick?: (url: string) => void;
 }) {
   if (isStorageFileUrl(content)) {
     const url = content.trim();
@@ -120,7 +122,7 @@ function MessageContent({
             className="max-w-xs max-h-80 rounded-xl cursor-pointer hover:opacity-90 transition-opacity"
             onClick={(e) => {
               e.stopPropagation();
-              setLightboxUrl(url);
+              onImageClick?.(url);
             }}
             onError={onImageError}
           />
@@ -461,6 +463,7 @@ export const MessageItem = memo(function MessageItem({
                 content={message.content}
                 imageError={imageError}
                 onImageError={() => setImageError(true)}
+                onImageClick={setLightboxUrl}
               />
               {/* 連続メッセージで編集済みの場合、本文の後に表示 */}
               {isConsecutive && message.edited_at && (

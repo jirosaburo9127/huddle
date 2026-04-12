@@ -217,7 +217,11 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
       await onSend(trimmed, mentions, options);
     } finally {
       setSending(false);
-      textareaRef.current?.focus();
+      // PC のみ自動フォーカス（モバイルではキーボードが勝手に出てうるさい）
+      const isMobile = typeof window !== "undefined" && window.innerWidth < 1024;
+      if (!isMobile) {
+        textareaRef.current?.focus();
+      }
     }
   }
 

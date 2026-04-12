@@ -38,6 +38,13 @@ export default function AboutPage() {
             <span className="font-bold text-xl tracking-tight">Huddle</span>
           </Link>
           <div className="flex items-center gap-2 sm:gap-4">
+            {/* アプリ（チャット画面）に戻るリンク */}
+            <a
+              href="/"
+              className="text-sm text-[#55555c] hover:text-[#0f0f1a] transition-colors"
+            >
+              ← アプリに戻る
+            </a>
             <Link
               href="/login"
               className="text-sm text-[#55555c] hover:text-[#0f0f1a] transition-colors"
