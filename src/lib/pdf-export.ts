@@ -537,33 +537,37 @@ export async function savePdf(
   }
 
   // [Path B] Web Share API (Level 2) で File を渡す。
-  // iOS Capacitor の古いビルドでも navigator.share はサポートされているので、
-  // ネイティブプラグインが未登録でもここで共有シートが出る。
-  // Chrome デスクトップなどでは canShare が false になるので Path C に抜ける。
-  try {
-    const nav = navigator as Navigator & {
-      canShare?: (data: { files: File[] }) => boolean;
-      share?: (data: {
-        files?: File[];
-        title?: string;
-        text?: string;
-      }) => Promise<void>;
-    };
-    if (typeof nav.share === "function") {
-      const file = new File([blob], filename, { type: "application/pdf" });
-      if (!nav.canShare || nav.canShare({ files: [file] })) {
-        await nav.share({ files: [file], title: filename });
+  // iOS Capacitor の古いビルドでのみ使用（ネイティブプラグイン未登録時のフォールバック）。
+  // macOS Safari/Chrome もnavigator.shareをサポートするが、デスクトップでは共有シートより
+  // ファイルダウンロード（Path C）の方がユーザー体験が良いため、モバイル限定。
+  const isMobileDevice =
+    typeof navigator !== "undefined" &&
+    /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+  if (isMobileDevice) {
+    try {
+      const nav = navigator as Navigator & {
+        canShare?: (data: { files: File[] }) => boolean;
+        share?: (data: {
+          files?: File[];
+          title?: string;
+          text?: string;
+        }) => Promise<void>;
+      };
+      if (typeof nav.share === "function") {
+        const file = new File([blob], filename, { type: "application/pdf" });
+        if (!nav.canShare || nav.canShare({ files: [file] })) {
+          await nav.share({ files: [file], title: filename });
+          return;
+        }
+      }
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") {
         return;
       }
+      // eslint-disable-next-line no-console
+      console.warn("[pdf-export] web share failed, falling back:", err);
     }
-  } catch (err) {
-    // ユーザーがキャンセルした場合も AbortError で飛んでくるが、その場合は
-    // 静かに終わりたいので Path C に流さない
-    if (err instanceof Error && err.name === "AbortError") {
-      return;
-    }
-    // eslint-disable-next-line no-console
-    console.warn("[pdf-export] web share failed, falling back:", err);
   }
 
   // [Path C] 最後の手段: Blob URL から <a download> で保存。
