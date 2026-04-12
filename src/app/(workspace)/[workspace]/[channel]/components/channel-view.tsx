@@ -53,6 +53,22 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     messagesRef.current = messages;
   }, [messages]);
 
+  // 自分のプロフィールを取得して楽観的メッセージに使う（avatar_url を正しく反映）
+  const [myProfile, setMyProfile] = useState<{
+    display_name: string;
+    avatar_url: string | null;
+  } | null>(null);
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("display_name, avatar_url")
+        .eq("id", currentUserId)
+        .maybeSingle();
+      if (data) setMyProfile(data);
+    })();
+  }, [currentUserId, supabase]);
+
   // モバイル: チャンネルURL直アクセス（プッシュ通知タップや共有リンク）では
   // サイドバーを閉じてチャンネルビューを前面に出す
   useEffect(() => {
@@ -586,8 +602,8 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
       profiles: {
         id: user.id,
         email: user.email || "",
-        display_name: user.user_metadata?.display_name || user.email?.split("@")[0] || "",
-        avatar_url: null,
+        display_name: myProfile?.display_name || user.user_metadata?.display_name || user.email?.split("@")[0] || "",
+        avatar_url: myProfile?.avatar_url ?? null,
         status: null,
         last_seen_at: null,
       },
@@ -867,6 +883,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
           currentUserId={currentUserId}
           channelId={channel.id}
           workspaceId={channel.workspace_id}
+          myProfile={myProfile}
           onClose={() => setActiveThread(null)}
           onReplyCountChange={handleReplyCountChange}
           onDecision={handleDecision}

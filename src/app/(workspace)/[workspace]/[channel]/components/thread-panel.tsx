@@ -16,6 +16,7 @@ type Props = {
   currentUserId: string;
   channelId: string;
   workspaceId?: string;
+  myProfile?: { display_name: string; avatar_url: string | null } | null;
   onClose: () => void;
   onReplyCountChange: (parentId: string, delta: number) => void;
   onDecision?: (messageId: string, isDecision: boolean) => Promise<void>;
@@ -28,6 +29,7 @@ export function ThreadPanel({
   currentUserId,
   channelId,
   workspaceId,
+  myProfile,
   onClose,
   onReplyCountChange,
   onDecision,
@@ -301,10 +303,11 @@ export function ThreadPanel({
         id: user.id,
         email: user.email || "",
         display_name:
+          myProfile?.display_name ||
           user.user_metadata?.display_name ||
           user.email?.split("@")[0] ||
           "",
-        avatar_url: null,
+        avatar_url: myProfile?.avatar_url ?? null,
         status: null,
         last_seen_at: null,
       },
