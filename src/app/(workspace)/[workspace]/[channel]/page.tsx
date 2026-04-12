@@ -30,6 +30,7 @@ export default async function ChannelPage({
 
   return (
     <ChannelView
+      key={result.channel.id}
       channel={result.channel}
       initialMessages={result.messages || []}
       currentUserId={user.id}
