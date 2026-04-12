@@ -434,32 +434,28 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
           maxLength={4000}
           className="flex-1 resize-none bg-transparent text-lg text-foreground placeholder-muted focus:outline-none max-h-[200px]"
         />
-        {/* 決定として送るトグル */}
+        {/* 決定として送るトグル — テキスト付きピル */}
         <button
           type="button"
           onClick={() => setSendAsDecision((v) => !v)}
-          className={`shrink-0 rounded-lg p-2 transition-all duration-200 ${
+          className={`shrink-0 flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-all duration-200 select-none ${
             sendAsDecision
-              ? "bg-accent text-white scale-110 shadow-lg shadow-accent/20"
-              : "text-muted hover:text-foreground hover:bg-white/[0.04]"
+              ? "bg-accent text-white shadow-md shadow-accent/25"
+              : "text-muted border border-border hover:text-foreground hover:border-foreground/30"
           }`}
-          title={sendAsDecision ? "決定フラグON（このメッセージは決定事項としてダッシュボードに記録されます）" : "決定として送る"}
           aria-pressed={sendAsDecision}
         >
-          <svg className="h-4 w-4" fill={sendAsDecision ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+          <svg className="w-3.5 h-3.5" fill={sendAsDecision ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
+          決定
         </button>
 
         {/* 送信ボタン */}
         <button
           type="submit"
           disabled={!content.trim()}
-          className={`shrink-0 rounded-lg p-2 text-white transition-colors ${
-            sendAsDecision
-              ? "bg-accent hover:bg-accent-hover"
-              : "bg-accent hover:bg-accent-hover"
-          } disabled:opacity-30`}
+          className="shrink-0 rounded-lg bg-accent p-2 text-white hover:bg-accent-hover disabled:opacity-30 transition-colors"
         >
           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
