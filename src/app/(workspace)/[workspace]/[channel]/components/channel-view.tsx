@@ -557,11 +557,17 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
   }, [supabase, currentUserId, bookmarkedIds]);
 
   // メッセージ送信
-  async function handleSend(content: string, mentions: MentionPayload) {
+  async function handleSend(
+    content: string,
+    mentions: MentionPayload,
+    options?: { isDecision?: boolean }
+  ) {
     if (content.length > 4000) return;
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
+
+    const isDecision = options?.isDecision ?? false;
 
     // 楽観的UI更新
     const optimisticMsg: MessageWithProfile = {
@@ -572,7 +578,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
       content,
       edited_at: null,
       deleted_at: null,
-      is_decision: false,
+      is_decision: isDecision,
       decision_why: null,
       decision_due: null,
       reply_count: 0,
@@ -593,6 +599,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
       channel_id: channel.id,
       user_id: user.id,
       content,
+      ...(isDecision ? { is_decision: true } : {}),
     }).select().single();
 
     if (error) {

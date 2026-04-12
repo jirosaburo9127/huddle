@@ -613,6 +613,23 @@ export const MessageItem = memo(function MessageItem({
           {/* PC: アクションバー（ホバーで表示、メッセージ右上に浮かせる） */}
           {!isEditing && !isThreadView && (
           <div className="hidden lg:flex absolute -top-2 right-3 z-10 transition-opacity items-center gap-0.5 bg-sidebar/95 backdrop-blur-sm border border-border/60 rounded-lg px-1 py-0.5 shadow-lg opacity-0 group-hover:opacity-100">
+            {/* 決定ボタンは一番左 — Huddleの推し機能なので最も発見しやすい位置 */}
+            {onDecision && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onDecision(message.id, !message.is_decision); }}
+                className={`flex items-center gap-1 px-2.5 py-1 text-[13px] font-medium border rounded-md transition-all active:scale-90 ${
+                  message.is_decision
+                    ? "text-accent border-accent/40 bg-accent/10"
+                    : "text-muted hover:text-accent border-transparent hover:border-accent/30 hover:bg-accent/5"
+                }`}
+              >
+                <svg className="w-4 h-4" fill={message.is_decision ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {message.is_decision ? "決定済" : "決定"}
+              </button>
+            )}
+            <div className="w-px h-4 bg-border/50 mx-0.5" />
             {onReact && (
               <div className="relative">
                 <button
@@ -641,22 +658,6 @@ export const MessageItem = memo(function MessageItem({
               </svg>
               返信
             </button>
-            {/* 決定事項トグル */}
-            {onDecision && (
-              <button
-                onClick={(e) => { e.stopPropagation(); onDecision(message.id, !message.is_decision); }}
-                className={`flex items-center gap-1 px-2 py-0.5 text-[13px] border rounded transition-all active:scale-90 ${
-                  message.is_decision
-                    ? "text-accent border-accent/40 bg-accent/10"
-                    : "text-muted hover:text-accent border-transparent hover:border-border/50"
-                }`}
-              >
-                <svg className="w-3.5 h-3.5" fill={message.is_decision ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                {message.is_decision ? "決定済" : "決定"}
-              </button>
-            )}
             {/* ブックマーク */}
             {onBookmark && (
               <button
@@ -722,6 +723,22 @@ export const MessageItem = memo(function MessageItem({
                 </span>
                 <span className="text-xs text-foreground">返信</span>
               </button>
+              {/* 決定事項トグル（モバイル）— Huddleの推し機能、最も目立つ位置 */}
+              {onDecision && (
+                <button
+                  onClick={() => { setShowActions(false); onDecision(message.id, !message.is_decision); }}
+                  className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] active:scale-90 transition-all"
+                >
+                  <span className={`w-12 h-12 rounded-full border-2 flex items-center justify-center ${message.is_decision ? "border-accent bg-accent/15" : "border-muted/40"}`}>
+                    <svg className={`w-5 h-5 ${message.is_decision ? "text-accent" : "text-foreground"}`} fill={message.is_decision ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </span>
+                  <span className={`text-xs ${message.is_decision ? "text-accent font-semibold" : "text-foreground"}`}>
+                    {message.is_decision ? "決定済" : "決定"}
+                  </span>
+                </button>
+              )}
               {/* リアクション */}
               {onReact && (
                 <button
@@ -752,22 +769,6 @@ export const MessageItem = memo(function MessageItem({
                     ))}
                   </div>
                 </div>
-              )}
-              {/* 決定事項トグル（モバイル） */}
-              {onDecision && (
-                <button
-                  onClick={() => { setShowActions(false); onDecision(message.id, !message.is_decision); }}
-                  className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] active:scale-90 transition-all"
-                >
-                  <span className={`w-12 h-12 rounded-full border-2 flex items-center justify-center ${message.is_decision ? "border-accent bg-accent/15" : "border-muted/40"}`}>
-                    <svg className={`w-5 h-5 ${message.is_decision ? "text-accent" : "text-foreground"}`} fill={message.is_decision ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </span>
-                  <span className={`text-xs ${message.is_decision ? "text-accent font-semibold" : "text-foreground"}`}>
-                    {message.is_decision ? "決定済" : "決定"}
-                  </span>
-                </button>
               )}
               {/* ブックマーク（モバイル） */}
               {onBookmark && (

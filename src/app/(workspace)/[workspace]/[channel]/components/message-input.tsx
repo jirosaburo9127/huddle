@@ -62,9 +62,13 @@ export type MentionPayload = {
   broadcast: "here" | "channel" | null; // @here / @channel 特殊メンション
 };
 
+type SendOptions = {
+  isDecision?: boolean;
+};
+
 type Props = {
   channelName?: string;
-  onSend: (content: string, mentions: MentionPayload) => void | Promise<void>;
+  onSend: (content: string, mentions: MentionPayload, options?: SendOptions) => void | Promise<void>;
   placeholder?: string;
   channelId?: string; // ファイルアップロード用
   workspaceId?: string; // メンション用
@@ -73,6 +77,7 @@ type Props = {
 export function MessageInput({ channelName, onSend, placeholder, channelId, workspaceId }: Props) {
   const [content, setContent] = useState("");
   const [sending, setSending] = useState(false);
+  const [sendAsDecision, setSendAsDecision] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -199,7 +204,9 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
 
     setSending(true);
     const mentions = extractMentions(trimmed);
+    const options: SendOptions = sendAsDecision ? { isDecision: true } : {};
     setContent("");
+    setSendAsDecision(false);
 
     // テキストエリアの高さをリセット
     if (textareaRef.current) {
@@ -207,7 +214,7 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
     }
 
     try {
-      await onSend(trimmed, mentions);
+      await onSend(trimmed, mentions, options);
     } finally {
       setSending(false);
       textareaRef.current?.focus();
@@ -427,10 +434,32 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
           maxLength={4000}
           className="flex-1 resize-none bg-transparent text-lg text-foreground placeholder-muted focus:outline-none max-h-[200px]"
         />
+        {/* 決定として送るトグル */}
+        <button
+          type="button"
+          onClick={() => setSendAsDecision((v) => !v)}
+          className={`shrink-0 rounded-lg p-2 transition-all duration-200 ${
+            sendAsDecision
+              ? "bg-accent text-white scale-110 shadow-lg shadow-accent/20"
+              : "text-muted hover:text-foreground hover:bg-white/[0.04]"
+          }`}
+          title={sendAsDecision ? "決定フラグON（このメッセージは決定事項としてダッシュボードに記録されます）" : "決定として送る"}
+          aria-pressed={sendAsDecision}
+        >
+          <svg className="h-4 w-4" fill={sendAsDecision ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </button>
+
+        {/* 送信ボタン */}
         <button
           type="submit"
           disabled={!content.trim()}
-          className="shrink-0 rounded-lg bg-accent p-2 text-white hover:bg-accent-hover disabled:opacity-30 transition-colors"
+          className={`shrink-0 rounded-lg p-2 text-white transition-colors ${
+            sendAsDecision
+              ? "bg-accent hover:bg-accent-hover"
+              : "bg-accent hover:bg-accent-hover"
+          } disabled:opacity-30`}
         >
           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
