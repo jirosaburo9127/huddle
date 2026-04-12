@@ -446,6 +446,32 @@ export function Sidebar({
                   >
                     + 新しいワークスペースを作成
                   </Link>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setShowWsSwitcher(false);
+                      const name = workspace.name;
+                      const input = prompt(
+                        `ワークスペース「${name}」を完全に削除しますか？\n\n` +
+                        `すべてのチャンネル・メッセージ・決定事項が削除されます。\n` +
+                        `確認のためワークスペース名を入力:`
+                      );
+                      if (input !== name) {
+                        if (input !== null) alert("名前が一致しません");
+                        return;
+                      }
+                      const supabase = createClient();
+                      const { data, error } = await supabase.rpc("delete_workspace", {
+                        p_workspace_id: workspace.id,
+                      });
+                      if (error) { alert("削除失敗: " + error.message); return; }
+                      if (data?.error === "owner_only") { alert("オーナーのみ削除できます"); return; }
+                      window.location.href = "/";
+                    }}
+                    className="block w-full px-3 py-2 text-sm text-mention hover:bg-mention/10 transition-colors rounded-lg mx-1 text-left"
+                  >
+                    このワークスペースを削除
+                  </button>
                 </div>
               </div>
             )}
@@ -911,42 +937,6 @@ export function Sidebar({
             <div>
               <h3 className="text-sm font-semibold text-foreground mb-3">テーマ</h3>
               <ThemeSelector />
-            </div>
-
-            {/* ワークスペース削除 */}
-            <div>
-              <h3 className="text-sm font-semibold text-foreground mb-3">ワークスペース管理</h3>
-              <button
-                type="button"
-                onClick={async () => {
-                  const name = workspace.name;
-                  const input = prompt(
-                    `ワークスペース「${name}」を完全に削除しますか？\n\n` +
-                    `この操作は取り消せません。すべてのチャンネル・メッセージ・決定事項が削除されます。\n\n` +
-                    `確認のためワークスペース名「${name}」を入力してください:`
-                  );
-                  if (input !== name) {
-                    if (input !== null) alert("ワークスペース名が一致しません。削除をキャンセルしました。");
-                    return;
-                  }
-                  const supabase = createClient();
-                  const { data, error } = await supabase.rpc("delete_workspace", {
-                    p_workspace_id: workspace.id,
-                  });
-                  if (error) {
-                    alert("削除に失敗しました: " + error.message);
-                    return;
-                  }
-                  if (data?.error === "owner_only") {
-                    alert("オーナーのみがワークスペースを削除できます。");
-                    return;
-                  }
-                  window.location.href = "/";
-                }}
-                className="px-4 py-2 text-sm rounded-xl border border-mention/30 text-mention hover:bg-mention/10 transition-colors"
-              >
-                ワークスペースを削除
-              </button>
             </div>
 
             {/* ログアウト */}
