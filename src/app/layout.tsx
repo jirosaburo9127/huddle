@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ServiceWorkerRegister } from "@/components/sw-register";
+import { SplashDismisser } from "@/components/splash-dismisser";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -58,6 +59,7 @@ export default function RootLayout({
       <body className="h-full overflow-x-hidden">
         <ThemeProvider />
         <ServiceWorkerRegister />
+        <SplashDismisser />
         {children}
       </body>
     </html>
