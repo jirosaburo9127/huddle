@@ -315,14 +315,21 @@ Deno.serve(async (req) => {
       })
     );
 
-    // 送信失敗したトークンをログ出力 (410 Gone は無効トークン → 削除推奨)
+    // 送信失敗したトークンをログ出力 + 無効トークン削除
+    // - 410 Gone: トークンが完全に無効（アプリ削除・再インストール後）
+    // - 400 BadDeviceToken: production/sandbox の環境不一致（Xcodeデバッグ → TestFlight切替時）
     const failures: string[] = [];
     for (let i = 0; i < results.length; i++) {
       const r = results[i];
       if (r.status === "fulfilled" && !r.value.ok) {
         failures.push(`${targetedTokens[i].token.slice(0, 8)}... -> ${r.value.status} ${r.value.error}`);
-        // 410 Gone なら DB から削除
-        if (r.value.status === 410) {
+        // 無効トークンは DB から削除（410 Gone or 400 BadDeviceToken）
+        const shouldDelete =
+          r.value.status === 410 ||
+          (r.value.status === 400 &&
+            typeof r.value.error === "string" &&
+            r.value.error.includes("BadDeviceToken"));
+        if (shouldDelete) {
           await supabase
             .from("device_tokens")
             .delete()
