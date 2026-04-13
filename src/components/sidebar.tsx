@@ -899,6 +899,8 @@ export function Sidebar({
         <CreateChannelModal
           workspaceId={workspace.id}
           workspaceSlug={workspaceSlug}
+          currentUserId={currentUserId}
+          members={members as Array<{ user_id: string; profiles: MemberProfile | MemberProfile[] }>}
           onClose={() => setShowCreateChannel(false)}
         />
       )}

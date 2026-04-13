@@ -692,26 +692,29 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
       {/* チャンネルエリア */}
       <div className="flex flex-col h-full flex-1 min-w-0">
         {/* チャンネルヘッダー */}
-        <header className="flex items-center justify-between px-4 py-3 border-b border-border bg-header shrink-0">
-          <div className="flex items-center gap-2 min-w-0">
+        <header className="flex items-center gap-2 px-3 sm:px-4 py-3 border-b border-border bg-header shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
             {/* モバイル戻るボタン */}
             <button
               onClick={() => setSidebarOpen(true)}
-              className="lg:hidden mr-1 p-1 text-muted hover:text-foreground rounded transition-colors"
+              className="lg:hidden shrink-0 p-1 text-muted hover:text-foreground rounded transition-colors"
+              aria-label="戻る"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </button>
-            <span className="text-muted font-medium">#</span>
-            <h1 className="font-bold text-2xl">{channel.name}</h1>
+            <span className="text-muted font-medium shrink-0">#</span>
+            <h1 className="font-bold text-lg sm:text-2xl truncate min-w-0">
+              {channel.name}
+            </h1>
             {channel.topic && (
-              <span className="ml-2 text-sm text-muted truncate hidden sm:inline">
+              <span className="ml-2 text-sm text-muted truncate hidden lg:inline">
                 {channel.topic}
               </span>
             )}
           </div>
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
             {/* 決定事項フィルタ */}
             <button
               onClick={() => setShowDecisionsOnly((v) => !v)}
