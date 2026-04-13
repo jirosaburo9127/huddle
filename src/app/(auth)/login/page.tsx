@@ -54,18 +54,49 @@ function LoginForm() {
   const [mfaCode, setMfaCode] = useState("");
   const [mfaVerifying, setMfaVerifying] = useState(false);
 
-  // クライアントサイドRate Limiting用state
-  const [failCount, setFailCount] = useState(0);
-  const [lockUntil, setLockUntil] = useState(0);
+  // クライアントサイド Rate Limiting 用 state（localStorage に永続化）
+  // 段階的バックオフ: 5回失敗→1分、10回→15分、20回→1時間
+  // ブラウザタブを閉じても保持されるため単純なリロード回避は効かない
+  const LOCK_KEY = "huddle_login_lock";
+  const [lockUntil, setLockUntil] = useState<number>(() => {
+    if (typeof window === "undefined") return 0;
+    const raw = localStorage.getItem(LOCK_KEY);
+    return raw ? Number(raw) : 0;
+  });
+
+  function applyLock(ms: number) {
+    const until = Date.now() + ms;
+    setLockUntil(until);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(LOCK_KEY, String(until));
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
 
-    // Rate Limiting: ロック中は試行を拒否
+    // Rate Limiting: ロック中は試行を拒否（localStorage で永続化済み）
     if (Date.now() < lockUntil) {
-      setError("しばらくしてからお試しください");
+      const secLeft = Math.ceil((lockUntil - Date.now()) / 1000);
+      setError(`ログインがロックされています。あと約${secLeft}秒お待ちください。`);
       return;
+    }
+
+    // サーバ側の失敗数も確認（複数端末・ブラウザを跨いだブルートフォース検知）
+    // 直近15分で15回以上失敗していたら一旦ロック
+    try {
+      const { data: failCount } = await supabase.rpc("count_recent_login_failures", {
+        p_email: email,
+        p_window_minutes: 15,
+      });
+      if (typeof failCount === "number" && failCount >= 15) {
+        applyLock(15 * 60 * 1000); // 15分
+        setError("このメールアドレスのログイン試行が多すぎます。しばらく待ってからお試しください。");
+        return;
+      }
+    } catch {
+      // RPC失敗はスキップ（可用性優先）
     }
 
     setLoading(true);
@@ -77,24 +108,40 @@ function LoginForm() {
       });
 
       if (error) {
-        // 汎用エラーメッセージ（Supabaseの詳細を隠す）
+        // 汎用エラーメッセージ（Supabase の詳細を隠す）
         setError("メールアドレスまたはパスワードが正しくありません");
 
-        // 連続失敗カウント更新
-        setFailCount((prev) => {
-          const newCount = prev + 1;
-          if (newCount >= 5) {
-            setLockUntil(Date.now() + 15000); // 15秒ロック
-            setError("ログイン試行回数が上限に達しました。しばらくしてからお試しください");
-            return 0;
+        // DB に失敗を記録（別端末からのブルートフォース検知に使う）
+        supabase.rpc("record_login_failure", { p_email: email }).then(() => {});
+
+        // サーバで返ってきた直近失敗数で段階的バックオフを適用
+        try {
+          const { data: latestCount } = await supabase.rpc("count_recent_login_failures", {
+            p_email: email,
+            p_window_minutes: 15,
+          });
+          const c = typeof latestCount === "number" ? latestCount : 0;
+          if (c >= 20) {
+            applyLock(60 * 60 * 1000); // 1時間
+            setError("ログイン試行が多すぎます。1時間後に再度お試しください。");
+          } else if (c >= 10) {
+            applyLock(15 * 60 * 1000); // 15分
+            setError("ログイン試行が多すぎます。15分後に再度お試しください。");
+          } else if (c >= 5) {
+            applyLock(60 * 1000); // 1分
+            setError("ログイン試行が多すぎます。1分後に再度お試しください。");
           }
-          return newCount;
-        });
+        } catch {
+          // カウント取得失敗は無視
+        }
         return;
       }
 
-      // ログイン成功: 失敗カウントをリセット
-      setFailCount(0);
+      // ログイン成功: ロックを解除
+      setLockUntil(0);
+      if (typeof window !== "undefined") {
+        localStorage.removeItem(LOCK_KEY);
+      }
 
       // 監査ログ（fire-and-forget: awaitしない）
       if (data.user) {
