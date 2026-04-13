@@ -597,7 +597,7 @@ export function Sidebar({
         </div>
 
         {/* チャンネル・DM一覧 */}
-        <div className="flex-1 overflow-y-auto py-2">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden py-2">
           {/* 進捗ダッシュボードリンク */}
           <Link
             href={`/${workspaceSlug}/dashboard`}
@@ -650,7 +650,7 @@ export function Sidebar({
                 prefetch
                 onClick={() => setSidebarOpen(false)}
                 className={`
-                  flex items-center px-3 py-2.5 text-xl rounded-xl mx-2 transition-colors
+                  flex items-center min-w-0 px-3 py-2.5 text-xl rounded-xl mx-2 transition-colors
                   ${
                     isActive
                       ? "bg-accent/10 text-accent"
@@ -660,11 +660,11 @@ export function Sidebar({
                 `}
               >
                 <span
-                  className={`mr-2 ${isActive ? "text-accent/50" : "text-accent/50"}`}
+                  className={`mr-2 shrink-0 ${isActive ? "text-accent/50" : "text-accent/50"}`}
                 >
                   #
                 </span>
-                <span className={`truncate ${showUnreadStyle ? "font-semibold text-foreground" : ""}`}>
+                <span className={`truncate min-w-0 flex-1 ${showUnreadStyle ? "font-semibold text-foreground" : ""}`}>
                   {channel.name}
                 </span>
                 {/* ミュートアイコン */}
