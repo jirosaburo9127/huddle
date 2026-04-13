@@ -94,6 +94,17 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
   const [mentionStartPos, setMentionStartPos] = useState(0);
   const [isComposing, setIsComposing] = useState(false);
 
+  // 常時表示の「@」ピル方式メンション
+  // チャットワークの To のような使い方: 入力前に宛先を選んでおくと
+  // 本文送信時に自動で先頭に @name が付く。IME 確定なしで使える。
+  type PillMention =
+    | { kind: "user"; id: string; label: string }
+    | { kind: "broadcast"; type: "here" | "channel" };
+  const [pillMentions, setPillMentions] = useState<PillMention[]>([]);
+  const [showMentionPicker, setShowMentionPicker] = useState(false);
+  const [pickerQuery, setPickerQuery] = useState("");
+  const mentionPickerRef = useRef<HTMLDivElement>(null);
+
   // WSメンバーを取得
   useEffect(() => {
     if (!workspaceId) return;
@@ -127,6 +138,56 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
       m.profiles?.display_name?.toLowerCase().includes(q)
     );
   }, [members, mentionQuery]);
+
+  // ピル方式の候補リスト（ピッカー内の検索）
+  const pickerCandidates = useMemo(() => {
+    const q = pickerQuery.toLowerCase().trim();
+    const list = members.filter((m) => {
+      if (!m.profiles?.display_name) return false;
+      if (pillMentions.some((p) => p.kind === "user" && p.id === m.user_id)) return false;
+      if (!q) return true;
+      return m.profiles.display_name.toLowerCase().includes(q);
+    });
+    return list;
+  }, [members, pillMentions, pickerQuery]);
+
+  const hasBroadcastHere = pillMentions.some((p) => p.kind === "broadcast" && p.type === "here");
+  const hasBroadcastChannel = pillMentions.some((p) => p.kind === "broadcast" && p.type === "channel");
+
+  function addUserPill(member: MentionMember) {
+    setPillMentions((prev) => {
+      if (prev.some((p) => p.kind === "user" && p.id === member.user_id)) return prev;
+      return [...prev, { kind: "user", id: member.user_id, label: member.profiles.display_name }];
+    });
+    setPickerQuery("");
+  }
+
+  function addBroadcastPill(type: "here" | "channel") {
+    setPillMentions((prev) => {
+      if (prev.some((p) => p.kind === "broadcast" && p.type === type)) return prev;
+      return [...prev, { kind: "broadcast", type }];
+    });
+    setShowMentionPicker(false);
+  }
+
+  function removePill(idx: number) {
+    setPillMentions((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  // ピッカー外クリックで閉じる
+  useEffect(() => {
+    if (!showMentionPicker) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        mentionPickerRef.current &&
+        !mentionPickerRef.current.contains(e.target as Node)
+      ) {
+        setShowMentionPicker(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showMentionPicker]);
 
   // テキスト変更時のメンション検出
   const handleContentChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -217,8 +278,23 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const trimmed = content.trim();
-    if (!trimmed || sending) return;
+    const rawTrimmed = content.trim();
+    if (!rawTrimmed && pillMentions.length === 0) return;
+    if (sending) return;
+
+    // ピル方式で選ばれたメンションを本文先頭に差し込む
+    // 表示名に含まれる半角スペースは NBSP に置換して 1 トークン扱い
+    const pillPrefix = pillMentions
+      .map((p) => {
+        if (p.kind === "user") return `@${p.label.replace(/ /g, "\u00A0")}`;
+        return p.type === "here" ? "@here" : "@channel";
+      })
+      .join(" ");
+    const combined = pillPrefix
+      ? pillPrefix + (rawTrimmed ? " " + rawTrimmed : "")
+      : rawTrimmed;
+    const trimmed = combined.trim();
+    if (!trimmed) return;
 
     // DLP: 機密情報検知 → 警告して確認を取る（強制ブロックはしない）
     const findings = scanForSensitiveData(trimmed);
@@ -235,6 +311,7 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
     const options: SendOptions = sendAsDecision ? { isDecision: true } : {};
     setContent("");
     setSendAsDecision(false);
+    setPillMentions([]);
 
     // テキストエリアの高さをリセット
     if (textareaRef.current) {
@@ -427,6 +504,123 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
           ))}
         </div>
       )}
+
+      {/* 常時表示の @ メンションピル */}
+      <div className="relative mb-1.5 flex flex-wrap items-center gap-1.5" ref={mentionPickerRef}>
+        <button
+          type="button"
+          onClick={() => setShowMentionPicker((v) => !v)}
+          className="inline-flex items-center gap-1 rounded-full border border-dashed border-border/70 px-2.5 py-1 text-xs text-muted hover:text-accent hover:border-accent/50 transition-colors"
+          aria-haspopup="listbox"
+          aria-expanded={showMentionPicker}
+        >
+          <span className="text-accent font-bold">@</span>
+          <span>{pillMentions.length === 0 ? "メンションを追加" : "追加"}</span>
+        </button>
+        {pillMentions.map((p, idx) => (
+          <span
+            key={p.kind === "user" ? `u-${p.id}` : `b-${p.type}`}
+            className="inline-flex items-center gap-1 rounded-full bg-accent/10 border border-accent/30 px-2.5 py-1 text-xs text-accent"
+          >
+            <span className="font-semibold">
+              @{p.kind === "user" ? p.label : p.type}
+            </span>
+            <button
+              type="button"
+              onClick={() => removePill(idx)}
+              className="text-accent/70 hover:text-accent"
+              aria-label="削除"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </span>
+        ))}
+
+        {/* ピッカー */}
+        {showMentionPicker && (
+          <div className="absolute bottom-full left-0 mb-1 w-72 max-h-72 flex flex-col rounded-xl bg-sidebar border border-border shadow-xl z-50 overflow-hidden">
+            <div className="p-2 border-b border-border/50 shrink-0">
+              <input
+                type="text"
+                value={pickerQuery}
+                onChange={(e) => setPickerQuery(e.target.value)}
+                placeholder="メンバーを検索"
+                className="w-full rounded-lg bg-input-bg border border-border px-2.5 py-1.5 text-sm text-foreground placeholder-muted focus:border-accent focus:outline-none"
+                autoFocus
+              />
+            </div>
+            <div className="flex-1 overflow-y-auto py-1">
+              {/* @here / @channel 特殊メンション */}
+              {!pickerQuery && (
+                <>
+                  {!hasBroadcastHere && (
+                    <button
+                      type="button"
+                      onClick={() => addBroadcastPill("here")}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-white/[0.04] transition-colors"
+                    >
+                      <span className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center shrink-0 text-accent text-xs font-bold">H</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-foreground">@here</div>
+                        <div className="text-[11px] text-muted">オンラインのメンバーに通知</div>
+                      </div>
+                    </button>
+                  )}
+                  {!hasBroadcastChannel && (
+                    <button
+                      type="button"
+                      onClick={() => addBroadcastPill("channel")}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-white/[0.04] transition-colors"
+                    >
+                      <span className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center shrink-0 text-accent text-xs font-bold">C</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-foreground">@channel</div>
+                        <div className="text-[11px] text-muted">チャンネル全員に通知</div>
+                      </div>
+                    </button>
+                  )}
+                  {(!hasBroadcastHere || !hasBroadcastChannel) && pickerCandidates.length > 0 && (
+                    <div className="my-1 border-t border-border/50" />
+                  )}
+                </>
+              )}
+
+              {pickerCandidates.length === 0 ? (
+                <div className="px-3 py-4 text-center text-xs text-muted">
+                  該当するメンバーがいません
+                </div>
+              ) : (
+                pickerCandidates.map((member) => (
+                  <button
+                    key={member.user_id}
+                    type="button"
+                    onClick={() => addUserPill(member)}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-white/[0.04] transition-colors"
+                  >
+                    {member.profiles.avatar_url ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={member.profiles.avatar_url}
+                        alt={member.profiles.display_name}
+                        className="w-6 h-6 rounded-full object-cover shrink-0"
+                      />
+                    ) : (
+                      <div className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center shrink-0">
+                        <span className="text-[10px] font-medium text-accent">
+                          {member.profiles.display_name.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                    )}
+                    <span className="truncate text-foreground">{member.profiles.display_name}</span>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+      </div>
 
       <form
         onSubmit={handleSubmit}
