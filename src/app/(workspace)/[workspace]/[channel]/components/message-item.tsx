@@ -287,6 +287,17 @@ export const MessageItem = memo(function MessageItem({
   const [imageError, setImageError] = useState(false);
   const [showActions, setShowActions] = useState(false);
   const [mobileEmojiOpen, setMobileEmojiOpen] = useState(false);
+
+  // 他所で「すべてのアクションメニューを閉じて」と言われたら閉じる。
+  // スレッドを開いた瞬間にアクションシート/絵文字ピッカーを自動で畳むのに使う。
+  useEffect(() => {
+    function close() {
+      setShowActions(false);
+      setMobileEmojiOpen(false);
+    }
+    window.addEventListener("huddle:closeAllActions", close);
+    return () => window.removeEventListener("huddle:closeAllActions", close);
+  }, []);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [showDecisionMetaModal, setShowDecisionMetaModal] = useState(false);
   const [metaWhyInput, setMetaWhyInput] = useState("");

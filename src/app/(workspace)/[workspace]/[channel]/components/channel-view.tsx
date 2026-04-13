@@ -144,6 +144,12 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
 
   // スレッドを開く
   const handleOpenThread = useCallback((msg: MessageWithProfile) => {
+    // 同時に開いているモバイルのアクションシート/絵文字ピッカーを全部畳む
+    // （タップした本人の MessageItem は onClick 側で閉じるが、
+    //  スレッド内から別メッセージのリアクション選択中にスレッド遷移した場合などに残るため）
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("huddle:closeAllActions"));
+    }
     setActiveThread(msg);
   }, []);
 
