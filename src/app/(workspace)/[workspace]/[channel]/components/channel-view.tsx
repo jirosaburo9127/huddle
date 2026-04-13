@@ -640,6 +640,10 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     if (error) {
       // 失敗時は楽観的更新を取り消し
       setMessages((prev) => prev.filter((m) => m.id !== optimisticMsg.id));
+      // レート制限エラー(P0001 + rate_limit_exceeded)はユーザーに明示する
+      if (error.message && error.message.includes("rate_limit_exceeded")) {
+        alert("メッセージの送信頻度が高すぎます。少し時間を置いてください。");
+      }
     } else if (data) {
       // Realtime購読で同じメッセージが二重追加されないようにDB IDを記録
       sentMessageIdsRef.current.add(data.id);
