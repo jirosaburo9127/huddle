@@ -444,10 +444,11 @@ export function Sidebar({
   return (
     <>
       {/* サイドバー（モバイルではフルスクリーン表示） */}
+      {/* transition-transform は付けない（横スライドのチラつきを嫌ってパッと切り替える） */}
       <aside
         className={`
           fixed inset-y-0 left-0 z-50 w-full sm:w-64 bg-sidebar flex flex-col border-r border-border
-          transform transition-transform lg:relative lg:translate-x-0
+          lg:relative lg:translate-x-0
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
         `}
       >
