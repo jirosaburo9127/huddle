@@ -2,12 +2,36 @@
 
 import { ThemeSelector } from "@/components/theme-selector";
 import { signOut } from "@/lib/actions";
+import { useMobileNavStore } from "@/stores/mobile-nav-store";
 
 export default function SettingsPage() {
+  const setSidebarOpen = useMobileNavStore((s) => s.setSidebarOpen);
+
   return (
     <div className="flex flex-col h-full">
       {/* ヘッダー */}
       <header className="flex items-center px-6 py-3 border-b border-border bg-header shrink-0">
+        {/* モバイル: サイドバーを開くボタン（元のチャンネルに戻るため） */}
+        <button
+          type="button"
+          onClick={() => setSidebarOpen(true)}
+          className="lg:hidden mr-2 p-1 text-muted hover:text-foreground rounded transition-colors"
+          aria-label="戻る"
+        >
+          <svg
+            className="w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M15 19l-7-7 7-7"
+            />
+          </svg>
+        </button>
         <h1 className="font-bold text-lg">設定</h1>
       </header>
 
