@@ -6,7 +6,11 @@ import { PushNotifications } from "@capacitor/push-notifications";
 import { Badge } from "@capawesome/capacitor-badge";
 import { createClient } from "@/lib/supabase/client";
 
-let registered = false;
+// 同一モジュールコンテキスト内の多重実行を防ぐための Promise キャッシュ
+// （1度目が走り終わるまで 2度目は待つ、終わっても再度実行可能）
+let currentSetupPromise: Promise<void> | null = null;
+// addListener は一度だけ登録する（重複登録防止）
+let listenersAdded = false;
 
 /**
  * iOS アプリアイコンのバッジを任意の数値にセット（0でクリア）。
@@ -74,91 +78,89 @@ export async function clearPushBadge(userId?: string): Promise<void> {
  * - 同じセッション内で複数回呼ばれても1度だけ実行される
  */
 export async function setupPushNotifications(userId: string): Promise<void> {
-  if (registered) return;
   if (typeof window === "undefined") return;
   if (!Capacitor.isNativePlatform()) return;
 
-  registered = true;
+  // 同時実行を1つに制限（複数回呼ばれても内部で1回にまとめる）
+  if (currentSetupPromise) return currentSetupPromise;
 
-  try {
-    // 既存の権限状態を確認
-    let permStatus = await PushNotifications.checkPermissions();
+  currentSetupPromise = (async () => {
+    try {
+      // 1. 権限確認
+      let permStatus = await PushNotifications.checkPermissions();
+      if (permStatus.receive === "prompt") {
+        permStatus = await PushNotifications.requestPermissions();
+      }
+      if (permStatus.receive !== "granted") {
+        return;
+      }
 
-    // 未許可ならリクエスト
-    if (permStatus.receive === "prompt") {
-      permStatus = await PushNotifications.requestPermissions();
-    }
+      // 2. イベントリスナー登録（初回のみ）
+      if (!listenersAdded) {
+        listenersAdded = true;
 
-    if (permStatus.receive !== "granted") {
-      // ユーザーが拒否した場合は終了
-      return;
-    }
+        // registration: 新しいトークンが発行されたら device_tokens に保存
+        await PushNotifications.addListener("registration", async (token) => {
+          // eslint-disable-next-line no-console
+          console.log("[push] token received:", token.value.slice(0, 16) + "...");
+          const supabase = createClient();
+          const platform = Capacitor.getPlatform() === "ios" ? "ios" : "android";
+          const { error } = await supabase.from("device_tokens").upsert(
+            {
+              user_id: userId,
+              token: token.value,
+              platform,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "token" }
+          );
+          if (error) {
+            // eslint-disable-next-line no-console
+            console.error("[push] upsert error:", error);
+          }
+        });
 
-    // 登録成功時: トークンを Supabase に保存
-    // ※リスナーは register() より先に登録する必要がある
-    await PushNotifications.addListener("registration", async (token) => {
+        await PushNotifications.addListener("registrationError", (err) => {
+          // eslint-disable-next-line no-console
+          console.error("[push] registration error:", err);
+        });
+
+        await PushNotifications.addListener(
+          "pushNotificationReceived",
+          (notification) => {
+            // eslint-disable-next-line no-console
+            console.log("[push] received:", notification);
+            syncAppBadgeFromServer(userId);
+          }
+        );
+
+        await PushNotifications.addListener(
+          "pushNotificationActionPerformed",
+          (action) => {
+            // eslint-disable-next-line no-console
+            console.log("[push] action:", action);
+            const data = action.notification.data as { url?: string } | undefined;
+            const url = data?.url;
+            if (url && typeof window !== "undefined") {
+              window.location.href = url;
+            }
+          }
+        );
+      }
+
+      // 3. 毎回 register() を呼び出してトークンを取得／更新
+      //    iOS は register() 後に "registration" イベントが発火する
+      await PushNotifications.register();
+
+      // 4. 起動直後にバッジ同期
+      syncAppBadgeFromServer(userId);
+    } catch (err) {
       // eslint-disable-next-line no-console
-      console.log("[push] registration token received:", token.value.slice(0, 16) + "...");
-      const supabase = createClient();
-      const platform = Capacitor.getPlatform() === "ios" ? "ios" : "android";
-      const { error } = await supabase.from("device_tokens").upsert(
-        {
-          user_id: userId,
-          token: token.value,
-          platform,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "token" }
-      );
-      if (error) {
-        // eslint-disable-next-line no-console
-        console.error("[push] device_tokens upsert error:", error);
-      } else {
-        // eslint-disable-next-line no-console
-        console.log("[push] device_tokens upsert success");
-      }
-    });
-
-    // 登録エラー
-    await PushNotifications.addListener("registrationError", (err) => {
-      // eslint-disable-next-line no-console
-      console.error("[push] registration error:", err);
-    });
-
-    // 登録 (APNs/FCM への登録要求) - リスナー登録後に呼ぶ
-    await PushNotifications.register();
-
-    // フォアグラウンド受信時の挙動 (画面内に通知バナーを出すなどは別途実装可)
-    await PushNotifications.addListener(
-      "pushNotificationReceived",
-      (notification) => {
-        // eslint-disable-next-line no-console
-        console.log("[push] received:", notification);
-        // 受信即時にサーバ真実でバッジを再同期（APNs の badge 値は送信時点の値なので
-        // 複数通知が立て続けに来ると古い数字が残ることがある）
-        syncAppBadgeFromServer(userId);
-      }
-    );
-
-    // 通知タップ時の挙動: APNs payload の url フィールドに従って画面遷移
-    await PushNotifications.addListener(
-      "pushNotificationActionPerformed",
-      (action) => {
-        // eslint-disable-next-line no-console
-        console.log("[push] action:", action);
-        const data = action.notification.data as { url?: string } | undefined;
-        const url = data?.url;
-        if (url && typeof window !== "undefined") {
-          // ハードナビゲーションで遷移（SSRコンテンツを確実に取得するため）
-          window.location.href = url;
-        }
-      }
-    );
-
-    // 起動直後にもサーバ真実でアイコンバッジを同期
-    syncAppBadgeFromServer(userId);
-  } catch (err) {
-    // eslint-disable-next-line no-console
-    console.error("[push] setup error:", err);
-  }
+      console.error("[push] setup error:", err);
+    } finally {
+      // 次回の setup で再実行可能にする
+      currentSetupPromise = null;
+    }
+  })();
+  return currentSetupPromise;
 }
