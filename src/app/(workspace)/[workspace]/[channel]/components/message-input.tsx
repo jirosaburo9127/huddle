@@ -2,13 +2,15 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { verifyFileMagicBytes } from "@/lib/file-validation";
 
 // ファイルサイズ上限: 10MB
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 // 許可するMIMEタイプ
+// SVG はスクリプト埋め込み可能で XSS ベクトルなので除外する
 const ALLOWED_MIME_TYPES = [
-  "image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml",
+  "image/jpeg", "image/png", "image/gif", "image/webp",
   "application/pdf",
   "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -315,6 +317,16 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
       : "";
     if (BLOCKED_EXTENSIONS.includes(ext)) {
       setUploadError("実行ファイルはアップロードできません");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    // マジックバイト検証（MIME type 偽装の検知）
+    // 例: 実行ファイルを .jpg にリネーム + MIME を image/jpeg に偽装しても
+    // 先頭バイトが JPEG と一致しなければ拒否する
+    const magicOk = await verifyFileMagicBytes(file, file.type);
+    if (!magicOk) {
+      setUploadError("ファイルの内容と形式が一致しません");
       if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }

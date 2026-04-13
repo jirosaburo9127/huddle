@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { validatePassword } from "@/lib/password-strength";
 import Link from "next/link";
 
 export default function SignupPage() {
@@ -23,9 +24,18 @@ function SignupForm() {
   const inviteToken = searchParams.get("invite");
   const supabase = createClient();
 
+  const passwordStrength = useMemo(() => validatePassword(password), [password]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+
+    // パスワード強度検証（クライアント側の最終チェック）
+    if (!passwordStrength.valid) {
+      setError(passwordStrength.errors[0]);
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -111,10 +121,42 @@ function SignupForm() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              minLength={8}
+              minLength={12}
               className="w-full rounded-lg border border-border bg-input-bg px-3 py-2 text-foreground placeholder-muted focus:border-accent focus:outline-none"
-              placeholder="8文字以上（英大文字・小文字・数字を含む）"
+              placeholder="12文字以上（英大文字小文字・数字・記号）"
             />
+            {/* 強度ゲージ */}
+            {password.length > 0 && (
+              <div className="mt-2">
+                <div className="flex gap-1 mb-1">
+                  {[0, 1, 2, 3].map((i) => (
+                    <div
+                      key={i}
+                      className={`flex-1 h-1 rounded-full transition-colors ${
+                        i < passwordStrength.score
+                          ? passwordStrength.score <= 1
+                            ? "bg-red-500"
+                            : passwordStrength.score === 2
+                            ? "bg-amber-500"
+                            : passwordStrength.score === 3
+                            ? "bg-lime-500"
+                            : "bg-emerald-500"
+                          : "bg-white/10"
+                      }`}
+                    />
+                  ))}
+                </div>
+                {passwordStrength.errors.length > 0 ? (
+                  <p className="text-xs text-red-400">
+                    {passwordStrength.errors[0]}
+                  </p>
+                ) : (
+                  <p className="text-xs text-emerald-400">
+                    強度OK
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           <button
