@@ -365,8 +365,17 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
 
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", onVisible);
+
+    // 保険: 15秒ごとにバックグラウンドで再同期
+    // Realtime の取りこぼしや optimistic 更新のドリフトを定期的に直す
+    const poll = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      syncMissedMessages();
+    }, 15000);
+
     return () => {
       cancelled = true;
+      clearInterval(poll);
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);
     };
@@ -604,9 +613,17 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
 
     const isDecision = options?.isDecision ?? false;
 
-    // 楽観的UI更新
+    // 送信前にクライアント側で UUID を決めてしまうことで、
+    // 「optimistic insert → DB insert → realtime 到着」のレース条件を完全に排除する。
+    // (以前は DB からの返り値を待って sentMessageIdsRef に入れていたため、
+    //  その待ち時間の間に realtime が先に届くと同じメッセージが二重/消失する事故があった)
+    const newMessageId = crypto.randomUUID();
+
+    // まず realtime 用の除外セットに入れてから state へ楽観的に追加
+    sentMessageIdsRef.current.add(newMessageId);
+
     const optimisticMsg: MessageWithProfile = {
-      id: crypto.randomUUID(),
+      id: newMessageId,
       channel_id: channel.id,
       user_id: user.id,
       parent_id: null,
@@ -630,7 +647,9 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
 
     setMessages((prev) => [...prev, optimisticMsg]);
 
+    // クライアント発行の UUID をそのまま使って DB に挿入
     const { data, error } = await supabase.from("messages").insert({
+      id: newMessageId,
       channel_id: channel.id,
       user_id: user.id,
       content,
@@ -638,18 +657,17 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     }).select().single();
 
     if (error) {
-      // 失敗時は楽観的更新を取り消し
-      setMessages((prev) => prev.filter((m) => m.id !== optimisticMsg.id));
+      // 失敗時は楽観的更新を取り消し、除外セットからも外す
+      sentMessageIdsRef.current.delete(newMessageId);
+      setMessages((prev) => prev.filter((m) => m.id !== newMessageId));
       // レート制限エラー(P0001 + rate_limit_exceeded)はユーザーに明示する
       if (error.message && error.message.includes("rate_limit_exceeded")) {
         alert("メッセージの送信頻度が高すぎます。少し時間を置いてください。");
       }
     } else if (data) {
-      // Realtime購読で同じメッセージが二重追加されないようにDB IDを記録
-      sentMessageIdsRef.current.add(data.id);
-      // 楽観的メッセージのIDをDB側のIDに置き換え
+      // サーバが割り当てた created_at だけ差し替え（IDは同じ）
       setMessages((prev) =>
-        prev.map((m) => m.id === optimisticMsg.id ? { ...m, id: data.id, created_at: data.created_at } : m)
+        prev.map((m) => (m.id === newMessageId ? { ...m, created_at: data.created_at } : m))
       );
 
       // メンション行を mentions テーブルに保存（プッシュ通知 send-push が参照する）
@@ -660,7 +678,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
       }> = [];
       for (const uid of mentions.userIds) {
         mentionRows.push({
-          message_id: data.id,
+          message_id: newMessageId,
           mentioned_user_id: uid,
           mention_type: "user",
         });
@@ -670,7 +688,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
       //   RLS/DB整合性の観点から自分のIDを入れておく）
       if (mentions.broadcast) {
         mentionRows.push({
-          message_id: data.id,
+          message_id: newMessageId,
           mentioned_user_id: user.id,
           mention_type: mentions.broadcast,
         });

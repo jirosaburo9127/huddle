@@ -53,7 +53,7 @@ export function ThreadPanel({
     prevReplyCountRef.current = replies.length;
   }, [replies.length]);
 
-  // 初回フェッチ + Realtime購読
+  // 初回フェッチ + Realtime購読 + 定期バックグラウンド再同期
   useEffect(() => {
     let mounted = true;
 
@@ -64,13 +64,48 @@ export function ThreadPanel({
         .eq("parent_id", parentMessage.id)
         .order("created_at", { ascending: true });
 
-      if (mounted && data) {
-        setReplies(data as MessageWithProfile[]);
+      if (!mounted || !data) {
+        if (mounted) setLoading(false);
+        return;
       }
-      if (mounted) setLoading(false);
+
+      // 初回はそのまま置き換え、2回目以降はローカルの楽観的更新を壊さずマージ
+      setReplies((prev) => {
+        if (prev.length === 0) return data as MessageWithProfile[];
+        const existingIds = new Set(prev.map((m) => m.id));
+        const additions = (data as MessageWithProfile[]).filter(
+          (m) => !existingIds.has(m.id)
+        );
+        if (additions.length === 0) {
+          // DB から取得した最新版で content / edited_at / deleted_at を上書きする
+          // (他端末での編集や削除を反映)
+          const byId = new Map(
+            (data as MessageWithProfile[]).map((m) => [m.id, m])
+          );
+          return prev.map((m) => {
+            const latest = byId.get(m.id);
+            if (!latest) return m;
+            return {
+              ...m,
+              content: latest.content,
+              edited_at: latest.edited_at,
+              deleted_at: latest.deleted_at,
+              reactions: latest.reactions,
+            };
+          });
+        }
+        return [...prev, ...additions];
+      });
+      setLoading(false);
     }
 
     fetchReplies();
+
+    // 15秒ごとに再同期（Realtime取りこぼし対策）
+    const poll = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      fetchReplies();
+    }, 15000);
 
     // Realtime購読
     const subscription = supabase
@@ -145,6 +180,7 @@ export function ThreadPanel({
 
     return () => {
       mounted = false;
+      clearInterval(poll);
       supabase.removeChannel(subscription);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -285,9 +321,13 @@ export function ThreadPanel({
     } = await supabase.auth.getUser();
     if (!user) return;
 
-    // 楽観的UI更新
+    // クライアント側で UUID を先に決めてから insert することで、
+    // optimistic → DB insert → realtime 到着のレースを排除する。
+    const newReplyId = crypto.randomUUID();
+    sentReplyIdsRef.current.add(newReplyId);
+
     const optimisticReply: MessageWithProfile = {
-      id: crypto.randomUUID(),
+      id: newReplyId,
       channel_id: channelId,
       user_id: user.id,
       parent_id: parentMessage.id,
@@ -318,6 +358,7 @@ export function ThreadPanel({
     const { data, error } = await supabase
       .from("messages")
       .insert({
+        id: newReplyId,
         channel_id: channelId,
         user_id: user.id,
         parent_id: parentMessage.id,
@@ -327,18 +368,18 @@ export function ThreadPanel({
       .single();
 
     if (error) {
-      // 失敗時は楽観的更新を取り消し
-      setReplies((prev) => prev.filter((m) => m.id !== optimisticReply.id));
+      // 失敗時は楽観的更新を取り消し、除外セットからも外す
+      sentReplyIdsRef.current.delete(newReplyId);
+      setReplies((prev) => prev.filter((m) => m.id !== newReplyId));
       return;
     }
 
     if (data) {
-      // Realtime購読の二重追加を防ぐためDB IDを記録し、楽観的IDをDB IDに置換
-      sentReplyIdsRef.current.add(data.id);
+      // ID は同じなのでそのまま、created_at だけサーバ時刻に差し替え
       setReplies((prev) =>
         prev.map((m) =>
-          m.id === optimisticReply.id
-            ? { ...m, id: data.id, created_at: data.created_at }
+          m.id === newReplyId
+            ? { ...m, created_at: data.created_at }
             : m
         )
       );
