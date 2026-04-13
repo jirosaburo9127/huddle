@@ -61,6 +61,8 @@ export function Sidebar({
   // 毎回新しくなるため、シンクすると無限ループ（React error #185）を起こす。
   // WS切替時は layout が再マウントされるので初期値で十分。
   const [unreadState, setUnreadState] = useState<Record<string, number>>(unreadCounts);
+  // ワークスペース単位の未読カウント（他WSにメッセージが来たことを一目で伝えるため）
+  const [unreadByWorkspace, setUnreadByWorkspace] = useState<Record<string, number>>({});
   // ミュート中のチャンネルIDセット。channel-view側のトグルから CustomEvent で更新される
   const [mutedSet, setMutedSet] = useState<Set<string>>(() => new Set(mutedChannelIds));
 
@@ -256,17 +258,33 @@ export function Sidebar({
     let cancelled = false;
     async function refetchUnread() {
       const supabase = sidebarSupabaseRef.current;
-      const { data } = await supabase.rpc("get_unread_counts", {
-        p_user_id: currentUserId,
-      });
-      if (cancelled || !data) return;
-      const next: Record<string, number> = {};
-      for (const row of data as Array<{ channel_id: string; unread_count: number }>) {
-        // 現在開いているチャンネルは未読カウントをスキップ
-        if (row.channel_id === currentChannelId) continue;
-        next[row.channel_id] = Number(row.unread_count);
+      // チャンネル単位とワークスペース単位を並列取得
+      const [channelRes, wsRes] = await Promise.all([
+        supabase.rpc("get_unread_counts", { p_user_id: currentUserId }),
+        supabase.rpc("get_unread_counts_by_workspace", { p_user_id: currentUserId }),
+      ]);
+      if (cancelled) return;
+
+      if (channelRes.data) {
+        const next: Record<string, number> = {};
+        for (const row of channelRes.data as Array<{ channel_id: string; unread_count: number }>) {
+          // 現在開いているチャンネルは未読カウントをスキップ
+          if (row.channel_id === currentChannelId) continue;
+          next[row.channel_id] = Number(row.unread_count);
+        }
+        setUnreadState(next);
       }
-      setUnreadState(next);
+
+      if (wsRes.data) {
+        const nextWs: Record<string, number> = {};
+        for (const row of wsRes.data as Array<{ workspace_id: string; unread_count: number }>) {
+          // 現在見ているワークスペースは除外（自分のWS内のバッジはチャンネル側で表現されるので）
+          if (row.workspace_id === workspace.id) continue;
+          nextWs[row.workspace_id] = Number(row.unread_count);
+        }
+        setUnreadByWorkspace(nextWs);
+      }
+
       // ネイティブ（iOS）アプリアイコンのバッジもここで一緒に同期
       syncAppBadgeFromServer(currentUserId);
     }
@@ -315,7 +333,24 @@ export function Sidebar({
           if (msg.parent_id) return;
           if (msg.user_id === currentUserId) return;
           const ch = channelById.get(msg.channel_id);
-          if (!ch) return;
+          if (!ch) {
+            // このサイドバーに無いチャンネル = 別ワークスペースのメッセージの可能性。
+            // ユーザーがそのチャンネルのメンバーかつミュートしていないかをRPC側で判定して
+            // ワークスペース単位の未読バッジだけ更新する。
+            (async () => {
+              const { data } = await supabase.rpc("get_unread_counts_by_workspace", {
+                p_user_id: currentUserId,
+              });
+              if (!data) return;
+              const nextWs: Record<string, number> = {};
+              for (const row of data as Array<{ workspace_id: string; unread_count: number }>) {
+                if (row.workspace_id === workspace.id) continue;
+                nextWs[row.workspace_id] = Number(row.unread_count);
+              }
+              setUnreadByWorkspace(nextWs);
+            })();
+            return;
+          }
 
           // ミュート中のチャンネルは未読カウントもせず無視
           if (mutedSet.has(msg.channel_id)) return;
@@ -427,6 +462,13 @@ export function Sidebar({
               className="flex items-center gap-1.5 text-xl font-bold text-foreground hover:text-accent transition-colors truncate w-full text-left"
             >
               <span className="truncate">{workspace.name}</span>
+              {/* 他のワークスペースに未読がある時はドットを表示 */}
+              {Object.keys(unreadByWorkspace).length > 0 && (
+                <span
+                  className="shrink-0 w-2.5 h-2.5 rounded-full bg-mention"
+                  aria-label="他のワークスペースに未読あり"
+                />
+              )}
               <svg className="w-5 h-5 shrink-0 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
               </svg>
@@ -434,20 +476,28 @@ export function Sidebar({
             {/* ワークスペース切り替えドロップダウン */}
             {showWsSwitcher && (
               <div className="absolute left-0 top-full mt-1 w-full bg-sidebar border border-border rounded-xl shadow-lg z-50 py-1 animate-fade-in">
-                {allWorkspaces.map((ws) => (
-                  <Link
-                    key={ws.id}
-                    href={`/${ws.slug}`}
-                    onClick={() => setShowWsSwitcher(false)}
-                    className={`block px-3 py-2 text-sm truncate transition-colors rounded-lg mx-1 ${
-                      ws.id === workspace.id
-                        ? "text-accent bg-accent/10 font-semibold"
-                        : "text-foreground hover:bg-white/[0.04]"
-                    }`}
-                  >
-                    {ws.name}
-                  </Link>
-                ))}
+                {allWorkspaces.map((ws) => {
+                  const wsUnread = unreadByWorkspace[ws.id] || 0;
+                  return (
+                    <Link
+                      key={ws.id}
+                      href={`/${ws.slug}`}
+                      onClick={() => setShowWsSwitcher(false)}
+                      className={`flex items-center justify-between gap-2 px-3 py-2 text-sm truncate transition-colors rounded-lg mx-1 ${
+                        ws.id === workspace.id
+                          ? "text-accent bg-accent/10 font-semibold"
+                          : "text-foreground hover:bg-white/[0.04]"
+                      }`}
+                    >
+                      <span className="truncate">{ws.name}</span>
+                      {wsUnread > 0 && (
+                        <span className="shrink-0 min-w-[20px] px-1.5 h-5 rounded-full bg-mention text-white text-[11px] font-bold flex items-center justify-center">
+                          {wsUnread > 99 ? "99+" : wsUnread}
+                        </span>
+                      )}
+                    </Link>
+                  );
+                })}
                 <div className="border-t border-border/50 mt-1 pt-1">
                   <Link
                     href="/?create=true"
