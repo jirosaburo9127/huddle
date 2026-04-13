@@ -302,41 +302,53 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel.id]);
 
-  // フォアグラウンド復帰時の差分取得
-  // モバイル(特にCapacitor)では画面オフ・別アプリ切替でWebSocketが切断されるため
-  // バックグラウンド中に飛んだメッセージは取りこぼす。可視化イベントを契機にDBから補完する
+  // 差分取得（マウント時 / フォアグラウンド復帰時 / Realtime取りこぼし対策）
+  // - マウント時: SSRの initialMessages がRSCキャッシュなどで古い場合に最新50件で補正する
+  //   （別チャンネルから戻った時に直近の数件が消えて見えるバグの修正）
+  // - 復帰時: モバイル(特にCapacitor)で画面オフ・別アプリ切替で切断されたWebSocketの取りこぼしを補完
   useEffect(() => {
-    async function syncMissedMessages() {
-      // 現状の最新メッセージのcreated_atを取得（state経由でクロージャ最新値を読む）
-      let latestCreatedAt: string | null = null;
-      setMessages((prev) => {
-        const lastMsg = prev[prev.length - 1];
-        latestCreatedAt = lastMsg?.created_at ?? null;
-        return prev;
-      });
+    let cancelled = false;
 
-      const query = supabase
+    async function syncMissedMessages() {
+      // 直近50件をDBから取り直し、ローカルに無いものだけマージする
+      //（最新が消える系のバグは「ローカルに無いはずの新しい行」を補えれば直る）
+      const { data } = await supabase
         .from("messages")
         .select("*, profiles(*), reactions(*)")
         .eq("channel_id", channel.id)
         .is("parent_id", null)
-        .order("created_at", { ascending: true });
+        .order("created_at", { ascending: false })
+        .limit(50);
 
-      const { data } = latestCreatedAt
-        ? await query.gt("created_at", latestCreatedAt)
-        : await query;
+      if (cancelled || !data || data.length === 0) return;
 
-      if (!data || data.length === 0) return;
+      // created_at 昇順に戻す
+      const fresh = (data as MessageWithProfile[])
+        .slice()
+        .sort(
+          (a, b) =>
+            new Date(a.created_at).getTime() -
+            new Date(b.created_at).getTime()
+        );
 
       setMessages((prev) => {
         const existingIds = new Set(prev.map((m) => m.id));
-        const additions = (data as MessageWithProfile[]).filter(
-          (m) => !existingIds.has(m.id)
-        );
+        const additions = fresh.filter((m) => !existingIds.has(m.id));
         if (additions.length === 0) return prev;
-        return [...prev, ...additions];
+        // 新しい分を末尾に足し、created_at 昇順で再ソート
+        // （DB由来の古い行が混ざってもインデックス上は正しい位置に挿入される）
+        const merged = [...prev, ...additions];
+        merged.sort(
+          (a, b) =>
+            new Date(a.created_at).getTime() -
+            new Date(b.created_at).getTime()
+        );
+        return merged;
       });
     }
+
+    // マウント直後に1回必ず走らせる
+    syncMissedMessages();
 
     function onVisible() {
       if (typeof document === "undefined") return;
@@ -348,6 +360,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", onVisible);
     return () => {
+      cancelled = true;
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);
     };

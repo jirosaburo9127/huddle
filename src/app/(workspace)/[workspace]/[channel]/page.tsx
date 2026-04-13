@@ -4,6 +4,11 @@ import { redirect } from "next/navigation";
 import { ChannelView } from "./components/channel-view";
 import type { Channel, MessageWithProfile } from "@/lib/supabase/types";
 
+// Next.js のRSCキャッシュを無効化する。
+// ここをキャッシュすると「別チャンネル → 戻る」で initialMessages が古いままになり、
+// 直近の数件が消えて見える原因になる（リロードで戻るのはそのため）。
+export const dynamic = "force-dynamic";
+
 export default async function ChannelPage({
   params,
 }: {

@@ -249,17 +249,17 @@ export function Sidebar({
     setupPushNotifications(currentUserId);
   }, [currentUserId]);
 
-  // フォアグラウンド復帰時に未読カウントを再同期
-  // モバイルで画面オフ→復帰した際にRealtime取りこぼしを補完
+  // フォアグラウンド復帰時 / マウント時 / ワークスペース切替時に未読カウントを再同期
+  // モバイルで画面オフ→復帰した際にRealtime取りこぼしを補完するのと、
+  // SSRから渡された unreadCounts がRSCキャッシュで古い場合の補正も兼ねる
   useEffect(() => {
+    let cancelled = false;
     async function refetchUnread() {
-      if (typeof document === "undefined") return;
-      if (document.visibilityState !== "visible") return;
       const supabase = sidebarSupabaseRef.current;
       const { data } = await supabase.rpc("get_unread_counts", {
         p_user_id: currentUserId,
       });
-      if (!data) return;
+      if (cancelled || !data) return;
       const next: Record<string, number> = {};
       for (const row of data as Array<{ channel_id: string; unread_count: number }>) {
         // 現在開いているチャンネルは未読カウントをスキップ
@@ -271,13 +271,23 @@ export function Sidebar({
       syncAppBadgeFromServer(currentUserId);
     }
 
-    document.addEventListener("visibilitychange", refetchUnread);
-    window.addEventListener("focus", refetchUnread);
+    // マウント直後・ワークスペース切替直後に必ず1回同期する
+    refetchUnread();
+
+    function onVisible() {
+      if (typeof document === "undefined") return;
+      if (document.visibilityState !== "visible") return;
+      refetchUnread();
+    }
+
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
     return () => {
-      document.removeEventListener("visibilitychange", refetchUnread);
-      window.removeEventListener("focus", refetchUnread);
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
     };
-  }, [currentUserId, currentChannelId]);
+  }, [currentUserId, currentChannelId, workspace.id]);
 
   // ワークスペース内のメッセージを Realtime 購読（未読バッジ更新 + 通知）
   useEffect(() => {
