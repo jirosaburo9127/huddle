@@ -12,6 +12,13 @@ const config: CapacitorConfig = {
     contentInset: 'automatic',
     scheme: 'Huddle',
   },
+  plugins: {
+    PushNotifications: {
+      // フォアグラウンド時もバナー・サウンド・バッジを表示する
+      // （別ワークスペースの新着を見落とさないため）
+      presentationOptions: ['badge', 'sound', 'alert'],
+    },
+  },
 };
 
 export default config;

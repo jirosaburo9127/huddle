@@ -277,7 +277,7 @@ Deno.serve(async (req) => {
     function buildTitle(isMentioned: boolean): string {
       if (channel.is_dm) return senderName;
       if (isMentioned) {
-        return `🔔 ${senderName} があなたをメンション (#${channel.name})`;
+        return `${senderName} があなたをメンション (#${channel.name})`;
       }
       return `${senderName} (#${channel.name})`;
     }
