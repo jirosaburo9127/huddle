@@ -910,15 +910,25 @@ export function Sidebar({
       {/* 設定モーダル */}
       {showSettings && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowSettings(false)}>
-          <div className="w-full max-w-md rounded-2xl bg-sidebar border border-border p-6 space-y-6 animate-fade-in" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between">
+          <div
+            className="w-full max-w-md max-h-[92vh] flex flex-col rounded-2xl bg-sidebar border border-border animate-fade-in overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* ヘッダー: 常に画面に残るよう sticky 相当に固定 */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border/50 bg-sidebar shrink-0">
               <h2 className="text-lg font-bold">設定</h2>
-              <button onClick={() => setShowSettings(false)} className="p-1 text-muted hover:text-foreground rounded transition-colors">
+              <button
+                onClick={() => setShowSettings(false)}
+                className="p-1 text-muted hover:text-foreground rounded transition-colors"
+                aria-label="閉じる"
+              >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
+            {/* スクロール可能なボディ */}
+            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
 
             {/* プロフィール */}
             <div>
@@ -1019,6 +1029,7 @@ export function Sidebar({
                 </button>
               </form>
             </div>
+            </div> {/* /scrollable body */}
           </div>
         </div>
       )}
