@@ -160,13 +160,17 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
   }, [isComposing]);
 
   // メンション選択時の挿入
+  // 表示名に含まれる半角スペースは NBSP (U+00A0) に置換して 1 トークン扱いにする。
+  // 見た目は通常の空白と同じだが、正規表現では \S と同等扱いでき、
+  // 「@奥 純香」のような多語メンションを後段で正しく検出できる。
   const insertMention = useCallback((member: MentionMember) => {
-    const name = member.profiles.display_name;
+    const displayName = member.profiles.display_name;
+    const nameForMention = displayName.replace(/ /g, "\u00A0");
     const before = content.slice(0, mentionStartPos);
     const after = content.slice(
       mentionStartPos + 1 + mentionQuery.length // @+クエリ文字列分
     );
-    const newContent = `${before}@${name} ${after}`;
+    const newContent = `${before}@${nameForMention} ${after}`;
     setContent(newContent);
     setShowMention(false);
     setMentionQuery("");
@@ -174,7 +178,7 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
     // カーソルをメンション直後に移動
     requestAnimationFrame(() => {
       if (textareaRef.current) {
-        const pos = mentionStartPos + name.length + 2; // @+name+space
+        const pos = mentionStartPos + nameForMention.length + 2; // @+name+space
         textareaRef.current.selectionStart = pos;
         textareaRef.current.selectionEnd = pos;
         textareaRef.current.focus();
@@ -198,7 +202,10 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
     for (const m of sorted) {
       const name = m.profiles.display_name;
       if (!name) continue;
-      const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      // 表示名内の半角スペースは挿入時に NBSP に置換されているので、
+      // 照合用の名前も同様に変換してからエスケープする
+      const nameForMatch = name.replace(/ /g, "\u00A0");
+      const escaped = nameForMatch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const re = new RegExp(`(^|\\s)@${escaped}(?=\\s|$)`);
       if (re.test(text)) userIds.add(m.user_id);
     }

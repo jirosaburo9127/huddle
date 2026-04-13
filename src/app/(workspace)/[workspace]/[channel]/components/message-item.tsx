@@ -87,10 +87,13 @@ function parseMarkdown(text: string): string {
     '<a href="$1" target="_blank" rel="noopener noreferrer" class="text-accent hover:underline">$1</a>'
   );
 
-  // @メンション（全角・半角文字をハイライト）
+  // @メンション（全角・半角文字＋非ブレークスペース対応）
+  // U+00A0 (non-breaking space) を許可することで、「奥 純香」のように
+  // 空白を含む表示名のメンションを 1 トークンとしてハイライトできる
   html = html.replace(
-    /@([\w\u3000-\u9FFF\uF900-\uFAFF]+)/g,
-    '<span class="text-accent font-semibold">@$1</span>'
+    /@([\w\u3000-\u9FFF\uF900-\uFAFF\u00A0]+)/g,
+    (_m, name: string) =>
+      `<span class="text-accent font-semibold">@${name.replace(/\u00A0/g, " ")}</span>`
   );
 
   return html;
