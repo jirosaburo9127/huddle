@@ -73,11 +73,11 @@ export default function AboutPage() {
               全部どこ行った？
             </h1>
             <p className="text-base sm:text-xl text-[#55555c] leading-[1.85] mb-10 lp-fade-up lp-delay-200">
-              チャットで流れていった「決まったこと」を、
+              「あれ、どうなりましたっけ?」
               <br className="hidden sm:block" />
-              チームの資産として永久に残す。
+              ― 毎週のミーティングで飛び交うその一言を、アプリが終わらせます。
               <br className="hidden sm:block" />
-              それが Huddle です。
+              チームの "ちゃんと" を、Huddleが代わりに覚えています。
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start items-center lp-fade-up lp-delay-300">
               <Link
@@ -326,17 +326,121 @@ export default function AboutPage() {
                 />
                 <CompRow label="日本語設計" s="△" c="○" h="○" />
                 <CompRow label="東京リージョン" s="—" c="○" h="○" />
+                <CompRow
+                  label="漏洩パスワードの自動チェック"
+                  s="—"
+                  c="—"
+                  h="✅"
+                  highlight
+                />
+                <CompRow
+                  label="ログイン端末の確認・削除"
+                  s="△"
+                  c="—"
+                  h="✅"
+                  highlight
+                />
+                <CompRow
+                  label="うっかり送信の警告"
+                  s="—"
+                  c="—"
+                  h="✅"
+                  highlight
+                />
               </tbody>
             </table>
           </div>
           <p className="mt-6 text-xs text-[#8a8a92] text-center">
             ※ 2026年4月時点の各社公開情報に基づく。Huddleは「意思決定の記録」に
-            特化しており、汎用チャットとは性格が異なります。
+            特化しており、汎用チャットとは性格が異なります。SlackのEnterprise/Enterprise+は
+            年間契約・最低ユーザー数などの制約があり、小規模組織には現実的でありません。
           </p>
         </div>
       </section>
 
-      {/* ───────── ⑦ 料金 ───────── */}
+      {/* ───────── ⑦ 安心の標準装備 ───────── */}
+      <section className="px-5 py-20 sm:py-28 border-b border-[#ececec]">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-14 lp-reveal">
+            <p className="text-sm font-semibold tracking-widest uppercase text-[#55555c] mb-3">
+              Standard Equipment
+            </p>
+            <h2 className="text-2xl sm:text-4xl font-bold tracking-tight leading-tight">
+              安心して使える、
+              <br className="sm:hidden" />
+              標準装備。
+            </h2>
+            <p className="mt-6 text-[#55555c] text-sm sm:text-base leading-relaxed max-w-2xl mx-auto">
+              決定事項を安心して残せるように、
+              <br className="hidden sm:block" />
+              "あって当たり前" のセキュリティ機能を最初から全部入れてあります。
+            </p>
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div className="rounded-2xl border border-[#ececec] bg-white p-6 lp-reveal lp-lift">
+              <div className="text-xs font-semibold tracking-widest uppercase text-[#55555c] mb-2">
+                パスワードチェック
+              </div>
+              <h3 className="font-bold text-lg mb-2">
+                弱いパスワードを自動でブロック
+              </h3>
+              <p className="text-sm text-[#55555c] leading-relaxed">
+                過去に世界中で流出したパスワード集との照合を行い、使い回しを防ぎます。メンバー個人のうっかりから、チーム全体を守ります。
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-[#ececec] bg-white p-6 lp-reveal lp-lift">
+              <div className="text-xs font-semibold tracking-widest uppercase text-[#55555c] mb-2">
+                端末とログインの見える化
+              </div>
+              <h3 className="font-bold text-lg mb-2">
+                「今どこから入ってる?」がわかる
+              </h3>
+              <p className="text-sm text-[#55555c] leading-relaxed">
+                通知を受けている端末の一覧や、最近のログイン履歴をいつでも確認できます。見知らぬ端末はワンタップで解除できます。
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-[#ececec] bg-white p-6 lp-reveal lp-lift">
+              <div className="text-xs font-semibold tracking-widest uppercase text-[#55555c] mb-2">
+                誤送信の事前警告
+              </div>
+              <h3 className="font-bold text-lg mb-2">
+                うっかり送信のヒヤリを、送る前に
+              </h3>
+              <p className="text-sm text-[#55555c] leading-relaxed">
+                メッセージにクレジットカード番号やAPIキーらしきものが含まれていると、送信前にそっと確認を求めます。誤爆の冷や汗を予防します。
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-[#ececec] bg-white p-6 lp-reveal lp-lift">
+              <div className="text-xs font-semibold tracking-widest uppercase text-[#55555c] mb-2">
+                基本のセキュリティ
+              </div>
+              <h3 className="font-bold text-lg mb-2">
+                TLS通信 ／ 2段階認証 ／ 東京サーバ
+              </h3>
+              <p className="text-sm text-[#55555c] leading-relaxed">
+                通信の暗号化、2段階認証、操作履歴、レート制限、自動ログアウト、招待制チャンネル、実行ファイルのアップロード禁止 ― 一般的なビジネスチャットに期待される機能は全部入りです。
+              </p>
+            </div>
+          </div>
+
+          {/* 適正利用の注記 */}
+          <div className="mt-10 max-w-3xl mx-auto rounded-2xl border border-[#ececec] bg-[#fafafb] p-5">
+            <p className="text-xs sm:text-sm text-[#55555c] leading-relaxed text-center">
+              ※ Huddleは一般的なチームコミュニケーション・プロジェクト運営向けのサービスです。
+              <br className="hidden sm:block" />
+              医療情報・法律相談・金融取引など、取扱いに特別な法令遵守が求められる機密情報のやり取りには
+              <strong className="text-[#0f0f1a]">ご利用いただけません</strong>
+              。
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* ───────── ⑧ 料金 ───────── */}
       <section className="px-5 py-20 sm:py-28 border-b border-[#ececec]">
         <div className="max-w-3xl mx-auto">
           <div className="text-center mb-14 lp-reveal">
@@ -369,7 +473,8 @@ export default function AboutPage() {
               <Benefit>PDFエクスポート（日本語ベクター対応）</Benefit>
               <Benefit>ログイン不要の外部共有リンク</Benefit>
               <Benefit>Why / Due による決定事項への背景追記</Benefit>
-              <Benefit>2段階認証・監査ログ・東京リージョン</Benefit>
+              <Benefit>弱いパスワードの自動ブロック・端末の見える化</Benefit>
+              <Benefit>2段階認証・自動ログアウト・東京リージョン</Benefit>
               <Benefit>iOSアプリ（プッシュ通知対応）</Benefit>
             </ul>
             <Link
@@ -385,7 +490,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* ───────── ⑧ 最終CTA ───────── */}
+      {/* ───────── ⑨ 最終CTA ───────── */}
       <section className="px-5 py-24 sm:py-32 bg-[#0f0f1a] text-white relative overflow-hidden">
         {/* 背景ドットパターン */}
         <div
