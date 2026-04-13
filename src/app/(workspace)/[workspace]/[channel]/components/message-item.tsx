@@ -416,10 +416,14 @@ export const MessageItem = memo(function MessageItem({
         className={`group relative flex gap-3 px-2 rounded-lg hover:bg-white/[0.02] transition-colors ${
           isConsecutive ? "py-1" : "pt-3 pb-1"
         }`}
-        onClick={() => {
+        onClick={(e) => {
           // スレッド表示中はアクションシートを出さない（返信画面に入った後に
           // リアクション一覧が残り続ける問題の防止）
           if (isThreadView) return;
+          // クリック対象がリンク(または子孫)の場合はブラウザで URL を開く動作を優先し
+          // アクションメニューは出さない
+          const target = e.target as HTMLElement | null;
+          if (target && target.closest("a")) return;
           setShowActions((v) => !v);
         }}
       >
