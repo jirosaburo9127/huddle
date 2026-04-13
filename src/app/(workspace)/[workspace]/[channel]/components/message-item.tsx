@@ -82,9 +82,24 @@ function parseMarkdown(text: string): string {
   html = html.replace(/data:(?!image\/)/gi, "blocked:");
 
   // URLの自動リンク化（コードブロック/インラインコード内を除く）
+  // 末尾の句読点・括弧・空白はURLから外す（日本語の句点・読点含む）
   html = html.replace(
-    /(?<!["=])(https?:\/\/[^\s<]+)/g,
-    '<a href="$1" target="_blank" rel="noopener noreferrer" class="text-accent hover:underline">$1</a>'
+    /(?<!["=>])(https?:\/\/[^\s<]+)/g,
+    (_m, raw: string) => {
+      // 末尾の不要文字を剥がす（日本語句読点・閉じ括弧・記号）
+      const trimmed = raw.replace(/[。、．，）\])\}>"'`,.!?;:]+$/u, "");
+      const dropped = raw.slice(trimmed.length);
+      return (
+        `<a href="${trimmed}" target="_blank" rel="noopener noreferrer" ` +
+        `class="inline-flex items-center gap-1 text-accent underline underline-offset-2 decoration-accent/50 hover:decoration-accent break-all">` +
+        `<svg class="inline-block w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true">` +
+        `<path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>` +
+        `</svg>` +
+        `<span>${trimmed}</span>` +
+        `</a>` +
+        dropped
+      );
+    }
   );
 
   // @メンション（全角・半角文字＋非ブレークスペース対応）
