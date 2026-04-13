@@ -45,7 +45,8 @@ const nextConfig: NextConfig = {
                 ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
                 : "script-src 'self' 'unsafe-inline'",
               // jsdelivr は PDFエクスポートで Noto Sans JP OTF を初回取得するため許可
-              "connect-src 'self' https://emfngqketrieioxusuhg.supabase.co wss://emfngqketrieioxusuhg.supabase.co https://cdn.jsdelivr.net",
+              // pwnedpasswords.com は漏洩パスワードチェック (k-anonymity API)
+              "connect-src 'self' https://emfngqketrieioxusuhg.supabase.co wss://emfngqketrieioxusuhg.supabase.co https://cdn.jsdelivr.net https://api.pwnedpasswords.com",
               "img-src 'self' https://emfngqketrieioxusuhg.supabase.co data: blob:",
               "style-src 'self' 'unsafe-inline'",
               "font-src 'self' https://fonts.gstatic.com",

@@ -3,7 +3,7 @@
 import { useState, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { validatePassword } from "@/lib/password-strength";
+import { validatePassword, checkPasswordBreached } from "@/lib/password-strength";
 import Link from "next/link";
 
 export default function SignupPage() {
@@ -37,6 +37,17 @@ function SignupForm() {
     }
 
     setLoading(true);
+
+    // 漏洩パスワード DB (HaveIBeenPwned) と突き合わせ
+    // k-anonymity API なのでパスワード本体は送信されない
+    const breachCount = await checkPasswordBreached(password);
+    if (breachCount !== null && breachCount > 0) {
+      setError(
+        `このパスワードは過去のデータ漏洩で${breachCount.toLocaleString()}回確認されています。別のパスワードを設定してください。`
+      );
+      setLoading(false);
+      return;
+    }
 
     try {
       const { error } = await supabase.auth.signUp({

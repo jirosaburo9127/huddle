@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { verifyFileMagicBytes } from "@/lib/file-validation";
+import { scanForSensitiveData } from "@/lib/dlp-scan";
 
 // ファイルサイズ上限: 10MB
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -218,6 +219,16 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
     e.preventDefault();
     const trimmed = content.trim();
     if (!trimmed || sending) return;
+
+    // DLP: 機密情報検知 → 警告して確認を取る（強制ブロックはしない）
+    const findings = scanForSensitiveData(trimmed);
+    if (findings.length > 0) {
+      const labels = findings.map((f) => `・${f.label} (${f.preview})`).join("\n");
+      const ok = window.confirm(
+        `以下の機密情報らしき内容が含まれています:\n\n${labels}\n\nこのまま送信しますか？`
+      );
+      if (!ok) return;
+    }
 
     setSending(true);
     const mentions = extractMentions(trimmed);

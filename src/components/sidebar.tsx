@@ -11,6 +11,7 @@ import { BookmarkModal } from "@/components/bookmark-modal";
 import { WsMembersModal } from "@/components/ws-members-modal";
 import { ThemeSelector } from "@/components/theme-selector";
 import { MfaSetup } from "@/components/mfa-setup";
+import { SecuritySettings } from "@/components/security-settings";
 import { signOut } from "@/lib/actions";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
 import { createClient } from "@/lib/supabase/client";
@@ -998,6 +999,9 @@ export function Sidebar({
               <h3 className="text-sm font-semibold text-foreground mb-3">テーマ</h3>
               <ThemeSelector />
             </div>
+
+            {/* セキュリティ（デバイス一覧・ログイン履歴・MFA状態） */}
+            <SecuritySettings currentUserId={currentUserId} />
 
             {/* ログアウト */}
             <div className="pt-2 border-t border-border/50">
