@@ -629,7 +629,11 @@ export const MessageItem = memo(function MessageItem({
           {/* スレッド返信数 */}
           {message.reply_count > 0 && !isThreadView && (
             <button
-              onClick={() => onOpenThread?.(message)}
+              onClick={(e) => {
+                // 親div(onClickでshowActionsトグル)に伝播させない
+                e.stopPropagation();
+                onOpenThread?.(message);
+              }}
               className="mt-1 text-xs text-accent hover:underline"
             >
               {message.reply_count}件の返信
