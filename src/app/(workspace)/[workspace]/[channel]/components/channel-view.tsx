@@ -797,6 +797,41 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
                   >
                     <button
                       role="menuitem"
+                      onClick={async () => {
+                        setShowOverflowMenu(false);
+                        const input = prompt(
+                          "新しいチャンネル名を入力してください",
+                          channel.name
+                        );
+                        if (input === null) return;
+                        const trimmed = input.trim();
+                        if (!trimmed || trimmed === channel.name) return;
+                        const { data, error } = await supabase.rpc("rename_channel", {
+                          p_channel_id: channel.id,
+                          p_new_name: trimmed,
+                        });
+                        if (error) {
+                          alert("変更に失敗しました: " + error.message);
+                          return;
+                        }
+                        const ch = data as { slug: string } | null;
+                        if (ch?.slug) {
+                          // 新 slug へ遷移
+                          const wsSlug = window.location.pathname.split("/")[1];
+                          window.location.href = `/${wsSlug}/${ch.slug}`;
+                        } else {
+                          window.location.reload();
+                        }
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-white/[0.04] transition-colors"
+                    >
+                      <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                      チャンネル名を変更
+                    </button>
+                    <button
+                      role="menuitem"
                       onClick={() => {
                         setShowOverflowMenu(false);
                         setShowDeleteChannel(true);

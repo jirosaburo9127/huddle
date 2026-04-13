@@ -500,6 +500,38 @@ export function Sidebar({
                   );
                 })}
                 <div className="border-t border-border/50 mt-1 pt-1">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setShowWsSwitcher(false);
+                      const input = prompt(
+                        "新しいワークスペース名を入力してください",
+                        workspace.name
+                      );
+                      if (input === null) return;
+                      const trimmed = input.trim();
+                      if (!trimmed || trimmed === workspace.name) return;
+                      const supabase = createClient();
+                      const { data, error } = await supabase.rpc("rename_workspace", {
+                        p_workspace_id: workspace.id,
+                        p_new_name: trimmed,
+                      });
+                      if (error) {
+                        alert("変更に失敗しました: " + error.message);
+                        return;
+                      }
+                      // slug が変わるので新 URL に遷移
+                      const ws = data as { slug: string } | null;
+                      if (ws?.slug) {
+                        window.location.href = `/${ws.slug}`;
+                      } else {
+                        window.location.reload();
+                      }
+                    }}
+                    className="block w-full px-3 py-2 text-sm text-foreground hover:bg-white/[0.04] transition-colors rounded-lg mx-1 text-left"
+                  >
+                    このワークスペースの名前を変更
+                  </button>
                   <Link
                     href="/?create=true"
                     onClick={() => setShowWsSwitcher(false)}
