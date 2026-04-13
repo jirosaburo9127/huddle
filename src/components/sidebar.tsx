@@ -444,12 +444,14 @@ export function Sidebar({
   return (
     <>
       {/* サイドバー（モバイルではフルスクリーン表示） */}
-      {/* transition-transform は付けない（横スライドのチラつきを嫌ってパッと切り替える） */}
+      {/* transform ではなく display の切り替えで表示/非表示を制御する。
+          translate-x 系の CSS 変数はブラウザのコンポジターが一瞬動かしてしまい
+          「横スライド」に見える副作用があるので完全に使わない */}
       <aside
         className={`
-          fixed inset-y-0 left-0 z-50 w-full sm:w-64 bg-sidebar flex flex-col border-r border-border
-          lg:relative lg:translate-x-0
-          ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
+          fixed inset-y-0 left-0 z-50 w-full sm:w-64 bg-sidebar flex-col border-r border-border
+          lg:relative lg:flex
+          ${sidebarOpen ? "flex" : "hidden"}
         `}
       >
         {/* ヘッダー: 現在のワークスペースを一番目立たせる */}

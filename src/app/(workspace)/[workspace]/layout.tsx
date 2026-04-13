@@ -5,7 +5,7 @@ import { IdleLogout } from "@/components/idle-logout";
 // サイドバーのスケルトンUI（データ取得中に表示）
 function SidebarSkeleton() {
   return (
-    <aside className="fixed inset-y-0 left-0 z-50 w-full sm:w-64 bg-sidebar flex flex-col border-r border-border -translate-x-full lg:relative lg:translate-x-0">
+    <aside className="fixed inset-y-0 left-0 z-50 w-full sm:w-64 bg-sidebar flex-col border-r border-border hidden lg:flex lg:relative">
       {/* ヘッダースケルトン */}
       <div className="px-4 py-3 border-b border-border/50">
         <div className="h-8 w-24 bg-white/[0.06] rounded-lg animate-pulse" />
