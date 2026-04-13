@@ -401,7 +401,12 @@ export const MessageItem = memo(function MessageItem({
         className={`group relative flex gap-3 px-2 rounded-lg hover:bg-white/[0.02] transition-colors ${
           isConsecutive ? "py-1" : "pt-3 pb-1"
         }`}
-        onClick={() => setShowActions((v) => !v)}
+        onClick={() => {
+          // スレッド表示中はアクションシートを出さない（返信画面に入った後に
+          // リアクション一覧が残り続ける問題の防止）
+          if (isThreadView) return;
+          setShowActions((v) => !v);
+        }}
       >
         {/* アバター or 左マージン（連続メッセージ時） */}
         {isConsecutive ? (
