@@ -349,14 +349,15 @@ export const MessageItem = memo(function MessageItem({
     onReact?.(message.id, emoji);
   }
 
-  // 編集モード開始時にフォーカス
+  // 編集モード開始時にフォーカス + 既存コンテンツ長に応じた自動リサイズ
   useEffect(() => {
     if (isEditing && editTextareaRef.current) {
-      editTextareaRef.current.focus();
-      editTextareaRef.current.setSelectionRange(
-        editTextareaRef.current.value.length,
-        editTextareaRef.current.value.length
-      );
+      const el = editTextareaRef.current;
+      el.focus();
+      el.setSelectionRange(el.value.length, el.value.length);
+      // 既存メッセージが長い場合は開いた瞬間に広げる
+      el.style.height = "auto";
+      el.style.height = Math.min(el.scrollHeight, window.innerHeight * 0.6) + "px";
     }
   }, [isEditing]);
 
@@ -500,10 +501,17 @@ export const MessageItem = memo(function MessageItem({
               <textarea
                 ref={editTextareaRef}
                 value={editContent}
-                onChange={(e) => setEditContent(e.target.value)}
+                onChange={(e) => {
+                  setEditContent(e.target.value);
+                  // 入力に応じて高さを自動調整 (最大 60vh まで)
+                  const el = e.currentTarget;
+                  el.style.height = "auto";
+                  el.style.height = Math.min(el.scrollHeight, window.innerHeight * 0.6) + "px";
+                }}
                 onKeyDown={handleEditKeyDown}
-                className="w-full resize-none rounded-lg border border-border bg-input-bg px-3 py-2 text-[15px] leading-relaxed text-foreground focus:border-accent focus:outline-none"
-                rows={2}
+                className="w-full resize-none rounded-lg border border-border bg-input-bg px-3 py-2 text-[15px] leading-relaxed text-foreground focus:border-accent focus:outline-none overflow-y-auto"
+                style={{ minHeight: "6rem", maxHeight: "60vh" }}
+                rows={4}
               />
               <div className="flex items-center gap-2 mt-1">
                 <button
@@ -910,23 +918,30 @@ export const MessageItem = memo(function MessageItem({
 
       {/* 削除確認ダイアログ */}
       {isDeleting && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-sm rounded-xl bg-sidebar border border-border p-6 space-y-4">
-            <h3 className="text-lg font-bold">メッセージを削除</h3>
-            <div className="rounded-lg bg-background/50 p-3 text-sm text-muted">
-              {message.content}
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm max-h-[85vh] rounded-xl bg-sidebar border border-border flex flex-col">
+            {/* ヘッダー (固定) */}
+            <div className="px-6 pt-6 pb-2 shrink-0">
+              <h3 className="text-lg font-bold">メッセージを削除</h3>
             </div>
-            <p className="text-sm text-muted">このメッセージを削除しますか？</p>
-            <div className="flex justify-end gap-2">
+            {/* プレビュー (スクロール領域) */}
+            <div className="flex-1 min-h-0 overflow-y-auto px-6 py-2">
+              <div className="rounded-lg bg-background/50 p-3 text-sm text-muted whitespace-pre-wrap break-words">
+                {message.content}
+              </div>
+              <p className="text-sm text-muted mt-3">このメッセージを削除しますか？</p>
+            </div>
+            {/* フッターボタン (固定) */}
+            <div className="px-6 pt-2 pb-6 shrink-0 flex justify-end gap-2 border-t border-border/50">
               <button
                 onClick={() => setIsDeleting(false)}
-                className="rounded-lg px-4 py-2 text-sm text-muted hover:text-foreground transition-colors"
+                className="rounded-lg px-4 py-2 text-sm text-muted hover:text-foreground transition-colors mt-4"
               >
                 キャンセル
               </button>
               <button
                 onClick={handleDelete}
-                className="rounded-lg bg-mention px-4 py-2 text-sm font-medium text-white hover:opacity-90 transition-colors"
+                className="rounded-lg bg-mention px-4 py-2 text-sm font-medium text-white hover:opacity-90 transition-colors mt-4"
               >
                 削除
               </button>
