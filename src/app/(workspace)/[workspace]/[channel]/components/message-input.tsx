@@ -306,20 +306,24 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
       ? pillPrefix + (rawTrimmed ? " " + rawTrimmed : "")
       : rawTrimmed;
     const trimmed = combined.trim();
-    if (!trimmed) return;
+    // 添付のみで本文空の場合は trimmed が空でも送信可能にする
+    if (!trimmed && pendingAttachments.length === 0) return;
 
     // DLP: 機密情報検知 → 警告して確認を取る（強制ブロックはしない）
-    const findings = scanForSensitiveData(trimmed);
-    if (findings.length > 0) {
-      const labels = findings.map((f) => `・${f.label} (${f.preview})`).join("\n");
-      const ok = window.confirm(
-        `以下の機密情報らしき内容が含まれています:\n\n${labels}\n\nこのまま送信しますか？`
-      );
-      if (!ok) return;
+    // 本文が空 (添付のみ) の場合はスキャン不要
+    if (trimmed) {
+      const findings = scanForSensitiveData(trimmed);
+      if (findings.length > 0) {
+        const labels = findings.map((f) => `・${f.label} (${f.preview})`).join("\n");
+        const ok = window.confirm(
+          `以下の機密情報らしき内容が含まれています:\n\n${labels}\n\nこのまま送信しますか？`
+        );
+        if (!ok) return;
+      }
     }
 
     setSending(true);
-    const mentions = extractMentions(trimmed);
+    const mentions = trimmed ? extractMentions(trimmed) : { userIds: [], broadcast: null };
     const options: SendOptions = sendAsDecision ? { isDecision: true } : {};
     const attachmentsSnapshot = pendingAttachments;
     setContent("");
