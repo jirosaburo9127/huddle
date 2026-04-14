@@ -66,5 +66,30 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // 最後に開いたワークスペースを Cookie に保存。
+  // クライアントから document.cookie で書くと iOS WKWebView で
+  // 再起動をまたいで消える既知問題があるので、サーバ側で Set-Cookie する。
+  // 予約パス以外の /<slug> / を拾う。
+  const RESERVED_ROOT_SEGMENTS = new Set([
+    "login",
+    "signup",
+    "invite",
+    "about",
+    "share",
+    "api",
+  ]);
+  const segments = request.nextUrl.pathname.split("/").filter(Boolean);
+  if (segments.length > 0) {
+    const first = segments[0];
+    if (!RESERVED_ROOT_SEGMENTS.has(first)) {
+      supabaseResponse.cookies.set("huddle_last_workspace", first, {
+        path: "/",
+        maxAge: 31536000, // 1 年
+        sameSite: "lax",
+        httpOnly: false,
+      });
+    }
+  }
+
   return supabaseResponse;
 }

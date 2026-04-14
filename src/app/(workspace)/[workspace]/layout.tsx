@@ -1,6 +1,5 @@
 import { Suspense } from "react";
 import { WorkspaceShell } from "@/components/sidebar-loader";
-import { LastWorkspaceTracker } from "@/components/last-workspace-tracker";
 
 // サイドバーのスケルトンUI（データ取得中に表示）
 function SidebarSkeleton() {
@@ -46,7 +45,6 @@ export default async function WorkspaceLayout({
 
   return (
     <div className="flex h-full">
-      <LastWorkspaceTracker slug={workspaceSlug} />
       <Suspense fallback={<WorkspaceSkeleton />}>
         <WorkspaceShell workspaceSlug={workspaceSlug}>
           {children}
