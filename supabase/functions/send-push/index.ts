@@ -163,6 +163,7 @@ interface MessageRecord {
   parent_id: string | null;
   content: string;
   created_at: string;
+  system_event?: string | null;
 }
 
 Deno.serve(async (req) => {
@@ -177,13 +178,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    // スレッド返信は通知対象外
-    if (record.parent_id) {
-      return new Response(JSON.stringify({ skipped: "thread reply" }), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      });
-    }
+    // スレッド返信は、スレッドの親メッセージの著者 + これまでに返信した人に通知する
+    // (チャンネル全員ではなくスレッド参加者だけに絞る)
+    const isThreadReply = !!record.parent_id;
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -224,21 +221,66 @@ Deno.serve(async (req) => {
     const channelUrl =
       workspaceSlug && channel.slug ? `/${workspaceSlug}/${channel.slug}` : "/";
 
-    // チャンネルメンバー (送信者以外) — ミュート状態も取得
-    const { data: members } = await supabase
-      .from("channel_members")
-      .select("user_id, muted")
-      .eq("channel_id", record.channel_id)
-      .neq("user_id", record.user_id);
+    // 受信者 user_id の集合を作る
+    let recipientIdsSet = new Set<string>();
+    const mutedByUser = new Map<string, boolean>();
 
-    if (!members || members.length === 0) {
+    if (isThreadReply) {
+      // スレッド返信: 親メッセージの著者 + これまでの返信者 + 親チャンネルメンバーのミュート状態
+      // 親メッセージの著者
+      const { data: parentMsg } = await supabase
+        .from("messages")
+        .select("user_id")
+        .eq("id", record.parent_id!)
+        .maybeSingle();
+      if (parentMsg?.user_id && parentMsg.user_id !== record.user_id) {
+        recipientIdsSet.add(parentMsg.user_id);
+      }
+      // 過去にそのスレッドに返信した人
+      const { data: replies } = await supabase
+        .from("messages")
+        .select("user_id")
+        .eq("parent_id", record.parent_id!)
+        .neq("user_id", record.user_id);
+      for (const r of replies || []) {
+        recipientIdsSet.add(r.user_id);
+      }
+      // ミュート状態は全員 false 扱い (スレッド参加者はミュート影響を受けない)
+      // ただしチャンネルメンバーでない相手には送らない
+      if (recipientIdsSet.size > 0) {
+        const { data: cms } = await supabase
+          .from("channel_members")
+          .select("user_id, muted")
+          .eq("channel_id", record.channel_id)
+          .in("user_id", Array.from(recipientIdsSet));
+        const validSet = new Set<string>();
+        for (const cm of cms || []) {
+          validSet.add(cm.user_id);
+          mutedByUser.set(cm.user_id, Boolean(cm.muted));
+        }
+        recipientIdsSet = validSet;
+      }
+    } else {
+      // 通常メッセージ: チャンネルメンバー全員 (送信者以外)
+      const { data: members } = await supabase
+        .from("channel_members")
+        .select("user_id, muted")
+        .eq("channel_id", record.channel_id)
+        .neq("user_id", record.user_id);
+      for (const m of members || []) {
+        recipientIdsSet.add(m.user_id);
+        mutedByUser.set(m.user_id, Boolean(m.muted));
+      }
+    }
+
+    if (recipientIdsSet.size === 0) {
       return new Response(JSON.stringify({ skipped: "no recipients" }), {
         status: 200,
         headers: { "content-type": "application/json" },
       });
     }
 
-    const recipientIds = members.map((m) => m.user_id);
+    const recipientIds = Array.from(recipientIdsSet);
     // user_id -> muted の引き当て用マップ（後段で @メンション以外は除外するのに使う）
     const mutedByUser = new Map<string, boolean>();
     for (const m of members) {
@@ -297,14 +339,25 @@ Deno.serve(async (req) => {
     const bodyPlain = "新しいメッセージがあります";
 
     // 受信者ごとに通知内容を組み立てる
-    // - メンションされた人: 「🔔 sumika があなたをメンション (#general)」
-    // - DM: 送信者名のみ
-    // - 通常: 「sumika (#general)」
     function buildTitle(isMentioned: boolean): string {
+      // 投票作成 / 投票締切
+      if (record.system_event === "poll_created") {
+        return `📊 ${senderName} が投票を作成 (#${channel.name})`;
+      }
+      if (record.system_event === "poll_closed") {
+        return `📊 投票が締め切られました (#${channel.name})`;
+      }
+      // スレッド返信
+      if (isThreadReply) {
+        return `💬 ${senderName} がスレッドに返信 (#${channel.name})`;
+      }
+      // DM
       if (channel.is_dm) return senderName;
+      // メンション
       if (isMentioned) {
         return `${senderName} があなたをメンション (#${channel.name})`;
       }
+      // 通常
       return `${senderName} (#${channel.name})`;
     }
 

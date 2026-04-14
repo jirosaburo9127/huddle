@@ -42,6 +42,7 @@ export type Message = {
   decision_due: string | null;
   reply_count: number;
   created_at: string;
+  system_event?: string | null;
 };
 
 export type Reaction = {
