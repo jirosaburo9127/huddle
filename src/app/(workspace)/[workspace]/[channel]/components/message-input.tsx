@@ -628,6 +628,23 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
           >
             @
           </button>
+
+          {/* 決定として送るトグル — 添付・@と並んで入力ツールの一部 */}
+          <button
+            type="button"
+            onClick={() => setSendAsDecision((v) => !v)}
+            className={`shrink-0 flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition-all duration-200 select-none ${
+              sendAsDecision
+                ? "bg-accent text-white shadow-md shadow-accent/25"
+                : "text-muted border border-border hover:text-foreground hover:border-foreground/30"
+            }`}
+            aria-pressed={sendAsDecision}
+          >
+            <svg className="w-3.5 h-3.5" fill={sendAsDecision ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            決定
+          </button>
         </div>
 
         {/* ツールバーと入力欄の区切り線 */}
@@ -686,23 +703,6 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
             maxLength={4000}
             className="flex-1 resize-none bg-transparent text-lg text-foreground placeholder-muted focus:outline-none max-h-[200px]"
           />
-          {/* 決定として送るトグル — テキスト付きピル */}
-          <button
-            type="button"
-            onClick={() => setSendAsDecision((v) => !v)}
-            className={`shrink-0 flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-all duration-200 select-none ${
-              sendAsDecision
-                ? "bg-accent text-white shadow-md shadow-accent/25"
-                : "text-muted border border-border hover:text-foreground hover:border-foreground/30"
-            }`}
-            aria-pressed={sendAsDecision}
-          >
-            <svg className="w-3.5 h-3.5" fill={sendAsDecision ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            決定
-          </button>
-
           {/* 送信ボタン */}
           <button
             type="submit"
