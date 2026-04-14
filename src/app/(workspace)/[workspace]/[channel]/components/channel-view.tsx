@@ -529,10 +529,12 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     setMessages((prev) =>
       prev.map((m) => (m.id === messageId ? { ...m, is_decision: isDecision } : m))
     );
-    const { error } = await supabase
-      .from("messages")
-      .update({ is_decision: isDecision })
-      .eq("id", messageId);
+    // messages_update RLS は著者のみに限定されているので、
+    // チャンネルメンバー全員が操作できる RPC 経由で更新する
+    const { error } = await supabase.rpc("toggle_decision", {
+      p_message_id: messageId,
+      p_is_decision: isDecision,
+    });
 
     if (error) {
       // ロールバック
@@ -558,10 +560,12 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
             : m
         )
       );
-      const { error } = await supabase
-        .from("messages")
-        .update({ decision_why: why, decision_due: due })
-        .eq("id", messageId);
+      // こちらも RLS 回避のため RPC 経由
+      const { error } = await supabase.rpc("update_decision_meta", {
+        p_message_id: messageId,
+        p_why: why,
+        p_due: due,
+      });
       if (error) {
         // eslint-disable-next-line no-console
         console.error("[decision-meta] update failed:", error);
