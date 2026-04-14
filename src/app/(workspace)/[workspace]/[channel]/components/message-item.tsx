@@ -175,7 +175,7 @@ function MessageContent({
 
   return (
     <div
-      className="text-lg leading-[1.7] text-foreground whitespace-pre-wrap break-words [&_pre]:whitespace-pre [&_pre]:my-2"
+      className="text-[15px] leading-[1.65] text-foreground whitespace-pre-wrap break-words [&_pre]:whitespace-pre [&_pre]:my-2"
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );
@@ -372,7 +372,7 @@ export const MessageItem = memo(function MessageItem({
               <span className="text-sm text-muted/70">{time}</span>
             </div>
           )}
-          <p className="text-lg leading-[1.7] text-muted italic">このメッセージは削除されました</p>
+          <p className="text-[15px] leading-[1.65] text-muted italic">このメッセージは削除されました</p>
         </div>
       </div>
     );

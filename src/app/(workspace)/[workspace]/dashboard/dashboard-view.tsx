@@ -329,64 +329,87 @@ export function DashboardView({
           )}
 
           {filteredDecisions.length === 0 ? (
-            <div className="rounded-2xl border border-border bg-white/[0.02] p-8 text-center text-muted">
+            <div className="rounded-2xl border border-border bg-white/[0.02] p-8 text-center text-sm text-muted">
               {decisions.length === 0
                 ? "まだ決定事項がありません。メッセージの「決定」ボタンを押すとここに集まります。"
                 : "このチャンネルの決定事項はまだありません。"}
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               {filteredDecisions.map((d) => (
                 <Link
                   key={d.id}
                   href={`/${workspaceSlug}/${d.channel_slug}`}
-                  className="print-card block rounded-2xl border border-accent/30 bg-accent/[0.03] p-4 hover:bg-accent/[0.06] transition-colors"
+                  className="print-card group block rounded-xl border border-border bg-surface hover:border-accent/40 hover:bg-accent/[0.04] transition-all"
                 >
-                  <div className="flex items-center gap-2 text-xs text-muted mb-1.5">
-                    <span className="text-accent font-semibold">
+                  {/* 上部メタ: チャンネルバッジ + 日付 */}
+                  <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-1.5">
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-accent bg-accent/10 rounded-full px-2 py-0.5">
                       #{d.channel_name}
                     </span>
-                    <span>・</span>
-                    <span>{d.sender_name}</span>
-                    <span>・</span>
-                    <span>{formatDate(d.created_at)}</span>
+                    <span className="text-[11px] text-muted shrink-0">
+                      {formatDate(d.created_at)}
+                    </span>
                   </div>
-                  {isImageUrl(d.content) ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={d.content}
-                      alt="添付画像"
-                      className="max-h-80 rounded-xl border border-border object-contain"
-                    />
-                  ) : (
-                    <div className="text-base whitespace-pre-wrap break-words text-foreground">
-                      {d.content}
-                    </div>
-                  )}
+
+                  {/* 本文 */}
+                  <div className="px-4 pb-3">
+                    {isImageUrl(d.content) ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={d.content}
+                        alt="添付画像"
+                        className="max-h-72 rounded-lg border border-border object-contain"
+                      />
+                    ) : (
+                      <div className="text-[15px] leading-relaxed whitespace-pre-wrap break-words text-foreground">
+                        {d.content}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Why / Due */}
                   {(d.decision_why || d.decision_due) && (
-                    <div className="mt-3 pt-3 border-t border-accent/20 space-y-1 text-sm">
+                    <div className="mx-4 mb-3 rounded-lg bg-background/40 border border-border/60 px-3 py-2 space-y-1.5 text-[13px]">
                       {d.decision_why && (
                         <div className="flex gap-2">
-                          <span className="shrink-0 text-xs font-semibold text-muted uppercase mt-0.5">
+                          <span className="shrink-0 text-[10px] font-bold text-muted uppercase tracking-wider pt-0.5 w-8">
                             Why
                           </span>
-                          <span className="text-foreground/90 whitespace-pre-wrap break-words">
+                          <span className="flex-1 text-foreground/90 whitespace-pre-wrap break-words">
                             {d.decision_why}
                           </span>
                         </div>
                       )}
                       {d.decision_due && (
                         <div className="flex gap-2">
-                          <span className="shrink-0 text-xs font-semibold text-muted uppercase mt-0.5">
+                          <span className="shrink-0 text-[10px] font-bold text-muted uppercase tracking-wider pt-0.5 w-8">
                             Due
                           </span>
-                          <span className="text-foreground/90 whitespace-pre-wrap break-words">
+                          <span className="flex-1 text-foreground/90 whitespace-pre-wrap break-words">
                             {d.decision_due}
                           </span>
                         </div>
                       )}
                     </div>
                   )}
+
+                  {/* フッター: 送信者 */}
+                  <div className="flex items-center gap-2 px-4 py-2 border-t border-border/40">
+                    {d.sender_avatar ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={d.sender_avatar}
+                        alt={d.sender_name}
+                        className="w-5 h-5 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-5 h-5 rounded-full bg-accent/20 flex items-center justify-center text-[9px] font-bold text-accent">
+                        {d.sender_name.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <span className="text-[12px] text-muted">{d.sender_name}</span>
+                  </div>
                 </Link>
               ))}
             </div>

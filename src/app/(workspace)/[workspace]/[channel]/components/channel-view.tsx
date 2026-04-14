@@ -779,7 +779,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
               </svg>
             </button>
             <span className="text-muted font-medium shrink-0">#</span>
-            <h1 className="font-bold text-lg sm:text-2xl truncate min-w-0">
+            <h1 className="font-bold text-base sm:text-lg truncate min-w-0">
               {channel.name}
             </h1>
             {channel.topic && (
@@ -963,7 +963,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
         <div className="flex-1 overflow-y-auto px-4 py-4">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-muted">
-              <p className="text-lg font-medium">#{channel.name} へようこそ</p>
+              <p className="text-base font-medium">#{channel.name} へようこそ</p>
               <p className="text-sm mt-1">最初のメッセージを送信しましょう</p>
             </div>
           ) : (
