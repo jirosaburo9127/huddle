@@ -267,6 +267,8 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
     let broadcast: "here" | "channel" | null = null;
 
     if (/(^|\s)@here(\s|$)/.test(text)) broadcast = "here";
+    // @All (新しい表記) または @channel (後方互換) のどちらも channel ブロードキャスト扱い
+    else if (/(^|\s)@All(\s|$)/.test(text)) broadcast = "channel";
     else if (/(^|\s)@channel(\s|$)/.test(text)) broadcast = "channel";
 
     // 長い display_name から順に照合（部分一致衝突を避けるため）
@@ -298,7 +300,7 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
     const pillPrefix = pillMentions
       .map((p) => {
         if (p.kind === "user") return `@${p.label.replace(/ /g, "\u00A0")}`;
-        return p.type === "here" ? "@here" : "@channel";
+        return p.type === "here" ? "@here" : "@All";
       })
       .join(" ");
     const combined = pillPrefix
@@ -609,9 +611,9 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
                       onClick={() => addBroadcastPill("channel")}
                       className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-white/[0.04] transition-colors"
                     >
-                      <span className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center shrink-0 text-accent text-xs font-bold">C</span>
+                      <span className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center shrink-0 text-accent text-[10px] font-bold">All</span>
                       <div className="flex-1 min-w-0">
-                        <div className="text-foreground">@channel</div>
+                        <div className="text-foreground">@All</div>
                         <div className="text-[11px] text-muted">チャンネル全員に通知</div>
                       </div>
                     </button>
@@ -768,7 +770,7 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
                 className="inline-flex items-center gap-1 rounded-full bg-accent/10 border border-accent/30 px-2 py-0.5 text-xs text-accent"
               >
                 <span className="font-semibold">
-                  @{p.kind === "user" ? p.label : p.type}
+                  @{p.kind === "user" ? p.label : p.type === "here" ? "here" : "All"}
                 </span>
                 <button
                   type="button"

@@ -107,8 +107,11 @@ function parseMarkdown(text: string): string {
   // 空白を含む表示名のメンションを 1 トークンとしてハイライトできる
   html = html.replace(
     /@([\w\u3000-\u9FFF\uF900-\uFAFF\u00A0]+)/g,
-    (_m, name: string) =>
-      `<span class="text-accent font-semibold">@${name.replace(/\u00A0/g, " ")}</span>`
+    (_m, name: string) => {
+      // 旧来の @channel 表記は表示だけ @All に置き換える (DB互換のため)
+      const displayName = name === "channel" ? "All" : name.replace(/\u00A0/g, " ");
+      return `<span class="text-accent font-semibold">@${displayName}</span>`;
+    }
   );
 
   return html;
