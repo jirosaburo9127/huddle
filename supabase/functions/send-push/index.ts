@@ -80,7 +80,7 @@ async function getApnsJwt(): Promise<string> {
   return jwt;
 }
 
-async function sendPush(
+async function sendPushOnce(
   deviceToken: string,
   title: string,
   body: string,
@@ -128,6 +128,32 @@ async function sendPush(
   } catch (err) {
     return { ok: false, status: 0, error: String(err) };
   }
+}
+
+// リトライ付き送信: 5xx / ネットワークエラー (status === 0) のみリトライ
+// 4xx (BadDeviceToken 等) は即座に諦めて返す
+async function sendPush(
+  deviceToken: string,
+  title: string,
+  body: string,
+  badge: number,
+  url: string,
+  isMention: boolean
+): Promise<{ ok: boolean; status: number; error?: string }> {
+  const DELAYS = [250, 750, 2000]; // ms. 合計 ~3秒
+  let result = await sendPushOnce(deviceToken, title, body, badge, url, isMention);
+  for (const delay of DELAYS) {
+    if (result.ok) return result;
+    // リトライ可能エラー: 5xx, 408, 0 (network)
+    const retriable =
+      result.status === 0 ||
+      result.status === 408 ||
+      (result.status >= 500 && result.status < 600);
+    if (!retriable) return result;
+    await new Promise((r) => setTimeout(r, delay));
+    result = await sendPushOnce(deviceToken, title, body, badge, url, isMention);
+  }
+  return result;
 }
 
 interface MessageRecord {
@@ -315,28 +341,72 @@ Deno.serve(async (req) => {
       })
     );
 
-    // 送信失敗したトークンをログ出力 + 無効トークン削除
-    // - 410 Gone: トークンが完全に無効（アプリ削除・再インストール後）
-    // - 400 BadDeviceToken: production/sandbox の環境不一致（Xcodeデバッグ → TestFlight切替時）
+    // 送信結果に基づく失敗カウンターとトークン管理
+    // 方針:
+    // - 410 Gone (Unregistered) は即削除 (確実に無効)
+    // - 400 BadDeviceToken は即削除しない: consecutive_failures を +1 し、
+    //   3回連続で失敗した時点で削除する (一時的な sandbox/production 不一致対策)
+    // - 成功時は consecutive_failures = 0 にリセット + last_success_at 更新
     const failures: string[] = [];
     for (let i = 0; i < results.length; i++) {
       const r = results[i];
+      const token = targetedTokens[i].token;
+      if (r.status === "fulfilled" && r.value.ok) {
+        // 成功: カウンターをリセット
+        await supabase
+          .from("device_tokens")
+          .update({
+            consecutive_failures: 0,
+            last_success_at: new Date().toISOString(),
+          })
+          .eq("token", token);
+        continue;
+      }
+
       if (r.status === "fulfilled" && !r.value.ok) {
-        failures.push(`${targetedTokens[i].token.slice(0, 8)}... -> ${r.value.status} ${r.value.error}`);
-        // 無効トークンは DB から削除（410 Gone or 400 BadDeviceToken）
-        const shouldDelete =
-          r.value.status === 410 ||
-          (r.value.status === 400 &&
-            typeof r.value.error === "string" &&
-            r.value.error.includes("BadDeviceToken"));
-        if (shouldDelete) {
-          await supabase
-            .from("device_tokens")
-            .delete()
-            .eq("token", targetedTokens[i].token);
+        failures.push(`${token.slice(0, 8)}... -> ${r.value.status} ${r.value.error}`);
+
+        // 410 Gone: 確実に無効 → 即削除
+        if (r.value.status === 410) {
+          await supabase.from("device_tokens").delete().eq("token", token);
+          continue;
         }
+
+        // 400 BadDeviceToken: 連続失敗カウンターを上げる (3回で削除)
+        const isBadDeviceToken =
+          r.value.status === 400 &&
+          typeof r.value.error === "string" &&
+          r.value.error.includes("BadDeviceToken");
+
+        if (isBadDeviceToken) {
+          const { data: current } = await supabase
+            .from("device_tokens")
+            .select("consecutive_failures")
+            .eq("token", token)
+            .maybeSingle();
+          const nextCount = ((current?.consecutive_failures as number) || 0) + 1;
+          if (nextCount >= 3) {
+            // 3回連続でアウトなので削除
+            await supabase.from("device_tokens").delete().eq("token", token);
+          } else {
+            await supabase
+              .from("device_tokens")
+              .update({
+                consecutive_failures: nextCount,
+                last_failure_at: new Date().toISOString(),
+              })
+              .eq("token", token);
+          }
+          continue;
+        }
+
+        // その他のエラー (一時的な可能性) は last_failure_at だけ記録
+        await supabase
+          .from("device_tokens")
+          .update({ last_failure_at: new Date().toISOString() })
+          .eq("token", token);
       } else if (r.status === "rejected") {
-        failures.push(`${targetedTokens[i].token.slice(0, 8)}... -> rejected: ${r.reason}`);
+        failures.push(`${token.slice(0, 8)}... -> rejected: ${r.reason}`);
       }
     }
 

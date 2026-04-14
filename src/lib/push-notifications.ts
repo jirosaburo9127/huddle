@@ -11,6 +11,11 @@ import { createClient } from "@/lib/supabase/client";
 let currentSetupPromise: Promise<void> | null = null;
 // addListener は一度だけ登録する（重複登録防止）
 let listenersAdded = false;
+// resume (visibilitychange) リスナーも1度だけ登録
+let resumeListenerAdded = false;
+// 最後にトークンを再登録した時刻。短時間に連打しないよう制御
+let lastRegisterAt = 0;
+const REGISTER_COOLDOWN_MS = 60 * 1000; // 60秒
 
 /**
  * iOS アプリアイコンのバッジを任意の数値にセット（0でクリア）。
@@ -151,9 +156,34 @@ export async function setupPushNotifications(userId: string): Promise<void> {
       // 3. 毎回 register() を呼び出してトークンを取得／更新
       //    iOS は register() 後に "registration" イベントが発火する
       await PushNotifications.register();
+      lastRegisterAt = Date.now();
 
       // 4. 起動直後にバッジ同期
       syncAppBadgeFromServer(userId);
+
+      // 5. アプリ復帰 (visibilitychange / focus) 時にもトークンを再登録
+      //    バックグラウンドで長時間置かれた後にトークンが失効していても自動で復旧する
+      if (!resumeListenerAdded) {
+        resumeListenerAdded = true;
+        const onResume = () => {
+          if (typeof document === "undefined") return;
+          if (document.visibilityState !== "visible") return;
+          if (!Capacitor.isNativePlatform()) return;
+          // クールダウン (連続イベント抑制)
+          if (Date.now() - lastRegisterAt < REGISTER_COOLDOWN_MS) return;
+          lastRegisterAt = Date.now();
+          // eslint-disable-next-line no-console
+          console.log("[push] re-registering on resume");
+          PushNotifications.register().catch((e) => {
+            // eslint-disable-next-line no-console
+            console.error("[push] re-register error:", e);
+          });
+          // 同時にバッジも再同期
+          syncAppBadgeFromServer(userId);
+        };
+        document.addEventListener("visibilitychange", onResume);
+        window.addEventListener("focus", onResume);
+      }
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error("[push] setup error:", err);
