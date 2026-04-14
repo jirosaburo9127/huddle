@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createWorkspace } from "@/lib/actions";
 
@@ -14,19 +15,32 @@ export default async function HomePage({
 
   const { create } = await searchParams;
 
-  // ユーザーが所属するワークスペースを取得
+  // ユーザーが所属するワークスペース一覧を取得
   const { data: memberships } = await supabase
     .from("workspace_members")
-    .select("workspace_id, workspaces(slug)")
-    .eq("user_id", user.id)
-    .limit(1);
+    .select("workspace_id, workspaces(slug, created_at)")
+    .eq("user_id", user.id);
 
-  // create=true でなければ、既存WSにリダイレクト
+  // create=true でなければ、適切なワークスペースにリダイレクト
   if (create !== "true" && memberships && memberships.length > 0) {
-    const workspace = memberships[0].workspaces as unknown as { slug: string };
-    if (workspace?.slug) {
-      // 既存WSのロビー（チャンネル一覧画面）へ。いきなり general を開かない。
-      redirect(`/${workspace.slug}`);
+    // 所属ワークスペースの slug 一覧
+    const slugs = memberships
+      .map((m) => (m.workspaces as unknown as { slug: string } | null)?.slug)
+      .filter((s): s is string => !!s);
+
+    // 前回開いていたワークスペースを Cookie から取得
+    // 所属確認して一致すればそこへ戻る (LastWorkspaceTracker が書き込んでいる)
+    const cookieStore = await cookies();
+    const lastWsSlug = cookieStore.get("huddle_last_workspace")?.value;
+
+    if (lastWsSlug && slugs.includes(lastWsSlug)) {
+      redirect(`/${lastWsSlug}`);
+    }
+
+    // Cookie が無い / 所属外なら、所属している中で最も古いワークスペースへ
+    // (ユーザーが最初に参加した順で安定した挙動にする)
+    if (slugs.length > 0) {
+      redirect(`/${slugs[0]}`);
     }
   }
 
