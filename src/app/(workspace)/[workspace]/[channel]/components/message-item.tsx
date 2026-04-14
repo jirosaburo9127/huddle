@@ -3,6 +3,7 @@
 import { memo, useState, useRef, useEffect, useMemo } from "react";
 import type { MessageWithProfile, Reaction } from "@/lib/supabase/types";
 import { EmojiPicker } from "./emoji-picker";
+import { PollDisplay } from "./poll-display";
 
 type Props = {
   message: MessageWithProfile;
@@ -21,6 +22,7 @@ type Props = {
   isBookmarked?: boolean;
   isThreadView?: boolean;
   isConsecutive?: boolean;
+  hasPoll?: boolean;
 };
 
 // Supabase Storage URLかどうか判定
@@ -282,6 +284,7 @@ export const MessageItem = memo(function MessageItem({
   isBookmarked,
   isThreadView,
   isConsecutive,
+  hasPoll,
 }: Props) {
   const profile = message.profiles;
   const isOwn = message.user_id === currentUserId;
@@ -513,6 +516,14 @@ export const MessageItem = memo(function MessageItem({
                 onImageError={() => setImageError(true)}
                 onImageClick={setLightboxUrl}
               />
+              {/* 投票 (message に紐づく polls 行がある時だけ) */}
+              {hasPoll && (
+                <PollDisplay
+                  messageId={message.id}
+                  currentUserId={currentUserId}
+                  onMarkDecision={(id) => onDecision?.(id, true)}
+                />
+              )}
               {/* 連続メッセージで編集済みの場合、本文の後に表示 */}
               {isConsecutive && message.edited_at && (
                 <span className="text-xs text-muted/70">(編集済み)</span>

@@ -75,9 +75,10 @@ type Props = {
   placeholder?: string;
   channelId?: string; // ファイルアップロード用
   workspaceId?: string; // メンション用
+  onCreatePoll?: () => void; // 投票作成モーダルを開くコールバック
 };
 
-export function MessageInput({ channelName, onSend, placeholder, channelId, workspaceId }: Props) {
+export function MessageInput({ channelName, onSend, placeholder, channelId, workspaceId, onCreatePoll }: Props) {
   const [content, setContent] = useState("");
   const [sending, setSending] = useState(false);
   const [sendAsDecision, setSendAsDecision] = useState(false);
@@ -684,6 +685,20 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
           >
             @
           </button>
+
+          {/* 投票作成ボタン */}
+          {onCreatePoll && (
+            <button
+              type="button"
+              onClick={onCreatePoll}
+              className="shrink-0 rounded-lg w-8 h-8 flex items-center justify-center text-muted hover:text-accent transition-colors"
+              title="投票を作成"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 11l3 3L22 4M13 3H6a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+              </svg>
+            </button>
+          )}
 
           {/* 決定として送るトグル — 添付・@と並んで入力ツールの一部 */}
           <button

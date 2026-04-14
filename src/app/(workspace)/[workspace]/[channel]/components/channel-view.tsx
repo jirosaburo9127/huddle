@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { MessageItem } from "./message-item";
 import { MessageInput, type MentionPayload } from "./message-input";
 import { ThreadPanel } from "./thread-panel";
+import { CreatePollModal } from "./create-poll-modal";
 import { DateSeparator } from "./date-separator";
 import { ChannelWiki } from "./channel-wiki";
 import { ChannelMembersModal } from "@/components/channel-members-modal";
@@ -46,6 +47,11 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
   // 画面全体でのドラッグ&ドロップを受け付けるオーバーレイ表示制御
   const [isDraggingFiles, setIsDraggingFiles] = useState(false);
   const dragCounterRef = useRef(0);
+
+  // 投票作成モーダル
+  const [showCreatePoll, setShowCreatePoll] = useState(false);
+  // このチャンネルで投票が紐づいているメッセージID集合
+  const [pollMessageIds, setPollMessageIds] = useState<Set<string>>(new Set());
   // このタブが自分で送信して既に楽観的反映済みのメッセージID集合。
   // Realtime購読では「同一ユーザーかどうか」ではなく「このタブで送ったか」で判定するのが正しい。
   // （PCとiPhoneで同じユーザーでログインしている場合に、片方の送信がもう片方に届かなくなるため）
@@ -215,6 +221,47 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     fetchBookmarks();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUserId]);
+
+  // 投票メッセージID を一括取得 + Realtime 追跡
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchPolls() {
+      const { data } = await supabase
+        .from("polls")
+        .select("message_id")
+        .eq("channel_id", channel.id);
+      if (cancelled || !data) return;
+      setPollMessageIds(new Set(data.map((r: { message_id: string }) => r.message_id)));
+    }
+    fetchPolls();
+
+    // 新規 polls INSERT を監視 (他端末からの投票作成も反映)
+    const sub = supabase
+      .channel(`polls-${channel.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "polls",
+          filter: `channel_id=eq.${channel.id}`,
+        },
+        (payload: { new: { message_id: string } }) => {
+          setPollMessageIds((prev) => {
+            const next = new Set(prev);
+            next.add(payload.new.message_id);
+            return next;
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(sub);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channel.id]);
 
   // チャンネル切替時: 最新メッセージ位置まで即スクロール（初回マウント・URL直アクセス対応）
   useEffect(() => {
@@ -1009,6 +1056,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
                       onBookmark={handleBookmark}
                       isBookmarked={bookmarkedIds.has(message.id)}
                       isConsecutive={isConsecutive}
+                      hasPoll={pollMessageIds.has(message.id)}
                     />
                   </div>
                 );
@@ -1024,8 +1072,17 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
           onSend={handleSend}
           channelId={channel.id}
           workspaceId={channel.workspace_id}
+          onCreatePoll={() => setShowCreatePoll(true)}
         />
       </div>
+
+      {/* 投票作成モーダル */}
+      {showCreatePoll && (
+        <CreatePollModal
+          channelId={channel.id}
+          onClose={() => setShowCreatePoll(false)}
+        />
+      )}
 
       {/* スレッドパネル */}
       {activeThread && (
