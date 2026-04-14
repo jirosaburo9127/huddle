@@ -505,17 +505,20 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
         </div>
       )}
 
-      {/* 常時表示の @ メンションピル */}
+      {/* 常時表示の To メンションピル（チャットワーク風） */}
       <div className="relative mb-1.5 flex flex-wrap items-center gap-1.5" ref={mentionPickerRef}>
         <button
           type="button"
           onClick={() => setShowMentionPicker((v) => !v)}
-          className="inline-flex items-center justify-center w-7 h-7 rounded-full text-sm font-bold text-muted hover:text-accent hover:bg-accent/10 transition-colors"
+          className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold text-muted hover:text-accent hover:bg-accent/10 transition-colors"
           aria-haspopup="listbox"
           aria-expanded={showMentionPicker}
-          aria-label="メンションを追加"
+          aria-label="宛先を追加"
         >
-          @
+          <span className="uppercase tracking-wider">To</span>
+          <svg className="w-3 h-3 opacity-60" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
         </button>
         {pillMentions.map((p, idx) => (
           <span
