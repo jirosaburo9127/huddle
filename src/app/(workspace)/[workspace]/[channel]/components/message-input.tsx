@@ -380,22 +380,17 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
     }
   }
 
-  // ファイル選択ハンドラ
-  async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  // 実際のアップロード処理 (file input / paste / drop から共通で呼ぶ)
+  async function uploadFile(file: File) {
     // ファイルサイズチェック
     if (file.size > MAX_FILE_SIZE) {
       setUploadError("ファイルサイズは10MB以下にしてください");
-      if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
 
     // MIMEタイプチェック
     if (!ALLOWED_MIME_TYPES.includes(file.type)) {
       setUploadError("このファイル形式はアップロードできません");
-      if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
 
@@ -405,17 +400,13 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
       : "";
     if (BLOCKED_EXTENSIONS.includes(ext)) {
       setUploadError("実行ファイルはアップロードできません");
-      if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
 
     // マジックバイト検証（MIME type 偽装の検知）
-    // 例: 実行ファイルを .jpg にリネーム + MIME を image/jpeg に偽装しても
-    // 先頭バイトが JPEG と一致しなければ拒否する
     const magicOk = await verifyFileMagicBytes(file, file.type);
     if (!magicOk) {
       setUploadError("ファイルの内容と形式が一致しません");
-      if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
 
@@ -446,13 +437,80 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
       setUploadError(err instanceof Error ? err.message : "アップロードに失敗しました");
     } finally {
       setUploading(false);
-      // input をリセット
-      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  // ファイル選択ハンドラ
+  async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await uploadFile(file);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  // クリップボードからのペースト (スクショ貼り付け等)
+  async function handlePaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    // テキストペーストは通常の動作を通す。ファイル (image/*) のみ横取り
+    const files: File[] = [];
+    for (const item of items) {
+      if (item.kind === "file") {
+        const f = item.getAsFile();
+        if (f) files.push(f);
+      }
+    }
+    if (files.length === 0) return;
+    e.preventDefault();
+    for (const f of files) {
+      // クリップボードから来た画像は file.name が "image.png" 固定で拡張子無しの
+      // ことがあるので、タイプから拡張子を補完する
+      const withName =
+        f.name && f.name !== "image.png" && f.name.includes(".")
+          ? f
+          : new File([f], `paste-${Date.now()}.${(f.type.split("/")[1] || "png").toLowerCase()}`, { type: f.type });
+      await uploadFile(withName);
+    }
+  }
+
+  // ドラッグ&ドロップ
+  const [isDragging, setIsDragging] = useState(false);
+  function handleDragOver(e: React.DragEvent) {
+    if (!e.dataTransfer?.types?.includes("Files")) return;
+    e.preventDefault();
+    setIsDragging(true);
+  }
+  function handleDragLeave(e: React.DragEvent) {
+    if (e.currentTarget === e.target) setIsDragging(false);
+  }
+  async function handleDrop(e: React.DragEvent) {
+    if (!e.dataTransfer?.files || e.dataTransfer.files.length === 0) return;
+    e.preventDefault();
+    setIsDragging(false);
+    const files = Array.from(e.dataTransfer.files);
+    for (const f of files) {
+      await uploadFile(f);
     }
   }
 
   return (
-    <div className="shrink-0 px-4 pb-4 relative">
+    <div
+      className="shrink-0 px-4 pb-4 relative"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {/* ドラッグオーバー時のオーバーレイ */}
+      {isDragging && (
+        <div className="absolute inset-4 rounded-xl border-2 border-dashed border-accent bg-accent/10 flex items-center justify-center z-20 pointer-events-none">
+          <div className="text-accent font-semibold text-base flex items-center gap-2">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            ドロップしてアップロード
+          </div>
+        </div>
+      )}
       {/* アップロードエラー表示 */}
       {uploadError && (
         <div className="mb-2 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400 flex items-center justify-between">
@@ -696,6 +754,7 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
             onChange={handleContentChange}
             onKeyDown={handleKeyDown}
             onInput={handleInput}
+            onPaste={handlePaste}
             onCompositionStart={() => setIsComposing(true)}
             onCompositionEnd={() => setIsComposing(false)}
             placeholder={placeholder || (channelName ? `#${channelName} にメッセージを送信` : "メッセージを入力")}

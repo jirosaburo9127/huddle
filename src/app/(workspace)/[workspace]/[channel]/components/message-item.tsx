@@ -420,10 +420,17 @@ export const MessageItem = memo(function MessageItem({
           // スレッド表示中はアクションシートを出さない（返信画面に入った後に
           // リアクション一覧が残り続ける問題の防止）
           if (isThreadView) return;
+          // テキストをドラッグ選択した直後の click は無視する
+          // （そうしないとコピーのために選択した瞬間にメニューが開く）
+          const selection = typeof window !== "undefined" ? window.getSelection() : null;
+          if (selection && selection.toString().length > 0) return;
           // クリック対象がリンク(または子孫)の場合はブラウザで URL を開く動作を優先し
           // アクションメニューは出さない
           const target = e.target as HTMLElement | null;
           if (target && target.closest("a")) return;
+          // PC ではアクションシートは開かない (lg:hidden なので無効)。
+          // モバイルだけトグル。
+          if (typeof window !== "undefined" && window.innerWidth >= 1024) return;
           setShowActions((v) => !v);
         }}
       >
@@ -645,7 +652,7 @@ export const MessageItem = memo(function MessageItem({
             />
           )}
 
-          {/* スレッド返信数 */}
+          {/* スレッド返信数 — ボタン型で大きく目立つように */}
           {message.reply_count > 0 && !isThreadView && (
             <button
               onClick={(e) => {
@@ -653,9 +660,15 @@ export const MessageItem = memo(function MessageItem({
                 e.stopPropagation();
                 onOpenThread?.(message);
               }}
-              className="mt-1 text-xs text-accent hover:underline"
+              className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-accent/40 bg-accent/5 hover:bg-accent/15 text-sm font-semibold text-accent transition-colors"
             >
-              {message.reply_count}件の返信
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+              <span>{message.reply_count} 件の返信</span>
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
             </button>
           )}
 
