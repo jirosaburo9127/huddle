@@ -1,6 +1,5 @@
 import { Suspense } from "react";
 import { WorkspaceShell } from "@/components/sidebar-loader";
-import { IdleLogout } from "@/components/idle-logout";
 
 // サイドバーのスケルトンUI（データ取得中に表示）
 function SidebarSkeleton() {
@@ -46,7 +45,6 @@ export default async function WorkspaceLayout({
 
   return (
     <div className="flex h-full">
-      <IdleLogout />
       <Suspense fallback={<WorkspaceSkeleton />}>
         <WorkspaceShell workspaceSlug={workspaceSlug}>
           {children}

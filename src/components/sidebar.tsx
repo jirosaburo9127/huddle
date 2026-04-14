@@ -481,6 +481,7 @@ export function Sidebar({
                     <Link
                       key={ws.id}
                       href={`/${ws.slug}`}
+                      prefetch
                       onClick={() => setShowWsSwitcher(false)}
                       className={`flex items-center justify-between gap-2 px-3 py-2 text-sm truncate transition-colors rounded-lg mx-1 ${
                         ws.id === workspace.id
@@ -743,6 +744,7 @@ export function Sidebar({
               <Link
                 key={dm.id}
                 href={href}
+                prefetch
                 onClick={() => setSidebarOpen(false)}
                 className={`
                   flex items-center gap-2 px-3 py-2 text-[15px] rounded-xl mx-2 transition-colors

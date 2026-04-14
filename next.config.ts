@@ -3,6 +3,16 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   serverExternalPackages: ["@supabase/supabase-js", "@supabase/ssr"],
+  // Next.js 15 以降は動的ページの Client Cache TTL がデフォルト 0 秒になっており、
+  // チャンネル/ワークスペース間の往復で毎回サーバ RPC を待つ挙動になっていた。
+  // 30 秒キャッシュすれば「直前に見ていたチャンネルに戻る」操作が即時になる。
+  // 新着メッセージの取りこぼしは channel-view 側の syncMissedMessages が補正する。
+  experimental: {
+    staleTimes: {
+      dynamic: 30,
+      static: 300,
+    },
+  },
   // 画像最適化: Supabase Storageのリモート画像を許可
   images: {
     remotePatterns: [
