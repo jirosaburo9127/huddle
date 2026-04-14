@@ -505,42 +505,8 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
         </div>
       )}
 
-      {/* 常時表示の To メンションピル（チャットワーク風） */}
-      <div className="relative mb-1.5 flex flex-wrap items-center gap-1.5" ref={mentionPickerRef}>
-        <button
-          type="button"
-          onClick={() => setShowMentionPicker((v) => !v)}
-          className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold text-muted hover:text-accent hover:bg-accent/10 transition-colors"
-          aria-haspopup="listbox"
-          aria-expanded={showMentionPicker}
-          aria-label="宛先を追加"
-        >
-          <span className="uppercase tracking-wider">To</span>
-          <svg className="w-3 h-3 opacity-60" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-          </svg>
-        </button>
-        {pillMentions.map((p, idx) => (
-          <span
-            key={p.kind === "user" ? `u-${p.id}` : `b-${p.type}`}
-            className="inline-flex items-center gap-1 rounded-full bg-accent/10 border border-accent/30 px-2.5 py-1 text-xs text-accent"
-          >
-            <span className="font-semibold">
-              @{p.kind === "user" ? p.label : p.type}
-            </span>
-            <button
-              type="button"
-              onClick={() => removePill(idx)}
-              className="text-accent/70 hover:text-accent"
-              aria-label="削除"
-            >
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </span>
-        ))}
-
+      {/* ピッカーは form の外側で absolute 配置 */}
+      <div className="relative" ref={mentionPickerRef}>
         {/* ピッカー */}
         {showMentionPicker && (
           <div className="absolute bottom-full left-0 mb-1 w-72 max-h-72 flex flex-col rounded-xl bg-sidebar border border-border shadow-xl z-50 overflow-hidden">
@@ -627,8 +593,39 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
 
       <form
         onSubmit={handleSubmit}
-        className="flex items-end gap-2 rounded-xl border border-border bg-input-bg px-3 py-2"
+        className="flex flex-col gap-1.5 rounded-xl border border-border bg-input-bg px-3 py-2"
       >
+        {/* To 行: 宛先選択ボタンとピルを常に表示（ただし選択中の宛先がある時だけ） */}
+        {pillMentions.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 pb-1.5 border-b border-border/50">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted shrink-0">
+              To
+            </span>
+            {pillMentions.map((p, idx) => (
+              <span
+                key={p.kind === "user" ? `u-${p.id}` : `b-${p.type}`}
+                className="inline-flex items-center gap-1 rounded-full bg-accent/10 border border-accent/30 px-2 py-0.5 text-xs text-accent"
+              >
+                <span className="font-semibold">
+                  @{p.kind === "user" ? p.label : p.type}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => removePill(idx)}
+                  className="text-accent/70 hover:text-accent"
+                  aria-label="削除"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* 本体行: 添付 / To / textarea / 決定 / 送信 */}
+        <div className="flex items-end gap-2">
         {/* ファイル添付ボタン */}
         <button
           type="button"
@@ -649,6 +646,20 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
             </svg>
           )}
+        </button>
+
+        {/* 宛先追加ボタン — 添付と並んで入力ツールの一部として表示 */}
+        <button
+          type="button"
+          onClick={() => setShowMentionPicker((v) => !v)}
+          className="shrink-0 rounded-lg p-2 text-muted hover:text-accent transition-colors"
+          title="宛先を追加"
+          aria-haspopup="listbox"
+          aria-expanded={showMentionPicker}
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M16 14v7m-3.5-3.5h7M5.5 21h7.5m-7.5 0a3 3 0 01-3-3v-1a5 5 0 015-5h4a5 5 0 015 5M17.5 10a4 4 0 11-8 0 4 4 0 018 0z" />
+          </svg>
         </button>
 
         {/* 非表示のファイルinput */}
@@ -700,6 +711,7 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
           </svg>
         </button>
+        </div>
       </form>
     </div>
   );
