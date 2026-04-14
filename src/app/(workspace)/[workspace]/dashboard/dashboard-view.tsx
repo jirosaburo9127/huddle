@@ -206,7 +206,7 @@ export function DashboardView({
             <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
-        <h1 className="font-bold text-lg">進捗ダッシュボード</h1>
+        <h1 className="font-bold text-lg">決定事項</h1>
         <span className="ml-2 text-sm text-muted">{workspace.name}</span>
       </header>
 

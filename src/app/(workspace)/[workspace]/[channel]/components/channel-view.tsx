@@ -42,6 +42,10 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
   const prevMessageCountRef = useRef(initialMessages.length);
   const supabaseRef = useRef(createClient());
   const supabase = supabaseRef.current;
+
+  // 画面全体でのドラッグ&ドロップを受け付けるオーバーレイ表示制御
+  const [isDraggingFiles, setIsDraggingFiles] = useState(false);
+  const dragCounterRef = useRef(0);
   // このタブが自分で送信して既に楽観的反映済みのメッセージID集合。
   // Realtime購読では「同一ユーザーかどうか」ではなく「このタブで送ったか」で判定するのが正しい。
   // （PCとiPhoneで同じユーザーでログインしている場合に、片方の送信がもう片方に届かなくなるため）
@@ -520,7 +524,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     // 決定する時のみ確認ダイアログ（解除時は確認なし）
     if (isDecision) {
       const ok = window.confirm(
-        "この投稿を「決定事項」としてマークしますか？\n進捗ダッシュボードに表示されます。"
+        "この投稿を「決定事項」としてマークしますか？\n決定事項一覧に表示されます。"
       );
       if (!ok) return;
     }
@@ -710,7 +714,55 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
   }
 
   return (
-    <div className="flex h-full page-enter">
+    <div
+      className="flex h-full page-enter relative"
+      onDragEnter={(e) => {
+        // ファイルドラッグのみ対応
+        if (!e.dataTransfer?.types?.includes("Files")) return;
+        e.preventDefault();
+        dragCounterRef.current += 1;
+        setIsDraggingFiles(true);
+      }}
+      onDragOver={(e) => {
+        if (!e.dataTransfer?.types?.includes("Files")) return;
+        e.preventDefault();
+      }}
+      onDragLeave={(e) => {
+        if (!e.dataTransfer?.types?.includes("Files")) return;
+        dragCounterRef.current -= 1;
+        if (dragCounterRef.current <= 0) {
+          dragCounterRef.current = 0;
+          setIsDraggingFiles(false);
+        }
+      }}
+      onDrop={(e) => {
+        if (!e.dataTransfer?.files || e.dataTransfer.files.length === 0) return;
+        e.preventDefault();
+        dragCounterRef.current = 0;
+        setIsDraggingFiles(false);
+        const files = Array.from(e.dataTransfer.files);
+        // message-input にドロップされたファイルを通知
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("huddle:filesDropped", { detail: { files } })
+          );
+        }
+      }}
+    >
+      {/* ドラッグ中のフルサイズオーバーレイ */}
+      {isDraggingFiles && (
+        <div className="absolute inset-0 z-[60] flex items-center justify-center bg-accent/10 backdrop-blur-sm pointer-events-none">
+          <div className="rounded-2xl border-4 border-dashed border-accent bg-background/90 px-10 py-8 shadow-2xl">
+            <div className="flex flex-col items-center gap-3 text-accent">
+              <svg className="w-12 h-12" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              <div className="text-lg font-bold">ドロップしてアップロード</div>
+              <div className="text-sm text-muted">画像やファイルを送信できます</div>
+            </div>
+          </div>
+        </div>
+      )}
       {/* チャンネルエリア */}
       <div className="flex flex-col h-full flex-1 min-w-0">
         {/* チャンネルヘッダー */}

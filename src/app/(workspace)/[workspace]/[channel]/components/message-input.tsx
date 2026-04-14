@@ -105,6 +105,16 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
   const [pickerQuery, setPickerQuery] = useState("");
   const mentionPickerRef = useRef<HTMLDivElement>(null);
 
+  // ペースト/ドロップされた添付ファイルの保留キュー
+  // アップロードは即時だが「送信」ボタンを押すまで実送信はしない
+  type PendingAttachment = {
+    url: string;
+    name: string;
+    type: string;
+    isImage: boolean;
+  };
+  const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
+
   // WSメンバーを取得
   useEffect(() => {
     if (!workspaceId) return;
@@ -279,7 +289,8 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const rawTrimmed = content.trim();
-    if (!rawTrimmed && pillMentions.length === 0) return;
+    // 添付がある場合はテキスト空でも送信を許可する
+    if (!rawTrimmed && pillMentions.length === 0 && pendingAttachments.length === 0) return;
     if (sending) return;
 
     // ピル方式で選ばれたメンションを本文先頭に差し込む
@@ -309,9 +320,11 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
     setSending(true);
     const mentions = extractMentions(trimmed);
     const options: SendOptions = sendAsDecision ? { isDecision: true } : {};
+    const attachmentsSnapshot = pendingAttachments;
     setContent("");
     setSendAsDecision(false);
     setPillMentions([]);
+    setPendingAttachments([]);
 
     // テキストエリアの高さをリセット
     if (textareaRef.current) {
@@ -319,7 +332,14 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
     }
 
     try {
-      await onSend(trimmed, mentions, options);
+      // テキスト本文（宛先ピル含む）があれば先に送る
+      if (trimmed) {
+        await onSend(trimmed, mentions, options);
+      }
+      // 続けて添付を順次送信（1添付 = 1メッセージ）
+      for (const att of attachmentsSnapshot) {
+        await onSend(att.url, { userIds: [], broadcast: null });
+      }
     } finally {
       setSending(false);
       // PC のみ自動フォーカス（モバイルではキーボードが勝手に出てうるさい）
@@ -380,7 +400,7 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
     }
   }
 
-  // 実際のアップロード処理 (file input / paste / drop から共通で呼ぶ)
+  // ファイルをアップロードして保留キューに追加する (送信は送信ボタン待ち)
   async function uploadFile(file: File) {
     // ファイルサイズチェック
     if (file.size > MAX_FILE_SIZE) {
@@ -427,12 +447,20 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
         return;
       }
 
-      // 公開URLを取得してメッセージとして送信
       const { data: urlData } = supabase.storage
         .from("chat-files")
         .getPublicUrl(path);
 
-      await onSend(urlData.publicUrl, { userIds: [], broadcast: null });
+      // 即送信せず保留キューに入れる
+      setPendingAttachments((prev) => [
+        ...prev,
+        {
+          url: urlData.publicUrl,
+          name: file.name,
+          type: file.type,
+          isImage: file.type.startsWith("image/"),
+        },
+      ]);
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : "アップロードに失敗しました");
     } finally {
@@ -473,44 +501,24 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
     }
   }
 
-  // ドラッグ&ドロップ
-  const [isDragging, setIsDragging] = useState(false);
-  function handleDragOver(e: React.DragEvent) {
-    if (!e.dataTransfer?.types?.includes("Files")) return;
-    e.preventDefault();
-    setIsDragging(true);
-  }
-  function handleDragLeave(e: React.DragEvent) {
-    if (e.currentTarget === e.target) setIsDragging(false);
-  }
-  async function handleDrop(e: React.DragEvent) {
-    if (!e.dataTransfer?.files || e.dataTransfer.files.length === 0) return;
-    e.preventDefault();
-    setIsDragging(false);
-    const files = Array.from(e.dataTransfer.files);
-    for (const f of files) {
-      await uploadFile(f);
+  // 親 (channel-view) からのドロップイベントを受け取ってアップロード
+  useEffect(() => {
+    async function handler(ev: Event) {
+      const detail = (ev as CustomEvent<{ files: File[] }>).detail;
+      if (!detail?.files?.length) return;
+      for (const f of detail.files) {
+        await uploadFile(f);
+      }
     }
-  }
+    window.addEventListener("huddle:filesDropped", handler as EventListener);
+    return () => {
+      window.removeEventListener("huddle:filesDropped", handler as EventListener);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channelId]);
 
   return (
-    <div
-      className="shrink-0 px-4 pb-4 relative"
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-    >
-      {/* ドラッグオーバー時のオーバーレイ */}
-      {isDragging && (
-        <div className="absolute inset-4 rounded-xl border-2 border-dashed border-accent bg-accent/10 flex items-center justify-center z-20 pointer-events-none">
-          <div className="text-accent font-semibold text-base flex items-center gap-2">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-            </svg>
-            ドロップしてアップロード
-          </div>
-        </div>
-      )}
+    <div className="shrink-0 px-4 pb-4 relative">
       {/* アップロードエラー表示 */}
       {uploadError && (
         <div className="mb-2 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400 flex items-center justify-between">
@@ -708,6 +716,46 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
         {/* ツールバーと入力欄の区切り線 */}
         <div className="border-t border-border/50" />
 
+        {/* 保留中の添付ファイル（送信ボタンで実送信される） */}
+        {pendingAttachments.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b border-border/50">
+            {pendingAttachments.map((att, idx) => (
+              <div
+                key={idx}
+                className="relative group rounded-lg border border-border bg-background/40 overflow-hidden"
+              >
+                {att.isImage ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={att.url}
+                    alt={att.name}
+                    className="w-20 h-20 object-cover"
+                  />
+                ) : (
+                  <div className="w-32 h-20 flex items-center gap-2 px-2">
+                    <svg className="w-6 h-6 text-muted shrink-0" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                    </svg>
+                    <span className="text-xs text-foreground truncate">{att.name}</span>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPendingAttachments((prev) => prev.filter((_, i) => i !== idx))
+                  }
+                  className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 transition-colors"
+                  aria-label="添付を削除"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* 選択済みの宛先ピル行 */}
         {pillMentions.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5 px-3 py-1.5 border-b border-border/50">
@@ -765,7 +813,7 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
           {/* 送信ボタン */}
           <button
             type="submit"
-            disabled={!content.trim()}
+            disabled={!content.trim() && pendingAttachments.length === 0}
             className="shrink-0 rounded-lg bg-accent p-2 text-white hover:bg-accent-hover disabled:opacity-30 transition-colors"
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
