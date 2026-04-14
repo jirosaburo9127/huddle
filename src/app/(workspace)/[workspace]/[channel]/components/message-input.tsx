@@ -652,14 +652,12 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
         <button
           type="button"
           onClick={() => setShowMentionPicker((v) => !v)}
-          className="shrink-0 rounded-lg p-2 text-muted hover:text-accent transition-colors"
+          className="shrink-0 rounded-lg w-8 h-8 flex items-center justify-center text-base font-bold text-muted hover:text-accent transition-colors"
           title="宛先を追加"
           aria-haspopup="listbox"
           aria-expanded={showMentionPicker}
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M16 14v7m-3.5-3.5h7M5.5 21h7.5m-7.5 0a3 3 0 01-3-3v-1a5 5 0 015-5h4a5 5 0 015 5M17.5 10a4 4 0 11-8 0 4 4 0 018 0z" />
-          </svg>
+          @
         </button>
 
         {/* 非表示のファイルinput */}
