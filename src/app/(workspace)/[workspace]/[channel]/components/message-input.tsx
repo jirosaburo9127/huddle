@@ -161,7 +161,6 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
     return list;
   }, [members, pillMentions, pickerQuery]);
 
-  const hasBroadcastHere = pillMentions.some((p) => p.kind === "broadcast" && p.type === "here");
   const hasBroadcastChannel = pillMentions.some((p) => p.kind === "broadcast" && p.type === "channel");
 
   function addUserPill(member: MentionMember) {
@@ -589,36 +588,21 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
               />
             </div>
             <div className="flex-1 overflow-y-auto py-1">
-              {/* @here / @channel 特殊メンション */}
-              {!pickerQuery && (
+              {/* @All 特殊メンション */}
+              {!pickerQuery && !hasBroadcastChannel && (
                 <>
-                  {!hasBroadcastHere && (
-                    <button
-                      type="button"
-                      onClick={() => addBroadcastPill("here")}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-white/[0.04] transition-colors"
-                    >
-                      <span className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center shrink-0 text-accent text-xs font-bold">H</span>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-foreground">@here</div>
-                        <div className="text-[11px] text-muted">オンラインのメンバーに通知</div>
-                      </div>
-                    </button>
-                  )}
-                  {!hasBroadcastChannel && (
-                    <button
-                      type="button"
-                      onClick={() => addBroadcastPill("channel")}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-white/[0.04] transition-colors"
-                    >
-                      <span className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center shrink-0 text-accent text-[10px] font-bold">All</span>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-foreground">@All</div>
-                        <div className="text-[11px] text-muted">チャンネル全員に通知</div>
-                      </div>
-                    </button>
-                  )}
-                  {(!hasBroadcastHere || !hasBroadcastChannel) && pickerCandidates.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => addBroadcastPill("channel")}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-white/[0.04] transition-colors"
+                  >
+                    <span className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center shrink-0 text-accent text-[10px] font-bold">All</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-foreground">@All</div>
+                      <div className="text-[11px] text-muted">チャンネル全員に通知</div>
+                    </div>
+                  </button>
+                  {pickerCandidates.length > 0 && (
                     <div className="my-1 border-t border-border/50" />
                   )}
                 </>
