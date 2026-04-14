@@ -510,12 +510,12 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
         <button
           type="button"
           onClick={() => setShowMentionPicker((v) => !v)}
-          className="inline-flex items-center gap-1 rounded-full border border-dashed border-border/70 px-2.5 py-1 text-xs text-muted hover:text-accent hover:border-accent/50 transition-colors"
+          className="inline-flex items-center justify-center w-7 h-7 rounded-full text-sm font-bold text-muted hover:text-accent hover:bg-accent/10 transition-colors"
           aria-haspopup="listbox"
           aria-expanded={showMentionPicker}
+          aria-label="メンションを追加"
         >
-          <span className="text-accent font-bold">@</span>
-          <span>{pillMentions.length === 0 ? "メンションを追加" : "追加"}</span>
+          @
         </button>
         {pillMentions.map((p, idx) => (
           <span

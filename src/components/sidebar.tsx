@@ -212,12 +212,10 @@ export function Sidebar({
 
     (async () => {
       const supabase = sidebarSupabaseRef.current;
-      // last_read_at を更新
-      await supabase
-        .from("channel_members")
-        .update({ last_read_at: new Date().toISOString() })
-        .eq("channel_id", currentChannelId)
-        .eq("user_id", currentUserId);
+      // サーバの now() で last_read_at を更新する
+      // （クライアントの new Date() を使うと時計ズレで既読タイムスタンプが
+      //   新着メッセージより古くなりバッジが残ることがある）
+      await supabase.rpc("mark_channel_read", { p_channel_id: currentChannelId });
 
       if (cancelled) return;
 
@@ -356,13 +354,10 @@ export function Sidebar({
           // ミュート中のチャンネルは未読カウントもせず無視
           if (mutedSet.has(msg.channel_id)) return;
 
-          // 表示中チャンネル → 自動既読
+          // 表示中チャンネル → サーバ now() で自動既読
           if (msg.channel_id === currentChannelId) {
             supabase
-              .from("channel_members")
-              .update({ last_read_at: new Date().toISOString() })
-              .eq("channel_id", msg.channel_id)
-              .eq("user_id", currentUserId)
+              .rpc("mark_channel_read", { p_channel_id: msg.channel_id })
               .then(() => {});
             return;
           }
