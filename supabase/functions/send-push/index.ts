@@ -341,6 +341,10 @@ Deno.serve(async (req) => {
       if (record.system_event === "poll_closed") {
         return `📊 投票が締め切られました (#${channel.name})`;
       }
+      // 決定事項
+      if (record.system_event === "decision_marked") {
+        return `✅ ${senderName} が決定事項を登録 (#${channel.name})`;
+      }
       // スレッド返信
       if (isThreadReply) {
         return `💬 ${senderName} がスレッドに返信 (#${channel.name})`;
@@ -360,13 +364,14 @@ Deno.serve(async (req) => {
     const targetedTokens = tokens;
 
     // バナー (音+通知センター表示) を出すかどうかの判定
-    // デフォルトは「メンション / DM / スレッド返信 / 投票作成/締切」のみ
+    // デフォルトは「メンション / DM / スレッド返信 / 投票作成/締切 / 決定登録」のみ
     // それ以外はバッジだけ更新する静かな通知にする
     const isPollEvent =
       record.system_event === "poll_created" ||
       record.system_event === "poll_closed";
+    const isDecisionEvent = record.system_event === "decision_marked";
     const baseShowBanner =
-      isThreadReply || channel.is_dm || isPollEvent;
+      isThreadReply || channel.is_dm || isPollEvent || isDecisionEvent;
 
     // 並列送信
     const results = await Promise.allSettled(

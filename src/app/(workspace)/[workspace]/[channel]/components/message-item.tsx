@@ -361,8 +361,11 @@ export const MessageItem = memo(function MessageItem({
     }
   }, [isEditing]);
 
-  // 投票締切のシステムメッセージ — 控えめなセンタリング表示
-  if (message.system_event === "poll_closed") {
+  // 投票締切・決定登録のシステムメッセージ — 控えめなセンタリング表示
+  if (
+    message.system_event === "poll_closed" ||
+    message.system_event === "decision_marked"
+  ) {
     return (
       <div className="flex justify-center my-2">
         <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-accent/30 bg-accent/5 text-xs text-accent">
@@ -419,9 +422,6 @@ export const MessageItem = memo(function MessageItem({
           isConsecutive ? "py-1" : "pt-3 pb-1"
         }`}
         onClick={(e) => {
-          // スレッド表示中はアクションシートを出さない（返信画面に入った後に
-          // リアクション一覧が残り続ける問題の防止）
-          if (isThreadView) return;
           // テキストをドラッグ選択した直後の click は無視する
           // （そうしないとコピーのために選択した瞬間にメニューが開く）
           const selection = typeof window !== "undefined" ? window.getSelection() : null;
@@ -690,7 +690,7 @@ export const MessageItem = memo(function MessageItem({
           )}
 
           {/* PC: アクションバー（ホバーで表示、メッセージ右上に浮かせる） */}
-          {!isEditing && !isThreadView && (
+          {!isEditing && (
           <div className="hidden lg:flex absolute -top-2 right-3 z-10 transition-opacity items-center gap-0.5 bg-sidebar/95 backdrop-blur-sm border border-border/60 rounded-lg px-1 py-0.5 shadow-lg opacity-0 group-hover:opacity-100">
             {/* 決定ボタンは一番左 — Huddleの推し機能なので最も発見しやすい位置 */}
             {onDecision && (
@@ -728,15 +728,17 @@ export const MessageItem = memo(function MessageItem({
                 )}
               </div>
             )}
-            <button
-              onClick={(e) => { e.stopPropagation(); onOpenThread?.(message); }}
-              className="flex items-center gap-1 px-2 py-0.5 text-[13px] text-muted hover:text-accent border border-transparent hover:border-border/50 rounded transition-colors"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-              </svg>
-              返信
-            </button>
+            {!isThreadView && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onOpenThread?.(message); }}
+                className="flex items-center gap-1 px-2 py-0.5 text-[13px] text-muted hover:text-accent border border-transparent hover:border-border/50 rounded transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                </svg>
+                返信
+              </button>
+            )}
             {/* ブックマーク */}
             {onBookmark && (
               <button
@@ -779,7 +781,7 @@ export const MessageItem = memo(function MessageItem({
       </div>
 
       {/* モバイル: Chatwork風アクションモーダル */}
-      {showActions && !isEditing && !isThreadView && (
+      {showActions && !isEditing && (
         <div
           className="fixed inset-0 z-50 flex items-end justify-center lg:hidden"
           onClick={(e) => { e.stopPropagation(); setShowActions(false); }}
@@ -790,18 +792,20 @@ export const MessageItem = memo(function MessageItem({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="grid grid-cols-3 gap-3">
-              {/* 返信 */}
-              <button
-                onClick={() => { setShowActions(false); onOpenThread?.(message); }}
-                className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
-              >
-                <span className="w-12 h-12 rounded-full border-2 border-muted/40 flex items-center justify-center">
-                  <svg className="w-5 h-5 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                  </svg>
-                </span>
-                <span className="text-xs text-foreground">返信</span>
-              </button>
+              {/* 返信 (スレッド内では非表示) */}
+              {!isThreadView && (
+                <button
+                  onClick={() => { setShowActions(false); onOpenThread?.(message); }}
+                  className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
+                >
+                  <span className="w-12 h-12 rounded-full border-2 border-muted/40 flex items-center justify-center">
+                    <svg className="w-5 h-5 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                    </svg>
+                  </span>
+                  <span className="text-xs text-foreground">返信</span>
+                </button>
+              )}
               {/* 決定事項トグル（モバイル）— Huddleの推し機能、最も目立つ位置 */}
               {onDecision && (
                 <button

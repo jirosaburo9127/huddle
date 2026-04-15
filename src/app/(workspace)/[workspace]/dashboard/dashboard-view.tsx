@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
+import { createClient } from "@/lib/supabase/client";
 import {
   createShareToken,
   revokeShareToken,
@@ -67,6 +68,19 @@ export function DashboardView({
   isAdmin,
 }: Props) {
   const setSidebarOpen = useMobileNavStore((s) => s.setSidebarOpen);
+
+  // マウント時: 決定事項を既読にしてサイドバーのバッジを 0 にする
+  useEffect(() => {
+    const supabase = createClient();
+    supabase
+      .rpc("mark_decisions_read", { p_workspace_id: workspace.id })
+      .then(() => {
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("huddle:decisionsRead"));
+        }
+      });
+  }, [workspace.id]);
+
   const [newLabel, setNewLabel] = useState("");
   const [showShareSection, setShowShareSection] = useState(false);
   const [creating, setCreating] = useState(false);

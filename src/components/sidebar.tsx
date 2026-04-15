@@ -62,6 +62,8 @@ export function Sidebar({
   const [unreadState, setUnreadState] = useState<Record<string, number>>(unreadCounts);
   // ワークスペース単位の未読カウント（他WSにメッセージが来たことを一目で伝えるため）
   const [unreadByWorkspace, setUnreadByWorkspace] = useState<Record<string, number>>({});
+  // 決定事項ボードの未読数 (自分が最後に見た時刻以降に追加された決定の数)
+  const [decisionUnreadCount, setDecisionUnreadCount] = useState<number>(0);
   // Sidebar専用のSupabaseクライアント（毎レンダー再生成しない）
   const sidebarSupabaseRef = useRef(createClient());
   const [showCreateChannel, setShowCreateChannel] = useState(false);
@@ -226,12 +228,20 @@ export function Sidebar({
     let cancelled = false;
     async function refetchUnread() {
       const supabase = sidebarSupabaseRef.current;
-      // チャンネル単位とワークスペース単位を並列取得
-      const [channelRes, wsRes] = await Promise.all([
+      // チャンネル単位とワークスペース単位 + 決定事項未読を並列取得
+      const [channelRes, wsRes, decisionRes] = await Promise.all([
         supabase.rpc("get_unread_counts", { p_user_id: currentUserId }),
         supabase.rpc("get_unread_counts_by_workspace", { p_user_id: currentUserId }),
+        supabase.rpc("get_decision_unread_count", {
+          p_workspace_id: workspace.id,
+          p_user_id: currentUserId,
+        }),
       ]);
       if (cancelled) return;
+
+      if (typeof decisionRes.data === "number") {
+        setDecisionUnreadCount(decisionRes.data);
+      }
 
       if (channelRes.data) {
         const next: Record<string, number> = {};
@@ -266,12 +276,19 @@ export function Sidebar({
       refetchUnread();
     }
 
+    // ダッシュボードが既読マークした瞬間にバッジを 0 にする
+    function onDecisionsRead() {
+      setDecisionUnreadCount(0);
+    }
+
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", onVisible);
+    window.addEventListener("huddle:decisionsRead", onDecisionsRead);
     return () => {
       cancelled = true;
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);
+      window.removeEventListener("huddle:decisionsRead", onDecisionsRead);
     };
   }, [currentUserId, currentChannelId, workspace.id]);
 
@@ -299,6 +316,23 @@ export function Sidebar({
         (payload: RealtimePostgresInsertPayload<Message>) => {
           const msg = payload.new;
           if (msg.parent_id) return;
+
+          // 決定登録のシステムメッセージ → 決定事項バッジを再取得
+          // (自分の操作でも他人の操作でも、既に読んだかどうかはサーバで判定されるので問題ない)
+          if (msg.system_event === "decision_marked") {
+            (async () => {
+              const { data } = await supabase.rpc("get_decision_unread_count", {
+                p_workspace_id: workspace.id,
+                p_user_id: currentUserId,
+              });
+              if (typeof data === "number") {
+                setDecisionUnreadCount(data);
+              }
+            })();
+            // システムメッセージ自体は通常のチャンネル未読カウントに含めない
+            return;
+          }
+
           if (msg.user_id === currentUserId) return;
           const ch = channelById.get(msg.channel_id);
           if (!ch) {
@@ -564,12 +598,19 @@ export function Sidebar({
             href={`/${workspaceSlug}/dashboard`}
             prefetch
             onClick={() => setSidebarOpen(false)}
-            className="flex items-center gap-2 px-3 py-2 text-[13px] text-muted hover:text-accent mx-2 rounded-xl hover:bg-white/[0.04] transition-colors w-full mb-1"
+            className={`flex items-center gap-2 px-3 py-2 text-[13px] mx-2 rounded-xl hover:bg-white/[0.04] transition-colors w-full mb-1 ${
+              decisionUnreadCount > 0 ? "text-accent font-semibold" : "text-muted hover:text-accent"
+            }`}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            決定事項
+            <span className="flex-1 text-left">決定事項</span>
+            {decisionUnreadCount > 0 && (
+              <span className="bg-accent text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                {decisionUnreadCount > 99 ? "99+" : decisionUnreadCount}
+              </span>
+            )}
           </Link>
 
           {/* ブックマークリンク */}
