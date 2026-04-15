@@ -3,6 +3,11 @@
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import type { ChannelCategory } from "@/lib/supabase/types";
+import {
+  CHANNEL_CATEGORIES,
+  CHANNEL_CATEGORY_LABELS,
+} from "@/lib/channel-categories";
 
 type MemberProfile = {
   id: string;
@@ -33,6 +38,7 @@ export function CreateChannelModal({
 }: Props) {
   const [name, setName] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
+  const [category, setCategory] = useState<ChannelCategory | "">("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set());
@@ -98,6 +104,19 @@ export function CreateChannelModal({
       return;
     }
 
+    // カテゴリを別 RPC で設定 (create_channel_with_members RPC はカテゴリ未対応のため)
+    if (category) {
+      const { error: catErr } = await supabase.rpc("update_channel_category", {
+        p_channel_id: channel.id,
+        p_category: category,
+      });
+      if (catErr) {
+        // カテゴリ設定失敗はチャンネル作成自体は成功として扱い、警告だけ出す
+        // eslint-disable-next-line no-console
+        console.warn("[create-channel] category set failed:", catErr);
+      }
+    }
+
     onClose();
     router.push(`/${workspaceSlug}/${channel.slug}`);
     router.refresh();
@@ -147,6 +166,22 @@ export function CreateChannelModal({
               className="w-full rounded-lg border border-border bg-input-bg px-3 py-2 text-foreground placeholder-muted focus:border-accent focus:outline-none"
               placeholder="例: random"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm text-muted mb-1">カテゴリ</label>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value as ChannelCategory | "")}
+              className="w-full rounded-lg border border-border bg-input-bg px-3 py-2 text-foreground focus:border-accent focus:outline-none"
+            >
+              <option value="">未分類</option>
+              {CHANNEL_CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {CHANNEL_CATEGORY_LABELS[c]}
+                </option>
+              ))}
+            </select>
           </div>
 
           <label className="flex items-center gap-2 text-sm">

@@ -38,6 +38,7 @@ export async function WorkspaceShell({ workspaceSlug, children }: WorkspaceShell
       is_private: boolean;
       is_dm: boolean;
       topic: string | null;
+      category: "idea" | "todo" | "in_progress" | "review" | "archived" | null;
       created_by: string;
       created_at: string;
     }>;
@@ -49,6 +50,7 @@ export async function WorkspaceShell({ workspaceSlug, children }: WorkspaceShell
       is_private: boolean;
       is_dm: boolean;
       topic: string | null;
+      category: "idea" | "todo" | "in_progress" | "review" | "archived" | null;
       created_by: string;
       created_at: string;
       channel_members: Array<{

@@ -3,7 +3,12 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { Workspace, Channel } from "@/lib/supabase/types";
+import type { Workspace, Channel, ChannelCategory } from "@/lib/supabase/types";
+import {
+  CHANNEL_CATEGORIES,
+  CHANNEL_CATEGORY_LABELS,
+  UNCATEGORIZED_LABEL,
+} from "@/lib/channel-categories";
 import { CreateChannelModal } from "@/components/create-channel-modal";
 import { CreateDmModal } from "@/components/create-dm-modal";
 import { InviteModal } from "@/components/invite-modal";
@@ -315,7 +320,7 @@ export function Sidebar({
         },
         (payload: RealtimePostgresInsertPayload<Message>) => {
           const msg = payload.new;
-          if (msg.parent_id) return;
+          // Chatwork風インライン返信: 返信もチャンネルの未読としてカウント
 
           // 決定登録のシステムメッセージ → 決定事項バッジを再取得
           // (自分の操作でも他人の操作でも、既に読んだかどうかはサーバで判定されるので問題ない)
@@ -638,42 +643,14 @@ export function Sidebar({
             </button>
           </div>
 
-          {filteredChannels.map((channel) => {
-            const href = `/${workspaceSlug}/${channel.slug}`;
-            const isActive = pathname === href;
-            const unreadCount = unreadState[channel.id] || 0;
-            const showUnreadStyle = unreadCount > 0 && !isActive;
-            return (
-              <Link
-                key={channel.id}
-                href={href}
-                prefetch
-                onClick={() => setSidebarOpen(false)}
-                className={`
-                  flex items-center min-w-0 px-3 py-2 text-[15px] rounded-xl mx-2 transition-colors
-                  ${
-                    isActive
-                      ? "bg-accent/10 text-accent"
-                      : "text-muted hover:text-foreground hover:bg-white/[0.04]"
-                  }
-                `}
-              >
-                <span
-                  className={`mr-2 shrink-0 ${isActive ? "text-accent/50" : "text-accent/50"}`}
-                >
-                  #
-                </span>
-                <span className={`truncate min-w-0 flex-1 ${showUnreadStyle ? "font-semibold text-foreground" : ""}`}>
-                  {channel.name}
-                </span>
-                {showUnreadStyle && (
-                  <span className="ml-auto bg-accent text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
-                    {unreadCount > 99 ? "99+" : unreadCount}
-                  </span>
-                )}
-              </Link>
-            );
-          })}
+          <ChannelCategoryList
+            channels={filteredChannels}
+            workspaceSlug={workspaceSlug}
+            pathname={pathname}
+            unreadState={unreadState}
+            onNavigate={() => setSidebarOpen(false)}
+          />
+
 
           {/* DMセクション */}
           <div className="px-3 mt-4 mb-1 flex items-center justify-between">
@@ -1041,5 +1018,162 @@ export function Sidebar({
         </div>
       )}
     </>
+  );
+}
+
+// ==================================================
+// カテゴリ別チャンネルリスト
+// Chatwork風タスクステータスでチャンネルをグループ化してサイドバーに表示する
+// ==================================================
+type ChannelCategoryListProps = {
+  channels: Channel[];
+  workspaceSlug: string;
+  pathname: string;
+  unreadState: Record<string, number>;
+  onNavigate: () => void;
+};
+
+const COLLAPSED_KEY = "huddle:sidebar:collapsedCategories";
+
+function ChannelCategoryList({
+  channels,
+  workspaceSlug,
+  pathname,
+  unreadState,
+  onNavigate,
+}: ChannelCategoryListProps) {
+  // 折りたたみ状態をlocalStorageに保存
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(COLLAPSED_KEY);
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) setCollapsed(new Set(arr));
+      }
+    } catch {
+      // 破損した設定は無視
+    }
+  }, []);
+
+  function toggleCollapsed(key: string) {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      try {
+        localStorage.setItem(COLLAPSED_KEY, JSON.stringify(Array.from(next)));
+      } catch {
+        // localStorage使えない環境は無視
+      }
+      return next;
+    });
+  }
+
+  // カテゴリごとにチャンネルを振り分け (未分類は UNCATEGORIZED)
+  const grouped = useMemo(() => {
+    const map = new Map<string, Channel[]>();
+    for (const cat of CHANNEL_CATEGORIES) map.set(cat, []);
+    map.set("__uncategorized__", []);
+    for (const ch of channels) {
+      const key = ch.category ?? "__uncategorized__";
+      const list = map.get(key);
+      if (list) list.push(ch);
+      else map.set("__uncategorized__", [ch]); // 想定外カテゴリ値はその他行き
+    }
+    return map;
+  }, [channels]);
+
+  const sections: Array<{ key: string; label: string }> = [
+    ...CHANNEL_CATEGORIES.map((c) => ({
+      key: c as string,
+      label: CHANNEL_CATEGORY_LABELS[c as ChannelCategory],
+    })),
+    { key: "__uncategorized__", label: UNCATEGORIZED_LABEL },
+  ];
+
+  return (
+    <div className="space-y-0.5">
+      {sections.map(({ key, label }) => {
+        const list = grouped.get(key) || [];
+        if (list.length === 0) return null;
+        const isCollapsed = collapsed.has(key);
+        // カテゴリ内の未読合計
+        const unreadTotal = list.reduce(
+          (sum, ch) => sum + (unreadState[ch.id] || 0),
+          0
+        );
+        return (
+          <div key={key} className="mb-1">
+            <button
+              type="button"
+              onClick={() => toggleCollapsed(key)}
+              className="w-full flex items-center gap-1 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-muted hover:text-foreground transition-colors"
+            >
+              <svg
+                className={`w-3 h-3 shrink-0 transition-transform ${
+                  isCollapsed ? "-rotate-90" : ""
+                }`}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2.5}
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+              <span className="flex-1 text-left">{label}</span>
+              {isCollapsed && unreadTotal > 0 && (
+                <span className="bg-accent text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                  {unreadTotal > 99 ? "99+" : unreadTotal}
+                </span>
+              )}
+            </button>
+            {!isCollapsed &&
+              list.map((channel) => {
+                const href = `/${workspaceSlug}/${channel.slug}`;
+                const isActive = pathname === href;
+                const unreadCount = unreadState[channel.id] || 0;
+                const showUnreadStyle = unreadCount > 0 && !isActive;
+                return (
+                  <Link
+                    key={channel.id}
+                    href={href}
+                    prefetch
+                    onClick={onNavigate}
+                    className={`
+                      flex items-center min-w-0 px-3 py-2 text-[15px] rounded-xl mx-2 transition-colors
+                      ${
+                        isActive
+                          ? "bg-accent/10 text-accent"
+                          : "text-muted hover:text-foreground hover:bg-white/[0.04]"
+                      }
+                    `}
+                  >
+                    <span
+                      className={`mr-2 shrink-0 ${
+                        isActive ? "text-accent/50" : "text-accent/50"
+                      }`}
+                    >
+                      #
+                    </span>
+                    <span
+                      className={`truncate min-w-0 flex-1 ${
+                        showUnreadStyle ? "font-semibold text-foreground" : ""
+                      }`}
+                    >
+                      {channel.name}
+                    </span>
+                    {showUnreadStyle && (
+                      <span className="ml-auto bg-accent text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                        {unreadCount > 99 ? "99+" : unreadCount}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
+          </div>
+        );
+      })}
+    </div>
   );
 }

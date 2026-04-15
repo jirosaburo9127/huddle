@@ -3,11 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { RealtimePostgresInsertPayload, RealtimePostgresUpdatePayload } from "@supabase/supabase-js";
-import type { Channel, Message, MessageWithProfile, Reaction } from "@/lib/supabase/types";
+import type { Channel, ChannelCategory, Message, MessageWithProfile, Reaction } from "@/lib/supabase/types";
 import { useRouter } from "next/navigation";
+import { CHANNEL_CATEGORIES, CHANNEL_CATEGORY_LABELS } from "@/lib/channel-categories";
 import { MessageItem } from "./message-item";
 import { MessageInput, type MentionPayload } from "./message-input";
-import { ThreadPanel } from "./thread-panel";
 import { CreatePollModal } from "./create-poll-modal";
 import { DateSeparator } from "./date-separator";
 import { ChannelWiki } from "./channel-wiki";
@@ -27,7 +27,8 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
   const setSidebarOpen = useMobileNavStore((s) => s.setSidebarOpen);
   const router = useRouter();
   const [messages, setMessages] = useState<MessageWithProfile[]>(initialMessages);
-  const [activeThread, setActiveThread] = useState<MessageWithProfile | null>(null);
+  // Chatwork風インライン返信の返信対象
+  const [replyTo, setReplyTo] = useState<MessageWithProfile | null>(null);
   const [showMembersModal, setShowMembersModal] = useState(false);
   const [showDeleteChannel, setShowDeleteChannel] = useState(false);
   const [deletingChannel, setDeletingChannel] = useState(false);
@@ -36,6 +37,9 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
   const [hasWiki, setHasWiki] = useState(false);
   const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
   const [showOverflowMenu, setShowOverflowMenu] = useState(false);
+  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+  const [categoryValue, setCategoryValue] = useState<ChannelCategory | null>(channel.category ?? null);
+  const [categorySaving, setCategorySaving] = useState(false);
   const overflowMenuRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const prevMessageCountRef = useRef(initialMessages.length);
@@ -101,30 +105,22 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showOverflowMenu]);
 
-  // スレッドを開く
-  const handleOpenThread = useCallback((msg: MessageWithProfile) => {
-    // 同時に開いているモバイルのアクションシート/絵文字ピッカーを全部畳む
-    // （タップした本人の MessageItem は onClick 側で閉じるが、
-    //  スレッド内から別メッセージのリアクション選択中にスレッド遷移した場合などに残るため）
+  // 返信対象をセット (メッセージ入力欄に引用が出る)
+  const handleReply = useCallback((msg: MessageWithProfile) => {
+    // モバイルのアクションシート/絵文字ピッカーを閉じる
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("huddle:closeAllActions"));
     }
-    setActiveThread(msg);
+    setReplyTo(msg);
   }, []);
 
-  // スレッド返信数の変更を親メッセージに反映
-  const handleReplyCountChange = useCallback((parentId: string, delta: number) => {
-    setMessages((prev) =>
-      prev.map((m) =>
-        m.id === parentId ? { ...m, reply_count: m.reply_count + delta } : m
-      )
-    );
-    // activeThreadも更新
-    setActiveThread((prev) =>
-      prev && prev.id === parentId
-        ? { ...prev, reply_count: prev.reply_count + delta }
-        : prev
-    );
+  // 引用元メッセージへジャンプしてハイライト
+  const handleJumpToMessage = useCallback((messageId: string) => {
+    const el = document.getElementById(`msg-${messageId}`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.classList.add("reply-jump-highlight");
+    setTimeout(() => el.classList.remove("reply-jump-highlight"), 1600);
   }, []);
 
   // オンライン状態の更新（60秒ごと）
@@ -243,8 +239,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
           filter: `channel_id=eq.${channel.id}`,
         },
         async (payload: RealtimePostgresInsertPayload<Message>) => {
-          // parent_idがあるものはスレッド返信なので無視
-          if (payload.new.parent_id) return;
+          // Chatwork風インライン返信: parent_id があるメッセージもタイムラインに流す
 
           // このタブで楽観的に追加済みのメッセージはスキップ（user_idでの判定はNG。
           // 同じユーザーが別端末で送ったメッセージも届かなくなってしまうため）
@@ -318,11 +313,11 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     async function syncMissedMessages() {
       // 直近50件をDBから取り直し、ローカルに無いものだけマージする
       //（最新が消える系のバグは「ローカルに無いはずの新しい行」を補えれば直る）
+      // 返信(parent_id あり)も含めて取得する。Chatwork風インライン表示でタイムラインに流すため
       const { data } = await supabase
         .from("messages")
         .select("*, profiles(*), reactions(*)")
         .eq("channel_id", channel.id)
-        .is("parent_id", null)
         .order("created_at", { ascending: false })
         .limit(50);
 
@@ -616,6 +611,8 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     if (!user) return;
 
     const isDecision = options?.isDecision ?? false;
+    // 送信時点の返信対象をスナップショット (連投時に次のメッセージに引きずられないように)
+    const parentIdSnapshot = replyTo?.id ?? null;
 
     // 送信前にクライアント側で UUID を決めてしまうことで、
     // 「optimistic insert → DB insert → realtime 到着」のレース条件を完全に排除する。
@@ -630,7 +627,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
       id: newMessageId,
       channel_id: channel.id,
       user_id: user.id,
-      parent_id: null,
+      parent_id: parentIdSnapshot,
       content,
       edited_at: null,
       deleted_at: null,
@@ -650,6 +647,8 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     };
 
     setMessages((prev) => [...prev, optimisticMsg]);
+    // 送信と同時に返信対象をリセット
+    if (parentIdSnapshot) setReplyTo(null);
 
     // クライアント発行の UUID をそのまま使って DB に挿入
     const { data, error } = await supabase.from("messages").insert({
@@ -657,6 +656,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
       channel_id: channel.id,
       user_id: user.id,
       content,
+      ...(parentIdSnapshot ? { parent_id: parentIdSnapshot } : {}),
       ...(isDecision ? { is_decision: true } : {}),
     }).select().single();
 
@@ -856,6 +856,29 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
                     </button>
                   )}
 
+                  {/* カテゴリ変更 (DMでは非表示) */}
+                  {!channel.is_dm && (
+                    <button
+                      role="menuitem"
+                      onClick={() => {
+                        setShowOverflowMenu(false);
+                        setCategoryValue(channel.category ?? null);
+                        setShowCategoryPicker(true);
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-white/[0.04] transition-colors"
+                    >
+                      <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                      </svg>
+                      カテゴリを変更
+                      {channel.category && (
+                        <span className="ml-auto text-xs text-muted truncate">
+                          {CHANNEL_CATEGORY_LABELS[channel.category]}
+                        </span>
+                      )}
+                    </button>
+                  )}
+
                   {/* チャンネル名変更 / 削除 は general と DM では非表示 */}
                   {!channel.is_dm && channel.slug !== "general" && (
                     <>
@@ -950,42 +973,55 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
                   <button onClick={() => setShowDecisionsOnly(false)} className="ml-auto text-xs hover:underline">解除</button>
                 </div>
               )}
-              {(showDecisionsOnly ? messages.filter((m) => m.is_decision) : messages).map((message, index, arr) => {
-                const prev = index > 0 ? arr[index - 1] : null;
-                // 日付セパレーター: 前のメッセージと日付が異なる場合に表示
-                const currentDate = new Date(message.created_at).toDateString();
-                const prevDate = prev ? new Date(prev.created_at).toDateString() : null;
-                const showDateSeparator = !prev || currentDate !== prevDate;
-                // 連続メッセージ判定: 同一ユーザーかつ5分以内
-                const isConsecutive =
-                  !showDateSeparator &&
-                  prev !== null &&
-                  prev.user_id === message.user_id &&
-                  !prev.deleted_at &&
-                  new Date(message.created_at).getTime() - new Date(prev.created_at).getTime() < 5 * 60 * 1000;
+              {(() => {
+                const displayed = showDecisionsOnly
+                  ? messages.filter((m) => m.is_decision)
+                  : messages;
+                // 引用ブロック表示用の参照マップ (O(1) 親解決)
+                const byId = new Map<string, MessageWithProfile>();
+                for (const m of messages) byId.set(m.id, m);
+                return displayed.map((message, index, arr) => {
+                  const prev = index > 0 ? arr[index - 1] : null;
+                  // 日付セパレーター: 前のメッセージと日付が異なる場合に表示
+                  const currentDate = new Date(message.created_at).toDateString();
+                  const prevDate = prev ? new Date(prev.created_at).toDateString() : null;
+                  const showDateSeparator = !prev || currentDate !== prevDate;
+                  // 連続メッセージ判定: 同一ユーザーかつ5分以内
+                  // 返信メッセージは引用ブロックを見せるため連続化しない
+                  const isConsecutive =
+                    !showDateSeparator &&
+                    prev !== null &&
+                    prev.user_id === message.user_id &&
+                    !prev.deleted_at &&
+                    !message.parent_id &&
+                    new Date(message.created_at).getTime() - new Date(prev.created_at).getTime() < 5 * 60 * 1000;
+                  const parentMessage = message.parent_id ? byId.get(message.parent_id) ?? null : null;
 
-                return (
-                  <div key={message.id}>
-                    {showDateSeparator && (
-                      <DateSeparator date={message.created_at} />
-                    )}
-                    <MessageItem
-                      message={message}
-                      currentUserId={currentUserId}
-                      onEdit={handleEdit}
-                      onDelete={handleDelete}
-                      onOpenThread={handleOpenThread}
-                      onReact={handleReact}
-                      onDecision={handleDecision}
-                      onUpdateDecisionMeta={handleUpdateDecisionMeta}
-                      onBookmark={handleBookmark}
-                      isBookmarked={bookmarkedIds.has(message.id)}
-                      isConsecutive={isConsecutive}
-                      hasPoll={pollMessageIds.has(message.id)}
-                    />
-                  </div>
-                );
-              })}
+                  return (
+                    <div key={message.id}>
+                      {showDateSeparator && (
+                        <DateSeparator date={message.created_at} />
+                      )}
+                      <MessageItem
+                        message={message}
+                        parentMessage={parentMessage}
+                        currentUserId={currentUserId}
+                        onEdit={handleEdit}
+                        onDelete={handleDelete}
+                        onReply={handleReply}
+                        onJumpToMessage={handleJumpToMessage}
+                        onReact={handleReact}
+                        onDecision={handleDecision}
+                        onUpdateDecisionMeta={handleUpdateDecisionMeta}
+                        onBookmark={handleBookmark}
+                        isBookmarked={bookmarkedIds.has(message.id)}
+                        isConsecutive={isConsecutive}
+                        hasPoll={pollMessageIds.has(message.id)}
+                      />
+                    </div>
+                  );
+                });
+              })()}
             </div>
           )}
           <div ref={messagesEndRef} />
@@ -998,6 +1034,8 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
           channelId={channel.id}
           workspaceId={channel.workspace_id}
           onCreatePoll={() => setShowCreatePoll(true)}
+          replyTo={replyTo}
+          onCancelReply={() => setReplyTo(null)}
         />
       </div>
 
@@ -1009,24 +1047,8 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
         />
       )}
 
-      {/* スレッドパネル */}
-      {activeThread && (
-        <ThreadPanel
-          parentMessage={activeThread}
-          currentUserId={currentUserId}
-          channelId={channel.id}
-          workspaceId={channel.workspace_id}
-          myProfile={myProfile}
-          onClose={() => setActiveThread(null)}
-          onReplyCountChange={handleReplyCountChange}
-          onDecision={handleDecision}
-          onBookmark={handleBookmark}
-          bookmarkedIds={bookmarkedIds}
-        />
-      )}
-
       {/* Wikiパネル */}
-      {showWiki && !activeThread && (
+      {showWiki && (
         <ChannelWiki
           channelId={channel.id}
           onClose={() => { setShowWiki(false); setHasWiki(true); }}
@@ -1042,6 +1064,91 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
           isPrivate={channel.is_private}
           onClose={() => setShowMembersModal(false)}
         />
+      )}
+
+      {/* チャンネルカテゴリ変更モーダル */}
+      {showCategoryPicker && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => !categorySaving && setShowCategoryPicker(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl bg-sidebar border border-border p-5 space-y-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold">カテゴリを選択</h3>
+              <button
+                type="button"
+                onClick={() => !categorySaving && setShowCategoryPicker(false)}
+                className="text-muted hover:text-foreground"
+                aria-label="閉じる"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="space-y-1">
+              <label className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer hover:bg-white/[0.04] transition-colors">
+                <input
+                  type="radio"
+                  name="channel-category"
+                  checked={categoryValue === null}
+                  onChange={() => setCategoryValue(null)}
+                />
+                <span className="text-sm text-foreground">未分類</span>
+              </label>
+              {CHANNEL_CATEGORIES.map((cat) => (
+                <label
+                  key={cat}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer hover:bg-white/[0.04] transition-colors"
+                >
+                  <input
+                    type="radio"
+                    name="channel-category"
+                    checked={categoryValue === cat}
+                    onChange={() => setCategoryValue(cat)}
+                  />
+                  <span className="text-sm text-foreground">
+                    {CHANNEL_CATEGORY_LABELS[cat]}
+                  </span>
+                </label>
+              ))}
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => !categorySaving && setShowCategoryPicker(false)}
+                className="rounded-lg px-4 py-2 text-sm text-muted hover:text-foreground transition-colors"
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                disabled={categorySaving}
+                onClick={async () => {
+                  setCategorySaving(true);
+                  const { error } = await supabase.rpc("update_channel_category", {
+                    p_channel_id: channel.id,
+                    p_category: categoryValue,
+                  });
+                  setCategorySaving(false);
+                  if (error) {
+                    alert("カテゴリの更新に失敗しました: " + error.message);
+                    return;
+                  }
+                  setShowCategoryPicker(false);
+                  // サイドバーに反映するため RSC を再検証
+                  router.refresh();
+                }}
+                className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50 transition-colors"
+              >
+                {categorySaving ? "保存中..." : "保存"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* チャンネル削除確認ダイアログ */}

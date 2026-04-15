@@ -316,6 +316,15 @@ html, body {
   --color-mention: #ef4444;
 }
 
+/* 引用元メッセージへのジャンプ時に一瞬ハイライト */
+@keyframes reply-jump-flash {
+  0% { background-color: rgba(139, 92, 246, 0.25); }
+  100% { background-color: transparent; }
+}
+.reply-jump-highlight {
+  animation: reply-jump-flash 1.6s ease-out;
+}
+
 /* Warm（あったかベージュ） */
 [data-theme="warm"] {
   --color-background: #f5f0e8;

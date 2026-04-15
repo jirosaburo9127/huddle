@@ -7,10 +7,12 @@ import { PollDisplay } from "./poll-display";
 
 type Props = {
   message: MessageWithProfile;
+  parentMessage?: MessageWithProfile | null;
   currentUserId: string;
   onEdit: (messageId: string, newContent: string) => Promise<void>;
   onDelete: (messageId: string) => Promise<void>;
-  onOpenThread?: (message: MessageWithProfile) => void;
+  onReply?: (message: MessageWithProfile) => void;
+  onJumpToMessage?: (messageId: string) => void;
   onReact?: (messageId: string, emoji: string) => Promise<void>;
   onDecision?: (messageId: string, isDecision: boolean) => Promise<void>;
   onUpdateDecisionMeta?: (
@@ -20,7 +22,6 @@ type Props = {
   ) => Promise<void>;
   onBookmark?: (messageId: string) => Promise<void>;
   isBookmarked?: boolean;
-  isThreadView?: boolean;
   isConsecutive?: boolean;
   hasPoll?: boolean;
 };
@@ -273,16 +274,17 @@ function ReactionBadges({
 
 export const MessageItem = memo(function MessageItem({
   message,
+  parentMessage,
   currentUserId,
   onEdit,
   onDelete,
-  onOpenThread,
+  onReply,
+  onJumpToMessage,
   onReact,
   onDecision,
   onUpdateDecisionMeta,
   onBookmark,
   isBookmarked,
-  isThreadView,
   isConsecutive,
   hasPoll,
 }: Props) {
@@ -418,6 +420,7 @@ export const MessageItem = memo(function MessageItem({
   return (
     <>
       <div
+        id={`msg-${message.id}`}
         className={`group relative flex gap-3 px-2 rounded-lg hover:bg-white/[0.02] transition-colors ${
           isConsecutive ? "py-1" : "pt-3 pb-1"
         }`}
@@ -513,6 +516,37 @@ export const MessageItem = memo(function MessageItem({
             </div>
           ) : (
             <>
+              {/* Chatwork風の引用ブロック: 返信メッセージの冒頭に元メッセージを表示 */}
+              {message.parent_id && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (parentMessage) onJumpToMessage?.(parentMessage.id);
+                  }}
+                  className="mt-1 mb-1.5 w-full text-left pl-3 pr-3 py-2 rounded-md bg-white/[0.04] border-l-2 border-accent/60 hover:bg-white/[0.06] transition-colors"
+                >
+                  {parentMessage ? (
+                    <>
+                      <div className="flex items-center gap-1 text-xs text-accent font-semibold mb-0.5">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                        </svg>
+                        <span>@{parentMessage.profiles?.display_name || "元メッセージ"}</span>
+                      </div>
+                      <div className="text-xs text-muted line-clamp-2 whitespace-pre-wrap break-words">
+                        {parentMessage.deleted_at
+                          ? "(削除されたメッセージ)"
+                          : isStorageFileUrl(parentMessage.content)
+                            ? `[${extractFileName(parentMessage.content.trim())}]`
+                            : parentMessage.content.slice(0, 120)}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-xs text-muted">元メッセージ (読み込み中)</div>
+                  )}
+                </button>
+              )}
               <MessageContent
                 content={message.content}
                 imageError={imageError}
@@ -669,26 +703,6 @@ export const MessageItem = memo(function MessageItem({
             />
           )}
 
-          {/* スレッド返信数 — ボタン型で大きく目立つように */}
-          {message.reply_count > 0 && !isThreadView && (
-            <button
-              onClick={(e) => {
-                // 親div(onClickでshowActionsトグル)に伝播させない
-                e.stopPropagation();
-                onOpenThread?.(message);
-              }}
-              className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-accent/40 bg-accent/5 hover:bg-accent/15 text-sm font-semibold text-accent transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
-              <span>{message.reply_count} 件の返信</span>
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-          )}
-
           {/* PC: アクションバー（ホバーで表示、メッセージ右上に浮かせる） */}
           {!isEditing && (
           <div className="hidden lg:flex absolute -top-2 right-3 z-10 transition-opacity items-center gap-0.5 bg-sidebar/95 backdrop-blur-sm border border-border/60 rounded-lg px-1 py-0.5 shadow-lg opacity-0 group-hover:opacity-100">
@@ -728,9 +742,9 @@ export const MessageItem = memo(function MessageItem({
                 )}
               </div>
             )}
-            {!isThreadView && (
+            {onReply && (
               <button
-                onClick={(e) => { e.stopPropagation(); onOpenThread?.(message); }}
+                onClick={(e) => { e.stopPropagation(); onReply(message); }}
                 className="flex items-center gap-1 px-2 py-0.5 text-[13px] text-muted hover:text-accent border border-transparent hover:border-border/50 rounded transition-colors"
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -792,10 +806,10 @@ export const MessageItem = memo(function MessageItem({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="grid grid-cols-3 gap-3">
-              {/* 返信 (スレッド内では非表示) */}
-              {!isThreadView && (
+              {/* 返信 */}
+              {onReply && (
                 <button
-                  onClick={() => { setShowActions(false); onOpenThread?.(message); }}
+                  onClick={() => { setShowActions(false); onReply(message); }}
                   className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
                 >
                   <span className="w-12 h-12 rounded-full border-2 border-muted/40 flex items-center justify-center">

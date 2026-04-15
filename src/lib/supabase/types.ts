@@ -17,6 +17,13 @@ export type Workspace = {
   created_at: string;
 };
 
+export type ChannelCategory =
+  | "idea"
+  | "todo"
+  | "in_progress"
+  | "review"
+  | "archived";
+
 export type Channel = {
   id: string;
   workspace_id: string;
@@ -25,6 +32,7 @@ export type Channel = {
   is_private: boolean;
   is_dm: boolean;
   topic: string | null;
+  category: ChannelCategory | null;
   created_by: string;
   created_at: string;
 };
