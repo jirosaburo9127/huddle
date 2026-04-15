@@ -281,11 +281,6 @@ Deno.serve(async (req) => {
     }
 
     const recipientIds = Array.from(recipientIdsSet);
-    // user_id -> muted の引き当て用マップ（後段で @メンション以外は除外するのに使う）
-    const mutedByUser = new Map<string, boolean>();
-    for (const m of members) {
-      mutedByUser.set(m.user_id, Boolean(m.muted));
-    }
 
     // 各受信者の iOS デバイストークンを取得
     const { data: tokens } = await supabase
