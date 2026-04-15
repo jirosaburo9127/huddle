@@ -68,8 +68,12 @@ export async function sendMessage(channelId: string, content: string, parentId?:
 }
 
 // ログアウト
+// 注: scope: "local" を指定することで、現在のセッション (このデバイス) だけを
+// 無効化する。デフォルトの "global" だと全デバイスのセッションがサーバ側で
+// 一括 revoke されてしまい、Web でログアウトしたら iOS アプリでもログアウト
+// される、という事故が起きる。
 export async function signOut() {
   const supabase = await createClient();
-  await supabase.auth.signOut();
+  await supabase.auth.signOut({ scope: "local" });
   redirect("/login");
 }
