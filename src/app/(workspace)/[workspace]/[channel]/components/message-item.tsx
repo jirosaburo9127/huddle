@@ -524,7 +524,7 @@ export const MessageItem = memo(function MessageItem({
                     e.stopPropagation();
                     if (parentMessage) onJumpToMessage?.(parentMessage.id);
                   }}
-                  className="mt-1 mb-1.5 w-full text-left pl-3 pr-3 py-2 rounded-md bg-white/[0.04] border-l-2 border-accent/60 hover:bg-white/[0.06] transition-colors"
+                  className="mt-1 mb-1.5 w-full text-left px-3 py-2 rounded-md bg-white/[0.04] hover:bg-white/[0.06] transition-colors"
                 >
                   {parentMessage ? (
                     <>
