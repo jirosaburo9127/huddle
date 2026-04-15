@@ -86,18 +86,22 @@ async function sendPushOnce(
   body: string,
   badge: number,
   url: string,
+  showBanner: boolean,
   isMention: boolean
 ): Promise<{ ok: boolean; status: number; error?: string }> {
   try {
     const jwt = await getApnsJwt();
-    // メンション時は interruption-level を time-sensitive にして集中モードを突破する
-    const aps: Record<string, unknown> = {
-      alert: { title, body },
-      sound: "default",
-      badge,
-    };
-    if (isMention) {
-      aps["interruption-level"] = "time-sensitive";
+    // showBanner=false の場合は alert / sound を付けず、
+    // badge だけ更新する「バッジのみ通知」として送る。
+    // iOS はバナー・音を出さずアイコンバッジだけ変わる挙動になる。
+    const aps: Record<string, unknown> = { badge };
+    if (showBanner) {
+      aps.alert = { title, body };
+      aps.sound = "default";
+      // メンション時は interruption-level を time-sensitive にして集中モードを突破する
+      if (isMention) {
+        aps["interruption-level"] = "time-sensitive";
+      }
     }
     const response = await fetch(
       `https://${APNS_HOST}/3/device/${deviceToken}`,
@@ -108,9 +112,9 @@ async function sendPushOnce(
           "apns-topic": APNS_BUNDLE_ID,
           "apns-push-type": "alert",
           "content-type": "application/json",
-          // チャットメッセージは即時配信優先なので常に 10（高優先度）。
-          // 5 だと iOS がロック中にまとめて配信して遅延することがある。
-          "apns-priority": "10",
+          // バナーを出す通知は即時優先 (10)、
+          // バッジのみ通知は iOS 側でまとめ配信可 (5) にしてバッテリー/帯域を節約
+          "apns-priority": showBanner ? "10" : "5",
         },
         body: JSON.stringify({
           aps,
@@ -138,10 +142,11 @@ async function sendPush(
   body: string,
   badge: number,
   url: string,
+  showBanner: boolean,
   isMention: boolean
 ): Promise<{ ok: boolean; status: number; error?: string }> {
   const DELAYS = [250, 750, 2000]; // ms. 合計 ~3秒
-  let result = await sendPushOnce(deviceToken, title, body, badge, url, isMention);
+  let result = await sendPushOnce(deviceToken, title, body, badge, url, showBanner, isMention);
   for (const delay of DELAYS) {
     if (result.ok) return result;
     // リトライ可能エラー: 5xx, 408, 0 (network)
@@ -151,7 +156,7 @@ async function sendPush(
       (result.status >= 500 && result.status < 600);
     if (!retriable) return result;
     await new Promise((r) => setTimeout(r, delay));
-    result = await sendPushOnce(deviceToken, title, body, badge, url, isMention);
+    result = await sendPushOnce(deviceToken, title, body, badge, url, showBanner, isMention);
   }
   return result;
 }
@@ -372,11 +377,21 @@ Deno.serve(async (req) => {
       );
     }
 
+    // バナー (音+通知センター表示) を出すかどうかの判定
+    // デフォルトは「メンション / DM / スレッド返信 / 投票作成/締切」のみ
+    // それ以外はバッジだけ更新する静かな通知にする
+    const isPollEvent =
+      record.system_event === "poll_created" ||
+      record.system_event === "poll_closed";
+    const baseShowBanner =
+      isThreadReply || channel.is_dm || isPollEvent;
+
     // 並列送信
     const results = await Promise.allSettled(
       targetedTokens.map((t) => {
         const isMentioned =
           isBroadcastMention || mentionedUserIds.has(t.user_id);
+        const showBanner = baseShowBanner || isMentioned;
         const badge = badgeCountByUser.get(t.user_id) ?? 1;
         return sendPush(
           t.token,
@@ -384,6 +399,7 @@ Deno.serve(async (req) => {
           bodyPlain,
           badge,
           channelUrl,
+          showBanner,
           isMentioned
         );
       })
