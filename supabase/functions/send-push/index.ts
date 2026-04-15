@@ -250,18 +250,18 @@ Deno.serve(async (req) => {
       for (const r of replies || []) {
         recipientIdsSet.add(r.user_id);
       }
-      // ミュート状態は全員 false 扱い (スレッド参加者はミュート影響を受けない)
-      // ただしチャンネルメンバーでない相手には送らない
+      // スレッド参加者はミュート影響を受けない (親 or 返信で明示的に会話に入った人)。
+      // チャンネルメンバーでない相手にだけは送らないように validSet で絞る。
+      // mutedByUser には意図的に値を入れない (undefined = 後段のフィルタで muted 扱いされない)。
       if (recipientIdsSet.size > 0) {
         const { data: cms } = await supabase
           .from("channel_members")
-          .select("user_id, muted")
+          .select("user_id")
           .eq("channel_id", record.channel_id)
           .in("user_id", Array.from(recipientIdsSet));
         const validSet = new Set<string>();
         for (const cm of cms || []) {
           validSet.add(cm.user_id);
-          mutedByUser.set(cm.user_id, Boolean(cm.muted));
         }
         recipientIdsSet = validSet;
       }
