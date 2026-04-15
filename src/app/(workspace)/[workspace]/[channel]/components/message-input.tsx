@@ -388,10 +388,10 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
       }
     }
 
-    // PC: Enterで送信（Shift+Enterで改行）
-    // モバイル: Enterは常に改行（送信ボタンで送信）
-    const isMobile = typeof window !== "undefined" && window.innerWidth < 1024;
-    if (e.key === "Enter" && !e.shiftKey && !isMobile) {
+    // Enter 単体 → 改行 (LINE 風)
+    // Alt+Enter (Windows Alt / Mac Option) または Cmd+Enter (Mac Command) → 送信
+    // Shift+Enter は従来どおり改行 (デフォルト動作)
+    if (e.key === "Enter" && (e.altKey || e.metaKey)) {
       e.preventDefault();
       handleSubmit(e);
     }
