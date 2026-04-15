@@ -40,7 +40,6 @@ type SidebarProps = {
   currentUserId: string;
   workspaceSlug: string;
   unreadCounts?: Record<string, number>;
-  mutedChannelIds?: string[];
   allWorkspaces: Array<{ id: string; name: string; slug: string }>;
 };
 
@@ -52,7 +51,6 @@ export function Sidebar({
   currentUserId,
   workspaceSlug,
   unreadCounts = {},
-  mutedChannelIds = [],
   allWorkspaces,
 }: SidebarProps) {
   const pathname = usePathname();
@@ -64,35 +62,6 @@ export function Sidebar({
   const [unreadState, setUnreadState] = useState<Record<string, number>>(unreadCounts);
   // ワークスペース単位の未読カウント（他WSにメッセージが来たことを一目で伝えるため）
   const [unreadByWorkspace, setUnreadByWorkspace] = useState<Record<string, number>>({});
-  // ミュート中のチャンネルIDセット。channel-view側のトグルから CustomEvent で更新される
-  const [mutedSet, setMutedSet] = useState<Set<string>>(() => new Set(mutedChannelIds));
-
-  // channel-view のミュートトグルから発火される `huddle:muteChanged` を購読
-  useEffect(() => {
-    function handler(ev: Event) {
-      const detail = (ev as CustomEvent<{ channelId: string; muted: boolean }>).detail;
-      if (!detail) return;
-      setMutedSet((prev) => {
-        const next = new Set(prev);
-        if (detail.muted) next.add(detail.channelId);
-        else next.delete(detail.channelId);
-        return next;
-      });
-      // ミュートにした場合はバッジ数も即時0に（解除時はRealtimeまたはfocusで再取得）
-      if (detail.muted) {
-        setUnreadState((prev) => {
-          if (!(detail.channelId in prev)) return prev;
-          const next = { ...prev };
-          delete next[detail.channelId];
-          return next;
-        });
-      }
-    }
-    window.addEventListener("huddle:muteChanged", handler as EventListener);
-    return () => {
-      window.removeEventListener("huddle:muteChanged", handler as EventListener);
-    };
-  }, []);
   // Sidebar専用のSupabaseクライアント（毎レンダー再生成しない）
   const sidebarSupabaseRef = useRef(createClient());
   const [showCreateChannel, setShowCreateChannel] = useState(false);
@@ -334,7 +303,6 @@ export function Sidebar({
           const ch = channelById.get(msg.channel_id);
           if (!ch) {
             // このサイドバーに無いチャンネル = 別ワークスペースのメッセージの可能性。
-            // ユーザーがそのチャンネルのメンバーかつミュートしていないかをRPC側で判定して
             // ワークスペース単位の未読バッジだけ更新する。
             (async () => {
               const { data } = await supabase.rpc("get_unread_counts_by_workspace", {
@@ -350,9 +318,6 @@ export function Sidebar({
             })();
             return;
           }
-
-          // ミュート中のチャンネルは未読カウントもせず無視
-          if (mutedSet.has(msg.channel_id)) return;
 
           // 表示中チャンネル → サーバ now() で自動既読
           if (msg.channel_id === currentChannelId) {
@@ -635,10 +600,8 @@ export function Sidebar({
           {filteredChannels.map((channel) => {
             const href = `/${workspaceSlug}/${channel.slug}`;
             const isActive = pathname === href;
-            const isMuted = mutedSet.has(channel.id);
             const unreadCount = unreadState[channel.id] || 0;
-            // ミュート中は未読があっても太字／バッジを出さず、全体を薄く
-            const showUnreadStyle = unreadCount > 0 && !isActive && !isMuted;
+            const showUnreadStyle = unreadCount > 0 && !isActive;
             return (
               <Link
                 key={channel.id}
@@ -652,7 +615,6 @@ export function Sidebar({
                       ? "bg-accent/10 text-accent"
                       : "text-muted hover:text-foreground hover:bg-white/[0.04]"
                   }
-                  ${isMuted && !isActive ? "opacity-50" : ""}
                 `}
               >
                 <span
@@ -663,20 +625,6 @@ export function Sidebar({
                 <span className={`truncate min-w-0 flex-1 ${showUnreadStyle ? "font-semibold text-foreground" : ""}`}>
                   {channel.name}
                 </span>
-                {/* ミュートアイコン */}
-                {isMuted && (
-                  <svg
-                    className="ml-auto w-4 h-4 text-muted/70 shrink-0"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                    viewBox="0 0 24 24"
-                    aria-label="ミュート中"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
-                  </svg>
-                )}
-                {/* 未読バッジ（ミュート中は非表示） */}
                 {showUnreadStyle && (
                   <span className="ml-auto bg-accent text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
                     {unreadCount > 99 ? "99+" : unreadCount}
@@ -737,8 +685,7 @@ export function Sidebar({
                   ? "bg-online"
                   : "bg-muted/50";
             const dmUnread = unreadState[dm.id] || 0;
-            const dmMuted = mutedSet.has(dm.id);
-            const dmShowUnreadStyle = dmUnread > 0 && !isActive && !dmMuted;
+            const dmShowUnreadStyle = dmUnread > 0 && !isActive;
 
             return (
               <Link
@@ -753,7 +700,6 @@ export function Sidebar({
                       ? "bg-accent/10 text-accent"
                       : "text-muted hover:text-foreground hover:bg-white/[0.04]"
                   }
-                  ${dmMuted && !isActive ? "opacity-50" : ""}
                 `}
               >
                 {/* アバター + オンラインドット */}
@@ -778,20 +724,6 @@ export function Sidebar({
                 >
                   {name}
                 </span>
-                {/* ミュートアイコン */}
-                {dmMuted && (
-                  <svg
-                    className="ml-auto w-4 h-4 text-muted/70 shrink-0"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                    viewBox="0 0 24 24"
-                    aria-label="ミュート中"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
-                  </svg>
-                )}
-                {/* 未読バッジ（ミュート中は非表示） */}
                 {dmShowUnreadStyle && (
                   <span className="ml-auto bg-accent text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
                     {dmUnread > 99 ? "99+" : dmUnread}

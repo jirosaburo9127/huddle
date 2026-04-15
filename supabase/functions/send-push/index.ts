@@ -228,11 +228,9 @@ Deno.serve(async (req) => {
 
     // 受信者 user_id の集合を作る
     let recipientIdsSet = new Set<string>();
-    const mutedByUser = new Map<string, boolean>();
 
     if (isThreadReply) {
-      // スレッド返信: 親メッセージの著者 + これまでの返信者 + 親チャンネルメンバーのミュート状態
-      // 親メッセージの著者
+      // スレッド返信: 親メッセージの著者 + これまでの返信者
       const { data: parentMsg } = await supabase
         .from("messages")
         .select("user_id")
@@ -241,7 +239,6 @@ Deno.serve(async (req) => {
       if (parentMsg?.user_id && parentMsg.user_id !== record.user_id) {
         recipientIdsSet.add(parentMsg.user_id);
       }
-      // 過去にそのスレッドに返信した人
       const { data: replies } = await supabase
         .from("messages")
         .select("user_id")
@@ -250,9 +247,7 @@ Deno.serve(async (req) => {
       for (const r of replies || []) {
         recipientIdsSet.add(r.user_id);
       }
-      // スレッド参加者はミュート影響を受けない (親 or 返信で明示的に会話に入った人)。
-      // チャンネルメンバーでない相手にだけは送らないように validSet で絞る。
-      // mutedByUser には意図的に値を入れない (undefined = 後段のフィルタで muted 扱いされない)。
+      // チャンネルメンバーでない相手には送らない
       if (recipientIdsSet.size > 0) {
         const { data: cms } = await supabase
           .from("channel_members")
@@ -269,12 +264,11 @@ Deno.serve(async (req) => {
       // 通常メッセージ: チャンネルメンバー全員 (送信者以外)
       const { data: members } = await supabase
         .from("channel_members")
-        .select("user_id, muted")
+        .select("user_id")
         .eq("channel_id", record.channel_id)
         .neq("user_id", record.user_id);
       for (const m of members || []) {
         recipientIdsSet.add(m.user_id);
-        mutedByUser.set(m.user_id, Boolean(m.muted));
       }
     }
 
@@ -361,21 +355,9 @@ Deno.serve(async (req) => {
       return `${senderName} (#${channel.name})`;
     }
 
-    // ミュートされていて、かつ @メンションもされていないトークンは通知しない
-    // Slackと同じ動作: ミュート中でも @メンションは常に通知する
-    const targetedTokens = tokens.filter((t) => {
-      const isMentioned =
-        isBroadcastMention || mentionedUserIds.has(t.user_id);
-      if (mutedByUser.get(t.user_id) && !isMentioned) return false;
-      return true;
-    });
-
-    if (targetedTokens.length === 0) {
-      return new Response(
-        JSON.stringify({ skipped: "all recipients muted (no mention)" }),
-        { status: 200, headers: { "content-type": "application/json" } }
-      );
-    }
+    // ミュート機能は廃止済み (035_remove_mute_feature.sql) なので
+    // 受信者全員のトークンをそのまま対象にする。
+    const targetedTokens = tokens;
 
     // バナー (音+通知センター表示) を出すかどうかの判定
     // デフォルトは「メンション / DM / スレッド返信 / 投票作成/締切」のみ
@@ -477,7 +459,6 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         sent: targetedTokens.length - failures.length,
-        muted_skipped: tokens.length - targetedTokens.length,
         failed: failures.length,
         failures: failures.length > 0 ? failures : undefined,
       }),

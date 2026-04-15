@@ -35,8 +35,6 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
   const [showWiki, setShowWiki] = useState(false);
   const [hasWiki, setHasWiki] = useState(false);
   const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
-  const [isMuted, setIsMuted] = useState(false);
-  const [muteUpdating, setMuteUpdating] = useState(false);
   const [showOverflowMenu, setShowOverflowMenu] = useState(false);
   const overflowMenuRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -88,25 +86,6 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     clearPushBadge(currentUserId);
   }, [channel.id, setSidebarOpen, currentUserId]);
 
-  // このチャンネルの自分のミュート状態を取得（チャンネル切替時に再取得）
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const { data } = await supabase
-        .from("channel_members")
-        .select("muted")
-        .eq("channel_id", channel.id)
-        .eq("user_id", currentUserId)
-        .maybeSingle();
-      if (!cancelled) {
-        setIsMuted(Boolean(data?.muted));
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [channel.id, currentUserId, supabase]);
-
   // overflow メニュー外クリックで閉じる
   useEffect(() => {
     if (!showOverflowMenu) return;
@@ -121,36 +100,6 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showOverflowMenu]);
-
-  // ミュート ON/OFF 切替
-  const handleToggleMute = useCallback(async () => {
-    if (muteUpdating) return;
-    setMuteUpdating(true);
-    const nextMuted = !isMuted;
-    // 楽観的更新
-    setIsMuted(nextMuted);
-    const { error } = await supabase
-      .from("channel_members")
-      .update({ muted: nextMuted })
-      .eq("channel_id", channel.id)
-      .eq("user_id", currentUserId);
-    setMuteUpdating(false);
-    if (error) {
-      // ロールバック
-      setIsMuted(!nextMuted);
-      // eslint-disable-next-line no-console
-      console.error("[mute] update failed:", error);
-      return;
-    }
-    // サイドバーに通知（バッジ即時反映のため）
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(
-        new CustomEvent("huddle:muteChanged", {
-          detail: { channelId: channel.id, muted: nextMuted },
-        })
-      );
-    }
-  }, [isMuted, muteUpdating, channel.id, currentUserId, supabase]);
 
   // スレッドを開く
   const handleOpenThread = useCallback((msg: MessageWithProfile) => {
@@ -889,30 +838,6 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
                       {showWiki ? "Wikiを閉じる" : "Wiki"}
                     </button>
                   )}
-
-                  {/* ミュート */}
-                  <button
-                    role="menuitem"
-                    onClick={() => {
-                      setShowOverflowMenu(false);
-                      handleToggleMute();
-                    }}
-                    disabled={muteUpdating}
-                    className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-white/[0.04] transition-colors disabled:opacity-50 ${
-                      isMuted ? "text-accent" : "text-foreground"
-                    }`}
-                  >
-                    {isMuted ? (
-                      <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
-                      </svg>
-                    ) : (
-                      <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                      </svg>
-                    )}
-                    {isMuted ? "ミュート解除" : "ミュート"}
-                  </button>
 
                   {/* メンバー管理（DMでは非表示） */}
                   {!channel.is_dm && (

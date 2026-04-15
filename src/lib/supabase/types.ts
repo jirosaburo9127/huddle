@@ -59,7 +59,6 @@ export type ChannelMember = {
   user_id: string;
   joined_at: string;
   last_read_at: string | null;
-  muted: boolean;
 };
 
 // メッセージ + プロフィール結合型
