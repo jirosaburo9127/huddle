@@ -524,26 +524,59 @@ export const MessageItem = memo(function MessageItem({
                     e.stopPropagation();
                     if (parentMessage) onJumpToMessage?.(parentMessage.id);
                   }}
-                  className="mt-1 mb-1.5 w-full text-left px-3 py-2 rounded-md bg-white/[0.04] hover:bg-white/[0.06] transition-colors"
+                  className="mt-1 mb-2 w-full text-left rounded-lg bg-accent/[0.06] hover:bg-accent/[0.1] transition-colors overflow-hidden"
                 >
                   {parentMessage ? (
                     <>
-                      <div className="flex items-center gap-1 text-xs text-accent font-semibold mb-0.5">
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                      {/* 返信先ヘッダー: アバター + 表示名 + 時刻 */}
+                      <div className="flex items-center gap-2 px-3 pt-2 pb-1">
+                        <svg
+                          className="w-3.5 h-3.5 text-accent shrink-0"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={2.5}
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
+                          />
                         </svg>
-                        <span>@{parentMessage.profiles?.display_name || "元メッセージ"}</span>
+                        {parentMessage.profiles?.avatar_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={parentMessage.profiles.avatar_url}
+                            alt={parentMessage.profiles.display_name}
+                            className="w-5 h-5 rounded-full object-cover shrink-0"
+                          />
+                        ) : (
+                          <span className="shrink-0 w-5 h-5 rounded-full bg-accent/20 flex items-center justify-center text-[10px] font-bold text-accent">
+                            {(parentMessage.profiles?.display_name || "?")[0].toUpperCase()}
+                          </span>
+                        )}
+                        <span className="text-xs font-semibold text-accent truncate">
+                          {parentMessage.profiles?.display_name || "元メッセージ"}
+                        </span>
+                        <span className="text-[11px] text-muted/70 shrink-0">
+                          {new Date(parentMessage.created_at).toLocaleTimeString("ja-JP", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            timeZone: "Asia/Tokyo",
+                          })}
+                        </span>
                       </div>
-                      <div className="text-xs text-muted line-clamp-2 whitespace-pre-wrap break-words">
+                      {/* 返信先本文プレビュー */}
+                      <div className="px-3 pb-2 pl-10 text-[13px] text-muted line-clamp-2 whitespace-pre-wrap break-words leading-snug">
                         {parentMessage.deleted_at
                           ? "(削除されたメッセージ)"
                           : isStorageFileUrl(parentMessage.content)
-                            ? `[${extractFileName(parentMessage.content.trim())}]`
-                            : parentMessage.content.slice(0, 120)}
+                            ? `📎 ${extractFileName(parentMessage.content.trim())}`
+                            : parentMessage.content.slice(0, 140)}
                       </div>
                     </>
                   ) : (
-                    <div className="text-xs text-muted">元メッセージ (読み込み中)</div>
+                    <div className="px-3 py-2 text-xs text-muted">元メッセージ (読み込み中)</div>
                   )}
                 </button>
               )}
