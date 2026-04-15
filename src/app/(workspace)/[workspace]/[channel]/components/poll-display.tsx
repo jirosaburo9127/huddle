@@ -304,23 +304,23 @@ export function PollDisplay({ messageId, currentUserId, onMarkDecision }: Props)
                 style={{ width: `${percent}%` }}
                 aria-hidden="true"
               />
-              <div className="relative flex items-center justify-between gap-2 text-[13px]">
-                <div className="flex items-center gap-2 min-w-0">
+              <div className="relative flex items-start justify-between gap-2 text-[13px]">
+                <div className="flex items-start gap-2 min-w-0 flex-1">
                   {isMyChoice && (
-                    <svg className="w-3.5 h-3.5 shrink-0 text-accent" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
+                    <svg className="w-3.5 h-3.5 shrink-0 text-accent mt-[3px]" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                     </svg>
                   )}
-                  <span className={`truncate ${isMyChoice ? "font-semibold text-foreground" : "text-foreground"}`}>
+                  <span className={`break-words whitespace-pre-wrap min-w-0 ${isMyChoice ? "font-semibold text-foreground" : "text-foreground"}`}>
                     {opt}
                   </span>
                   {isTop && !isActive && (
-                    <span className="shrink-0 text-[10px] font-bold text-accent uppercase">
+                    <span className="shrink-0 text-[10px] font-bold text-accent uppercase mt-[3px]">
                       👑 最多
                     </span>
                   )}
                 </div>
-                <div className="shrink-0 flex items-center gap-2 text-muted">
+                <div className="shrink-0 flex items-center gap-2 text-muted mt-[1px]">
                   <span className="text-[11px]">{count}票</span>
                   <span className="text-[11px] tabular-nums">{Math.round(percent)}%</span>
                 </div>
