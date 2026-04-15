@@ -375,28 +375,9 @@ export const MessageItem = memo(function MessageItem({
     );
   }
 
-  // 削除済みメッセージ
+  // 削除済みメッセージは完全に非表示 (プレースホルダも出さない)
   if (message.deleted_at) {
-    return (
-      <div className={`flex gap-3 px-2 rounded-lg ${isConsecutive ? "py-0.5 pl-[60px]" : "pt-3 pb-1"}`}>
-        {!isConsecutive && (
-          <div className="shrink-0 w-9 h-9 rounded-full bg-border/30 flex items-center justify-center text-muted text-[13px] mt-0.5">
-            {initial}
-          </div>
-        )}
-        <div className="min-w-0 flex-1">
-          {!isConsecutive && (
-            <div className="flex items-baseline gap-2">
-              <span className="font-semibold text-base text-muted">
-                {profile?.display_name || "不明なユーザー"}
-              </span>
-              <span className="text-sm text-muted/70">{time}</span>
-            </div>
-          )}
-          <p className="text-[15px] leading-[1.65] text-muted italic">このメッセージは削除されました</p>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   async function handleSaveEdit() {
