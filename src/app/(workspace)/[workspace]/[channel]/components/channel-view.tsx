@@ -36,12 +36,12 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
   const [showWiki, setShowWiki] = useState(false);
   const [hasWiki, setHasWiki] = useState(false);
   const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showOverflowMenu, setShowOverflowMenu] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [categoryValue, setCategoryValue] = useState<ChannelCategory | null>(channel.category ?? null);
   const [categorySaving, setCategorySaving] = useState(false);
   const overflowMenuRef = useRef<HTMLDivElement>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const prevMessageCountRef = useRef(initialMessages.length);
   const supabaseRef = useRef(createClient());
   const supabase = supabaseRef.current;
@@ -211,34 +211,26 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel.id]);
 
-  // 初期同期中フラグ: syncMissedMessages が返信メッセージを途中に挿入すると
-  // スクロール位置がずれるため、初期同期中は instant scroll を使う
-  const isInitialSyncRef = useRef(true);
+  // スクロールコンテナを最下部に強制移動
+  const scrollToBottom = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, []);
 
-  // チャンネル切替時: 最新メッセージ位置まで即スクロール（初回マウント・URL直アクセス対応）
+  // チャンネル切替時: DOM 確定後に即座に最下部へ
   useEffect(() => {
-    isInitialSyncRef.current = true;
-    // レイアウト確定後にスクロールさせるため次のフレームで実行
-    const id = requestAnimationFrame(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
-    });
+    // rAF 2段でレイアウト完了を確実に待つ
+    requestAnimationFrame(() => requestAnimationFrame(scrollToBottom));
     prevMessageCountRef.current = initialMessages.length;
-    // 初期同期が完了するまで 2 秒待ってからスムーズスクロールモードへ
-    const timer = setTimeout(() => { isInitialSyncRef.current = false; }, 2000);
-    return () => { cancelAnimationFrame(id); clearTimeout(timer); };
-  }, [channel.id, initialMessages.length]);
+  }, [channel.id, initialMessages.length, scrollToBottom]);
 
-  // メッセージ増加時のスクロール制御
-  // 初期同期中 (syncMissedMessages がリプライを途中に挿入) → instant scroll
-  // 通常の新着 → smooth scroll
+  // メッセージ増加時: DOM 更新後に即座に最下部へ（アニメーション無し）
   useEffect(() => {
     if (messages.length > prevMessageCountRef.current) {
-      messagesEndRef.current?.scrollIntoView({
-        behavior: isInitialSyncRef.current ? "auto" : "smooth",
-      });
+      requestAnimationFrame(scrollToBottom);
     }
     prevMessageCountRef.current = messages.length;
-  }, [messages.length]);
+  }, [messages.length, scrollToBottom]);
 
   // Realtime購読
   useEffect(() => {
@@ -974,7 +966,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
         )}
 
         {/* メッセージ一覧 */}
-        <div className="flex-1 overflow-y-auto px-4 py-4">
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-4">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-muted">
               <p className="text-base font-medium">#{channel.name} へようこそ</p>
@@ -1043,7 +1035,6 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
               })()}
             </div>
           )}
-          <div ref={messagesEndRef} />
         </div>
 
         {/* メッセージ入力 */}
