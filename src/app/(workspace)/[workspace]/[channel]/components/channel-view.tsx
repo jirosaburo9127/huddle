@@ -61,6 +61,8 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
   // messages の最新参照を ref で保持することで、handleReact 等の useCallback が
   // messages の変更ごとに再生成されるのを回避する（大量メッセージでの性能劣化対策）
   const messagesRef = useRef<MessageWithProfile[]>(initialMessages);
+  // テキスト＋添付が別々に onSend される際、parent_id を最初の1回だけ付ける制御用
+  const replyConsumedRef = useRef(false);
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
@@ -111,6 +113,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("huddle:closeAllActions"));
     }
+    replyConsumedRef.current = false; // 新しい返信操作 → refリセット
     setReplyTo(msg);
   }, []);
 
@@ -611,8 +614,13 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     if (!user) return;
 
     const isDecision = options?.isDecision ?? false;
-    // 送信時点の返信対象をスナップショット (連投時に次のメッセージに引きずられないように)
-    const parentIdSnapshot = replyTo?.id ?? null;
+    // テキスト＋添付を別々に onSend する場合、parent_id は最初の1回だけ付ける。
+    // React の setState はバッチ処理のため replyTo を null にしても次の onSend には
+    // 反映されないので ref で制御する。
+    const parentIdSnapshot = (replyTo && !replyConsumedRef.current)
+      ? replyTo.id
+      : null;
+    if (parentIdSnapshot) replyConsumedRef.current = true;
 
     // 送信前にクライアント側で UUID を決めてしまうことで、
     // 「optimistic insert → DB insert → realtime 到着」のレース条件を完全に排除する。
@@ -647,7 +655,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     };
 
     setMessages((prev) => [...prev, optimisticMsg]);
-    // 送信と同時に返信対象をリセット
+    // 送信と同時に返信対象をリセット (ref は handleReply で次の返信がセットされるまで維持)
     if (parentIdSnapshot) setReplyTo(null);
 
     // クライアント発行の UUID をそのまま使って DB に挿入
@@ -1035,7 +1043,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
           workspaceId={channel.workspace_id}
           onCreatePoll={() => setShowCreatePoll(true)}
           replyTo={replyTo}
-          onCancelReply={() => setReplyTo(null)}
+          onCancelReply={() => { replyConsumedRef.current = false; setReplyTo(null); }}
         />
       </div>
 
