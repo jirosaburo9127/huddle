@@ -211,20 +211,31 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel.id]);
 
+  // 初期同期中フラグ: syncMissedMessages が返信メッセージを途中に挿入すると
+  // スクロール位置がずれるため、初期同期中は instant scroll を使う
+  const isInitialSyncRef = useRef(true);
+
   // チャンネル切替時: 最新メッセージ位置まで即スクロール（初回マウント・URL直アクセス対応）
   useEffect(() => {
+    isInitialSyncRef.current = true;
     // レイアウト確定後にスクロールさせるため次のフレームで実行
     const id = requestAnimationFrame(() => {
       messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
     });
     prevMessageCountRef.current = initialMessages.length;
-    return () => cancelAnimationFrame(id);
+    // 初期同期が完了するまで 2 秒待ってからスムーズスクロールモードへ
+    const timer = setTimeout(() => { isInitialSyncRef.current = false; }, 2000);
+    return () => { cancelAnimationFrame(id); clearTimeout(timer); };
   }, [channel.id, initialMessages.length]);
 
-  // 新着メッセージ追加時のみ自動スクロール
+  // メッセージ増加時のスクロール制御
+  // 初期同期中 (syncMissedMessages がリプライを途中に挿入) → instant scroll
+  // 通常の新着 → smooth scroll
   useEffect(() => {
     if (messages.length > prevMessageCountRef.current) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      messagesEndRef.current?.scrollIntoView({
+        behavior: isInitialSyncRef.current ? "auto" : "smooth",
+      });
     }
     prevMessageCountRef.current = messages.length;
   }, [messages.length]);
