@@ -320,7 +320,9 @@ export function Sidebar({
         },
         (payload: RealtimePostgresInsertPayload<Message>) => {
           const msg = payload.new;
-          // Chatwork風インライン返信: 返信もチャンネルの未読としてカウント
+          // 返信メッセージはサイドバーの未読バッジには含めない
+          // (サーバー側 get_unread_counts も parent_id IS NULL で集計しているため一致させる)
+          if (msg.parent_id) return;
 
           // 決定登録のシステムメッセージ → 決定事項バッジを再取得
           // (自分の操作でも他人の操作でも、既に読んだかどうかはサーバで判定されるので問題ない)
