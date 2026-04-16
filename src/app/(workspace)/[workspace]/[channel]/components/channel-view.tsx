@@ -217,14 +217,28 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     if (el) el.scrollTop = el.scrollHeight;
   }, []);
 
-  // チャンネル切替時: DOM 確定後に即座に最下部へ
+  // チャンネル切替時: 最下部に移動 + ResizeObserver で
+  // 非同期コンテンツ (PollDisplay, 画像等) の展開に追従する
   useEffect(() => {
-    // rAF 2段でレイアウト完了を確実に待つ
     requestAnimationFrame(() => requestAnimationFrame(scrollToBottom));
     prevMessageCountRef.current = initialMessages.length;
+
+    // 初期表示中 (3秒間) はコンテンツ高さの変化を監視して最下部を維持する。
+    // PollDisplay の非同期ロードや画像展開でDOMが伸びてもズレない。
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    let armed = true;
+    const observer = new ResizeObserver(() => {
+      if (armed) scrollToBottom();
+    });
+    // スクロールコンテナの直接子要素（メッセージ一覧の wrapper div）を監視
+    const inner = container.firstElementChild;
+    if (inner) observer.observe(inner);
+    const timer = setTimeout(() => { armed = false; observer.disconnect(); }, 3000);
+    return () => { armed = false; clearTimeout(timer); observer.disconnect(); };
   }, [channel.id, initialMessages.length, scrollToBottom]);
 
-  // メッセージ増加時: DOM 更新後に即座に最下部へ（アニメーション無し）
+  // メッセージ増加時: DOM 更新後に即座に最下部へ
   useEffect(() => {
     if (messages.length > prevMessageCountRef.current) {
       requestAnimationFrame(scrollToBottom);
