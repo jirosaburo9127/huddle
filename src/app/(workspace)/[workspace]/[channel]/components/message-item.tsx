@@ -569,12 +569,12 @@ export const MessageItem = memo(function MessageItem({
                       {/* 返信先本文プレビュー: 改行/連続空白は1個の半角スペースに潰して
                           line-clamp-2 が自然に折り返せるようにする。
                           whitespace-pre-wrap と組み合わせると改行位置で変に途切れるため */}
-                      <div className="px-3 pb-2 pl-10 text-[13px] text-muted line-clamp-2 break-words leading-snug">
+                      <div className="px-3 pb-2 pl-10 text-[13px] text-muted truncate break-words leading-snug">
                         {parentMessage.deleted_at
                           ? "(削除されたメッセージ)"
                           : isStorageFileUrl(parentMessage.content)
                             ? `📎 ${extractFileName(parentMessage.content.trim())}`
-                            : parentMessage.content.replace(/\s+/g, " ").trim().slice(0, 160)}
+                            : parentMessage.content.replace(/\s+/g, " ").trim()}
                       </div>
                     </>
                   ) : (
