@@ -3,13 +3,12 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   serverExternalPackages: ["@supabase/supabase-js", "@supabase/ssr"],
-  // Next.js 15 以降は動的ページの Client Cache TTL がデフォルト 0 秒になっており、
-  // チャンネル/ワークスペース間の往復で毎回サーバ RPC を待つ挙動になっていた。
-  // 30 秒キャッシュすれば「直前に見ていたチャンネルに戻る」操作が即時になる。
-  // 新着メッセージの取りこぼしは channel-view 側の syncMissedMessages が補正する。
+  // チャンネル切替時に前のチャンネルが表示される問題を防ぐため、
+  // 動的ページのキャッシュを無効にして loading.tsx スケルトンを即座に表示する。
+  // データ鮮度は syncMissedMessages が補正する。
   experimental: {
     staleTimes: {
-      dynamic: 30,
+      dynamic: 0,
       static: 300,
     },
   },
