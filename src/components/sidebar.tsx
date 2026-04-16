@@ -1042,8 +1042,12 @@ function ChannelCategoryList({
   unreadState,
   onNavigate,
 }: ChannelCategoryListProps) {
-  // 折りたたみ状態をlocalStorageに保存
-  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
+  // 折りたたみ状態をlocalStorageに保存。初期値は「全カテゴリ折りたたみ」
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => {
+    const all = new Set<string>(CHANNEL_CATEGORIES as readonly string[]);
+    all.add("__uncategorized__");
+    return all;
+  });
   useEffect(() => {
     try {
       const raw = localStorage.getItem(COLLAPSED_KEY);
@@ -1051,6 +1055,7 @@ function ChannelCategoryList({
         const arr = JSON.parse(raw);
         if (Array.isArray(arr)) setCollapsed(new Set(arr));
       }
+      // localStorage が無い場合は「全カテゴリ折りたたみ」のままで維持
     } catch {
       // 破損した設定は無視
     }
@@ -1108,10 +1113,10 @@ function ChannelCategoryList({
             <button
               type="button"
               onClick={() => toggleCollapsed(key)}
-              className="w-full flex items-center gap-1 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-muted hover:text-foreground transition-colors"
+              className="w-full flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-muted hover:text-foreground transition-colors"
             >
               <svg
-                className={`w-3 h-3 shrink-0 transition-transform ${
+                className={`w-3.5 h-3.5 shrink-0 transition-transform ${
                   isCollapsed ? "-rotate-90" : ""
                 }`}
                 fill="none"
