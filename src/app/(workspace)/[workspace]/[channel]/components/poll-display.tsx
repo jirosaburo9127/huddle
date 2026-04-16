@@ -194,11 +194,11 @@ export function PollDisplay({ messageId, currentUserId, onMarkDecision }: Props)
       const supabase = createClient();
       const prevVotes = votes;
       const nextVotes: Vote[] = (() => {
-        // 単一選択なら既存の自分の票を削除して新規追加
-        // 複数選択なら既存があれば削除 (トグル)、なければ追加
+        // 単一選択・複数選択ともにトグル動作:
+        // 選択済みをタップ → 投票解除、未選択をタップ → 投票/変更
         const mine = votes.filter((v) => v.user_id === currentUserId);
+        const existing = mine.find((v) => v.option_index === optionIdx);
         if (poll.allow_multiple) {
-          const existing = mine.find((v) => v.option_index === optionIdx);
           if (existing) {
             return votes.filter((v) => v.id !== existing.id);
           }
@@ -212,8 +212,12 @@ export function PollDisplay({ messageId, currentUserId, onMarkDecision }: Props)
             },
           ];
         }
-        // 単一選択: 自分の既存票を全部削除して新しいのを 1 つ追加
+        // 単一選択: 同じ選択肢をタップ → 投票解除 / 別をタップ → 変更
         const withoutMine = votes.filter((v) => v.user_id !== currentUserId);
+        if (existing) {
+          // 同じ選択肢をタップ → 投票解除
+          return withoutMine;
+        }
         return [
           ...withoutMine,
           {
