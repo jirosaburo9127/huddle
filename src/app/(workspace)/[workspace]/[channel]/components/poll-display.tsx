@@ -106,7 +106,16 @@ export function PollDisplay({ messageId, currentUserId, onMarkDecision }: Props)
           (payload: RealtimePostgresInsertPayload<Vote>) => {
             setVotes((prev) => {
               if (prev.some((v) => v.id === payload.new.id)) return prev;
-              return [...prev, payload.new];
+              // 同じユーザー・同じ選択肢の楽観的更新 (tmp-*) を実IDで置き換える
+              const cleaned = prev.filter(
+                (v) =>
+                  !(
+                    v.id.startsWith("tmp-") &&
+                    v.user_id === payload.new.user_id &&
+                    v.option_index === payload.new.option_index
+                  )
+              );
+              return [...cleaned, payload.new];
             });
           }
         )
