@@ -173,10 +173,11 @@ export function Sidebar({
   // 表示中のチャンネルが切り替わったら:
   // 1. 楽観的にバッジを即消す
   // 2. DB の last_read_at を更新
-  // 3. get_unread_counts で全チャンネルの真のカウントを取り直す（ドリフト補正）
+  // ※ 以前は get_unread_counts で全チャンネルを再同期していたが、
+  //   RPC が空を返すと他チャンネルのバッジも消える問題があったため、
+  //   現在のチャンネルのバッジだけ消す方式に変更。
   useEffect(() => {
     if (!currentChannelId) return;
-    let cancelled = false;
 
     // 楽観的にバッジを即消す
     setUnreadState((prev) => {
@@ -186,30 +187,10 @@ export function Sidebar({
       return next;
     });
 
-    (async () => {
-      const supabase = sidebarSupabaseRef.current;
-      // サーバの now() で last_read_at を更新する
-      // （クライアントの new Date() を使うと時計ズレで既読タイムスタンプが
-      //   新着メッセージより古くなりバッジが残ることがある）
-      await supabase.rpc("mark_channel_read", { p_channel_id: currentChannelId });
-
-      if (cancelled) return;
-
-      // サーバ真実で全バッジを再同期（Realtimeとの累積ドリフトをここでリセット）
-      const { data } = await supabase.rpc("get_unread_counts", {
-        p_user_id: currentUserId,
-      });
-      if (cancelled || !data) return;
-      const next: Record<string, number> = {};
-      for (const row of data as Array<{ channel_id: string; unread_count: number }>) {
-        if (row.channel_id === currentChannelId) continue;
-        next[row.channel_id] = Number(row.unread_count);
-      }
-      setUnreadState(next);
-    })();
-
-    return () => { cancelled = true; };
-  }, [currentChannelId, currentUserId]);
+    // サーバの now() で last_read_at を更新する
+    const supabase = sidebarSupabaseRef.current;
+    supabase.rpc("mark_channel_read", { p_channel_id: currentChannelId });
+  }, [currentChannelId]);
 
   // ブラウザ通知許可リクエスト（マウント時に一度だけ）
   useEffect(() => {
