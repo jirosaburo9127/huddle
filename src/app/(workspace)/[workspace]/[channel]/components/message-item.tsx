@@ -144,7 +144,7 @@ function MessageContent({
           <img
             src={url}
             alt={fileName}
-            className="max-w-xs max-h-80 rounded-xl cursor-pointer hover:opacity-90 transition-opacity"
+            className="max-w-full sm:max-w-xs max-h-80 rounded-xl cursor-pointer hover:opacity-90 transition-opacity"
             onClick={(e) => {
               e.stopPropagation();
               onImageClick?.(url);
