@@ -40,6 +40,7 @@ export function PollDisplay({ messageId, currentUserId, onMarkDecision }: Props)
   const [poll, setPoll] = useState<Poll | null>(null);
   const [votes, setVotes] = useState<Vote[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [voting, setVoting] = useState(false);
   const [nowTick, setNowTick] = useState(Date.now());
 
@@ -55,26 +56,41 @@ export function PollDisplay({ messageId, currentUserId, onMarkDecision }: Props)
     const supabase = createClient();
 
     async function fetchPoll() {
-      const { data: pollData } = await supabase
+      const { data: pollData, error: pollErr } = await supabase
         .from("polls")
         .select("*")
         .eq("message_id", messageId)
         .maybeSingle();
       if (!mounted) return;
+      if (pollErr) {
+        // eslint-disable-next-line no-console
+        console.error("[poll] fetch failed:", pollErr);
+        setFetchError(pollErr.message);
+        setLoading(false);
+        return;
+      }
       if (!pollData) {
         setPoll(null);
         setLoading(false);
         return;
       }
-      // options は jsonb で来るので型を調整
-      const p = pollData as unknown as Poll;
+      // options は jsonb — 文字列で来る場合をパースする
+      const raw = pollData as Record<string, unknown>;
+      const options = typeof raw.options === "string"
+        ? JSON.parse(raw.options)
+        : raw.options;
+      const p = { ...raw, options } as unknown as Poll;
       setPoll(p);
 
-      const { data: voteData } = await supabase
+      const { data: voteData, error: voteErr } = await supabase
         .from("poll_votes")
         .select("*")
         .eq("poll_id", p.id);
       if (!mounted) return;
+      if (voteErr) {
+        // eslint-disable-next-line no-console
+        console.error("[poll] votes fetch failed:", voteErr);
+      }
       setVotes((voteData as Vote[]) || []);
       setLoading(false);
     }
@@ -271,7 +287,17 @@ export function PollDisplay({ messageId, currentUserId, onMarkDecision }: Props)
   }, [poll]);
 
   if (loading) return null;
+  if (fetchError) {
+    return (
+      <div className="mt-2 rounded-xl border border-border bg-background/40 p-3 text-sm text-muted">
+        投票の読み込みに失敗しました
+      </div>
+    );
+  }
   if (!poll) return null;
+
+  // options が配列でない場合のガード
+  if (!Array.isArray(poll.options)) return null;
 
   return (
     <div className="mt-2 rounded-xl border border-border bg-background/40 p-3">
