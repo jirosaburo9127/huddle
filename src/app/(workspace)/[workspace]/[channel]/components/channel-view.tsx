@@ -324,7 +324,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
           setMessages((prev) =>
             prev.map((m) =>
               m.id === updated.id
-                ? { ...m, content: updated.content, edited_at: updated.edited_at, deleted_at: updated.deleted_at, is_decision: updated.is_decision ?? m.is_decision, reply_count: updated.reply_count }
+                ? { ...m, content: updated.content, edited_at: updated.edited_at, deleted_at: updated.deleted_at, is_decision: updated.is_decision ?? m.is_decision, status: updated.status ?? m.status, reply_count: updated.reply_count }
                 : m
             )
           );
@@ -579,6 +579,33 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     router.refresh();
   }, [supabase, router]);
 
+  // ステータストグル（進行中 / 完了）
+  const handleStatus = useCallback(async (messageId: string, status: "in_progress" | "done") => {
+    // 楽観的更新（同じステータスならnullに戻す=トグル）
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m.id !== messageId) return m;
+        return { ...m, status: m.status === status ? null : status };
+      })
+    );
+
+    const { error } = await supabase.rpc("toggle_message_status", {
+      p_message_id: messageId,
+      p_status: status,
+    });
+
+    if (error) {
+      // ロールバック
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== messageId) return m;
+          return { ...m, status: m.status === null ? status : null };
+        })
+      );
+      alert("ステータスの更新に失敗しました");
+    }
+  }, [supabase]);
+
   // 決定事項の Why / Due 追記
   const handleUpdateDecisionMeta = useCallback(
     async (messageId: string, why: string | null, due: string | null) => {
@@ -672,6 +699,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
       edited_at: null,
       deleted_at: null,
       is_decision: isDecision,
+      status: null,
       decision_why: null,
       decision_due: null,
       reply_count: 0,
@@ -1078,6 +1106,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
                         onJumpToMessage={handleJumpToMessage}
                         onReact={handleReact}
                         onDecision={handleDecision}
+                        onStatus={handleStatus}
                         onUpdateDecisionMeta={handleUpdateDecisionMeta}
                         onBookmark={handleBookmark}
                         isBookmarked={bookmarkedIds.has(message.id)}

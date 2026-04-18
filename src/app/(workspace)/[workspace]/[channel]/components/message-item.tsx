@@ -15,6 +15,7 @@ type Props = {
   onJumpToMessage?: (messageId: string) => void;
   onReact?: (messageId: string, emoji: string) => Promise<void>;
   onDecision?: (messageId: string, isDecision: boolean) => Promise<void>;
+  onStatus?: (messageId: string, status: "in_progress" | "done") => Promise<void>;
   onUpdateDecisionMeta?: (
     messageId: string,
     why: string | null,
@@ -271,6 +272,7 @@ export const MessageItem = memo(function MessageItem({
   onJumpToMessage,
   onReact,
   onDecision,
+  onStatus,
   onUpdateDecisionMeta,
   onBookmark,
   isBookmarked,
@@ -593,6 +595,16 @@ export const MessageItem = memo(function MessageItem({
             </>
           )}
 
+          {/* 進行中マーカー */}
+          {message.status === "in_progress" && !isEditing && (
+            <div className="mt-1 px-3 py-1.5 rounded-lg bg-blue-400/10 border border-blue-400/20 text-sm text-blue-400 flex items-center gap-1.5">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              進行中
+            </div>
+          )}
+
           {/* 決定事項マーカー + Why/Due + 編集 */}
           {message.is_decision && !isEditing && (
             <div className="mt-1 px-3 py-2 rounded-lg bg-accent/10 border border-accent/20 text-sm text-accent">
@@ -731,7 +743,7 @@ export const MessageItem = memo(function MessageItem({
           {/* PC: アクションバー（ホバーで表示、メッセージ右上に浮かせる） */}
           {!isEditing && (
           <div className="hidden lg:flex absolute -top-2 right-3 z-10 transition-opacity items-center gap-0.5 bg-sidebar/95 backdrop-blur-sm border border-border/60 rounded-lg px-1 py-0.5 shadow-lg opacity-0 group-hover:opacity-100">
-            {/* 決定ボタンは一番左 — Huddleの推し機能なので最も発見しやすい位置 */}
+            {/* 決定ボタン */}
             {onDecision && (
               <button
                 onClick={(e) => { e.stopPropagation(); onDecision(message.id, !message.is_decision); }}
@@ -745,6 +757,22 @@ export const MessageItem = memo(function MessageItem({
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 {message.is_decision ? "決定済" : "決定"}
+              </button>
+            )}
+            {/* 進行中ボタン */}
+            {onStatus && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onStatus(message.id, "in_progress"); }}
+                className={`flex items-center gap-1 px-2.5 py-1 text-[13px] font-medium border rounded-md transition-all active:scale-90 ${
+                  message.status === "in_progress"
+                    ? "text-blue-400 border-blue-400/40 bg-blue-400/10"
+                    : "text-muted hover:text-blue-400 border-transparent hover:border-blue-400/30 hover:bg-blue-400/5"
+                }`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                {message.status === "in_progress" ? "進行中" : "進行中"}
               </button>
             )}
             <div className="w-px h-4 bg-border/50 mx-0.5" />
@@ -858,6 +886,22 @@ export const MessageItem = memo(function MessageItem({
                   </span>
                   <span className={`text-xs ${message.is_decision ? "text-accent font-semibold" : "text-foreground"}`}>
                     {message.is_decision ? "決定済" : "決定"}
+                  </span>
+                </button>
+              )}
+              {/* 進行中トグル（モバイル） */}
+              {onStatus && (
+                <button
+                  onClick={() => { setShowActions(false); onStatus(message.id, "in_progress"); }}
+                  className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] active:scale-90 transition-all"
+                >
+                  <span className={`w-12 h-12 rounded-full border-2 flex items-center justify-center ${message.status === "in_progress" ? "border-blue-400 bg-blue-400/15" : "border-muted/40"}`}>
+                    <svg className={`w-5 h-5 ${message.status === "in_progress" ? "text-blue-400" : "text-foreground"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                  </span>
+                  <span className={`text-xs ${message.status === "in_progress" ? "text-blue-400 font-semibold" : "text-foreground"}`}>
+                    進行中
                   </span>
                 </button>
               )}

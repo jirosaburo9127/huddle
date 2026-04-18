@@ -45,6 +45,7 @@ export type Message = {
   decision_why: string | null;
   decision_due: string | null;
   reply_count: number;
+  status: "in_progress" | "done" | null;
   created_at: string;
   system_event?: string | null;
 };
