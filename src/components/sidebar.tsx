@@ -252,14 +252,24 @@ export function Sidebar({
         setDecisionUnreadCount(decisionRes.data);
       }
 
-      if (channelRes.data) {
-        const next: Record<string, number> = {};
-        for (const row of channelRes.data as Array<{ channel_id: string; unread_count: number }>) {
-          // 現在開いているチャンネルは未読カウントをスキップ
-          if (row.channel_id === currentChannelId) continue;
-          next[row.channel_id] = Number(row.unread_count);
-        }
-        setUnreadState(next);
+      if (channelRes.data && Array.isArray(channelRes.data)) {
+        // サーバデータをマージ: サーバが返したカウントで更新しつつ、
+        // サーバに無い（=未読0の）チャンネルはローカルからも消す。
+        // ただしサーバが空配列を返した場合はRPCエラーの可能性があるため
+        // ローカルに未読がある場合はスキップして既存バッジを維持する。
+        setUnreadState((prev) => {
+          const serverCounts = channelRes.data as Array<{ channel_id: string; unread_count: number }>;
+          // サーバが空なのにローカルに未読がある → RPCエラーの疑い → 既存維持
+          const localHasUnread = Object.keys(prev).length > 0;
+          if (serverCounts.length === 0 && localHasUnread) return prev;
+
+          const next: Record<string, number> = {};
+          for (const row of serverCounts) {
+            if (row.channel_id === currentChannelId) continue;
+            next[row.channel_id] = Number(row.unread_count);
+          }
+          return next;
+        });
       }
 
       if (wsRes.data) {
