@@ -39,6 +39,7 @@ type Props = {
 export function PollDisplay({ messageId, currentUserId, onMarkDecision }: Props) {
   const [poll, setPoll] = useState<Poll | null>(null);
   const [votes, setVotes] = useState<Vote[]>([]);
+  const [memberCount, setMemberCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [voting, setVoting] = useState(false);
@@ -82,16 +83,17 @@ export function PollDisplay({ messageId, currentUserId, onMarkDecision }: Props)
       const p = { ...raw, options } as unknown as Poll;
       setPoll(p);
 
-      const { data: voteData, error: voteErr } = await supabase
-        .from("poll_votes")
-        .select("*")
-        .eq("poll_id", p.id);
+      const [voteRes, memberRes] = await Promise.all([
+        supabase.from("poll_votes").select("*").eq("poll_id", p.id),
+        supabase.from("channel_members").select("user_id", { count: "exact", head: true }).eq("channel_id", p.channel_id),
+      ]);
       if (!mounted) return;
-      if (voteErr) {
+      if (voteRes.error) {
         // eslint-disable-next-line no-console
-        console.error("[poll] votes fetch failed:", voteErr);
+        console.error("[poll] votes fetch failed:", voteRes.error);
       }
-      setVotes((voteData as Vote[]) || []);
+      setVotes((voteRes.data as Vote[]) || []);
+      setMemberCount(memberRes.count ?? 0);
       setLoading(false);
     }
 
@@ -312,14 +314,16 @@ export function PollDisplay({ messageId, currentUserId, onMarkDecision }: Props)
           )}
         </span>
         <span className="ml-auto text-[11px] text-muted">
-          {totalVoters}人が投票
+          {totalVoters}/{memberCount}人が投票
         </span>
       </div>
 
       <div className="space-y-1.5">
         {poll.options.map((opt, idx) => {
           const count = counts.get(idx) || 0;
-          const percent = totalVoters > 0 ? (count / totalVoters) * 100 : 0;
+          // バーは最多票を100%として相対表示
+          const maxCount = topOption?.count || 1;
+          const barPercent = maxCount > 0 ? (count / maxCount) * 100 : 0;
           const isMyChoice = myVotes.includes(idx);
           const isTop = topOption?.index === idx && count > 0;
 
@@ -352,10 +356,9 @@ export function PollDisplay({ messageId, currentUserId, onMarkDecision }: Props)
                     </span>
                   )}
                 </div>
-                <div className="shrink-0 flex items-center gap-2 text-muted mt-[1px]">
-                  <span className="text-[11px]">{count}票</span>
-                  <span className="text-[11px] tabular-nums w-8 text-right">{Math.round(percent)}%</span>
-                </div>
+                <span className="shrink-0 text-[12px] text-muted tabular-nums mt-[1px]">
+                  {count}票
+                </span>
               </div>
               {/* プログレスバー（テキストの下に独立表示） */}
               <div className="relative h-2 rounded-full bg-white/[0.06] overflow-hidden">
@@ -367,7 +370,7 @@ export function PollDisplay({ messageId, currentUserId, onMarkDecision }: Props)
                         ? "bg-accent/60"
                         : "bg-foreground/20"
                   }`}
-                  style={{ width: `${percent}%` }}
+                  style={{ width: `${barPercent}%` }}
                 />
               </div>
             </button>
