@@ -93,7 +93,7 @@ function SignupForm() {
           )}
 
           <div>
-            <label htmlFor="displayName" className="block text-[15px] text-muted mb-1">
+            <label htmlFor="displayName" className="block text-base text-muted mb-1">
               表示名
             </label>
             <input
@@ -108,7 +108,7 @@ function SignupForm() {
           </div>
 
           <div>
-            <label htmlFor="email" className="block text-[15px] text-muted mb-1">
+            <label htmlFor="email" className="block text-base text-muted mb-1">
               メールアドレス
             </label>
             <input
@@ -123,7 +123,7 @@ function SignupForm() {
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-[15px] text-muted mb-1">
+            <label htmlFor="password" className="block text-base text-muted mb-1">
               パスワード
             </label>
             <input

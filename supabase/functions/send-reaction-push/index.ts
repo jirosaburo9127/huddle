@@ -160,9 +160,9 @@ Deno.serve(async (req) => {
 
     const senderName = reactor?.display_name || "メンバー";
     const title = channel.is_dm
-      ? `${record.emoji} ${senderName}`
-      : `${record.emoji} ${senderName} (#${channel.name})`;
-    const body = message.content.slice(0, 100);
+      ? `${senderName}`
+      : `${senderName} (#${channel.name})`;
+    const body = `${record.emoji} リアクションがありました`;
     const showBanner = !isMuted;
 
     // APNs送信

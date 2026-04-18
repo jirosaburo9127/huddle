@@ -181,7 +181,7 @@ function MessageContent({
 
   return (
     <div
-      className="text-[15px] leading-[1.65] text-foreground whitespace-pre-wrap break-words [&_pre]:whitespace-pre [&_pre]:my-2"
+      className="text-base leading-[1.65] text-foreground whitespace-pre-wrap break-words [&_pre]:whitespace-pre [&_pre]:my-2"
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );
@@ -469,7 +469,7 @@ export const MessageItem = memo(function MessageItem({
                   el.style.height = Math.min(el.scrollHeight, window.innerHeight * 0.6) + "px";
                 }}
                 onKeyDown={handleEditKeyDown}
-                className="w-full resize-none rounded-lg border border-border bg-input-bg px-3 py-2 text-[15px] leading-relaxed text-foreground focus:border-accent focus:outline-none overflow-y-auto"
+                className="w-full resize-none rounded-lg border border-border bg-input-bg px-3 py-2 text-base leading-relaxed text-foreground focus:border-accent focus:outline-none overflow-y-auto"
                 style={{ minHeight: "6rem", maxHeight: "60vh" }}
                 rows={4}
               />

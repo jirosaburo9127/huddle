@@ -376,7 +376,7 @@ export function DashboardView({
                         className="max-h-72 rounded-lg border border-border object-contain"
                       />
                     ) : (
-                      <div className="text-[15px] leading-relaxed whitespace-pre-wrap break-words text-foreground">
+                      <div className="text-base leading-relaxed whitespace-pre-wrap break-words text-foreground">
                         {d.content}
                       </div>
                     )}

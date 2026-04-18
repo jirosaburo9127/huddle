@@ -747,7 +747,7 @@ export function Sidebar({
                 prefetch
                 onClick={() => setSidebarOpen(false)}
                 className={`
-                  flex items-center gap-2 px-3 py-2 text-[15px] rounded-xl mx-2 transition-colors
+                  flex items-center gap-2 px-3 py-2 text-base rounded-xl mx-2 transition-colors
                   ${
                     isActive
                       ? "bg-accent/10 text-accent"
@@ -1288,7 +1288,7 @@ function ChannelCategoryList({
                     prefetch
                     onClick={onNavigate}
                     className={`
-                      flex items-center min-w-0 px-3 py-2 text-[15px] rounded-xl mx-2 transition-colors
+                      flex items-center min-w-0 px-3 py-2 text-base rounded-xl mx-2 transition-colors
                       ${
                         isActive
                           ? "bg-accent/10 text-accent"
