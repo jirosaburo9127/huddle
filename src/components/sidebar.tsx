@@ -299,7 +299,12 @@ export function Sidebar({
       window.removeEventListener("focus", onVisible);
       window.removeEventListener("huddle:decisionsRead", onDecisionsRead);
     };
-  }, [currentUserId, currentChannelId, workspace.id]);
+    // currentChannelId を依存配列に含めない:
+    // チャンネル切替ごとに get_unread_counts を呼ぶと、RPCの結果で
+    // 他チャンネルのバッジも上書きされて消える問題があるため。
+    // チャンネル切替時の既読処理は別の useEffect で行う。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUserId, workspace.id]);
 
   // ワークスペース内のメッセージを Realtime 購読（未読バッジ更新 + 通知）
   useEffect(() => {
