@@ -465,13 +465,26 @@ export const MessageItem = memo(function MessageItem({
         <div className="min-w-0 flex-1">
           {/* ユーザー名と時刻（先頭メッセージのみ） */}
           {!isConsecutive && (
-            <div className="flex items-baseline gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className={`font-semibold text-base ${isOwn ? "text-accent" : "text-foreground"}`}>
                 {profile?.display_name || "不明なユーザー"}
               </span>
               <span className="text-sm text-muted/70">{time}</span>
               {message.edited_at && (
                 <span className="text-sm text-muted/70">(編集済み)</span>
+              )}
+              {message.status === "in_progress" && (
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-blue-400/15 text-[11px] font-semibold text-blue-400">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  進行中
+                </span>
+              )}
+              {message.is_decision && (
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-accent/15 text-[11px] font-semibold text-accent">
+                  ✅ 決定
+                </span>
               )}
             </div>
           )}
@@ -597,16 +610,6 @@ export const MessageItem = memo(function MessageItem({
                 <span className="text-xs text-muted/70">(編集済み)</span>
               )}
             </>
-          )}
-
-          {/* 進行中バッジ */}
-          {message.status === "in_progress" && !isEditing && (
-            <div className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-400/15 text-xs font-semibold text-blue-400">
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-              進行中
-            </div>
           )}
 
           {/* 決定事項マーカー + Why/Due + 編集 */}
