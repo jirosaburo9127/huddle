@@ -10,11 +10,14 @@ export function showMessageNotification({
   content: string;
   url: string;
 }) {
-  // アプリがフォーカスされている場合は通知しない
   if (typeof window === "undefined") return;
-  if (document.hasFocus()) return;
   if (typeof Notification === "undefined") return;
   if (Notification.permission !== "granted") return;
+
+  // 現在見ているチャンネルと同じURLなら、フォーカス中は通知しない
+  // 別チャンネルのメッセージならフォーカス中でも通知する（LINE方式）
+  const isCurrentPage = window.location.pathname === url;
+  if (isCurrentPage && document.hasFocus()) return;
 
   // メッセージ本文を100文字に切り詰め
   const body = content.length > 100 ? content.slice(0, 100) + "…" : content;

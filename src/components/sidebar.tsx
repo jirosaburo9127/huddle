@@ -339,12 +339,9 @@ export function Sidebar({
         },
         (payload: RealtimePostgresInsertPayload<Message>) => {
           const msg = payload.new;
-          // 返信メッセージはサイドバーの未読バッジには含めない
-          // (サーバー側 get_unread_counts も parent_id IS NULL で集計しているため一致させる)
-          if (msg.parent_id) return;
+          const isReply = !!msg.parent_id;
 
           // 決定登録のシステムメッセージ → 決定事項バッジを再取得
-          // (自分の操作でも他人の操作でも、既に読んだかどうかはサーバで判定されるので問題ない)
           if (msg.system_event === "decision_marked") {
             (async () => {
               const { data } = await supabase.rpc("get_decision_unread_count", {
@@ -355,15 +352,13 @@ export function Sidebar({
                 setDecisionUnreadCount(data);
               }
             })();
-            // システムメッセージ自体は通常のチャンネル未読カウントに含めない
             return;
           }
 
           if (msg.user_id === currentUserId) return;
           const ch = channelById.get(msg.channel_id);
           if (!ch) {
-            // このサイドバーに無いチャンネル = 別ワークスペースのメッセージの可能性。
-            // ワークスペース単位の未読バッジだけ更新する。
+            // 別ワークスペースのメッセージの可能性
             (async () => {
               const { data } = await supabase.rpc("get_unread_counts_by_workspace", {
                 p_user_id: currentUserId,
@@ -379,21 +374,23 @@ export function Sidebar({
             return;
           }
 
-          // 表示中チャンネル → サーバ now() で自動既読
+          // 表示中チャンネル → 自動既読（ただし通知は出す — 別タブやバックグラウンド対応）
           if (msg.channel_id === currentChannelId) {
             supabase
               .rpc("mark_channel_read", { p_channel_id: msg.channel_id })
               .then(() => {});
-            return;
+            // 表示中チャンネルでもブラウザ通知は出す（フォーカス判定は showMessageNotification 内で行う）
+          } else {
+            // 未読カウント増加（返信メッセージはサーバー側 get_unread_counts と一致させるためスキップ）
+            if (!isReply) {
+              setUnreadState((prev) => ({
+                ...prev,
+                [msg.channel_id]: (prev[msg.channel_id] || 0) + 1,
+              }));
+            }
           }
 
-          // 未読カウント増加
-          setUnreadState((prev) => ({
-            ...prev,
-            [msg.channel_id]: (prev[msg.channel_id] || 0) + 1,
-          }));
-
-          // 通知
+          // ブラウザ通知 — 返信含むすべてのメッセージで通知（LINE方式）
           const senderName = memberNameById.get(msg.user_id) || "メンバー";
           let channelLabel = ch.name;
           if (ch.is_dm) {
