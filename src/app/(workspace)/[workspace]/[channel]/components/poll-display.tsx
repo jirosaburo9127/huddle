@@ -318,12 +318,11 @@ export function PollDisplay({ messageId, currentUserId, onMarkDecision }: Props)
         </span>
       </div>
 
-      <div className="space-y-1.5">
+      <div className="space-y-2">
         {poll.options.map((opt, idx) => {
           const count = counts.get(idx) || 0;
-          // バーは最多票を100%として相対表示
-          const maxCount = topOption?.count || 1;
-          const barPercent = maxCount > 0 ? (count / maxCount) * 100 : 0;
+          // メンバー全員を母数にした割合（LINE方式）
+          const fillPercent = memberCount > 0 ? (count / memberCount) * 100 : 0;
           const isMyChoice = myVotes.includes(idx);
           const isTop = topOption?.index === idx && count > 0;
 
@@ -333,17 +332,29 @@ export function PollDisplay({ messageId, currentUserId, onMarkDecision }: Props)
               type="button"
               onClick={() => handleVote(idx)}
               disabled={!isActive || voting}
-              className={`relative w-full rounded-lg border px-3 py-2 text-left overflow-hidden transition-colors ${
+              className={`relative w-full rounded-xl border px-3 py-2.5 text-left overflow-hidden transition-colors ${
                 isMyChoice
-                  ? "border-accent bg-accent/10"
-                  : "border-border bg-background/50 hover:border-accent/40"
+                  ? "border-accent"
+                  : "border-border hover:border-accent/40"
               } ${!isActive ? "cursor-default" : "cursor-pointer"}`}
             >
+              {/* 背景塗りつぶし（LINE方式: 選択肢の背景が得票率で伸びる） */}
+              <div
+                className={`absolute inset-y-0 left-0 transition-all duration-500 ${
+                  isMyChoice
+                    ? "bg-accent/15"
+                    : isTop && !isActive
+                      ? "bg-accent/10"
+                      : "bg-foreground/[0.04]"
+                }`}
+                style={{ width: `${fillPercent}%` }}
+                aria-hidden="true"
+              />
               {/* テキスト行 */}
-              <div className="relative flex items-start justify-between gap-2 text-[13px] mb-1.5">
-                <div className="flex items-start gap-2 min-w-0 flex-1">
+              <div className="relative flex items-center justify-between gap-2 text-[13px]">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
                   {isMyChoice && (
-                    <svg className="w-3.5 h-3.5 shrink-0 text-accent mt-[3px]" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 shrink-0 text-accent" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                     </svg>
                   )}
@@ -351,27 +362,16 @@ export function PollDisplay({ messageId, currentUserId, onMarkDecision }: Props)
                     {opt}
                   </span>
                   {isTop && !isActive && (
-                    <span className="shrink-0 text-[10px] font-bold text-accent uppercase mt-[3px]">
-                      👑 最多
+                    <span className="shrink-0 text-[10px] font-bold text-accent">
+                      👑
                     </span>
                   )}
                 </div>
-                <span className="shrink-0 text-[12px] text-muted tabular-nums mt-[1px]">
-                  {count}票
-                </span>
-              </div>
-              {/* プログレスバー（テキストの下に独立表示） */}
-              <div className="relative h-2 rounded-full bg-white/[0.06] overflow-hidden">
-                <div
-                  className={`absolute inset-y-0 left-0 rounded-full transition-all duration-500 ${
-                    isMyChoice
-                      ? "bg-accent"
-                      : isTop && !isActive
-                        ? "bg-accent/60"
-                        : "bg-foreground/20"
-                  }`}
-                  style={{ width: `${barPercent}%` }}
-                />
+                {count > 0 && (
+                  <span className="shrink-0 text-[12px] font-medium text-muted tabular-nums">
+                    {count}
+                  </span>
+                )}
               </div>
             </button>
           );
