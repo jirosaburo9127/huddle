@@ -1014,7 +1014,9 @@ export function Sidebar({
                       </svg>
                     </button>
                   </div>
-                  {/* カテゴリ名（クリックで編集） */}
+                  {/* カテゴリ名 */}
+                  <span className="text-sm text-foreground flex-1 truncate">{cat.label}</span>
+                  {/* 編集ボタン */}
                   <button
                     type="button"
                     onClick={async () => {
@@ -1032,12 +1034,14 @@ export function Sidebar({
                         list.map((c) => c.slug === cat.slug ? { ...c, label: input.trim() } : c)
                       );
                     }}
-                    className="text-sm text-foreground flex-1 truncate text-left hover:text-accent transition-colors"
-                    title="クリックで名前を変更"
+                    className="shrink-0 p-1 text-muted hover:text-accent rounded hover:bg-accent/10 transition-colors"
+                    title="名前を変更"
                   >
-                    {cat.label}
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
                   </button>
-                  {/* 削除 */}
+                  {/* 削除ボタン */}
                   <button
                     type="button"
                     onClick={async () => {
@@ -1055,6 +1059,7 @@ export function Sidebar({
                       }
                     }}
                     className="shrink-0 p-1 text-muted hover:text-red-400 rounded hover:bg-red-500/10 transition-colors"
+                    title="削除"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
