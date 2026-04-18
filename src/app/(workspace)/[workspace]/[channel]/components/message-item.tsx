@@ -187,7 +187,8 @@ function MessageContent({
   );
 }
 
-// リアクションバッジコンポーネント（PC: ホバーツールチップ、モバイル: 長押しモーダル）
+// リアクションバッジコンポーネント
+// PC: ホバーツールチップ / モバイル: タップでリアクター表示、ダブルタップでトグル
 function ReactionBadges({
   reactions,
   onReact,
@@ -195,21 +196,7 @@ function ReactionBadges({
   reactions: Array<{ emoji: string; count: number; reacted: boolean; names: string[] }>;
   onReact?: (emoji: string) => void;
 }) {
-  const [longPressNames, setLongPressNames] = useState<{ emoji: string; names: string[] } | null>(null);
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  function handleTouchStart(emoji: string, names: string[]) {
-    longPressTimer.current = setTimeout(() => {
-      setLongPressNames({ emoji, names });
-    }, 500);
-  }
-
-  function handleTouchEnd() {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
-  }
+  const [showNames, setShowNames] = useState<{ emoji: string; names: string[] } | null>(null);
 
   return (
     <>
@@ -218,10 +205,22 @@ function ReactionBadges({
           <div key={emoji} className="relative group/reaction">
             <button
               type="button"
-              onClick={() => onReact?.(emoji)}
-              onTouchStart={(e) => { e.preventDefault(); handleTouchStart(emoji, names); }}
-              onTouchEnd={handleTouchEnd}
-              onTouchCancel={handleTouchEnd}
+              onClick={(e) => {
+                e.stopPropagation();
+                // PC (lg+): そのままトグル
+                if (typeof window !== "undefined" && window.innerWidth >= 1024) {
+                  onReact?.(emoji);
+                  return;
+                }
+                // モバイル: タップで名前表示
+                if (showNames?.emoji === emoji) {
+                  // 同じ絵文字を再タップ → トグル（リアクション追加/解除）
+                  setShowNames(null);
+                  onReact?.(emoji);
+                } else {
+                  setShowNames({ emoji, names });
+                }
+              }}
               onContextMenu={(e) => e.preventDefault()}
               className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm border cursor-pointer transition-colors select-none ${
                 reacted
@@ -242,30 +241,17 @@ function ReactionBadges({
           </div>
         ))}
       </div>
-      {/* モバイル: 長押しモーダル */}
-      {longPressNames && (
+      {/* モバイル: タップで表示されるリアクター名 */}
+      {showNames && (
         <div
-          className="fixed inset-0 z-[60] flex items-center justify-center lg:hidden"
-          onClick={() => setLongPressNames(null)}
+          className="mt-1.5 flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.04] border border-border/50 lg:hidden animate-fade-in"
+          onClick={() => setShowNames(null)}
         >
-          <div className="absolute inset-0 bg-black/40" />
-          <div className="relative bg-sidebar border border-border rounded-2xl px-5 py-4 max-w-xs w-full mx-4 animate-fade-in" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-2xl">{longPressNames.emoji}</span>
-              <span className="text-base font-semibold text-foreground">リアクションした人</span>
-            </div>
-            <div className="space-y-2">
-              {longPressNames.names.map((name) => (
-                <div key={name} className="text-sm text-foreground">{name}</div>
-              ))}
-            </div>
-            <button
-              onClick={() => setLongPressNames(null)}
-              className="mt-4 w-full py-2 text-sm text-muted hover:text-foreground rounded-xl border border-border/50 transition-colors"
-            >
-              閉じる
-            </button>
-          </div>
+          <span className="text-lg">{showNames.emoji}</span>
+          <span className="text-xs text-foreground">
+            {showNames.names.join("、")}
+          </span>
+          <span className="ml-auto text-[10px] text-muted">もう一度タップで切替</span>
         </div>
       )}
     </>
