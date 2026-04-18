@@ -599,6 +599,16 @@ export const MessageItem = memo(function MessageItem({
             </>
           )}
 
+          {/* 進行中バッジ */}
+          {message.status === "in_progress" && !isEditing && (
+            <div className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-400/15 text-xs font-semibold text-blue-400">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              進行中
+            </div>
+          )}
+
           {/* 決定事項マーカー + Why/Due + 編集 */}
           {message.is_decision && !isEditing && (
             <div className="mt-1 px-3 py-2 rounded-lg bg-accent/10 border border-accent/20 text-sm text-accent">
