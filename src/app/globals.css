@@ -24,7 +24,7 @@
 html, body {
   background: var(--color-background);
   color: var(--color-foreground);
-  font-size: 16px;
+  font-size: 18px;
   overflow-x: hidden;
   overscroll-behavior-x: none;
 }
