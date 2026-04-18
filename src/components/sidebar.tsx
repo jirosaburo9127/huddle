@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { Workspace, Channel } from "@/lib/supabase/types";
 import type { WorkspaceCategory } from "@/lib/channel-categories";
 import { UNCATEGORIZED_LABEL } from "@/lib/channel-categories";
@@ -58,6 +58,7 @@ export function Sidebar({
   categories = [],
 }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   // 未読カウントをローカルstate化（Realtime+クリックで更新するため）
   // NOTE: prop → state のシンク useEffect は意図的に置いていない。
   // サーバーアクション等で親が revalidate されると unreadCounts の参照が
@@ -1099,6 +1100,19 @@ export function Sidebar({
                 {catAdding ? "..." : "追加"}
               </button>
             </div>
+
+            {/* 決定ボタン */}
+            <button
+              type="button"
+              onClick={() => {
+                setShowCategoryManager(false);
+                // サイドバーに即反映するためページを再検証
+                router.refresh();
+              }}
+              className="w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white hover:bg-accent-hover transition-colors"
+            >
+              決定
+            </button>
           </div>
         </div>
       )}
@@ -1355,7 +1369,7 @@ function ChannelCategoryList({
               >
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
               </svg>
-              <span className="flex-1 text-left">{key === "__uncategorized__" ? label : `■ ${label}`}</span>
+              <span className="flex-1 text-left">■ {label}</span>
               {isCollapsed && unreadTotal > 0 && (
                 <span className="bg-accent text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
                   {unreadTotal > 99 ? "99+" : unreadTotal}
