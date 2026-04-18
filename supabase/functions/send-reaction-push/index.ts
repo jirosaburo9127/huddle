@@ -159,10 +159,9 @@ Deno.serve(async (req) => {
       .reduce((sum, r) => sum + Number(r.unread_count || 0), 0);
 
     const senderName = reactor?.display_name || "メンバー";
-    const title = channel.is_dm
-      ? `${senderName}`
-      : `${senderName} (#${channel.name})`;
-    const body = `${record.emoji} リアクションがありました`;
+    const preview = message.content.replace(/\s+/g, " ").trim().slice(0, 15);
+    const title = `${record.emoji} ${senderName}がリアクション`;
+    const body = `「${preview}…」に${record.emoji}をつけました`;
     const showBanner = !isMuted;
 
     // APNs送信
