@@ -189,7 +189,7 @@ function MessageContent({
 
 // リアクションバッジコンポーネント
 // PC: ホバーツールチップ + クリックでトグル
-// モバイル: バッジの横にリアクター名を常時表示（タップ操作不要）
+// モバイル: タップで名前を展開表示
 function ReactionBadges({
   reactions,
   onReact,
@@ -197,41 +197,52 @@ function ReactionBadges({
   reactions: Array<{ emoji: string; count: number; reacted: boolean; names: string[] }>;
   onReact?: (emoji: string) => void;
 }) {
+  const [expandedEmoji, setExpandedEmoji] = useState<string | null>(null);
+
   return (
     <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-      {reactions.map(({ emoji, count, reacted, names }) => (
-        <div key={emoji} className="relative group/reaction">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onReact?.(emoji);
-            }}
-            onContextMenu={(e) => e.preventDefault()}
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm border cursor-pointer transition-colors select-none ${
-              reacted
-                ? "bg-accent/10 border-accent/30 text-accent"
-                : "bg-white/[0.03] border-border/50 text-muted hover:border-accent/30"
-            }`}
-          >
-            <span className="text-base">{emoji}</span>
-            <span>{count}</span>
-            {/* モバイル: リアクター名をバッジ内に常時表示 */}
+      {reactions.map(({ emoji, count, reacted, names }) => {
+        const isExpanded = expandedEmoji === emoji;
+        return (
+          <div key={emoji} className="relative group/reaction">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                // PC: クリックでトグル
+                if (typeof window !== "undefined" && window.innerWidth >= 1024) {
+                  onReact?.(emoji);
+                  return;
+                }
+                // モバイル: タップで名前の展開/閉じ
+                setExpandedEmoji((prev) => prev === emoji ? null : emoji);
+              }}
+              onContextMenu={(e) => e.preventDefault()}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm border cursor-pointer transition-colors select-none ${
+                reacted
+                  ? "bg-accent/10 border-accent/30 text-accent"
+                  : "bg-white/[0.03] border-border/50 text-muted hover:border-accent/30"
+              }`}
+            >
+              <span className="text-base">{emoji}</span>
+              <span>{count}</span>
+              {/* モバイル: 展開時にバッジ内に名前表示 */}
+              {isExpanded && names.length > 0 && (
+                <span className="lg:hidden text-[11px]">
+                  {names.join(", ")}
+                </span>
+              )}
+            </button>
+            {/* PC: ホバーツールチップ */}
             {names.length > 0 && (
-              <span className="lg:hidden text-[11px] max-w-[120px] truncate">
-                {names.join(", ")}
-              </span>
+              <div className="hidden lg:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 rounded-lg bg-foreground text-background text-xs font-medium whitespace-nowrap opacity-0 group-hover/reaction:opacity-100 pointer-events-none transition-opacity duration-100 z-20">
+                {names.join("、")}
+                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-foreground" />
+              </div>
             )}
-          </button>
-          {/* PC: ホバーツールチップ */}
-          {names.length > 0 && (
-            <div className="hidden lg:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 rounded-lg bg-foreground text-background text-xs font-medium whitespace-nowrap opacity-0 group-hover/reaction:opacity-100 pointer-events-none transition-opacity duration-100 z-20">
-              {names.join("、")}
-              <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-foreground" />
-            </div>
-          )}
-        </div>
-      ))}
+          </div>
+        );
+      })}
     </div>
   );
 }
