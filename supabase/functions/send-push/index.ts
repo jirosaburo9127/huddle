@@ -327,11 +327,20 @@ Deno.serve(async (req) => {
       return `${senderName} (#${channel.name})`;
     }
 
-    // ミュート機能は廃止済み (035_remove_mute_feature.sql) なので
-    // 受信者全員のトークンをそのまま対象にする。
+    // ミュート判定: channel_members.muted が true のユーザーはバッジのみ
+    const { data: mutedRows } = await supabase
+      .from("channel_members")
+      .select("user_id")
+      .eq("channel_id", record.channel_id)
+      .eq("muted", true);
+    const mutedUserIds = new Set<string>(
+      (mutedRows || []).map((r: { user_id: string }) => r.user_id)
+    );
+
     const targetedTokens = tokens;
 
     // バナー (音+通知センター表示): LINE方式で全メッセージにバナーを出す
+    // ただしミュート中のユーザーはバッジのみ
     const baseShowBanner = true;
 
     // 並列送信
@@ -339,7 +348,8 @@ Deno.serve(async (req) => {
       targetedTokens.map((t) => {
         const isMentioned =
           isBroadcastMention || mentionedUserIds.has(t.user_id);
-        const showBanner = baseShowBanner || isMentioned;
+        const isMuted = mutedUserIds.has(t.user_id);
+        const showBanner = isMuted ? false : (baseShowBanner || isMentioned);
         const badge = badgeCountByUser.get(t.user_id) ?? 1;
         return sendPush(
           t.token,

@@ -42,6 +42,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
   const [categoryValue, setCategoryValue] = useState<string | null>(channel.category ?? null);
   const [categorySaving, setCategorySaving] = useState(false);
   const [wsCategories, setWsCategories] = useState<WorkspaceCategory[]>([]);
+  const [isMuted, setIsMuted] = useState(false);
   const overflowMenuRef = useRef<HTMLDivElement>(null);
   const prevMessageCountRef = useRef(initialMessages.length);
   const supabaseRef = useRef(createClient());
@@ -83,6 +84,19 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
       if (data) setMyProfile(data);
     })();
   }, [currentUserId, supabase]);
+
+  // ミュート状態を取得
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from("channel_members")
+        .select("muted")
+        .eq("channel_id", channel.id)
+        .eq("user_id", currentUserId)
+        .maybeSingle();
+      if (data) setIsMuted(!!data.muted);
+    })();
+  }, [channel.id, currentUserId, supabase]);
 
   // モバイル: チャンネルURL直アクセス（プッシュ通知タップや共有リンク）では
   // サイドバーを閉じてチャンネルビューを前面に出す
@@ -844,6 +858,35 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
                       <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     {showDecisionsOnly ? "すべて表示" : "決定事項のみ表示"}
+                  </button>
+
+                  {/* ミュートトグル */}
+                  <button
+                    role="menuitem"
+                    onClick={async () => {
+                      setShowOverflowMenu(false);
+                      const { data, error } = await supabase.rpc("toggle_channel_mute", {
+                        p_channel_id: channel.id,
+                      });
+                      if (!error && typeof data === "boolean") {
+                        setIsMuted(data);
+                      }
+                    }}
+                    className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-white/[0.04] transition-colors ${
+                      isMuted ? "text-accent" : "text-foreground"
+                    }`}
+                  >
+                    {isMuted ? (
+                      <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                      </svg>
+                    ) : (
+                      <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                      </svg>
+                    )}
+                    {isMuted ? "ミュート解除" : "ミュート"}
                   </button>
 
                   {/* Wiki（DMでは非表示） */}
