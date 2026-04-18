@@ -109,64 +109,110 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
   const [pickerQuery, setPickerQuery] = useState("");
   const mentionPickerRef = useRef<HTMLDivElement>(null);
 
-  // 音声入力 (Web Speech API)
+  // 音声入力 (Capacitor: ネイティブプラグイン / Web: Web Speech API)
   const [isListening, setIsListening] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null);
 
-  function toggleVoiceInput() {
+  async function toggleVoiceInput() {
     if (isListening) {
-      recognitionRef.current?.stop();
+      // 停止
+      try {
+        const { Capacitor } = await import("@capacitor/core");
+        if (Capacitor.isNativePlatform()) {
+          const { SpeechRecognition } = await import("@capacitor-community/speech-recognition");
+          await SpeechRecognition.stop();
+        } else {
+          recognitionRef.current?.stop();
+        }
+      } catch {
+        recognitionRef.current?.stop();
+      }
       setIsListening(false);
+      setContent((prev) => prev.replace(/\u200B/g, ""));
       return;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const w = typeof window !== "undefined" ? (window as any) : null;
-    const SpeechRecognitionClass = w?.SpeechRecognition || w?.webkitSpeechRecognition;
-
-    if (!SpeechRecognitionClass) {
-      alert("このブラウザは音声入力に対応していません");
-      return;
+    // Capacitor ネイティブ判定
+    let isNative = false;
+    try {
+      const { Capacitor } = await import("@capacitor/core");
+      isNative = Capacitor.isNativePlatform();
+    } catch {
+      // Capacitor未インストール環境
     }
 
-    const recognition = new SpeechRecognitionClass();
-    recognition.lang = "ja-JP";
-    recognition.interimResults = true;
-    recognition.continuous = true;
-    recognitionRef.current = recognition;
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    recognition.onresult = (event: any) => {
-      let transcript = "";
-      for (let i = 0; i < event.results.length; i++) {
-        transcript += event.results[i][0].transcript;
+    if (isNative) {
+      // ネイティブ音声認識 (iOS)
+      try {
+        const { SpeechRecognition } = await import("@capacitor-community/speech-recognition");
+        const perm = await SpeechRecognition.requestPermissions();
+        if (perm.speechRecognition !== "granted") {
+          alert("音声認識の権限を許可してください");
+          return;
+        }
+        setIsListening(true);
+        const result = await SpeechRecognition.start({
+          language: "ja-JP",
+          partialResults: false,
+          popup: false,
+        });
+        setIsListening(false);
+        if (result.matches && result.matches.length > 0) {
+          setContent((prev) => prev + result.matches![0]);
+          if (textareaRef.current) {
+            textareaRef.current.style.height = "auto";
+            textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
+          }
+        }
+      } catch {
+        setIsListening(false);
       }
-      setContent((prev) => {
-        // 前回の暫定結果を除去して最新に置換
-        const base = prev.replace(/\u200B[\s\S]*$/, "");
-        return base + "\u200B" + transcript;
-      });
-    };
-
-    recognition.onend = () => {
-      setIsListening(false);
-      // ゼロ幅スペースのマーカーを除去して確定
-      setContent((prev) => prev.replace(/\u200B/g, ""));
-      // テキストエリアの高さを調整
-      if (textareaRef.current) {
-        textareaRef.current.style.height = "auto";
-        textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
+    } else {
+      // Web Speech API (ブラウザ)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const w = window as any;
+      const SpeechRecognitionClass = w?.SpeechRecognition || w?.webkitSpeechRecognition;
+      if (!SpeechRecognitionClass) {
+        alert("このブラウザは音声入力に対応していません");
+        return;
       }
-    };
 
-    recognition.onerror = () => {
-      setIsListening(false);
-      setContent((prev) => prev.replace(/\u200B/g, ""));
-    };
+      const recognition = new SpeechRecognitionClass();
+      recognition.lang = "ja-JP";
+      recognition.interimResults = true;
+      recognition.continuous = true;
+      recognitionRef.current = recognition;
 
-    recognition.start();
-    setIsListening(true);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      recognition.onresult = (event: any) => {
+        let transcript = "";
+        for (let i = 0; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
+        }
+        setContent((prev) => {
+          const base = prev.replace(/\u200B[\s\S]*$/, "");
+          return base + "\u200B" + transcript;
+        });
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+        setContent((prev) => prev.replace(/\u200B/g, ""));
+        if (textareaRef.current) {
+          textareaRef.current.style.height = "auto";
+          textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
+        }
+      };
+
+      recognition.onerror = () => {
+        setIsListening(false);
+        setContent((prev) => prev.replace(/\u200B/g, ""));
+      };
+
+      recognition.start();
+      setIsListening(true);
+    }
   }
 
   // ペースト/ドロップされた添付ファイルの保留キュー
