@@ -4,6 +4,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ServiceWorkerRegister } from "@/components/sw-register";
 import { SplashDismisser } from "@/components/splash-dismisser";
+import { NativeAppDetector } from "@/components/native-app-detector";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -60,6 +61,7 @@ export default function RootLayout({
         <ThemeProvider />
         <ServiceWorkerRegister />
         <SplashDismisser />
+        <NativeAppDetector />
         {children}
       </body>
     </html>
