@@ -3,12 +3,9 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { Workspace, Channel, ChannelCategory } from "@/lib/supabase/types";
-import {
-  CHANNEL_CATEGORIES,
-  CHANNEL_CATEGORY_LABELS,
-  UNCATEGORIZED_LABEL,
-} from "@/lib/channel-categories";
+import type { Workspace, Channel } from "@/lib/supabase/types";
+import type { WorkspaceCategory } from "@/lib/channel-categories";
+import { UNCATEGORIZED_LABEL } from "@/lib/channel-categories";
 import { CreateChannelModal } from "@/components/create-channel-modal";
 import { CreateDmModal } from "@/components/create-dm-modal";
 import { InviteModal } from "@/components/invite-modal";
@@ -46,6 +43,7 @@ type SidebarProps = {
   workspaceSlug: string;
   unreadCounts?: Record<string, number>;
   allWorkspaces: Array<{ id: string; name: string; slug: string }>;
+  categories?: WorkspaceCategory[];
 };
 
 export function Sidebar({
@@ -57,6 +55,7 @@ export function Sidebar({
   workspaceSlug,
   unreadCounts = {},
   allWorkspaces,
+  categories = [],
 }: SidebarProps) {
   const pathname = usePathname();
   // 未読カウントをローカルstate化（Realtime+クリックで更新するため）
@@ -628,6 +627,7 @@ export function Sidebar({
 
           <ChannelCategoryList
             channels={filteredChannels}
+            categories={categories}
             workspaceSlug={workspaceSlug}
             pathname={pathname}
             unreadState={unreadState}
@@ -834,6 +834,7 @@ export function Sidebar({
           workspaceSlug={workspaceSlug}
           currentUserId={currentUserId}
           members={members as Array<{ user_id: string; profiles: MemberProfile | MemberProfile[] }>}
+          categories={categories}
           onClose={() => setShowCreateChannel(false)}
         />
       )}
@@ -1010,6 +1011,7 @@ export function Sidebar({
 // ==================================================
 type ChannelCategoryListProps = {
   channels: Channel[];
+  categories: WorkspaceCategory[];
   workspaceSlug: string;
   pathname: string;
   unreadState: Record<string, number>;
@@ -1020,6 +1022,7 @@ const COLLAPSED_KEY = "huddle:sidebar:collapsedCategories";
 
 function ChannelCategoryList({
   channels,
+  categories,
   workspaceSlug,
   pathname,
   unreadState,
@@ -1027,7 +1030,7 @@ function ChannelCategoryList({
 }: ChannelCategoryListProps) {
   // 折りたたみ状態をlocalStorageに保存。初期値は「全カテゴリ折りたたみ」
   const [collapsed, setCollapsed] = useState<Set<string>>(() => {
-    const all = new Set<string>(CHANNEL_CATEGORIES as readonly string[]);
+    const all = new Set<string>(categories.map((c) => c.slug));
     all.add("__uncategorized__");
     return all;
   });
@@ -1038,7 +1041,6 @@ function ChannelCategoryList({
         const arr = JSON.parse(raw);
         if (Array.isArray(arr)) setCollapsed(new Set(arr));
       }
-      // localStorage が無い場合は「全カテゴリ折りたたみ」のままで維持
     } catch {
       // 破損した設定は無視
     }
@@ -1058,27 +1060,32 @@ function ChannelCategoryList({
     });
   }
 
-  // カテゴリごとにチャンネルを振り分け (未分類は UNCATEGORIZED)
+  // カテゴリごとにチャンネルを振り分け
   const grouped = useMemo(() => {
     const map = new Map<string, Channel[]>();
-    for (const cat of CHANNEL_CATEGORIES) map.set(cat, []);
+    for (const cat of categories) map.set(cat.slug, []);
     map.set("__uncategorized__", []);
     for (const ch of channels) {
       const key = ch.category ?? "__uncategorized__";
       const list = map.get(key);
       if (list) list.push(ch);
-      else map.set("__uncategorized__", [ch]); // 想定外カテゴリ値はその他行き
+      else map.get("__uncategorized__")!.push(ch);
     }
     return map;
-  }, [channels]);
+  }, [channels, categories]);
 
-  const sections: Array<{ key: string; label: string }> = [
-    ...CHANNEL_CATEGORIES.map((c) => ({
-      key: c as string,
-      label: CHANNEL_CATEGORY_LABELS[c as ChannelCategory],
-    })),
+  // カテゴリラベルマップ
+  const labelMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const c of categories) m.set(c.slug, c.label);
+    m.set("__uncategorized__", UNCATEGORIZED_LABEL);
+    return m;
+  }, [categories]);
+
+  const sections = useMemo(() => [
+    ...categories.map((c) => ({ key: c.slug, label: c.label })),
     { key: "__uncategorized__", label: UNCATEGORIZED_LABEL },
-  ];
+  ], [categories]);
 
   return (
     <div className="space-y-0.5">

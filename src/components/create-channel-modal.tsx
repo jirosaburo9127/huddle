@@ -3,11 +3,7 @@
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import type { ChannelCategory } from "@/lib/supabase/types";
-import {
-  CHANNEL_CATEGORIES,
-  CHANNEL_CATEGORY_LABELS,
-} from "@/lib/channel-categories";
+import type { WorkspaceCategory } from "@/lib/channel-categories";
 
 type MemberProfile = {
   id: string;
@@ -26,6 +22,7 @@ type Props = {
   workspaceSlug: string;
   currentUserId: string;
   members: WorkspaceMember[];
+  categories?: WorkspaceCategory[];
   onClose: () => void;
 };
 
@@ -34,11 +31,12 @@ export function CreateChannelModal({
   workspaceSlug,
   currentUserId,
   members,
+  categories = [],
   onClose,
 }: Props) {
   const [name, setName] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
-  const [category, setCategory] = useState<ChannelCategory | "">("");
+  const [category, setCategory] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set());
@@ -172,13 +170,13 @@ export function CreateChannelModal({
             <label className="block text-sm text-muted mb-1">カテゴリ</label>
             <select
               value={category}
-              onChange={(e) => setCategory(e.target.value as ChannelCategory | "")}
+              onChange={(e) => setCategory(e.target.value)}
               className="w-full rounded-lg border border-border bg-input-bg px-3 py-2 text-foreground focus:border-accent focus:outline-none"
             >
               <option value="">未分類</option>
-              {CHANNEL_CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {CHANNEL_CATEGORY_LABELS[c]}
+              {categories.map((c) => (
+                <option key={c.slug} value={c.slug}>
+                  {c.label}
                 </option>
               ))}
             </select>

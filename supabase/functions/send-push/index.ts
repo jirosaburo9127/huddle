@@ -226,42 +226,10 @@ Deno.serve(async (req) => {
     const channelUrl =
       workspaceSlug && channel.slug ? `/${workspaceSlug}/${channel.slug}` : "/";
 
-    // 受信者 user_id の集合を作る
-    let recipientIdsSet = new Set<string>();
-
-    if (isThreadReply) {
-      // スレッド返信: 親メッセージの著者 + これまでの返信者
-      const { data: parentMsg } = await supabase
-        .from("messages")
-        .select("user_id")
-        .eq("id", record.parent_id!)
-        .maybeSingle();
-      if (parentMsg?.user_id && parentMsg.user_id !== record.user_id) {
-        recipientIdsSet.add(parentMsg.user_id);
-      }
-      const { data: replies } = await supabase
-        .from("messages")
-        .select("user_id")
-        .eq("parent_id", record.parent_id!)
-        .neq("user_id", record.user_id);
-      for (const r of replies || []) {
-        recipientIdsSet.add(r.user_id);
-      }
-      // チャンネルメンバーでない相手には送らない
-      if (recipientIdsSet.size > 0) {
-        const { data: cms } = await supabase
-          .from("channel_members")
-          .select("user_id")
-          .eq("channel_id", record.channel_id)
-          .in("user_id", Array.from(recipientIdsSet));
-        const validSet = new Set<string>();
-        for (const cm of cms || []) {
-          validSet.add(cm.user_id);
-        }
-        recipientIdsSet = validSet;
-      }
-    } else {
-      // 通常メッセージ: チャンネルメンバー全員 (送信者以外)
+    // 受信者: チャンネルメンバー全員（送信者除外）— LINE方式
+    // スレッド返信・通常メッセージ・投票・決定事項すべて同一ロジック
+    const recipientIdsSet = new Set<string>();
+    {
       const { data: members } = await supabase
         .from("channel_members")
         .select("user_id")
@@ -363,15 +331,8 @@ Deno.serve(async (req) => {
     // 受信者全員のトークンをそのまま対象にする。
     const targetedTokens = tokens;
 
-    // バナー (音+通知センター表示) を出すかどうかの判定
-    // デフォルトは「メンション / DM / スレッド返信 / 投票作成/締切 / 決定登録」のみ
-    // それ以外はバッジだけ更新する静かな通知にする
-    const isPollEvent =
-      record.system_event === "poll_created" ||
-      record.system_event === "poll_closed";
-    const isDecisionEvent = record.system_event === "decision_marked";
-    const baseShowBanner =
-      isThreadReply || channel.is_dm || isPollEvent || isDecisionEvent;
+    // バナー (音+通知センター表示): LINE方式で全メッセージにバナーを出す
+    const baseShowBanner = true;
 
     // 並列送信
     const results = await Promise.allSettled(

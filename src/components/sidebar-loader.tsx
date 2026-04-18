@@ -38,7 +38,7 @@ export async function WorkspaceShell({ workspaceSlug, children }: WorkspaceShell
       is_private: boolean;
       is_dm: boolean;
       topic: string | null;
-      category: "idea" | "todo" | "in_progress" | "review" | "archived" | null;
+      category: string | null;
       created_by: string;
       created_at: string;
     }>;
@@ -50,7 +50,7 @@ export async function WorkspaceShell({ workspaceSlug, children }: WorkspaceShell
       is_private: boolean;
       is_dm: boolean;
       topic: string | null;
-      category: "idea" | "todo" | "in_progress" | "review" | "archived" | null;
+      category: string | null;
       created_by: string;
       created_at: string;
       channel_members: Array<{
@@ -84,6 +84,14 @@ export async function WorkspaceShell({ workspaceSlug, children }: WorkspaceShell
     unreadCounts[row.channel_id] = row.unread_count;
   }
 
+  // ワークスペースのカテゴリ一覧を取得
+  const { data: categoriesData } = await supabase
+    .from("workspace_categories")
+    .select("slug, label, sort_order")
+    .eq("workspace_id", result.workspace.id)
+    .order("sort_order", { ascending: true });
+  const categories = (categoriesData || []) as Array<{ slug: string; label: string; sort_order: number }>;
+
   return (
     <>
       <Sidebar
@@ -95,6 +103,7 @@ export async function WorkspaceShell({ workspaceSlug, children }: WorkspaceShell
         workspaceSlug={workspaceSlug}
         unreadCounts={unreadCounts}
         allWorkspaces={result.all_workspaces || []}
+        categories={categories}
       />
       <KeyboardShortcuts workspaceId={result.workspace.id} workspaceSlug={workspaceSlug}>
         <main className="flex-1 flex flex-col min-w-0">

@@ -17,12 +17,8 @@ export type Workspace = {
   created_at: string;
 };
 
-export type ChannelCategory =
-  | "idea"
-  | "todo"
-  | "in_progress"
-  | "review"
-  | "archived";
+// カテゴリはワークスペースごとに動的管理 (workspace_categories テーブル)
+export type ChannelCategory = string;
 
 export type Channel = {
   id: string;

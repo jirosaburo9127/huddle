@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { RealtimePostgresInsertPayload, RealtimePostgresUpdatePayload } from "@supabase/supabase-js";
-import type { Channel, ChannelCategory, Message, MessageWithProfile, Reaction } from "@/lib/supabase/types";
+import type { Channel, Message, MessageWithProfile, Reaction } from "@/lib/supabase/types";
 import { useRouter } from "next/navigation";
-import { CHANNEL_CATEGORIES, CHANNEL_CATEGORY_LABELS } from "@/lib/channel-categories";
+import type { WorkspaceCategory } from "@/lib/channel-categories";
 import { MessageItem } from "./message-item";
 import { MessageInput, type MentionPayload } from "./message-input";
 import { CreatePollModal } from "./create-poll-modal";
@@ -39,8 +39,9 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showOverflowMenu, setShowOverflowMenu] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
-  const [categoryValue, setCategoryValue] = useState<ChannelCategory | null>(channel.category ?? null);
+  const [categoryValue, setCategoryValue] = useState<string | null>(channel.category ?? null);
   const [categorySaving, setCategorySaving] = useState(false);
+  const [wsCategories, setWsCategories] = useState<WorkspaceCategory[]>([]);
   const overflowMenuRef = useRef<HTMLDivElement>(null);
   const prevMessageCountRef = useRef(initialMessages.length);
   const supabaseRef = useRef(createClient());
@@ -888,7 +889,16 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
                       onClick={() => {
                         setShowOverflowMenu(false);
                         setCategoryValue(channel.category ?? null);
-                        setShowCategoryPicker(true);
+                        // カテゴリ一覧をDBから動的取得
+                        (async () => {
+                          const { data } = await supabase
+                            .from("workspace_categories")
+                            .select("slug, label, sort_order")
+                            .eq("workspace_id", channel.workspace_id)
+                            .order("sort_order", { ascending: true });
+                          setWsCategories((data || []) as WorkspaceCategory[]);
+                          setShowCategoryPicker(true);
+                        })();
                       }}
                       className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-white/[0.04] transition-colors"
                     >
@@ -896,11 +906,6 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
                         <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                       </svg>
                       カテゴリを変更
-                      {channel.category && (
-                        <span className="ml-auto text-xs text-muted truncate">
-                          {CHANNEL_CATEGORY_LABELS[channel.category]}
-                        </span>
-                      )}
                     </button>
                   )}
 
@@ -1123,19 +1128,19 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
                 />
                 <span className="text-sm text-foreground">未分類</span>
               </label>
-              {CHANNEL_CATEGORIES.map((cat) => (
+              {wsCategories.map((cat) => (
                 <label
-                  key={cat}
+                  key={cat.slug}
                   className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer hover:bg-white/[0.04] transition-colors"
                 >
                   <input
                     type="radio"
                     name="channel-category"
-                    checked={categoryValue === cat}
-                    onChange={() => setCategoryValue(cat)}
+                    checked={categoryValue === cat.slug}
+                    onChange={() => setCategoryValue(cat.slug)}
                   />
                   <span className="text-sm text-foreground">
-                    {CHANNEL_CATEGORY_LABELS[cat]}
+                    {cat.label}
                   </span>
                 </label>
               ))}
