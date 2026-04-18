@@ -77,6 +77,30 @@ export function Sidebar({
   const [showWsMembers, setShowWsMembers] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showWsSwitcher, setShowWsSwitcher] = useState(false);
+  const [showCategoryManager, setShowCategoryManager] = useState(false);
+  const [catList, setCatList] = useState(categories);
+  const [newCatLabel, setNewCatLabel] = useState("");
+  const [catAdding, setCatAdding] = useState(false);
+  const [catError, setCatError] = useState("");
+
+  async function handleAddCategory() {
+    if (!newCatLabel.trim() || catAdding) return;
+    setCatAdding(true);
+    setCatError("");
+    const supabase = sidebarSupabaseRef.current;
+    const { data, error } = await supabase.rpc("add_workspace_category", {
+      p_workspace_id: workspace.id,
+      p_label: newCatLabel.trim(),
+    });
+    if (error) {
+      setCatError(error.message);
+    } else if (data) {
+      const row = data as unknown as { slug: string; label: string; sort_order: number };
+      setCatList((prev) => [...prev, row]);
+      setNewCatLabel("");
+    }
+    setCatAdding(false);
+  }
   const wsSwitcherRef = useRef<HTMLDivElement>(null);
   // zustand セレクタ形式で購読範囲を限定（不要な再レンダーを防ぐ）
   const sidebarOpen = useMobileNavStore((s) => s.sidebarOpen);
@@ -616,13 +640,29 @@ export function Sidebar({
             <span className="text-sm font-semibold uppercase text-muted tracking-wider">
               チャンネル
             </span>
-            <button
-              onClick={() => setShowCreateChannel(true)}
-              className="text-muted hover:text-accent text-lg leading-none transition-colors"
-              title="チャンネル作成"
-            >
-              +
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => {
+                  setCatList(categories);
+                  setCatError("");
+                  setNewCatLabel("");
+                  setShowCategoryManager(true);
+                }}
+                className="text-muted hover:text-accent transition-colors p-0.5"
+                title="カテゴリ管理"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+              </button>
+              <button
+                onClick={() => setShowCreateChannel(true)}
+                className="text-muted hover:text-accent text-lg leading-none transition-colors"
+                title="チャンネル作成"
+              >
+                +
+              </button>
+            </div>
           </div>
 
           <ChannelCategoryList
@@ -873,6 +913,95 @@ export function Sidebar({
           members={members}
           onClose={() => setShowWsMembers(false)}
         />
+      )}
+
+      {/* カテゴリ管理モーダル */}
+      {showCategoryManager && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setShowCategoryManager(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl bg-sidebar border border-border p-5 space-y-4 animate-fade-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold">カテゴリ管理</h3>
+              <button
+                onClick={() => setShowCategoryManager(false)}
+                className="text-muted hover:text-foreground transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {catError && (
+              <div className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">{catError}</div>
+            )}
+
+            <div className="space-y-1 max-h-60 overflow-y-auto">
+              {catList.map((cat) => (
+                <div
+                  key={cat.slug}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.03] border border-border/50"
+                >
+                  <span className="text-sm text-foreground flex-1 truncate">{cat.label}</span>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!confirm(`カテゴリ「${cat.label}」を削除しますか？\n該当チャンネルは「その他」に移動します。`)) return;
+                      setCatError("");
+                      const supabase = sidebarSupabaseRef.current;
+                      const { error } = await supabase.rpc("delete_workspace_category", {
+                        p_workspace_id: workspace.id,
+                        p_slug: cat.slug,
+                      });
+                      if (error) {
+                        setCatError(error.message);
+                      } else {
+                        setCatList((prev) => prev.filter((c) => c.slug !== cat.slug));
+                      }
+                    }}
+                    className="shrink-0 p-1 text-muted hover:text-red-400 rounded hover:bg-red-500/10 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+              {catList.length === 0 && (
+                <div className="text-xs text-muted py-2 text-center">カテゴリがありません</div>
+              )}
+            </div>
+
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newCatLabel}
+                onChange={(e) => setNewCatLabel(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                    e.preventDefault();
+                    handleAddCategory();
+                  }
+                }}
+                placeholder="新しいカテゴリ名"
+                className="flex-1 rounded-lg border border-border bg-input-bg px-3 py-2 text-sm text-foreground placeholder-muted focus:border-accent focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={handleAddCategory}
+                disabled={!newCatLabel.trim() || catAdding}
+                className="shrink-0 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50 transition-colors"
+              >
+                {catAdding ? "..." : "追加"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* 設定モーダル */}

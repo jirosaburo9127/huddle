@@ -37,6 +37,30 @@ export function CreateChannelModal({
   const [name, setName] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
   const [category, setCategory] = useState("");
+  const [catOptions, setCatOptions] = useState(categories);
+  const [showNewCat, setShowNewCat] = useState(false);
+  const [newCatLabel, setNewCatLabel] = useState("");
+  const [catAdding, setCatAdding] = useState(false);
+
+  async function handleAddNewCategory() {
+    if (!newCatLabel.trim() || catAdding) return;
+    setCatAdding(true);
+    const { data, error: rpcErr } = await supabase.rpc("add_workspace_category", {
+      p_workspace_id: workspaceId,
+      p_label: newCatLabel.trim(),
+    });
+    if (rpcErr) {
+      setError(rpcErr.message);
+    } else if (data) {
+      const row = data as unknown as { slug: string; label: string; sort_order: number };
+      setCatOptions((prev) => [...prev, row]);
+      setCategory(row.slug);
+      setNewCatLabel("");
+      setShowNewCat(false);
+    }
+    setCatAdding(false);
+  }
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set());
@@ -170,16 +194,50 @@ export function CreateChannelModal({
             <label className="block text-sm text-muted mb-1">カテゴリ</label>
             <select
               value={category}
-              onChange={(e) => setCategory(e.target.value)}
+              onChange={(e) => {
+                if (e.target.value === "__new__") {
+                  setShowNewCat(true);
+                } else {
+                  setCategory(e.target.value);
+                }
+              }}
               className="w-full rounded-lg border border-border bg-input-bg px-3 py-2 text-foreground focus:border-accent focus:outline-none"
             >
               <option value="">未分類</option>
-              {categories.map((c) => (
+              {catOptions.map((c) => (
                 <option key={c.slug} value={c.slug}>
                   {c.label}
                 </option>
               ))}
+              <option value="__new__">+ 新しいカテゴリを追加</option>
             </select>
+            {showNewCat && (
+              <div className="mt-2 flex gap-2">
+                <input
+                  type="text"
+                  value={newCatLabel}
+                  onChange={(e) => setNewCatLabel(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                      e.preventDefault();
+                      handleAddNewCategory();
+                    }
+                    if (e.key === "Escape") setShowNewCat(false);
+                  }}
+                  placeholder="カテゴリ名を入力"
+                  autoFocus
+                  className="flex-1 rounded-lg border border-border bg-input-bg px-3 py-2 text-sm text-foreground placeholder-muted focus:border-accent focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddNewCategory}
+                  disabled={!newCatLabel.trim() || catAdding}
+                  className="shrink-0 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50 transition-colors"
+                >
+                  {catAdding ? "..." : "追加"}
+                </button>
+              </div>
+            )}
           </div>
 
           <label className="flex items-center gap-2 text-sm">
