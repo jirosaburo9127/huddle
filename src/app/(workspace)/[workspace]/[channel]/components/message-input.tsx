@@ -405,13 +405,16 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
     }
 
     try {
-      // テキスト本文（宛先ピル含む）があれば先に送る
-      if (trimmed) {
-        await onSend(trimmed, mentions, options);
-      }
-      // 続けて添付を順次送信（1添付 = 1メッセージ）
+      // テキスト + 添付URLを1つのメッセージにまとめて送信
+      // 添付URLは改行で区切って末尾に追加
+      const parts: string[] = [];
+      if (trimmed) parts.push(trimmed);
       for (const att of attachmentsSnapshot) {
-        await onSend(att.url, { userIds: [], broadcast: null });
+        parts.push(att.url);
+      }
+      const combined = parts.join("\n");
+      if (combined) {
+        await onSend(combined, mentions, options);
       }
     } finally {
       setSending(false);

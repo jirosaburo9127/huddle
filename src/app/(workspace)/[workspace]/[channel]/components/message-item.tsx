@@ -120,7 +120,22 @@ function parseMarkdown(text: string): string {
   return html;
 }
 
-// メッセージ本文のレンダリング（ファイルURL対応 + Markdown）
+// Storage URLを行単位で検出して分離する
+function splitContentAndFiles(content: string): { textLines: string[]; fileUrls: string[] } {
+  const lines = content.split("\n");
+  const textLines: string[] = [];
+  const fileUrls: string[] = [];
+  for (const line of lines) {
+    if (isStorageFileUrl(line)) {
+      fileUrls.push(line.trim());
+    } else {
+      textLines.push(line);
+    }
+  }
+  return { textLines, fileUrls };
+}
+
+// メッセージ本文のレンダリング（テキスト + ファイルの混在対応）
 function MessageContent({
   content,
   imageError,
@@ -132,58 +147,57 @@ function MessageContent({
   onImageError: () => void;
   onImageClick?: (url: string) => void;
 }) {
-  if (isStorageFileUrl(content)) {
-    const url = content.trim();
-    const fileName = extractFileName(url);
-
-    // 画像ファイルの場合はプレビュー表示（タップでアプリ内ライトボックス）
-    if (isImageFile(url) && !imageError) {
-      return (
-        <div className="mt-1">
-          <img
-            src={url}
-            alt={fileName}
-            className="max-w-full sm:max-w-xs max-h-80 rounded-xl cursor-pointer hover:opacity-90 transition-opacity"
-            onClick={(e) => {
-              e.stopPropagation();
-              onImageClick?.(url);
-            }}
-            onError={onImageError}
-          />
-          <span className="text-xs text-muted mt-1 block">{fileName}</span>
-        </div>
-      );
-    }
-
-    // それ以外のファイルはリンク表示
-    return (
-      <a
-        href={url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex items-center gap-2 mt-1 px-3 py-2 rounded-xl bg-white/[0.03] border border-border/50 hover:border-accent/30 transition-colors"
-      >
-        {/* ファイルアイコン */}
-        <svg className="w-5 h-5 text-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-        </svg>
-        <span className="text-sm text-accent">{fileName}</span>
-        {/* ダウンロードアイコン */}
-        <svg className="w-4 h-4 text-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-        </svg>
-      </a>
-    );
-  }
-
-  // Markdownパース済みHTML
-  const html = parseMarkdown(content);
+  const { textLines, fileUrls } = splitContentAndFiles(content);
+  const textContent = textLines.join("\n").trim();
 
   return (
-    <div
-      className="text-base leading-[1.65] text-foreground whitespace-pre-wrap break-words [&_pre]:whitespace-pre [&_pre]:my-2"
-      dangerouslySetInnerHTML={{ __html: html }}
-    />
+    <div>
+      {/* テキスト部分 */}
+      {textContent && (
+        <div
+          className="text-base leading-[1.65] text-foreground whitespace-pre-wrap break-words [&_pre]:whitespace-pre [&_pre]:my-2"
+          dangerouslySetInnerHTML={{ __html: parseMarkdown(textContent) }}
+        />
+      )}
+      {/* ファイル部分 */}
+      {fileUrls.map((url, i) => {
+        const fileName = extractFileName(url);
+        if (isImageFile(url) && !imageError) {
+          return (
+            <div key={i} className="mt-1">
+              <img
+                src={url}
+                alt={fileName}
+                className="max-w-full sm:max-w-xs max-h-80 rounded-xl cursor-pointer hover:opacity-90 transition-opacity"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onImageClick?.(url);
+                }}
+                onError={onImageError}
+              />
+              <span className="text-xs text-muted mt-1 block">{fileName}</span>
+            </div>
+          );
+        }
+        return (
+          <a
+            key={i}
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 mt-1 px-3 py-2 rounded-xl bg-white/[0.03] border border-border/50 hover:border-accent/30 transition-colors"
+          >
+            <svg className="w-5 h-5 text-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+            </svg>
+            <span className="text-sm text-accent">{fileName}</span>
+            <svg className="w-4 h-4 text-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+          </a>
+        );
+      })}
+    </div>
   );
 }
 
