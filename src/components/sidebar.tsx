@@ -1175,11 +1175,22 @@ function ChannelCategoryList({
     }
   }, []);
 
+  // アコーディオン方式: 1つ開くと他は全部閉じる
   function toggleCollapsed(key: string) {
     setCollapsed((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
+      const wasOpen = !prev.has(key);
+      let next: Set<string>;
+      if (wasOpen) {
+        // 既に開いていた → 閉じる
+        next = new Set(prev);
+        next.add(key);
+      } else {
+        // 閉じていた → 開く（他は全部閉じる）
+        const allKeys = categories.map((c) => c.slug);
+        allKeys.push("__uncategorized__");
+        next = new Set(allKeys);
+        next.delete(key);
+      }
       try {
         localStorage.setItem(COLLAPSED_KEY, JSON.stringify(Array.from(next)));
       } catch {
