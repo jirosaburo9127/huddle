@@ -335,15 +335,8 @@ export function PollDisplay({ messageId, currentUserId, onMarkDecision }: Props)
                   : "border-border bg-background/50 hover:border-accent/40"
               } ${!isActive ? "cursor-default" : "cursor-pointer"}`}
             >
-              {/* 進捗バー */}
-              <div
-                className={`absolute inset-y-0 left-0 ${
-                  isMyChoice ? "bg-accent/20" : "bg-white/[0.04]"
-                }`}
-                style={{ width: `${percent}%` }}
-                aria-hidden="true"
-              />
-              <div className="relative flex items-start justify-between gap-2 text-[13px]">
+              {/* テキスト行 */}
+              <div className="relative flex items-start justify-between gap-2 text-[13px] mb-1.5">
                 <div className="flex items-start gap-2 min-w-0 flex-1">
                   {isMyChoice && (
                     <svg className="w-3.5 h-3.5 shrink-0 text-accent mt-[3px]" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
@@ -361,8 +354,21 @@ export function PollDisplay({ messageId, currentUserId, onMarkDecision }: Props)
                 </div>
                 <div className="shrink-0 flex items-center gap-2 text-muted mt-[1px]">
                   <span className="text-[11px]">{count}票</span>
-                  <span className="text-[11px] tabular-nums">{Math.round(percent)}%</span>
+                  <span className="text-[11px] tabular-nums w-8 text-right">{Math.round(percent)}%</span>
                 </div>
+              </div>
+              {/* プログレスバー（テキストの下に独立表示） */}
+              <div className="relative h-2 rounded-full bg-white/[0.06] overflow-hidden">
+                <div
+                  className={`absolute inset-y-0 left-0 rounded-full transition-all duration-500 ${
+                    isMyChoice
+                      ? "bg-accent"
+                      : isTop && !isActive
+                        ? "bg-accent/60"
+                        : "bg-foreground/20"
+                  }`}
+                  style={{ width: `${percent}%` }}
+                />
               </div>
             </button>
           );
