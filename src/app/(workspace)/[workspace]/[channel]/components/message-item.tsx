@@ -411,7 +411,8 @@ export const MessageItem = memo(function MessageItem({
       setIsEditing(false);
       return;
     }
-    if (e.key === "Enter" && !e.shiftKey) {
+    // 通常投稿と同じ操作: Alt+Enter or Cmd+Enter で保存、Enter は改行
+    if (e.key === "Enter" && (e.altKey || e.metaKey)) {
       e.preventDefault();
       handleSaveEdit();
     }
