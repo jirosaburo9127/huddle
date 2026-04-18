@@ -1059,15 +1059,8 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
                   const currentDate = new Date(message.created_at).toDateString();
                   const prevDate = prev ? new Date(prev.created_at).toDateString() : null;
                   const showDateSeparator = !prev || currentDate !== prevDate;
-                  // 連続メッセージ判定: 同一ユーザーかつ5分以内
-                  // 返信メッセージは引用ブロックを見せるため連続化しない
-                  const isConsecutive =
-                    !showDateSeparator &&
-                    prev !== null &&
-                    prev.user_id === message.user_id &&
-                    !prev.deleted_at &&
-                    !message.parent_id &&
-                    new Date(message.created_at).getTime() - new Date(prev.created_at).getTime() < 5 * 60 * 1000;
+                  // 全メッセージにユーザー名+時刻を表示（連続投稿でも区別できるように）
+                  const isConsecutive = false;
                   const parentMessage = message.parent_id ? byId.get(message.parent_id) ?? null : null;
 
                   return (

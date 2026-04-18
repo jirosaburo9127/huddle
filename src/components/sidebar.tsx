@@ -696,10 +696,12 @@ export function Sidebar({
             </span>
             <button
               onClick={() => setShowCreateDm(true)}
-              className="text-muted hover:text-accent text-lg leading-none transition-colors"
+              className="text-muted hover:text-accent transition-colors p-2 -m-1 rounded-lg hover:bg-white/[0.04]"
               title="新しいメッセージ"
             >
-              +
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
             </button>
           </div>
 
