@@ -473,17 +473,20 @@ export const MessageItem = memo(function MessageItem({
               {message.edited_at && (
                 <span className="text-sm text-muted/70">(編集済み)</span>
               )}
+              {message.is_decision && (
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-red-400/15 text-[11px] font-semibold text-red-400">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  決定
+                </span>
+              )}
               {message.status === "in_progress" && (
                 <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-blue-400/15 text-[11px] font-semibold text-blue-400">
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                   </svg>
                   進行中
-                </span>
-              )}
-              {message.is_decision && (
-                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-accent/15 text-[11px] font-semibold text-accent">
-                  ✅ 決定
                 </span>
               )}
             </div>
@@ -612,52 +615,6 @@ export const MessageItem = memo(function MessageItem({
             </>
           )}
 
-          {/* 決定事項マーカー + Why/Due + 編集 */}
-          {message.is_decision && !isEditing && (
-            <div className="mt-1 px-3 py-2 rounded-lg bg-accent/10 border border-accent/20 text-sm text-accent">
-              <div className="flex items-center justify-between gap-2">
-                <span className="flex items-center gap-1.5">✅ 決定事項</span>
-                {onUpdateDecisionMeta && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setMetaWhyInput(message.decision_why || "");
-                      setMetaDueInput(message.decision_due || "");
-                      setShowDecisionMetaModal(true);
-                    }}
-                    className="text-xs text-accent/80 hover:text-accent underline decoration-dotted"
-                  >
-                    {message.decision_why || message.decision_due ? "編集" : "理由・期限を追記"}
-                  </button>
-                )}
-              </div>
-              {(message.decision_why || message.decision_due) && (
-                <div className="mt-2 pt-2 border-t border-accent/20 space-y-1 text-xs text-foreground/90">
-                  {message.decision_why && (
-                    <div className="flex gap-2">
-                      <span className="shrink-0 font-semibold text-muted uppercase">
-                        Why
-                      </span>
-                      <span className="whitespace-pre-wrap break-words">
-                        {message.decision_why}
-                      </span>
-                    </div>
-                  )}
-                  {message.decision_due && (
-                    <div className="flex gap-2">
-                      <span className="shrink-0 font-semibold text-muted uppercase">
-                        Due
-                      </span>
-                      <span className="whitespace-pre-wrap break-words">
-                        {message.decision_due}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
 
           {/* 決定事項 Why/Due 編集モーダル */}
           {showDecisionMetaModal && onUpdateDecisionMeta && (
