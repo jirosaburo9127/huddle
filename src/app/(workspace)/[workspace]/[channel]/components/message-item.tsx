@@ -413,8 +413,12 @@ export const MessageItem = memo(function MessageItem({
     <>
       <div
         id={`msg-${message.id}`}
-        className={`group relative flex gap-3 px-2 rounded-lg hover:bg-white/[0.02] transition-colors ${
+        className={`group relative flex gap-3 px-2 rounded-lg transition-colors ${
           isConsecutive ? "py-1" : "pt-3 pb-1"
+        } ${
+          message.status === "in_progress"
+            ? "bg-blue-400/[0.06] hover:bg-blue-400/[0.1]"
+            : "hover:bg-white/[0.02]"
         }`}
         onClick={(e) => {
           // テキストをドラッグ選択した直後の click は無視する
@@ -595,16 +599,6 @@ export const MessageItem = memo(function MessageItem({
             </>
           )}
 
-          {/* 進行中マーカー */}
-          {message.status === "in_progress" && !isEditing && (
-            <div className="mt-1 px-3 py-1.5 rounded-lg bg-blue-400/10 border border-blue-400/20 text-sm text-blue-400 flex items-center gap-1.5">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-              進行中
-            </div>
-          )}
-
           {/* 決定事項マーカー + Why/Due + 編集 */}
           {message.is_decision && !isEditing && (
             <div className="mt-1 px-3 py-2 rounded-lg bg-accent/10 border border-accent/20 text-sm text-accent">
@@ -770,7 +764,7 @@ export const MessageItem = memo(function MessageItem({
                 }`}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                 </svg>
                 {message.status === "in_progress" ? "進行中" : "進行中"}
               </button>
@@ -897,7 +891,7 @@ export const MessageItem = memo(function MessageItem({
                 >
                   <span className={`w-12 h-12 rounded-full border-2 flex items-center justify-center ${message.status === "in_progress" ? "border-blue-400 bg-blue-400/15" : "border-muted/40"}`}>
                     <svg className={`w-5 h-5 ${message.status === "in_progress" ? "text-blue-400" : "text-foreground"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                     </svg>
                   </span>
                   <span className={`text-xs ${message.status === "in_progress" ? "text-blue-400 font-semibold" : "text-foreground"}`}>
