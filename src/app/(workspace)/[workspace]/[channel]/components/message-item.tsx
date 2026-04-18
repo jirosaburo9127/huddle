@@ -207,19 +207,15 @@ function ReactionBadges({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                // PC (lg+): そのままトグル
+                // PC (lg+): ホバーで名前が見えるのでクリックはトグル
                 if (typeof window !== "undefined" && window.innerWidth >= 1024) {
                   onReact?.(emoji);
                   return;
                 }
-                // モバイル: タップで名前表示
-                if (showNames?.emoji === emoji) {
-                  // 同じ絵文字を再タップ → トグル（リアクション追加/解除）
-                  setShowNames(null);
-                  onReact?.(emoji);
-                } else {
-                  setShowNames({ emoji, names });
-                }
+                // モバイル: タップで名前表示/非表示のトグルのみ
+                setShowNames((prev) =>
+                  prev?.emoji === emoji ? null : { emoji, names }
+                );
               }}
               onContextMenu={(e) => e.preventDefault()}
               className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm border cursor-pointer transition-colors select-none ${
@@ -251,7 +247,6 @@ function ReactionBadges({
           <span className="text-xs text-foreground">
             {showNames.names.join("、")}
           </span>
-          <span className="ml-auto text-[10px] text-muted">もう一度タップで切替</span>
         </div>
       )}
     </>
