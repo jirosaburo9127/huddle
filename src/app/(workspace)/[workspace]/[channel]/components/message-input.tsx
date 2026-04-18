@@ -109,6 +109,66 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
   const [pickerQuery, setPickerQuery] = useState("");
   const mentionPickerRef = useRef<HTMLDivElement>(null);
 
+  // 音声入力 (Web Speech API)
+  const [isListening, setIsListening] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recognitionRef = useRef<any>(null);
+
+  function toggleVoiceInput() {
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const w = typeof window !== "undefined" ? (window as any) : null;
+    const SpeechRecognitionClass = w?.SpeechRecognition || w?.webkitSpeechRecognition;
+
+    if (!SpeechRecognitionClass) {
+      alert("このブラウザは音声入力に対応していません");
+      return;
+    }
+
+    const recognition = new SpeechRecognitionClass();
+    recognition.lang = "ja-JP";
+    recognition.interimResults = true;
+    recognition.continuous = true;
+    recognitionRef.current = recognition;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    recognition.onresult = (event: any) => {
+      let transcript = "";
+      for (let i = 0; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript;
+      }
+      setContent((prev) => {
+        // 前回の暫定結果を除去して最新に置換
+        const base = prev.replace(/\u200B[\s\S]*$/, "");
+        return base + "\u200B" + transcript;
+      });
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+      // ゼロ幅スペースのマーカーを除去して確定
+      setContent((prev) => prev.replace(/\u200B/g, ""));
+      // テキストエリアの高さを調整
+      if (textareaRef.current) {
+        textareaRef.current.style.height = "auto";
+        textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
+      }
+    };
+
+    recognition.onerror = () => {
+      setIsListening(false);
+      setContent((prev) => prev.replace(/\u200B/g, ""));
+    };
+
+    recognition.start();
+    setIsListening(true);
+  }
+
   // ペースト/ドロップされた添付ファイルの保留キュー
   // アップロードは即時だが「送信」ボタンを押すまで実送信はしない
   type PendingAttachment = {
@@ -736,6 +796,22 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
               </svg>
             </button>
           )}
+
+          {/* 音声入力ボタン */}
+          <button
+            type="button"
+            onClick={toggleVoiceInput}
+            className={`shrink-0 rounded-lg w-8 h-8 flex items-center justify-center transition-colors ${
+              isListening
+                ? "text-red-400 bg-red-500/10 animate-pulse"
+                : "text-muted hover:text-accent"
+            }`}
+            title={isListening ? "音声入力を停止" : "音声入力"}
+          >
+            <svg className="w-4 h-4" fill={isListening ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+            </svg>
+          </button>
 
           {/* 決定として送るトグル — 添付・@と並んで入力ツールの一部 */}
           <button
