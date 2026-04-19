@@ -781,7 +781,7 @@ export const MessageItem = memo(function MessageItem({
                 <svg className="w-3.5 h-3.5" fill={isBookmarked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
                 </svg>
-                保存
+                ブックマーク
               </button>
             )}
             {isOwn && (
@@ -911,7 +911,7 @@ export const MessageItem = memo(function MessageItem({
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
                     </svg>
                   </span>
-                  <span className={`text-xs ${isBookmarked ? "text-accent" : "text-foreground"}`}>保存</span>
+                  <span className={`text-xs ${isBookmarked ? "text-accent" : "text-foreground"}`}>ブックマーク</span>
                 </button>
               )}
               {/* 編集 */}
