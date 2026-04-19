@@ -934,6 +934,8 @@ export function Sidebar({
       {showWsMembers && (
         <WsMembersModal
           members={members}
+          workspaceId={workspace.id}
+          currentUserId={currentUserId}
           onClose={() => setShowWsMembers(false)}
         />
       )}

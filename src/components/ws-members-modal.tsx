@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 type MemberProfile = {
   id: string;
@@ -16,11 +17,15 @@ type WorkspaceMember = {
 
 type Props = {
   members: WorkspaceMember[];
+  workspaceId: string;
+  currentUserId: string;
   onClose: () => void;
 };
 
-export function WsMembersModal({ members, onClose }: Props) {
+export function WsMembersModal({ members, workspaceId, currentUserId, onClose }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
+  const [error, setError] = useState("");
 
   // プロフィールを正規化（配列の場合は先頭を取得）
   const normalizedMembers = useMemo(() => {
@@ -30,14 +35,30 @@ export function WsMembersModal({ members, onClose }: Props) {
     });
   }, [members]);
 
-  // 検索フィルタリング
+  // 検索フィルタリング + 削除済み除外
   const filteredMembers = useMemo(() => {
-    if (!searchQuery.trim()) return normalizedMembers;
-    const q = searchQuery.toLowerCase();
-    return normalizedMembers.filter((m) =>
-      m.profile?.display_name?.toLowerCase().includes(q)
-    );
-  }, [normalizedMembers, searchQuery]);
+    let list = normalizedMembers.filter((m) => !removedIds.has(m.user_id));
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter((m) => m.profile?.display_name?.toLowerCase().includes(q));
+    }
+    return list;
+  }, [normalizedMembers, searchQuery, removedIds]);
+
+  async function handleRemove(userId: string, name: string) {
+    if (!confirm(`${name} をワークスペースから削除しますか？\nこのメンバーは全チャンネルからも削除されます。`)) return;
+    setError("");
+    const supabase = createClient();
+    const { error: rpcErr } = await supabase.rpc("remove_workspace_member", {
+      p_workspace_id: workspaceId,
+      p_user_id: userId,
+    });
+    if (rpcErr) {
+      setError(rpcErr.message);
+      return;
+    }
+    setRemovedIds((prev) => new Set(prev).add(userId));
+  }
 
   return (
     <div
@@ -74,6 +95,10 @@ export function WsMembersModal({ members, onClose }: Props) {
           onChange={(e) => setSearchQuery(e.target.value)}
           className="w-full bg-background/50 rounded-xl px-3 py-2 text-sm border border-border/50 focus:border-accent focus:bg-input-bg placeholder-muted/60 transition-all outline-none"
         />
+
+        {error && (
+          <div className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">{error}</div>
+        )}
 
         {/* メンバーリスト */}
         <div className="max-h-64 overflow-y-auto space-y-1">
@@ -120,9 +145,25 @@ export function WsMembersModal({ members, onClose }: Props) {
                     />
                   </span>
                   {/* 表示名 */}
-                  <span className="text-sm text-foreground truncate">
+                  <span className="text-sm text-foreground truncate flex-1">
                     {name}
+                    {member.user_id === currentUserId && (
+                      <span className="text-muted ml-1">(あなた)</span>
+                    )}
                   </span>
+                  {/* 削除ボタン（自分以外） */}
+                  {member.user_id !== currentUserId && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemove(member.user_id, name)}
+                      className="shrink-0 p-1 text-muted hover:text-red-400 rounded hover:bg-red-500/10 transition-colors"
+                      title="メンバーを削除"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
                 </div>
               );
             })
