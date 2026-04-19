@@ -40,6 +40,11 @@ function isImageFile(url: string): boolean {
   return /\.(jpg|jpeg|png|gif|webp|svg)(\?.*)?$/i.test(url);
 }
 
+// 動画拡張子かどうか判定
+function isVideoFile(url: string): boolean {
+  return /\.(mp4|mov|webm|m4v)(\?.*)?$/i.test(url);
+}
+
 // URLからファイル名を抽出
 function extractFileName(url: string): string {
   try {
@@ -175,6 +180,20 @@ function MessageContent({
                   onImageClick?.(url);
                 }}
                 onError={onImageError}
+              />
+              <span className="text-xs text-muted mt-1 block">{fileName}</span>
+            </div>
+          );
+        }
+        if (isVideoFile(url)) {
+          return (
+            <div key={i} className="mt-1" onClick={(e) => e.stopPropagation()}>
+              <video
+                src={url}
+                controls
+                playsInline
+                preload="metadata"
+                className="max-w-full sm:max-w-sm max-h-80 rounded-xl"
               />
               <span className="text-xs text-muted mt-1 block">{fileName}</span>
             </div>

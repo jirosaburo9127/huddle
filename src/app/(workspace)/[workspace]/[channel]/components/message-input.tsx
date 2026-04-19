@@ -6,13 +6,14 @@ import { verifyFileMagicBytes } from "@/lib/file-validation";
 import { scanForSensitiveData } from "@/lib/dlp-scan";
 import type { MessageWithProfile } from "@/lib/supabase/types";
 
-// ファイルサイズ上限: 10MB
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
+// ファイルサイズ上限: 50MB（動画対応）
+const MAX_FILE_SIZE = 50 * 1024 * 1024;
 
 // 許可するMIMEタイプ
 // SVG はスクリプト埋め込み可能で XSS ベクトルなので除外する
 const ALLOWED_MIME_TYPES = [
   "image/jpeg", "image/png", "image/gif", "image/webp",
+  "video/mp4", "video/quicktime", "video/webm", "video/x-m4v",
   "application/pdf",
   "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -180,6 +181,7 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
     name: string;
     type: string;
     isImage: boolean;
+    isVideo: boolean;
   };
   const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
 
@@ -535,6 +537,7 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
           name: file.name,
           type: file.type,
           isImage: file.type.startsWith("image/"),
+          isVideo: file.type.startsWith("video/"),
         },
       ]);
     } catch (err) {
@@ -858,6 +861,12 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
                     alt={att.name}
                     className="w-20 h-20 object-cover"
                   />
+                ) : att.isVideo ? (
+                  <div className="w-20 h-20 flex items-center justify-center bg-black/20">
+                    <svg className="w-8 h-8 text-white/70" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  </div>
                 ) : (
                   <div className="w-32 h-20 flex items-center gap-2 px-2">
                     <svg className="w-6 h-6 text-muted shrink-0" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
@@ -918,7 +927,7 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
           type="file"
           className="hidden"
           onChange={handleFileSelect}
-          accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip,.json,.xml"
+          accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip,.json,.xml"
         />
 
         {/* 入力欄行 */}
