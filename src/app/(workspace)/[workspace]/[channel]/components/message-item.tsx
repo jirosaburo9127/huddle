@@ -251,8 +251,9 @@ function MessageContent({
 }
 
 // リアクションバッジコンポーネント
-// PC: ホバーツールチップ + クリックでトグル
-// モバイル: タップで名前を展開表示
+// タップ: 同じ絵文字を追加/解除（Zoom方式）
+// 長押し: 誰がリアクションしたか表示
+// ＋ボタン: 絵文字ピッカーを開く（LINE方式）
 function ReactionBadges({
   reactions,
   onReact,
@@ -260,13 +261,37 @@ function ReactionBadges({
   reactions: Array<{ emoji: string; count: number; reacted: boolean; names: string[] }>;
   onReact?: (emoji: string) => void;
 }) {
-  const [expandedEmoji, setExpandedEmoji] = useState<string | null>(null);
+  const [longPressNames, setLongPressNames] = useState<{ emoji: string; names: string[] } | null>(null);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showQuickPicker, setShowQuickPicker] = useState(false);
+
+  function handleTouchStart(emoji: string, names: string[]) {
+    longPressTimer.current = setTimeout(() => {
+      longPressTimer.current = null;
+      setLongPressNames({ emoji, names });
+    }, 400);
+  }
+
+  function handleTouchEnd(emoji: string) {
+    if (longPressTimer.current) {
+      // 長押しが発火する前にタッチ終了 = タップ → トグル
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+      onReact?.(emoji);
+    }
+  }
+
+  function handleTouchCancel() {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  }
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-      {reactions.map(({ emoji, count, reacted, names }) => {
-        const isExpanded = expandedEmoji === emoji;
-        return (
+    <>
+      <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+        {reactions.map(({ emoji, count, reacted, names }) => (
           <div key={emoji} className="relative group/reaction">
             <button
               type="button"
@@ -275,11 +300,18 @@ function ReactionBadges({
                 // PC: クリックでトグル
                 if (typeof window !== "undefined" && window.innerWidth >= 1024) {
                   onReact?.(emoji);
-                  return;
                 }
-                // モバイル: タップで名前の展開/閉じ
-                setExpandedEmoji((prev) => prev === emoji ? null : emoji);
+                // モバイル: タッチイベントで処理するのでonClickは無視
               }}
+              onTouchStart={(e) => {
+                e.stopPropagation();
+                handleTouchStart(emoji, names);
+              }}
+              onTouchEnd={(e) => {
+                e.stopPropagation();
+                handleTouchEnd(emoji);
+              }}
+              onTouchCancel={handleTouchCancel}
               onContextMenu={(e) => e.preventDefault()}
               className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm border cursor-pointer transition-colors select-none ${
                 reacted
@@ -289,12 +321,6 @@ function ReactionBadges({
             >
               <span className="text-base">{emoji}</span>
               <span>{count}</span>
-              {/* モバイル: 展開時にバッジ内に名前表示 */}
-              {isExpanded && names.length > 0 && (
-                <span className="lg:hidden text-[11px]">
-                  {names.join(", ")}
-                </span>
-              )}
             </button>
             {/* PC: ホバーツールチップ */}
             {names.length > 0 && (
@@ -304,9 +330,60 @@ function ReactionBadges({
               </div>
             )}
           </div>
-        );
-      })}
-    </div>
+        ))}
+        {/* ＋ボタン: 新しいリアクションを追加 */}
+        {onReact && (
+          <div className="relative">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowQuickPicker((v) => !v);
+              }}
+              className="inline-flex items-center justify-center w-7 h-7 rounded-full border border-border/50 bg-white/[0.03] text-muted hover:text-accent hover:border-accent/30 transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+            </button>
+            {showQuickPicker && (
+              <div className="absolute bottom-full left-0 mb-2 z-30">
+                <EmojiPicker
+                  onSelect={(em) => { setShowQuickPicker(false); onReact(em); }}
+                  onClose={() => setShowQuickPicker(false)}
+                />
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      {/* 長押し: リアクターモーダル */}
+      {longPressNames && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center lg:hidden"
+          onClick={() => setLongPressNames(null)}
+        >
+          <div className="absolute inset-0 bg-black/40" />
+          <div className="relative bg-sidebar border border-border rounded-2xl px-5 py-4 max-w-xs w-full mx-4 animate-fade-in" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-2xl">{longPressNames.emoji}</span>
+              <span className="text-base font-semibold text-foreground">リアクションした人</span>
+            </div>
+            <div className="space-y-2">
+              {longPressNames.names.map((name) => (
+                <div key={name} className="text-sm text-foreground">{name}</div>
+              ))}
+            </div>
+            <button
+              onClick={() => setLongPressNames(null)}
+              className="mt-4 w-full py-2 text-sm text-muted hover:text-foreground rounded-xl border border-border/50 transition-colors"
+            >
+              閉じる
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
