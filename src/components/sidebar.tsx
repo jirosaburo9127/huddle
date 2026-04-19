@@ -231,6 +231,12 @@ export function Sidebar({
     setupPushNotifications(currentUserId);
   }, [currentUserId]);
 
+  // タブタイトルに未読数を表示（Chatwork風: (3) Huddle）
+  useEffect(() => {
+    const total = Object.values(unreadState).reduce((sum, n) => sum + n, 0);
+    document.title = total > 0 ? `(${total}) Huddle` : "Huddle";
+  }, [unreadState]);
+
   // フォアグラウンド復帰時 / マウント時 / ワークスペース切替時に未読カウントを再同期
   // モバイルで画面オフ→復帰した際にRealtime取りこぼしを補完するのと、
   // SSRから渡された unreadCounts がRSCキャッシュで古い場合の補正も兼ねる

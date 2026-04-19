@@ -45,6 +45,8 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
   const [isMuted, setIsMuted] = useState(false);
   const overflowMenuRef = useRef<HTMLDivElement>(null);
   const prevMessageCountRef = useRef(initialMessages.length);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const syncMissedRef = useRef<(() => void) | null>(null);
   const supabaseRef = useRef(createClient());
   const supabase = supabaseRef.current;
 
@@ -330,7 +332,13 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
           );
         }
       )
-      .subscribe();
+      .subscribe((status: string) => {
+        // Realtime接続が切断→再接続した場合、取りこぼしを即座に補完する
+        if (status === "SUBSCRIBED") {
+          // 再接続時に最新メッセージを取得（初回接続時も走るが無害）
+          syncMissedRef.current?.();
+        }
+      });
 
     return () => {
       supabase.removeChannel(subscription);
@@ -346,6 +354,8 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     let cancelled = false;
 
     async function syncMissedMessages() {
+      // Realtime再接続時にも呼べるようrefに登録
+      syncMissedRef.current = syncMissedMessages;
       // 直近50件をDBから取り直し、ローカルに無いものだけマージする
       //（最新が消える系のバグは「ローカルに無いはずの新しい行」を補えれば直る）
       // 返信(parent_id あり)も含めて取得する。Chatwork風インライン表示でタイムラインに流すため
