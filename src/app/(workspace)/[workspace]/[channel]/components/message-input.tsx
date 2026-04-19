@@ -519,9 +519,13 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
       const safeName = sanitizeFileName(file.name);
       const path = `${channelId || "general"}/${crypto.randomUUID()}-${safeName}`;
 
+      // video/quicktime (MOV) は Supabase Storage が未対応のため
+      // content-type を video/mp4 に変換してアップロード
+      const uploadContentType =
+        file.type === "video/quicktime" ? "video/mp4" : file.type;
       const { error: uploadErr } = await supabase.storage
         .from("chat-files")
-        .upload(path, file);
+        .upload(path, file, { contentType: uploadContentType });
 
       if (uploadErr) {
         setUploadError(`アップロード失敗: ${uploadErr.message}`);
