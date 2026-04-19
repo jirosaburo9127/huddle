@@ -502,10 +502,13 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
     }
 
     // マジックバイト検証（MIME type 偽装の検知）
-    const magicOk = await verifyFileMagicBytes(file, file.type);
-    if (!magicOk) {
-      setUploadError("ファイルの内容と形式が一致しません");
-      return;
+    // 動画ファイルはコンテナ形式が多様でマジックバイト検証と相性が悪いためスキップ
+    if (!file.type.startsWith("video/")) {
+      const magicOk = await verifyFileMagicBytes(file, file.type);
+      if (!magicOk) {
+        setUploadError("ファイルの内容と形式が一致しません");
+        return;
+      }
     }
 
     setUploadError(null);
