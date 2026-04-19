@@ -852,10 +852,22 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </button>
-            <span className="text-muted font-medium shrink-0">#</span>
-            <h1 className="font-bold text-base sm:text-lg truncate min-w-0">
-              {channel.name}
-            </h1>
+            {channel.is_dm ? (
+              <h1 className="font-bold text-base sm:text-lg truncate min-w-0">
+                {/* DMの相手の名前を表示 */}
+                {(() => {
+                  const other = messages.find((m) => m.user_id !== currentUserId);
+                  return other?.profiles?.display_name || channel.name;
+                })()}
+              </h1>
+            ) : (
+              <>
+                <span className="text-muted font-medium shrink-0">#</span>
+                <h1 className="font-bold text-base sm:text-lg truncate min-w-0">
+                  {channel.name}
+                </h1>
+              </>
+            )}
             {channel.topic && (
               <span className="ml-2 text-sm text-muted truncate hidden lg:inline">
                 {channel.topic}
