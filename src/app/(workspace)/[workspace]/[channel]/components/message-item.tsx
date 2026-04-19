@@ -186,15 +186,22 @@ function MessageContent({
           );
         }
         if (isVideoFile(url)) {
+          // MOV(quicktime)はブラウザによって直接再生できない場合がある
+          // source要素で複数typeを指定してフォールバック
           return (
             <div key={i} className="mt-1" onClick={(e) => e.stopPropagation()}>
               <video
-                src={url}
                 controls
                 playsInline
                 preload="metadata"
                 className="max-w-full sm:max-w-sm max-h-80 rounded-xl"
-              />
+              >
+                <source src={url} type="video/mp4" />
+                <source src={url} type="video/quicktime" />
+                <a href={url} target="_blank" rel="noopener noreferrer" className="text-accent underline">
+                  動画をダウンロード
+                </a>
+              </video>
               <span className="text-xs text-muted mt-1 block">{fileName}</span>
             </div>
           );
