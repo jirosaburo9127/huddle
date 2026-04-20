@@ -102,6 +102,11 @@ export default function FilesPage() {
           const rawUrls = row.content.match(STORAGE_URL_RE) || [];
           for (const rawUrl of rawUrls) {
             const url = rawUrl.trim();
+            const ft = getFileType(url);
+            const fn = extractFileName(url);
+            // デバッグ: ファイルタイプ判定結果を出力
+            // eslint-disable-next-line no-console
+            console.log("[files]", fn, ft, url.slice(-30));
             files.push({
               id: `${row.id}-${url.slice(-8)}`,
               content: url,
@@ -110,8 +115,8 @@ export default function FilesPage() {
               channel_slug: ch?.slug || "",
               sender_name: p?.display_name || "メンバー",
               sender_avatar: p?.avatar_url || null,
-              fileName: extractFileName(url),
-              fileType: getFileType(url),
+              fileName: fn,
+              fileType: ft,
             });
           }
         }
