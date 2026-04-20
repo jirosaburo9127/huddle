@@ -28,6 +28,11 @@ html, body {
   overscroll-behavior-x: none;
 }
 
+/* ボトムタブバーのiOSセーフエリア対応 */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
 /* ネイティブアプリ（Capacitor）のみフォントサイズを大きくする */
 body.native-app {
   font-size: 17px;

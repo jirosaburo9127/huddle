@@ -3,6 +3,7 @@ import { getAuthUser } from "@/lib/supabase/auth";
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/sidebar";
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
+import { BottomTabBar } from "@/components/bottom-tab-bar";
 
 type WorkspaceShellProps = {
   workspaceSlug: string;
@@ -106,10 +107,11 @@ export async function WorkspaceShell({ workspaceSlug, children }: WorkspaceShell
         categories={categories}
       />
       <KeyboardShortcuts workspaceId={result.workspace.id} workspaceSlug={workspaceSlug}>
-        <main className="flex-1 flex flex-col min-w-0">
+        <main className="flex-1 flex flex-col min-w-0 pb-14 lg:pb-0">
           {children}
         </main>
       </KeyboardShortcuts>
+      <BottomTabBar workspaceSlug={workspaceSlug} currentUserId={user.id} />
     </>
   );
 }

@@ -623,8 +623,8 @@ export function Sidebar({
 
         {/* チャンネル・DM一覧 */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden py-2">
-          {/* ツールバー: 決定事項/進行中/ファイル/ブックマーク をアイコンで横並び */}
-          <div className="flex items-center justify-around mx-3 mb-3 py-2 rounded-xl bg-white/[0.02] border border-border/30">
+          {/* ツールバー: PC のみ表示（モバイルはボトムタブバーに移動） */}
+          <div className="hidden lg:flex items-center justify-around mx-3 mb-3 py-2 rounded-xl bg-white/[0.02] border border-border/30">
             <Link
               href={`/${workspaceSlug}/dashboard`}
               prefetch
@@ -720,8 +720,8 @@ export function Sidebar({
           />
 
 
-          {/* DMセクション */}
-          <div className="px-3 mt-4 mb-1 flex items-center justify-between">
+          {/* DMセクション（PCのみ。モバイルはボトムタブのDMページ） */}
+          <div className="hidden lg:flex px-3 mt-4 mb-1 items-center justify-between">
             <span className="text-sm font-semibold uppercase text-muted tracking-wider">
               ダイレクトメッセージ
             </span>
@@ -736,7 +736,8 @@ export function Sidebar({
             </button>
           </div>
 
-          {/* DM一覧 */}
+          {/* DM一覧（PCのみ） */}
+          <div className="hidden lg:block">
           {filteredDmChannels.map((dm) => {
             const href = `/${workspaceSlug}/${dm.slug}`;
             const isActive = pathname === href;
@@ -842,6 +843,7 @@ export function Sidebar({
             メンバーを招待
           </button>
 
+          </div>
           {/* 検索結果が空の場合 */}
           {searchQuery.trim() &&
             filteredChannels.length === 0 &&
