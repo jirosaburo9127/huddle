@@ -87,6 +87,11 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     })();
   }, [currentUserId, supabase]);
 
+  // 自分の最終既読時刻（チャンネル初回表示時点の値を保持。未読区切り線の位置に使用）
+  const [myLastReadAt, setMyLastReadAt] = useState<string | null>(null);
+  const myLastReadAtRef = useRef<string | null>(null);
+  const unreadLineRef = useRef<HTMLDivElement>(null);
+
   // 既読状態: チャンネルメンバーの last_read_at を取得して既読数を計算
   const [memberReadTimes, setMemberReadTimes] = useState<Array<{ user_id: string; last_read_at: string | null }>>([]);
   const memberCountForRead = memberReadTimes.filter((m) => m.user_id !== currentUserId).length;
@@ -115,16 +120,23 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     ).length;
   }, [memberReadTimes, currentUserId]);
 
-  // ミュート状態を取得
+  // ミュート状態 + 自分の最終既読時刻を取得
   useEffect(() => {
     (async () => {
       const { data } = await supabase
         .from("channel_members")
-        .select("muted")
+        .select("muted, last_read_at")
         .eq("channel_id", channel.id)
         .eq("user_id", currentUserId)
         .maybeSingle();
-      if (data) setIsMuted(!!data.muted);
+      if (data) {
+        setIsMuted(!!data.muted);
+        // 初回のみセット（チャンネル表示中に更新しない）
+        if (!myLastReadAtRef.current) {
+          myLastReadAtRef.current = data.last_read_at;
+          setMyLastReadAt(data.last_read_at);
+        }
+      }
     })();
   }, [channel.id, currentUserId, supabase]);
 
@@ -262,25 +274,43 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     if (el) el.scrollTop = el.scrollHeight;
   }, []);
 
-  // チャンネル切替時: 最下部に移動 + ResizeObserver で
-  // 非同期コンテンツ (PollDisplay, 画像等) の展開に追従する
+  // 未読区切り線または最下部にスクロール
+  const scrollToUnreadOrBottom = useCallback(() => {
+    const unreadEl = unreadLineRef.current;
+    if (unreadEl) {
+      // 未読区切り線の少し上にスクロール
+      unreadEl.scrollIntoView({ behavior: "auto", block: "center" });
+    } else {
+      scrollToBottom();
+    }
+  }, [scrollToBottom]);
+
+  // チャンネル切替時: 未読位置または最下部に移動 + ResizeObserver
   useEffect(() => {
-    requestAnimationFrame(() => requestAnimationFrame(scrollToBottom));
+    // myLastReadAt の取得を待ってからスクロール
+    const waitAndScroll = setTimeout(() => {
+      requestAnimationFrame(() => requestAnimationFrame(scrollToUnreadOrBottom));
+    }, 300);
     prevMessageCountRef.current = initialMessages.length;
 
-    // 初期表示中 (3秒間) はコンテンツ高さの変化を監視して最下部を維持する。
-    // PollDisplay の非同期ロードや画像展開でDOMが伸びてもズレない。
+    // 初期表示中 (3秒間) はコンテンツ高さの変化を監視
     const container = scrollContainerRef.current;
-    if (!container) return;
+    if (!container) return () => clearTimeout(waitAndScroll);
     let armed = true;
     const observer = new ResizeObserver(() => {
-      if (armed) scrollToBottom();
+      if (armed) {
+        const unreadEl = unreadLineRef.current;
+        if (unreadEl) {
+          unreadEl.scrollIntoView({ behavior: "auto", block: "center" });
+        } else {
+          scrollToBottom();
+        }
+      }
     });
-    // スクロールコンテナの直接子要素（メッセージ一覧の wrapper div）を監視
     const inner = container.firstElementChild;
     if (inner) observer.observe(inner);
     const timer = setTimeout(() => { armed = false; observer.disconnect(); }, 3000);
-    return () => { armed = false; clearTimeout(timer); observer.disconnect(); };
+    return () => { armed = false; clearTimeout(waitAndScroll); clearTimeout(timer); observer.disconnect(); };
   }, [channel.id, initialMessages.length, scrollToBottom]);
 
   // メッセージ増加時: DOM 更新後に即座に最下部へ
@@ -1141,8 +1171,22 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
                   const isConsecutive = false;
                   const parentMessage = message.parent_id ? byId.get(message.parent_id) ?? null : null;
 
+                  // 未読区切り線: 前のメッセージが既読で、このメッセージが未読の場合に表示
+                  const showUnreadLine = myLastReadAt &&
+                    message.user_id !== currentUserId &&
+                    prev !== null &&
+                    new Date(message.created_at).getTime() > new Date(myLastReadAt).getTime() &&
+                    (index === 0 || new Date(prev.created_at).getTime() <= new Date(myLastReadAt).getTime());
+
                   return (
                     <div key={message.id}>
+                      {showUnreadLine && (
+                        <div ref={unreadLineRef} className="flex items-center gap-3 my-3 px-2">
+                          <div className="flex-1 border-t border-red-400/60" />
+                          <span className="text-xs font-semibold text-red-400 shrink-0">未読メッセージ</span>
+                          <div className="flex-1 border-t border-red-400/60" />
+                        </div>
+                      )}
                       {showDateSeparator && (
                         <DateSeparator date={message.created_at} />
                       )}
