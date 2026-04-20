@@ -478,32 +478,13 @@ export function Sidebar({
           ${sidebarOpen ? "flex" : "hidden"}
         `}
       >
-        {/* ヘッダー: ワークスペース名 + 右上にプロフィールアイコン */}
+        {/* ヘッダー: ワークスペース名 + 右上にプロフィールアイコン（大） */}
         <div className="px-4 py-3 border-b border-border/50">
-          <div className="flex items-center justify-between mb-1">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted">
-              WORKSPACE
-            </div>
-            {/* 右上: プロフィールアイコン → 設定モーダル */}
-            <button
-              onClick={() => setShowSettings(true)}
-              className="shrink-0"
-              title="設定"
-            >
-              {(() => {
-                const me = members.find((m) => m.user_id === currentUserId);
-                const profile = me?.profiles;
-                const p = Array.isArray(profile) ? profile[0] : profile;
-                return p?.avatar_url ? (
-                  <img src={p.avatar_url} alt="" className="w-7 h-7 rounded-full object-cover" />
-                ) : (
-                  <span className="w-7 h-7 rounded-full bg-accent/20 flex items-center justify-center text-[11px] font-bold text-accent">
-                    {(p?.display_name || "?")[0].toUpperCase()}
-                  </span>
-                );
-              })()}
-            </button>
-          </div>
+          <div className="flex items-center justify-between">
+            <div className="flex-1 min-w-0">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted mb-1">
+                WORKSPACE
+              </div>
           <div className="flex items-center gap-1">
           <div className="relative flex-1 min-w-0" ref={wsSwitcherRef}>
             <button
@@ -618,10 +599,10 @@ export function Sidebar({
               </div>
             )}
           </div>
-          {/* WSメンバー一覧ボタン */}
+          {/* WSメンバー一覧ボタン（PCのみ） */}
           <button
             onClick={() => setShowWsMembers(true)}
-            className="shrink-0 p-1.5 text-muted hover:text-foreground rounded-lg hover:bg-white/[0.04] transition-colors"
+            className="hidden lg:block shrink-0 p-1.5 text-muted hover:text-foreground rounded-lg hover:bg-white/[0.04] transition-colors"
             title="ワークスペースメンバー"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -629,10 +610,31 @@ export function Sidebar({
             </svg>
           </button>
           </div>
+            </div>
+            {/* 右上: プロフィールアイコン（大きく） */}
+            <button
+              onClick={() => setShowSettings(true)}
+              className="shrink-0 ml-3"
+              title="設定"
+            >
+              {(() => {
+                const me = members.find((m) => m.user_id === currentUserId);
+                const profile = me?.profiles;
+                const p = Array.isArray(profile) ? profile[0] : profile;
+                return p?.avatar_url ? (
+                  <img src={p.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover" />
+                ) : (
+                  <span className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center text-sm font-bold text-accent">
+                    {(p?.display_name || "?")[0].toUpperCase()}
+                  </span>
+                );
+              })()}
+            </button>
+          </div>
         </div>
 
-        {/* 検索バー */}
-        <div className="px-3 py-2">
+        {/* 検索バー（PCのみ） */}
+        <div className="hidden lg:block px-3 py-2">
           <input
             type="text"
             placeholder="チャンネルを検索..."
@@ -1411,7 +1413,7 @@ function ChannelCategoryList({
             <button
               type="button"
               onClick={() => toggleCollapsed(key)}
-              className="w-full flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-muted hover:text-foreground transition-colors"
+              className="w-full flex items-center gap-1.5 px-3 py-2 text-base font-semibold text-muted hover:text-foreground transition-colors"
             >
               <svg
                 className={`w-3.5 h-3.5 shrink-0 transition-transform ${
