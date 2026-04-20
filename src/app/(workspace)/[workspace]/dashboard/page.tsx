@@ -111,51 +111,6 @@ export default async function DashboardPage({
     }
   );
 
-  // 進行中のメッセージを全チャンネル横断で取得
-  const { data: inProgressRaw } = await supabase
-    .from("messages")
-    .select(
-      "id, content, created_at, channel_id, user_id, channels!inner(name, slug, workspace_id, is_dm), profiles!inner(id, display_name, avatar_url)"
-    )
-    .eq("status", "in_progress")
-    .is("deleted_at", null)
-    .eq("channels.workspace_id", workspace.id)
-    .eq("channels.is_dm", false)
-    .order("created_at", { ascending: false })
-    .limit(100);
-
-  const inProgressItems: Decision[] = (inProgressRaw || []).map(
-    (row: {
-      id: string;
-      content: string;
-      created_at: string;
-      channel_id: string;
-      user_id: string;
-      channels: unknown;
-      profiles: unknown;
-    }) => {
-      const ch = Array.isArray(row.channels)
-        ? row.channels[0]
-        : (row.channels as { name: string; slug: string });
-      const p = Array.isArray(row.profiles)
-        ? row.profiles[0]
-        : (row.profiles as { id: string; display_name: string; avatar_url: string | null });
-      return {
-        id: row.id,
-        content: row.content,
-        created_at: row.created_at,
-        channel_id: row.channel_id,
-        channel_name: ch?.name || "",
-        channel_slug: ch?.slug || "",
-        sender_id: row.user_id,
-        sender_name: p?.display_name || "メンバー",
-        sender_avatar: p?.avatar_url || null,
-        decision_why: null,
-        decision_due: null,
-      };
-    }
-  );
-
   // 共有トークン一覧（管理者のみ）
   let shareTokens: ShareToken[] = [];
   if (isAdmin) {
@@ -172,7 +127,6 @@ export default async function DashboardPage({
       workspace={workspace}
       workspaceSlug={workspaceSlug}
       decisions={decisions}
-      inProgressItems={inProgressItems}
       shareTokens={shareTokens}
       isAdmin={isAdmin}
     />

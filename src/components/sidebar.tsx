@@ -643,6 +643,19 @@ export function Sidebar({
             )}
           </Link>
 
+          {/* 進行中ダッシュボードリンク */}
+          <Link
+            href={`/${workspaceSlug}/in-progress`}
+            prefetch
+            onClick={() => setSidebarOpen(false)}
+            className="flex items-center gap-2 px-3 py-2 text-[13px] text-muted hover:text-accent mx-2 rounded-xl hover:bg-white/[0.04] transition-colors w-full mb-1"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            <span className="flex-1 text-left">進行中</span>
+          </Link>
+
           {/* ブックマークリンク */}
           <button
             onClick={() => setShowBookmarkModal(true)}
