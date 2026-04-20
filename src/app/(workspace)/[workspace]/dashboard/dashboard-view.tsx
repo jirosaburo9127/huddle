@@ -46,6 +46,7 @@ type Props = {
   workspace: { id: string; name: string; slug: string };
   workspaceSlug: string;
   decisions: Decision[];
+  inProgressItems?: Decision[];
   shareTokens: ShareToken[];
   isAdmin: boolean;
 };
@@ -64,10 +65,12 @@ export function DashboardView({
   workspace,
   workspaceSlug,
   decisions,
+  inProgressItems = [],
   shareTokens,
   isAdmin,
 }: Props) {
   const setSidebarOpen = useMobileNavStore((s) => s.setSidebarOpen);
+  const [activeTab, setActiveTab] = useState<"decisions" | "in_progress">("decisions");
 
   // マウント時: 決定事項を既読にしてサイドバーのバッジを 0 にする
   useEffect(() => {
@@ -220,13 +223,83 @@ export function DashboardView({
             <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
-        <h1 className="font-bold text-lg">決定事項</h1>
+        <h1 className="font-bold text-lg">ダッシュボード</h1>
         <span className="ml-2 text-sm text-muted">{workspace.name}</span>
       </header>
 
+      {/* タブ切り替え */}
+      <div className="flex gap-1 px-6 py-2 bg-header border-b border-border/50">
+        <button
+          onClick={() => setActiveTab("decisions")}
+          className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+            activeTab === "decisions"
+              ? "bg-accent text-white"
+              : "text-muted hover:text-foreground hover:bg-white/[0.04]"
+          }`}
+        >
+          決定事項 ({decisions.length})
+        </button>
+        <button
+          onClick={() => setActiveTab("in_progress")}
+          className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+            activeTab === "in_progress"
+              ? "bg-blue-400 text-white"
+              : "text-muted hover:text-foreground hover:bg-white/[0.04]"
+          }`}
+        >
+          進行中 ({inProgressItems.length})
+        </button>
+      </div>
+
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-4xl mx-auto p-6 space-y-8">
+
+        {/* 進行中一覧 */}
+        {activeTab === "in_progress" && (
+          <section>
+            {inProgressItems.length === 0 ? (
+              <div className="text-center py-16 text-muted">
+                <svg className="w-12 h-12 mx-auto mb-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                <p>進行中の項目はありません</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {inProgressItems.map((item) => (
+                  <Link
+                    key={item.id}
+                    href={`/${workspaceSlug}/${item.channel_slug}`}
+                    className="block px-4 py-3 rounded-xl bg-blue-400/[0.06] border border-blue-400/20 hover:bg-blue-400/[0.1] transition-colors"
+                  >
+                    <div className="flex items-start gap-3">
+                      {item.sender_avatar ? (
+                        <img src={item.sender_avatar} alt="" className="w-8 h-8 rounded-full object-cover shrink-0 mt-0.5" />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-blue-400/20 flex items-center justify-center shrink-0 mt-0.5">
+                          <span className="text-xs font-bold text-blue-400">{item.sender_name[0]?.toUpperCase()}</span>
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-sm font-semibold text-foreground">{item.sender_name}</span>
+                          <span className="text-xs text-muted">{formatDate(item.created_at)}</span>
+                          <span className="text-xs text-muted">#{item.channel_name}</span>
+                        </div>
+                        <div className="text-sm text-foreground whitespace-pre-wrap break-words line-clamp-3">
+                          {item.content}
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
         {/* 決定事項一覧 */}
+        {activeTab === "decisions" && (
         <section className="print-area">
           {/* 印刷専用ヘッダー（画面には出さない） */}
           <div className="print-only" aria-hidden="true">
@@ -429,8 +502,9 @@ export function DashboardView({
             </div>
           )}
         </section>
+        )}
 
-        {/* 共有リンク管理（管理者のみ・最下部に折りたたみ表示） */}
+        {/* 共有リンク管理（管理者のみ） */}
         {isAdmin && (
           <section className="pt-4 border-t border-border">
             <button
