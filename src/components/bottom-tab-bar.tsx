@@ -102,7 +102,7 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
 
       {/* その他メニュー */}
       {showMore && (
-        <div className="fixed inset-0 z-50 flex items-end lg:hidden" onClick={() => setShowMore(false)}>
+        <div className="fixed inset-0 z-[60] flex items-end lg:hidden" onClick={() => setShowMore(false)}>
           <div className="absolute inset-0 bg-black/40" />
           <div className="relative w-full mb-16 mx-4 rounded-2xl bg-sidebar border border-border p-4 animate-slide-up" onClick={(e) => e.stopPropagation()}>
             <div className="grid grid-cols-3 gap-3">

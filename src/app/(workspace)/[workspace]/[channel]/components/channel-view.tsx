@@ -1259,7 +1259,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
       {/* チャンネルカテゴリ変更モーダル */}
       {showCategoryPicker && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
           onClick={() => !categorySaving && setShowCategoryPicker(false)}
         >
           <div
@@ -1343,7 +1343,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
 
       {/* チャンネル削除確認ダイアログ */}
       {showDeleteChannel && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowDeleteChannel(false)}>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50" onClick={() => setShowDeleteChannel(false)}>
           <div className="w-full max-w-sm rounded-2xl bg-sidebar border border-border p-6 space-y-4 animate-fade-in" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-bold">チャンネルを削除</h3>
             <p className="text-sm text-muted">

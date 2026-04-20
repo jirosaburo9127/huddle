@@ -359,10 +359,10 @@ function ReactionBadges({
             {showQuickPicker && (
               <>
                 {/* モバイル: 画面下からスライドアップ（LINE方式） */}
-                <div className="fixed inset-0 z-[55] flex items-end lg:hidden" onClick={() => setShowQuickPicker(false)}>
+                <div className="fixed inset-0 z-[60] flex items-end lg:hidden" onClick={() => setShowQuickPicker(false)}>
                   <div className="absolute inset-0 bg-black/40" />
                   <div className="relative w-full animate-slide-up" onClick={(e) => e.stopPropagation()}>
-                    <div className="w-full rounded-t-2xl bg-sidebar border-t border-border shadow-xl p-4 pb-8">
+                    <div className="w-full rounded-t-2xl bg-sidebar border-t border-border shadow-xl p-4 pb-20">
                       {QUICK_EMOJIS.map((group) => (
                         <div key={group.category} className="mb-3">
                           <p className="text-[11px] text-muted font-medium mb-1.5">{group.category}</p>
@@ -992,12 +992,12 @@ export const MessageItem = memo(function MessageItem({
       {/* モバイル: Chatwork風アクションモーダル */}
       {showActions && !isEditing && (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center lg:hidden"
+          className="fixed inset-0 z-[60] flex items-end justify-center lg:hidden"
           onClick={(e) => { e.stopPropagation(); setShowActions(false); }}
         >
           <div className="absolute inset-0 bg-black/40" />
           <div
-            className="relative w-full max-w-sm mx-4 mb-6 rounded-2xl bg-sidebar border border-border p-5 animate-slide-up"
+            className="relative w-full max-w-sm mx-4 mb-20 rounded-2xl bg-sidebar border border-border p-5 animate-slide-up"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="grid grid-cols-3 gap-3">
@@ -1128,7 +1128,7 @@ export const MessageItem = memo(function MessageItem({
 
       {/* 削除確認ダイアログ */}
       {isDeleting && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-sm max-h-[85vh] rounded-xl bg-sidebar border border-border flex flex-col">
             {/* ヘッダー (固定) */}
             <div className="px-6 pt-6 pb-2 shrink-0">
