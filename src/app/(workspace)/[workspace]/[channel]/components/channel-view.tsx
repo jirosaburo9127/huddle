@@ -1168,13 +1168,15 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
             /* 独り言: Twitter/Threads風カード表示 */
             <div>
               {(() => {
-                // 返信(parent_idあり)は除外し、トップレベル投稿のみ表示
-                const topLevel = messages.filter((m) => !m.parent_id && !m.deleted_at);
-                return topLevel.map((message, index, arr) => {
+                const displayed = messages.filter((m) => !m.deleted_at);
+                const byId = new Map<string, MessageWithProfile>();
+                for (const m of messages) byId.set(m.id, m);
+                return displayed.map((message, index, arr) => {
                   const prev = index > 0 ? arr[index - 1] : null;
                   const currentDate = new Date(message.created_at).toDateString();
                   const prevDate = prev ? new Date(prev.created_at).toDateString() : null;
                   const showDateSeparator = !prev || currentDate !== prevDate;
+                  const parentMessage = message.parent_id ? byId.get(message.parent_id) ?? null : null;
 
                   return (
                     <div key={message.id} className="group">
@@ -1183,6 +1185,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
                       )}
                       <HitorigotoPostCard
                         message={message}
+                        parentMessage={parentMessage}
                         currentUserId={currentUserId}
                         onReply={handleReply}
                         onReact={handleReact}

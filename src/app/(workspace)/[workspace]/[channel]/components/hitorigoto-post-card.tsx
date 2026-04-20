@@ -6,6 +6,7 @@ import { PollDisplay } from "./poll-display";
 
 type Props = {
   message: MessageWithProfile;
+  parentMessage?: MessageWithProfile | null;
   currentUserId: string;
   onReply?: (message: MessageWithProfile) => void;
   onReact?: (messageId: string, emoji: string) => Promise<void>;
@@ -115,6 +116,7 @@ const QUICK_EMOJIS = ["👍", "❤️", "😊", "🎉", "👀", "🙏"];
 
 function HitorigotoPostCardInner({
   message,
+  parentMessage,
   currentUserId,
   onReply,
   onReact,
@@ -162,6 +164,14 @@ function HitorigotoPostCardInner({
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchEnd}
       >
+        {/* 返信先の引用 */}
+        {parentMessage && (
+          <div className="flex items-center gap-2 mb-2 px-3 py-1.5 rounded-lg bg-white/[0.03] border-l-2 border-muted/30 text-xs text-muted truncate">
+            <span className="font-semibold shrink-0">{parentMessage.profiles?.display_name}</span>
+            <span className="truncate">{parentMessage.content.replace(/\s+/g, " ").slice(0, 60)}</span>
+          </div>
+        )}
+
         {/* ヘッダー: アバター + 名前 + 時間 */}
         <div className="flex items-center gap-3 mb-2.5">
           {avatarUrl ? (
