@@ -256,15 +256,26 @@ export function CreateChannelModal({
               <label className="text-sm text-muted">
                 メンバーを追加 ({selectedMemberIds.size}人選択中)
               </label>
-              {selectedMemberIds.size > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setSelectedMemberIds(new Set())}
-                  className="text-xs text-muted hover:text-accent"
-                >
-                  クリア
-                </button>
-              )}
+              <div className="flex items-center gap-2">
+                {selectedMemberIds.size < candidateMembers.length && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMemberIds(new Set(candidateMembers.map((m) => m.user_id)))}
+                    className="text-xs text-muted hover:text-accent"
+                  >
+                    全選択
+                  </button>
+                )}
+                {selectedMemberIds.size > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMemberIds(new Set())}
+                    className="text-xs text-muted hover:text-accent"
+                  >
+                    クリア
+                  </button>
+                )}
+              </div>
             </div>
             {candidateMembers.length === 0 ? (
               <p className="text-xs text-muted">
