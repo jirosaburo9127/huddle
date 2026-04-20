@@ -1176,9 +1176,9 @@ export function Sidebar({
 
       {/* 設定モーダル */}
       {showSettings && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowSettings(false)}>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50" onClick={() => setShowSettings(false)}>
           <div
-            className="w-full max-w-md max-h-[92vh] flex flex-col rounded-2xl bg-sidebar border border-border animate-fade-in overflow-hidden"
+            className="w-full max-w-md max-h-[85vh] mb-16 lg:mb-0 flex flex-col rounded-2xl bg-sidebar border border-border animate-fade-in overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {/* ヘッダー: 常に画面に残るよう sticky 相当に固定 */}
