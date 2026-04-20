@@ -35,9 +35,11 @@ function extractFileName(url: string): string {
 }
 
 function getFileType(url: string): FileItem["fileType"] {
-  if (PDF_EXT.test(url)) return "pdf";
-  if (IMAGE_EXT.test(url)) return "image";
-  if (VIDEO_EXT.test(url)) return "video";
+  // ファイル名で判定（URLにクエリパラメータが付く場合があるため）
+  const name = extractFileName(url).toLowerCase();
+  if (/\.pdf$/.test(name)) return "pdf";
+  if (/\.(jpg|jpeg|png|gif|webp)$/.test(name)) return "image";
+  if (/\.(mp4|mov|webm|m4v)$/.test(name)) return "video";
   return "other";
 }
 
