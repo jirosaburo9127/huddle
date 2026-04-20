@@ -473,15 +473,36 @@ export function Sidebar({
           「横スライド」に見える副作用があるので完全に使わない */}
       <aside
         className={`
-          fixed inset-y-0 left-0 z-50 w-full sm:w-64 bg-sidebar flex-col border-r border-border
-          lg:relative lg:flex
+          fixed top-0 bottom-14 left-0 z-50 w-full sm:w-64 bg-sidebar flex-col border-r border-border
+          lg:bottom-0 lg:relative lg:flex
           ${sidebarOpen ? "flex" : "hidden"}
         `}
       >
-        {/* ヘッダー: 現在のワークスペースを一番目立たせる */}
-        <div className="px-4 py-4 border-b border-border/50">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-muted mb-1">
-            WORKSPACE
+        {/* ヘッダー: ワークスペース名 + 右上にプロフィールアイコン */}
+        <div className="px-4 py-3 border-b border-border/50">
+          <div className="flex items-center justify-between mb-1">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted">
+              WORKSPACE
+            </div>
+            {/* 右上: プロフィールアイコン → 設定モーダル */}
+            <button
+              onClick={() => setShowSettings(true)}
+              className="shrink-0"
+              title="設定"
+            >
+              {(() => {
+                const me = members.find((m) => m.user_id === currentUserId);
+                const profile = me?.profiles;
+                const p = Array.isArray(profile) ? profile[0] : profile;
+                return p?.avatar_url ? (
+                  <img src={p.avatar_url} alt="" className="w-7 h-7 rounded-full object-cover" />
+                ) : (
+                  <span className="w-7 h-7 rounded-full bg-accent/20 flex items-center justify-center text-[11px] font-bold text-accent">
+                    {(p?.display_name || "?")[0].toUpperCase()}
+                  </span>
+                );
+              })()}
+            </button>
           </div>
           <div className="flex items-center gap-1">
           <div className="relative flex-1 min-w-0" ref={wsSwitcherRef}>
@@ -854,8 +875,8 @@ export function Sidebar({
             )}
         </div>
 
-        {/* 下部: ユーザー名 + ステータス + 設定 */}
-        <div className="px-3 py-3 border-t border-border/50 space-y-2">
+        {/* 下部: ユーザー名 + 設定（PCのみ。モバイルは右上アイコン+ボトムタブに移動） */}
+        <div className="hidden lg:block px-3 py-3 border-t border-border/50 space-y-2">
           <div className="flex items-center gap-2">
             {(() => {
               const me = members.find((m) => m.user_id === currentUserId);
