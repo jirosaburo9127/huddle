@@ -349,7 +349,7 @@ function ReactionBadges({
               </svg>
             </button>
             {showQuickPicker && (
-              <div className="absolute bottom-full left-0 mb-2 z-30">
+              <div className="absolute bottom-full right-0 mb-2 z-30">
                 <EmojiPicker
                   onSelect={(em) => { setShowQuickPicker(false); onReact(em); }}
                   onClose={() => setShowQuickPicker(false)}
