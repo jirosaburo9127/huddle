@@ -25,6 +25,8 @@ type Props = {
   isBookmarked?: boolean;
   isConsecutive?: boolean;
   hasPoll?: boolean;
+  readCount?: number; // -1: 非表示（他人の投稿）、0以上: 既読数
+  memberCount?: number; // 自分以外のメンバー数
 };
 
 // Supabase Storage URLかどうか判定
@@ -403,6 +405,8 @@ export const MessageItem = memo(function MessageItem({
   isBookmarked,
   isConsecutive,
   hasPoll,
+  readCount = -1,
+  memberCount = 0,
 }: Props) {
   const profile = message.profiles;
   const isOwn = message.user_id === currentUserId;
@@ -827,6 +831,19 @@ export const MessageItem = memo(function MessageItem({
               reactions={groupedReactions}
               onReact={onReact ? (emoji: string) => onReact(message.id, emoji) : undefined}
             />
+          )}
+
+          {/* 既読表示（LINE方式: 自分の投稿にのみ表示） */}
+          {readCount >= 0 && !isEditing && (
+            <div className="mt-1 text-right">
+              <span className="text-[11px] text-muted/70">
+                {readCount > 0
+                  ? memberCount <= 1
+                    ? "既読"
+                    : `既読 ${readCount}`
+                  : ""}
+              </span>
+            </div>
           )}
 
           {/* PC: アクションバー（ホバーで表示、メッセージ右上に浮かせる） */}

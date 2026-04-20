@@ -87,6 +87,34 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     })();
   }, [currentUserId, supabase]);
 
+  // 既読状態: チャンネルメンバーの last_read_at を取得して既読数を計算
+  const [memberReadTimes, setMemberReadTimes] = useState<Array<{ user_id: string; last_read_at: string | null }>>([]);
+  const memberCountForRead = memberReadTimes.filter((m) => m.user_id !== currentUserId).length;
+
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchReadTimes() {
+      const { data } = await supabase
+        .from("channel_members")
+        .select("user_id, last_read_at")
+        .eq("channel_id", channel.id);
+      if (!cancelled && data) setMemberReadTimes(data);
+    }
+    fetchReadTimes();
+    // 10秒ごとに既読状態を更新
+    const interval = setInterval(fetchReadTimes, 10000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [channel.id, supabase]);
+
+  // メッセージの既読数を計算（自分の投稿のみ対象）
+  const getReadCount = useCallback((message: MessageWithProfile) => {
+    if (message.user_id !== currentUserId) return -1; // 自分の投稿以外は表示しない
+    const msgTime = new Date(message.created_at).getTime();
+    return memberReadTimes.filter(
+      (m) => m.user_id !== currentUserId && m.last_read_at && new Date(m.last_read_at).getTime() >= msgTime
+    ).length;
+  }, [memberReadTimes, currentUserId]);
+
   // ミュート状態を取得
   useEffect(() => {
     (async () => {
@@ -1134,6 +1162,8 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
                         isBookmarked={bookmarkedIds.has(message.id)}
                         isConsecutive={isConsecutive}
                         hasPoll={pollMessageIds.has(message.id)}
+                        readCount={getReadCount(message)}
+                        memberCount={memberCountForRead}
                       />
                     </div>
                   );
