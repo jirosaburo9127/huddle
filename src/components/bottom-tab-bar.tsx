@@ -24,7 +24,7 @@ export function BottomTabBar({ workspaceSlug, currentUserId }: Props) {
 
   return (
     <>
-      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-sidebar border-t border-border lg:hidden safe-area-bottom">
+      <nav className="fixed bottom-0 left-0 right-0 z-[55] bg-sidebar border-t border-border lg:hidden safe-area-bottom">
         <div className="flex items-center justify-around py-1 px-2">
           {/* ホーム */}
           <button
@@ -42,6 +42,7 @@ export function BottomTabBar({ workspaceSlug, currentUserId }: Props) {
           {/* DM */}
           <Link
             href={`/${workspaceSlug}/dm-list`}
+            onClick={() => setSidebarOpen(false)}
             className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-lg transition-colors ${
               isDm ? "text-accent" : "text-muted"
             }`}
@@ -55,6 +56,7 @@ export function BottomTabBar({ workspaceSlug, currentUserId }: Props) {
           {/* 進行中 */}
           <Link
             href={`/${workspaceSlug}/in-progress`}
+            onClick={() => setSidebarOpen(false)}
             className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-lg transition-colors ${
               isInProgress ? "text-blue-400" : "text-muted"
             }`}
@@ -68,6 +70,7 @@ export function BottomTabBar({ workspaceSlug, currentUserId }: Props) {
           {/* ファイル */}
           <Link
             href={`/${workspaceSlug}/files`}
+            onClick={() => setSidebarOpen(false)}
             className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-lg transition-colors ${
               isFiles ? "text-accent" : "text-muted"
             }`}
