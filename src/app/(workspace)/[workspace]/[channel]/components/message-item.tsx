@@ -349,12 +349,25 @@ function ReactionBadges({
               </svg>
             </button>
             {showQuickPicker && (
-              <div className="absolute bottom-full right-0 mb-2 z-30">
-                <EmojiPicker
-                  onSelect={(em) => { setShowQuickPicker(false); onReact(em); }}
-                  onClose={() => setShowQuickPicker(false)}
-                />
-              </div>
+              <>
+                {/* モバイル: 画面中央にオーバーレイ表示 */}
+                <div className="fixed inset-0 z-[55] flex items-center justify-center lg:hidden" onClick={() => setShowQuickPicker(false)}>
+                  <div className="absolute inset-0 bg-black/40" />
+                  <div className="relative" onClick={(e) => e.stopPropagation()}>
+                    <EmojiPicker
+                      onSelect={(em) => { setShowQuickPicker(false); onReact(em); }}
+                      onClose={() => setShowQuickPicker(false)}
+                    />
+                  </div>
+                </div>
+                {/* PC: 従来のドロップダウン */}
+                <div className="hidden lg:block absolute bottom-full right-0 mb-2 z-30">
+                  <EmojiPicker
+                    onSelect={(em) => { setShowQuickPicker(false); onReact(em); }}
+                    onClose={() => setShowQuickPicker(false)}
+                  />
+                </div>
+              </>
             )}
           </div>
         )}
