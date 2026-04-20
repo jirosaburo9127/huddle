@@ -252,6 +252,14 @@ function MessageContent({
   );
 }
 
+// モバイル絵文字ピッカー用の定数
+const QUICK_EMOJIS = [
+  { category: "よく使う", emojis: ["👍", "❤️", "😂", "🎉", "🔥", "👀", "💯", "✅"] },
+  { category: "表情", emojis: ["😊", "😄", "🤔", "😮", "😢", "😡", "🥳", "😎"] },
+  { category: "ジェスチャー", emojis: ["👏", "🙌", "🤝", "💪", "✌️", "🫡", "👋", "🙏"] },
+  { category: "記号", emojis: ["⭐", "💡", "📌", "🚀", "⚡", "🎯", "📝", "🔔"] },
+];
+
 // リアクションバッジコンポーネント
 // タップ: 同じ絵文字を追加/解除（Zoom方式）
 // 長押し: 誰がリアクションしたか表示
@@ -350,14 +358,29 @@ function ReactionBadges({
             </button>
             {showQuickPicker && (
               <>
-                {/* モバイル: 画面中央にオーバーレイ表示 */}
-                <div className="fixed inset-0 z-[55] flex items-center justify-center lg:hidden" onClick={() => setShowQuickPicker(false)}>
+                {/* モバイル: 画面下からスライドアップ（LINE方式） */}
+                <div className="fixed inset-0 z-[55] flex items-end lg:hidden" onClick={() => setShowQuickPicker(false)}>
                   <div className="absolute inset-0 bg-black/40" />
-                  <div className="relative" onClick={(e) => e.stopPropagation()}>
-                    <EmojiPicker
-                      onSelect={(em) => { setShowQuickPicker(false); onReact(em); }}
-                      onClose={() => setShowQuickPicker(false)}
-                    />
+                  <div className="relative w-full animate-slide-up" onClick={(e) => e.stopPropagation()}>
+                    <div className="w-full rounded-t-2xl bg-sidebar border-t border-border shadow-xl p-4 pb-8">
+                      {QUICK_EMOJIS.map((group) => (
+                        <div key={group.category} className="mb-3">
+                          <p className="text-[11px] text-muted font-medium mb-1.5">{group.category}</p>
+                          <div className="grid grid-cols-8 gap-1.5">
+                            {group.emojis.map((emoji) => (
+                              <button
+                                key={emoji}
+                                type="button"
+                                onClick={() => { setShowQuickPicker(false); onReact(emoji); }}
+                                className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-white/[0.06] text-xl transition-colors"
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
                 {/* PC: 従来のドロップダウン */}
