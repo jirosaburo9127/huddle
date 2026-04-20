@@ -38,6 +38,7 @@ export async function WorkspaceShell({ workspaceSlug, children }: WorkspaceShell
       slug: string;
       is_private: boolean;
       is_dm: boolean;
+      is_hitorigoto: boolean;
       topic: string | null;
       category: string | null;
       created_by: string;
@@ -50,6 +51,7 @@ export async function WorkspaceShell({ workspaceSlug, children }: WorkspaceShell
       slug: string;
       is_private: boolean;
       is_dm: boolean;
+      is_hitorigoto: boolean;
       topic: string | null;
       category: string | null;
       created_by: string;
@@ -75,6 +77,7 @@ export async function WorkspaceShell({ workspaceSlug, children }: WorkspaceShell
     }>;
     unread_counts: Array<{ channel_id: string; unread_count: number }>;
     all_workspaces: Array<{ id: string; name: string; slug: string }>;
+    hitorigoto_channel: { id: string; slug: string; name: string } | null;
   };
 
   if (!result.workspace) redirect("/");
@@ -105,6 +108,7 @@ export async function WorkspaceShell({ workspaceSlug, children }: WorkspaceShell
         unreadCounts={unreadCounts}
         allWorkspaces={result.all_workspaces || []}
         categories={categories}
+        hitorigotoChannel={result.hitorigoto_channel ?? null}
       />
       <KeyboardShortcuts workspaceId={result.workspace.id} workspaceSlug={workspaceSlug}>
         <main className="flex-1 flex flex-col min-w-0 pb-14 lg:pb-0">

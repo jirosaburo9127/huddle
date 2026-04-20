@@ -7,6 +7,7 @@ import type { Channel, Message, MessageWithProfile, Reaction } from "@/lib/supab
 import { useRouter } from "next/navigation";
 import type { WorkspaceCategory } from "@/lib/channel-categories";
 import { MessageItem } from "./message-item";
+import { HitorigotoPostCard } from "./hitorigoto-post-card";
 import { MessageInput, type MentionPayload } from "./message-input";
 import { CreatePollModal } from "./create-poll-modal";
 import { DateSeparator } from "./date-separator";
@@ -918,6 +919,15 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
                   return other?.profiles?.display_name || channel.name;
                 })()}
               </h1>
+            ) : channel.is_hitorigoto ? (
+              <>
+                <svg className="w-5 h-5 text-muted shrink-0" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
+                </svg>
+                <h1 className="font-bold text-base sm:text-lg truncate min-w-0">
+                  独り言
+                </h1>
+              </>
             ) : (
               <>
                 <span className="text-muted font-medium shrink-0">#</span>
@@ -1139,8 +1149,54 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
         <div ref={scrollContainerRef} className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-4">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-muted">
-              <p className="text-base font-medium">#{channel.name} へようこそ</p>
-              <p className="text-sm mt-1">最初のメッセージを送信しましょう</p>
+              {channel.is_hitorigoto ? (
+                <>
+                  <svg className="w-12 h-12 mb-3 text-muted/50" fill="none" stroke="currentColor" strokeWidth={1} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
+                  </svg>
+                  <p className="text-base font-medium">独り言タイムライン</p>
+                  <p className="text-sm mt-1">思ったことを気軽につぶやこう</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-base font-medium">#{channel.name} へようこそ</p>
+                  <p className="text-sm mt-1">最初のメッセージを送信しましょう</p>
+                </>
+              )}
+            </div>
+          ) : channel.is_hitorigoto ? (
+            /* 独り言: Twitter/Threads風カード表示 */
+            <div>
+              {(() => {
+                // 返信(parent_idあり)は除外し、トップレベル投稿のみ表示
+                const topLevel = messages.filter((m) => !m.parent_id && !m.deleted_at);
+                return topLevel.map((message, index, arr) => {
+                  const prev = index > 0 ? arr[index - 1] : null;
+                  const currentDate = new Date(message.created_at).toDateString();
+                  const prevDate = prev ? new Date(prev.created_at).toDateString() : null;
+                  const showDateSeparator = !prev || currentDate !== prevDate;
+
+                  return (
+                    <div key={message.id} className="group">
+                      {showDateSeparator && (
+                        <DateSeparator date={message.created_at} />
+                      )}
+                      <HitorigotoPostCard
+                        message={message}
+                        currentUserId={currentUserId}
+                        onReply={handleReply}
+                        onReact={handleReact}
+                        onDelete={handleDelete}
+                        onBookmark={handleBookmark}
+                        isBookmarked={bookmarkedIds.has(message.id)}
+                        hasPoll={pollMessageIds.has(message.id)}
+                        readCount={getReadCount(message)}
+                        memberCount={memberCountForRead}
+                      />
+                    </div>
+                  );
+                });
+              })()}
             </div>
           ) : (
             <div>

@@ -27,6 +27,7 @@ export type Channel = {
   slug: string;
   is_private: boolean;
   is_dm: boolean;
+  is_hitorigoto: boolean;
   topic: string | null;
   category: ChannelCategory | null;
   created_by: string;
