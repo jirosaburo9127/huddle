@@ -99,8 +99,9 @@ export default function FilesPage() {
           const ch = Array.isArray(row.channels) ? row.channels[0] : (row.channels as { name: string; slug: string });
           const p = Array.isArray(row.profiles) ? row.profiles[0] : (row.profiles as { display_name: string; avatar_url: string | null });
           // メッセージ内の全Storage URLを抽出
-          const urls = row.content.match(STORAGE_URL_RE) || [];
-          for (const url of urls) {
+          const rawUrls = row.content.match(STORAGE_URL_RE) || [];
+          for (const rawUrl of rawUrls) {
+            const url = rawUrl.trim();
             files.push({
               id: `${row.id}-${url.slice(-8)}`,
               content: url,
