@@ -118,9 +118,9 @@ export default function InProgressPage() {
                   )}
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-semibold text-foreground">{item.sender_name}</span>
-                      <span className="text-xs text-muted">{formatDate(item.created_at)}</span>
-                      <span className="text-xs text-muted">#{item.channel_name}</span>
+                      <span className="text-sm font-semibold text-foreground truncate max-w-[10em]">{item.sender_name.length > 10 ? item.sender_name.slice(0, 10) + "…" : item.sender_name}</span>
+                      <span className="text-xs text-muted shrink-0">{formatDate(item.created_at)}</span>
+                      <span className="text-xs text-muted truncate max-w-[10em]">#{item.channel_name.length > 10 ? item.channel_name.slice(0, 10) + "…" : item.channel_name}</span>
                     </div>
                     <div className="text-sm text-foreground whitespace-pre-wrap break-words line-clamp-3">
                       {item.content}

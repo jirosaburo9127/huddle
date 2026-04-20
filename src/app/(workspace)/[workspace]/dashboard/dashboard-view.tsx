@@ -358,8 +358,8 @@ export function DashboardView({
                 >
                   {/* 上部メタ: チャンネルバッジ + 日付 */}
                   <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-1.5">
-                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-accent bg-accent/10 rounded-full px-2 py-0.5">
-                      #{d.channel_name}
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-accent bg-accent/10 rounded-full px-2 py-0.5 truncate max-w-[12em]">
+                      #{d.channel_name.length > 10 ? d.channel_name.slice(0, 10) + "…" : d.channel_name}
                     </span>
                     <span className="text-[11px] text-muted shrink-0">
                       {formatDate(d.created_at)}
@@ -422,7 +422,7 @@ export function DashboardView({
                         {d.sender_name.charAt(0).toUpperCase()}
                       </div>
                     )}
-                    <span className="text-[12px] text-muted">{d.sender_name}</span>
+                    <span className="text-[12px] text-muted">{d.sender_name.length > 10 ? d.sender_name.slice(0, 10) + "…" : d.sender_name}</span>
                   </div>
                 </Link>
               ))}
