@@ -18,7 +18,7 @@ type FileItem = {
   fileType: "pdf" | "image" | "video" | "other";
 };
 
-const STORAGE_URL_RE = /https:\/\/.*supabase.*\/storage\/v1\/object\/public\/chat-files\/\S+/g;
+const STORAGE_URL_RE = /https:\/\/[^\s]+supabase[^\s]+\/storage\/v1\/object\/public\/chat-files\/[^\s\n]+/g;
 const IMAGE_EXT = /\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i;
 const VIDEO_EXT = /\.(mp4|mov|webm|m4v)(\?.*)?$/i;
 const PDF_EXT = /\.pdf(\?.*)?$/i;
@@ -35,11 +35,16 @@ function extractFileName(url: string): string {
 }
 
 function getFileType(url: string): FileItem["fileType"] {
-  // ファイル名で判定（URLにクエリパラメータが付く場合があるため）
-  const name = extractFileName(url).toLowerCase();
-  if (/\.pdf$/.test(name)) return "pdf";
-  if (/\.(jpg|jpeg|png|gif|webp)$/.test(name)) return "image";
-  if (/\.(mp4|mov|webm|m4v)$/.test(name)) return "video";
+  // URL全体とファイル名の両方で拡張子を探す
+  const targets = [url.toLowerCase()];
+  try { targets.push(new URL(url).pathname.toLowerCase()); } catch {}
+  targets.push(extractFileName(url).toLowerCase());
+
+  for (const s of targets) {
+    if (/\.pdf/.test(s)) return "pdf";
+    if (/\.(jpg|jpeg|png|gif|webp)/.test(s)) return "image";
+    if (/\.(mp4|mov|webm|m4v)/.test(s)) return "video";
+  }
   return "other";
 }
 
