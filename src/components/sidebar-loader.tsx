@@ -111,7 +111,7 @@ export async function WorkspaceShell({ workspaceSlug, children }: WorkspaceShell
           {children}
         </main>
       </KeyboardShortcuts>
-      <BottomTabBar workspaceSlug={workspaceSlug} currentUserId={user.id} />
+      <BottomTabBar workspaceSlug={workspaceSlug} workspaceId={result.workspace.id} currentUserId={user.id} members={result.members || []} />
     </>
   );
 }

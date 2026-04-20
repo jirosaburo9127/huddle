@@ -5,17 +5,21 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
 import { BookmarkModal } from "@/components/bookmark-modal";
+import { WsMembersModal } from "@/components/ws-members-modal";
 
 type Props = {
   workspaceSlug: string;
+  workspaceId: string;
   currentUserId: string;
+  members: Array<{ user_id: string; profiles: { id: string; display_name: string; avatar_url: string | null; status: string | null } | Array<{ id: string; display_name: string; avatar_url: string | null; status: string | null }> }>;
 };
 
-export function BottomTabBar({ workspaceSlug, currentUserId }: Props) {
+export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, members }: Props) {
   const pathname = usePathname();
   const setSidebarOpen = useMobileNavStore((s) => s.setSidebarOpen);
   const [showMore, setShowMore] = useState(false);
   const [showBookmark, setShowBookmark] = useState(false);
+  const [showMembers, setShowMembers] = useState(false);
 
   const isHome = !pathname.includes("/dm-list") && !pathname.includes("/in-progress") && !pathname.includes("/files") && !pathname.includes("/dashboard");
   const isDm = pathname.includes("/dm-list");
@@ -101,7 +105,7 @@ export function BottomTabBar({ workspaceSlug, currentUserId }: Props) {
         <div className="fixed inset-0 z-50 flex items-end lg:hidden" onClick={() => setShowMore(false)}>
           <div className="absolute inset-0 bg-black/40" />
           <div className="relative w-full mb-16 mx-4 rounded-2xl bg-sidebar border border-border p-4 animate-slide-up" onClick={(e) => e.stopPropagation()}>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <Link
                 href={`/${workspaceSlug}/files`}
                 onClick={() => setShowMore(false)}
@@ -125,6 +129,17 @@ export function BottomTabBar({ workspaceSlug, currentUserId }: Props) {
                 </span>
                 <span className="text-xs text-foreground">ブックマーク</span>
               </button>
+              <button
+                onClick={() => { setShowMore(false); setShowMembers(true); }}
+                className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
+              >
+                <span className="w-12 h-12 rounded-full border-2 border-muted/40 flex items-center justify-center">
+                  <svg className="w-5 h-5 text-foreground" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                </span>
+                <span className="text-xs text-foreground">メンバー</span>
+              </button>
             </div>
           </div>
         </div>
@@ -135,6 +150,15 @@ export function BottomTabBar({ workspaceSlug, currentUserId }: Props) {
           currentUserId={currentUserId}
           workspaceSlug={workspaceSlug}
           onClose={() => setShowBookmark(false)}
+        />
+      )}
+
+      {showMembers && (
+        <WsMembersModal
+          members={members}
+          workspaceId={workspaceId}
+          currentUserId={currentUserId}
+          onClose={() => setShowMembers(false)}
         />
       )}
     </>
