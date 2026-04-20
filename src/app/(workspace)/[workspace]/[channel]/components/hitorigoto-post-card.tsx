@@ -164,11 +164,14 @@ function HitorigotoPostCardInner({
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchEnd}
       >
-        {/* 返信先の引用 */}
+        {/* 返信先 */}
         {parentMessage && (
-          <div className="flex items-center gap-2 mb-2 px-3 py-1.5 rounded-lg bg-white/[0.03] border-l-2 border-muted/30 text-xs text-muted truncate">
+          <div className="flex items-center gap-1.5 mb-2 text-xs text-muted">
+            <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+            </svg>
             <span className="font-semibold shrink-0">{parentMessage.profiles?.display_name}</span>
-            <span className="truncate">{parentMessage.content.replace(/\s+/g, " ").slice(0, 60)}</span>
+            <span className="truncate">{parentMessage.content.replace(/\s+/g, " ").slice(0, 40)}</span>
           </div>
         )}
 
