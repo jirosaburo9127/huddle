@@ -130,6 +130,7 @@ function HitorigotoPostCardInner({
 }: Props) {
   const [showActions, setShowActions] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [reacterModal, setReacterModal] = useState<{ emoji: string; names: string[]; reacted: boolean } | null>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isLongPress = useRef(false);
 
@@ -240,7 +241,13 @@ function HitorigotoPostCardInner({
           {grouped.map((g) => (
             <button
               key={g.emoji}
-              onClick={() => onReact?.(message.id, g.emoji)}
+              onClick={() => {
+                if (typeof window !== "undefined" && window.innerWidth >= 1024) {
+                  onReact?.(message.id, g.emoji);
+                } else {
+                  setReacterModal({ emoji: g.emoji, names: g.users, reacted: g.userIds.includes(currentUserId) });
+                }
+              }}
               className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs border transition-colors ${
                 g.userIds.includes(currentUserId)
                   ? "border-accent/40 bg-accent/10 text-foreground"
@@ -276,6 +283,44 @@ function HitorigotoPostCardInner({
           )}
         </div>
       </article>
+
+      {/* リアクターモーダル（LINE風下からスライド） */}
+      {reacterModal && (
+        <div
+          className="fixed inset-0 z-[60] flex items-end lg:hidden"
+          onClick={() => setReacterModal(null)}
+        >
+          <div className="absolute inset-0 bg-black/40" />
+          <div className="relative w-full rounded-t-2xl bg-sidebar border-t border-border px-5 pt-4 pb-20 animate-slide-up" onClick={(e) => e.stopPropagation()}>
+            <div className="w-10 h-1 rounded-full bg-muted/30 mx-auto mb-4" />
+            <div className="flex items-center gap-2 mb-3">
+              {reacterModal.emoji.length <= 2 ? (
+                <span className="text-2xl">{reacterModal.emoji}</span>
+              ) : (
+                <span className="text-sm font-semibold bg-accent/10 border border-accent/30 rounded-full px-2.5 py-0.5">{reacterModal.emoji}</span>
+              )}
+              <span className="text-base font-semibold text-foreground">リアクションした人</span>
+            </div>
+            <div className="space-y-2.5 mb-4">
+              {reacterModal.names.map((name) => (
+                <div key={name} className="text-sm text-foreground">{name}</div>
+              ))}
+            </div>
+            {onReact && (
+              <button
+                onClick={() => { onReact(message.id, reacterModal.emoji); setReacterModal(null); }}
+                className={`w-full py-2.5 text-sm font-medium rounded-xl border transition-colors ${
+                  reacterModal.reacted
+                    ? "text-red-400 border-red-400/30 hover:bg-red-400/10"
+                    : "text-accent border-accent/30 hover:bg-accent/10"
+                }`}
+              >
+                {reacterModal.reacted ? "取り消す" : "追加する"}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* モバイル絵文字ピッカー */}
       {showEmojiPicker && (

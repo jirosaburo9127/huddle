@@ -394,40 +394,37 @@ function ReactionBadges({
       {/* 長押し: リアクターモーダル */}
       {longPressNames && (
         <div
-          className="fixed inset-0 z-[60] flex items-center justify-center lg:hidden"
+          className="fixed inset-0 z-[60] flex items-end lg:hidden"
           onClick={() => setLongPressNames(null)}
         >
           <div className="absolute inset-0 bg-black/40" />
-          <div className="relative bg-sidebar border border-border rounded-2xl px-5 py-4 max-w-xs w-full mx-4 animate-fade-in" onClick={(e) => e.stopPropagation()}>
+          <div className="relative w-full rounded-t-2xl bg-sidebar border-t border-border px-5 pt-4 pb-20 animate-slide-up" onClick={(e) => e.stopPropagation()}>
+            <div className="w-10 h-1 rounded-full bg-muted/30 mx-auto mb-4" />
             <div className="flex items-center gap-2 mb-3">
-              <span className="text-2xl">{longPressNames.emoji}</span>
+              {longPressNames.emoji.length <= 2 ? (
+                <span className="text-2xl">{longPressNames.emoji}</span>
+              ) : (
+                <span className="text-sm font-semibold bg-accent/10 border border-accent/30 rounded-full px-2.5 py-0.5">{longPressNames.emoji}</span>
+              )}
               <span className="text-base font-semibold text-foreground">リアクションした人</span>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2.5 mb-4">
               {longPressNames.names.map((name) => (
                 <div key={name} className="text-sm text-foreground">{name}</div>
               ))}
             </div>
-            <div className="flex gap-2 mt-4">
-              {onReact && (
-                <button
-                  onClick={() => { onReact(longPressNames.emoji); setLongPressNames(null); }}
-                  className={`flex-1 py-2 text-sm font-medium rounded-xl border transition-colors ${
-                    longPressNames.reacted
-                      ? "text-red-400 border-red-400/30 hover:bg-red-400/10"
-                      : "text-accent border-accent/30 hover:bg-accent/10"
-                  }`}
-                >
-                  {longPressNames.reacted ? "取り消す" : "追加する"}
-                </button>
-              )}
+            {onReact && (
               <button
-                onClick={() => setLongPressNames(null)}
-                className="flex-1 py-2 text-sm text-muted hover:text-foreground rounded-xl border border-border/50 transition-colors"
+                onClick={() => { onReact(longPressNames.emoji); setLongPressNames(null); }}
+                className={`w-full py-2.5 text-sm font-medium rounded-xl border transition-colors ${
+                  longPressNames.reacted
+                    ? "text-red-400 border-red-400/30 hover:bg-red-400/10"
+                    : "text-accent border-accent/30 hover:bg-accent/10"
+                }`}
               >
-                閉じる
+                {longPressNames.reacted ? "取り消す" : "追加する"}
               </button>
-            </div>
+            )}
           </div>
         </div>
       )}
