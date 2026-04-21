@@ -1055,10 +1055,10 @@ export const MessageItem = memo(function MessageItem({
                   </span>
                 </button>
               )}
-              {/* リアクション */}
+              {/* リアクション（タップでアクションモーダルを閉じ、絵文字ピッカーを別で開く） */}
               {onReact && (
                 <button
-                  onClick={() => setMobileEmojiOpen(true)}
+                  onClick={() => { setShowActions(false); setMobileEmojiOpen(true); }}
                   className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
                 >
                   <span className="w-12 h-12 rounded-full border-2 border-muted/40 flex items-center justify-center">
@@ -1068,23 +1068,6 @@ export const MessageItem = memo(function MessageItem({
                   </span>
                   <span className="text-xs text-foreground">リアクション</span>
                 </button>
-              )}
-              {/* モバイル絵文字グリッド（アクションモーダル内） */}
-              {mobileEmojiOpen && onReact && (
-                <div className="col-span-3 border-t border-border/50 pt-3 mt-1">
-                  <p className="text-sm font-medium text-foreground mb-2">リアクションを選択</p>
-                  <div className="grid grid-cols-8 gap-2">
-                    {["👍", "❤️", "😂", "🎉", "🔥", "👀", "💯", "✅", "😊", "😄", "🤔", "😮", "😢", "🥳", "👏", "🙌", "🤝", "💪", "🙏", "⭐", "💡", "🚀", "⚡", "🎯"].map((emoji) => (
-                      <button
-                        key={emoji}
-                        onClick={() => { setShowActions(false); setMobileEmojiOpen(false); onReact(message.id, emoji); }}
-                        className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-white/[0.06] text-xl transition-colors"
-                      >
-                        {emoji}
-                      </button>
-                    ))}
-                  </div>
-                </div>
               )}
               {/* ブックマーク（モバイル） */}
               {onBookmark && (
@@ -1163,6 +1146,49 @@ export const MessageItem = memo(function MessageItem({
               >
                 削除
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* モバイル: アクションモーダルから開く絵文字ピッカー（下からスライド） */}
+      {mobileEmojiOpen && onReact && (
+        <div className="fixed inset-0 z-[60] flex items-end lg:hidden" onClick={() => setMobileEmojiOpen(false)}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div className="relative w-full animate-slide-up" onClick={(e) => e.stopPropagation()}>
+            <div className="w-full rounded-t-2xl bg-sidebar border-t border-border shadow-xl p-4 pb-20">
+              {QUICK_EMOJIS.map((group) => (
+                <div key={group.category} className="mb-3">
+                  <p className="text-[11px] text-muted font-medium mb-1.5">{group.category}</p>
+                  {group.category === "テキスト" ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {group.emojis.map((emoji) => (
+                        <button
+                          key={emoji}
+                          type="button"
+                          onClick={() => { setMobileEmojiOpen(false); onReact(message.id, emoji); }}
+                          className="px-3 py-2 rounded-xl border border-border/50 bg-white/[0.03] hover:bg-white/[0.06] text-sm font-medium text-foreground transition-colors"
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-8 gap-1.5">
+                      {group.emojis.map((emoji) => (
+                        <button
+                          key={emoji}
+                          type="button"
+                          onClick={() => { setMobileEmojiOpen(false); onReact(message.id, emoji); }}
+                          className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-white/[0.06] text-xl transition-colors"
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
         </div>
