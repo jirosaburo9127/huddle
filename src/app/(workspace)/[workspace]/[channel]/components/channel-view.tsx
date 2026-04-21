@@ -465,9 +465,8 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", onVisible);
 
-    // 保険: 5秒ごとにポーリング（Capacitor/WKWebViewでRealtimeが途切れた場合の補完）
-    // visibilityState のチェックを外し、フォアグラウンドでも常に動くようにする
-    const poll = setInterval(syncMissedMessages, 5000);
+    // 保険: 10秒ごとにポーリング（Capacitor/WKWebViewでRealtimeが途切れた場合の補完）
+    const poll = setInterval(syncMissedMessages, 10000);
 
     return () => {
       cancelled = true;

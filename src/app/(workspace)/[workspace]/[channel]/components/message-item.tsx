@@ -207,14 +207,17 @@ function MessageContent({
                 className="lg:hidden max-w-full sm:max-w-sm rounded-xl bg-black/80 flex items-center justify-center py-6 px-10 w-full"
                 onClick={async () => {
                   try {
-                    const { Capacitor, registerPlugin } = await import("@capacitor/core");
-                    if (Capacitor.isNativePlatform()) {
-                      const VideoPlayer = registerPlugin("VideoPlayer") as { play: (opts: { url: string }) => Promise<void> };
-                      await VideoPlayer.play({ url });
+                    // Capacitorブリッジ経由でネイティブプラグインを呼ぶ
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    const cap = (window as any).Capacitor as {
+                      isNativePlatform?: () => boolean;
+                      Plugins?: Record<string, { play?: (opts: { url: string }) => Promise<void> }>;
+                    } | undefined;
+                    if (cap?.isNativePlatform?.() && cap.Plugins?.VideoPlayer?.play) {
+                      await cap.Plugins.VideoPlayer.play({ url });
                       return;
                     }
                   } catch {}
-                  // Web fallback
                   window.open(url, "_blank");
                 }}
               >
