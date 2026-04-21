@@ -201,12 +201,22 @@ function MessageContent({
                   className="max-w-full sm:max-w-sm max-h-80 rounded-xl bg-black"
                 />
               </div>
-              {/* モバイル: リンクでiOSに処理を委任 */}
-              <a
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
+              {/* モバイル: タップでネイティブ動画プレーヤー起動（Chatwork方式） */}
+              <button
+                type="button"
                 className="lg:hidden max-w-full sm:max-w-sm rounded-xl bg-black/80 flex items-center justify-center py-6 px-10 w-full"
+                onClick={async () => {
+                  try {
+                    const { Capacitor, registerPlugin } = await import("@capacitor/core");
+                    if (Capacitor.isNativePlatform()) {
+                      const VideoPlayer = registerPlugin("VideoPlayer") as { play: (opts: { url: string }) => Promise<void> };
+                      await VideoPlayer.play({ url });
+                      return;
+                    }
+                  } catch {}
+                  // Web fallback
+                  window.open(url, "_blank");
+                }}
               >
                 <div className="flex items-center gap-3 text-white">
                   <svg className="w-10 h-10" fill="currentColor" viewBox="0 0 24 24">
@@ -217,7 +227,7 @@ function MessageContent({
                     <div className="text-xs text-white/60">{fileName}</div>
                   </div>
                 </div>
-              </a>
+              </button>
             </div>
           );
         }
