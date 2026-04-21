@@ -113,6 +113,7 @@ function groupReactions(reactions: Reaction[]) {
 }
 
 const QUICK_EMOJIS = ["👍", "❤️", "😊", "🎉", "👀", "🙏"];
+const TEXT_REACTIONS = ["完了しました！", "了解！", "確認中", "対応します", "ありがとう！", "お疲れ様！"];
 
 function HitorigotoPostCardInner({
   message,
@@ -246,7 +247,11 @@ function HitorigotoPostCardInner({
                   : "border-border bg-transparent text-muted hover:bg-white/[0.04]"
               }`}
             >
-              <span>{g.emoji}</span>
+              {g.emoji.length <= 2 ? (
+                <span className="text-base">{g.emoji}</span>
+              ) : (
+                <span className="text-xs font-medium">{g.emoji}</span>
+              )}
               <span>{g.count}</span>
             </button>
           ))}
@@ -278,7 +283,7 @@ function HitorigotoPostCardInner({
           <div className="absolute inset-0 bg-black/40" />
           <div className="relative w-full animate-slide-up" onClick={(e) => e.stopPropagation()}>
             <div className="w-full rounded-t-2xl bg-sidebar border-t border-border shadow-xl p-4 pb-20">
-              <div className="grid grid-cols-8 gap-2">
+              <div className="grid grid-cols-8 gap-2 mb-3">
                 {QUICK_EMOJIS.map((e) => (
                   <button
                     key={e}
@@ -286,6 +291,18 @@ function HitorigotoPostCardInner({
                     className="text-2xl p-2 rounded-lg hover:bg-white/[0.06] active:scale-90 transition-transform"
                   >
                     {e}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[11px] text-muted font-medium mb-1.5">テキスト</p>
+              <div className="flex flex-wrap gap-1.5">
+                {TEXT_REACTIONS.map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => { onReact?.(message.id, t); setShowEmojiPicker(false); }}
+                    className="px-3 py-2 rounded-xl border border-border/50 bg-white/[0.03] hover:bg-white/[0.06] text-sm font-medium text-foreground transition-colors"
+                  >
+                    {t}
                   </button>
                 ))}
               </div>

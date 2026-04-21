@@ -258,6 +258,7 @@ const QUICK_EMOJIS = [
   { category: "表情", emojis: ["😊", "😄", "🤔", "😮", "😢", "😡", "🥳", "😎"] },
   { category: "ジェスチャー", emojis: ["👏", "🙌", "🤝", "💪", "✌️", "🫡", "👋", "🙏"] },
   { category: "記号", emojis: ["⭐", "💡", "📌", "🚀", "⚡", "🎯", "📝", "🔔"] },
+  { category: "テキスト", emojis: ["完了しました！", "了解！", "確認中", "対応します", "ありがとう！", "お疲れ様！"] },
 ];
 
 // リアクションバッジコンポーネント
@@ -329,7 +330,11 @@ function ReactionBadges({
                   : "bg-white/[0.03] border-border/50 text-muted hover:border-accent/30"
               }`}
             >
-              <span className="text-base">{emoji}</span>
+              {emoji.length <= 2 ? (
+                <span className="text-base">{emoji}</span>
+              ) : (
+                <span className="text-xs font-medium">{emoji}</span>
+              )}
               <span>{count}</span>
             </button>
             {/* PC: ホバーツールチップ */}
@@ -366,18 +371,33 @@ function ReactionBadges({
                       {QUICK_EMOJIS.map((group) => (
                         <div key={group.category} className="mb-3">
                           <p className="text-[11px] text-muted font-medium mb-1.5">{group.category}</p>
-                          <div className="grid grid-cols-8 gap-1.5">
-                            {group.emojis.map((emoji) => (
-                              <button
-                                key={emoji}
-                                type="button"
-                                onClick={() => { setShowQuickPicker(false); onReact(emoji); }}
-                                className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-white/[0.06] text-xl transition-colors"
-                              >
-                                {emoji}
-                              </button>
-                            ))}
-                          </div>
+                          {group.category === "テキスト" ? (
+                            <div className="flex flex-wrap gap-1.5">
+                              {group.emojis.map((emoji) => (
+                                <button
+                                  key={emoji}
+                                  type="button"
+                                  onClick={() => { setShowQuickPicker(false); onReact(emoji); }}
+                                  className="px-3 py-2 rounded-xl border border-border/50 bg-white/[0.03] hover:bg-white/[0.06] text-sm font-medium text-foreground transition-colors"
+                                >
+                                  {emoji}
+                                </button>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-8 gap-1.5">
+                              {group.emojis.map((emoji) => (
+                                <button
+                                  key={emoji}
+                                  type="button"
+                                  onClick={() => { setShowQuickPicker(false); onReact(emoji); }}
+                                  className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-white/[0.06] text-xl transition-colors"
+                                >
+                                  {emoji}
+                                </button>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
