@@ -11,6 +11,8 @@ const config: CapacitorConfig = {
   ios: {
     contentInset: 'automatic',
     scheme: 'Huddle',
+    allowsLinkPreview: false,
+    preferredContentMode: 'mobile',
   },
   plugins: {
     PushNotifications: {

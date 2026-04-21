@@ -190,14 +190,15 @@ function MessageContent({
         if (isVideoFile(url)) {
           return (
             <div key={i} className="mt-1" onClick={(e) => e.stopPropagation()}>
+              {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
               <video
+                src={url}
                 controls
                 playsInline
+                webkit-playsinline="true"
                 preload="metadata"
-                className="max-w-full sm:max-w-sm max-h-80 rounded-xl"
-              >
-                <source src={url} />
-              </video>
+                className="max-w-full sm:max-w-sm max-h-80 rounded-xl bg-black"
+              />
               <span className="text-xs text-muted mt-1 block">{fileName}</span>
             </div>
           );
