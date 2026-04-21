@@ -117,7 +117,7 @@ function parseMarkdown(text: string): string {
   // メンション挿入時に「@name 」(末尾スペース付き) で保存されるため、
   // 文中の普通の @ (例: test@example.com, @以降の長文) は反応しない。
   html = html.replace(
-    /(^|[\s>])@([\w.\-\u3000-\u9FFF\uF900-\uFAFF\u00A0]{1,30})(?=[\s<]|$)/g,
+    /(^|[\s>])@([\w.\-\u3000-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF\u00A0()（）]{1,30})(?=[\s<]|$)/g,
     (_m, before: string, name: string) => {
       // 旧来の @channel 表記は表示だけ @All に置き換える (DB互換のため)
       const displayName = name === "channel" ? "All" : name.replace(/\u00A0/g, " ");
