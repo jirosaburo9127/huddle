@@ -403,11 +403,12 @@ function ReactionBadges({
                     </div>
                   </div>
                 </div>
-                {/* PC: 従来のドロップダウン */}
-                <div className="hidden lg:block absolute bottom-full right-0 mb-2 z-30">
+                {/* PC: 上方向に表示 */}
+                <div className="hidden lg:block">
                   <EmojiPicker
                     onSelect={(em) => { setShowQuickPicker(false); onReact(em); }}
                     onClose={() => setShowQuickPicker(false)}
+                    position="above"
                   />
                 </div>
               </>
@@ -902,9 +903,9 @@ export const MessageItem = memo(function MessageItem({
             </div>
           )}
 
-          {/* PC: アクションバー（ホバーで表示、メッセージ右上内側） */}
+          {/* PC: アクションバー（ホバーで表示、メッセージ右下） */}
           {!isEditing && (
-          <div className="hidden lg:flex absolute top-1 right-3 z-10 transition-opacity items-center gap-0.5 bg-sidebar/95 backdrop-blur-sm border border-border/60 rounded-lg px-1 py-0.5 shadow-lg opacity-0 group-hover:opacity-100">
+          <div className="hidden lg:flex absolute -bottom-2 right-3 z-10 transition-opacity items-center gap-0.5 bg-sidebar/95 backdrop-blur-sm border border-border/60 rounded-lg px-1 py-0.5 shadow-lg opacity-0 group-hover:opacity-100">
             {/* 決定ボタン */}
             {onDecision && (
               <button
@@ -953,6 +954,7 @@ export const MessageItem = memo(function MessageItem({
                   <EmojiPicker
                     onSelect={handleEmojiSelect}
                     onClose={() => setEmojiPickerLocation(null)}
+                    position="above"
                   />
                 )}
               </div>

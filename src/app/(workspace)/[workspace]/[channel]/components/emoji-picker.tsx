@@ -5,6 +5,7 @@ import { useEffect, useRef } from "react";
 type Props = {
   onSelect: (emoji: string) => void;
   onClose: () => void;
+  position?: "below" | "above";
 };
 
 // よく使う絵文字カテゴリ（外部ライブラリ不要）
@@ -13,9 +14,10 @@ const EMOJI_LIST = [
   { category: "表情", emojis: ["😊", "😄", "🤔", "😮", "😢", "😡", "🥳", "😎"] },
   { category: "ジェスチャー", emojis: ["👏", "🙌", "🤝", "💪", "✌️", "🫡", "👋", "🙏"] },
   { category: "記号", emojis: ["⭐", "💡", "📌", "🚀", "⚡", "🎯", "📝", "🔔"] },
+  { category: "テキスト", emojis: ["完了しました！", "了解！", "確認中", "対応します", "ありがとう！", "お疲れ様！"] },
 ];
 
-export function EmojiPicker({ onSelect, onClose }: Props) {
+export function EmojiPicker({ onSelect, onClose, position = "below" }: Props) {
   const ref = useRef<HTMLDivElement>(null);
 
   // 外側クリックで閉じる
@@ -38,7 +40,9 @@ export function EmojiPicker({ onSelect, onClose }: Props) {
   return (
     <div
       ref={ref}
-      className="absolute top-full mt-2 right-0 w-72 rounded-2xl bg-sidebar border border-border shadow-xl p-3 z-[60] animate-fade-in"
+      className={`absolute right-0 w-72 rounded-2xl bg-sidebar border border-border shadow-xl p-3 z-[60] animate-fade-in ${
+        position === "above" ? "bottom-full mb-2" : "top-full mt-2"
+      }`}
     >
       {EMOJI_LIST.map((group, gi) => (
         <div key={group.category}>
@@ -47,18 +51,33 @@ export function EmojiPicker({ onSelect, onClose }: Props) {
           >
             {group.category}
           </p>
-          <div className="grid grid-cols-8 gap-1">
-            {group.emojis.map((emoji) => (
-              <button
-                key={emoji}
-                type="button"
-                onClick={() => onSelect(emoji)}
-                className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/[0.06] cursor-pointer text-base transition-colors"
-              >
-                {emoji}
-              </button>
-            ))}
-          </div>
+          {group.category === "テキスト" ? (
+            <div className="flex flex-wrap gap-1">
+              {group.emojis.map((emoji) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={() => onSelect(emoji)}
+                  className="px-2.5 py-1.5 rounded-lg border border-border/50 bg-white/[0.03] hover:bg-white/[0.06] cursor-pointer text-xs font-medium text-foreground transition-colors"
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-8 gap-1">
+              {group.emojis.map((emoji) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={() => onSelect(emoji)}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/[0.06] cursor-pointer text-base transition-colors"
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       ))}
     </div>
