@@ -190,16 +190,44 @@ function MessageContent({
         if (isVideoFile(url)) {
           return (
             <div key={i} className="mt-1" onClick={(e) => e.stopPropagation()}>
-              {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-              <video
-                src={url}
-                controls
-                playsInline
-                webkit-playsinline="true"
-                preload="metadata"
-                className="max-w-full sm:max-w-sm max-h-80 rounded-xl bg-black"
-              />
-              <span className="text-xs text-muted mt-1 block">{fileName}</span>
+              {/* PC: インラインプレーヤー */}
+              <div className="hidden lg:block">
+                {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                <video
+                  src={url}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  className="max-w-full sm:max-w-sm max-h-80 rounded-xl bg-black"
+                />
+              </div>
+              {/* モバイル: タップでアプリ内ブラウザ再生（SFSafariViewControllerはHEVC対応、戻るボタンで即復帰） */}
+              <button
+                type="button"
+                className="lg:hidden max-w-full sm:max-w-sm rounded-xl bg-black/80 flex items-center justify-center py-6 px-10 w-full"
+                onClick={async () => {
+                  try {
+                    const { Capacitor } = await import("@capacitor/core");
+                    if (Capacitor.isNativePlatform()) {
+                      const { Browser } = await import("@capacitor/browser");
+                      await Browser.open({ url });
+                      return;
+                    }
+                  } catch {}
+                  window.open(url, "_blank");
+                }}
+              >
+                <div className="flex items-center gap-3 text-white">
+                  <svg className="w-10 h-10" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                  <div className="text-left">
+                    <div className="text-sm font-medium">動画を再生</div>
+                    <div className="text-xs text-white/60">{fileName}</div>
+                  </div>
+                </div>
+              </button>
+              <span className="text-xs text-muted mt-1 block lg:hidden">{fileName}</span>
             </div>
           );
         }
