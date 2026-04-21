@@ -465,12 +465,9 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", onVisible);
 
-    // 保険: 15秒ごとにバックグラウンドで再同期
-    // Realtime の取りこぼしや optimistic 更新のドリフトを定期的に直す
-    const poll = setInterval(() => {
-      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
-      syncMissedMessages();
-    }, 15000);
+    // 保険: 5秒ごとにポーリング（Capacitor/WKWebViewでRealtimeが途切れた場合の補完）
+    // visibilityState のチェックを外し、フォアグラウンドでも常に動くようにする
+    const poll = setInterval(syncMissedMessages, 5000);
 
     return () => {
       cancelled = true;
