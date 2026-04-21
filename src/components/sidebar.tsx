@@ -474,6 +474,7 @@ export function Sidebar({
           translate-x 系の CSS 変数はブラウザのコンポジターが一瞬動かしてしまい
           「横スライド」に見える副作用があるので完全に使わない */}
       <aside
+        data-sidebar
         className={`
           fixed top-0 bottom-14 left-0 z-50 w-full sm:w-64 bg-sidebar flex-col border-r border-border
           lg:bottom-0 lg:relative lg:flex
