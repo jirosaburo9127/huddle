@@ -201,39 +201,12 @@ function MessageContent({
                   className="max-w-full sm:max-w-sm max-h-80 rounded-xl bg-black"
                 />
               </div>
-              {/* モバイル: タップでiOSネイティブフルスクリーンプレーヤー起動 */}
-              <button
-                type="button"
+              {/* モバイル: リンクでiOSに処理を委任 */}
+              <a
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="lg:hidden max-w-full sm:max-w-sm rounded-xl bg-black/80 flex items-center justify-center py-6 px-10 w-full"
-                onClick={() => {
-                  // 非表示のvideo要素を作ってフルスクリーン再生（HEVCも対応）
-                  const v = document.createElement("video");
-                  v.src = url;
-                  v.setAttribute("playsinline", "true");
-                  v.style.position = "fixed";
-                  v.style.top = "-9999px";
-                  document.body.appendChild(v);
-                  // iOSネイティブフルスクリーンプレーヤーを起動
-                  const vAny = v as HTMLVideoElement & { webkitEnterFullscreen?: () => void };
-                  v.play().then(() => {
-                    if (vAny.webkitEnterFullscreen) {
-                      vAny.webkitEnterFullscreen();
-                    } else if (v.requestFullscreen) {
-                      v.requestFullscreen();
-                    }
-                  }).catch(() => {
-                    // 再生失敗時はURLを直接開く
-                    window.open(url, "_blank");
-                  });
-                  // フルスクリーン終了時にクリーンアップ
-                  v.addEventListener("webkitendfullscreen", () => {
-                    v.pause();
-                    document.body.removeChild(v);
-                  });
-                  v.addEventListener("ended", () => {
-                    document.body.removeChild(v);
-                  });
-                }}
               >
                 <div className="flex items-center gap-3 text-white">
                   <svg className="w-10 h-10" fill="currentColor" viewBox="0 0 24 24">
@@ -244,7 +217,7 @@ function MessageContent({
                     <div className="text-xs text-white/60">{fileName}</div>
                   </div>
                 </div>
-              </button>
+              </a>
             </div>
           );
         }
