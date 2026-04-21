@@ -24,12 +24,23 @@ function SidebarSkeleton() {
   );
 }
 
-// ワークスペース全体のフォールバック（サイドバースケルトン + メインコンテンツ領域）
+// ワークスペース全体のフォールバック
 function WorkspaceSkeleton() {
   return (
     <>
+      {/* PC: サイドバースケルトン */}
       <SidebarSkeleton />
-      <main className="flex-1 flex flex-col min-w-0" />
+      {/* モバイル: ロゴ + スピナー */}
+      <main className="flex-1 flex flex-col items-center justify-center min-w-0 lg:hidden">
+        <img
+          src="/icons/logo-transparent.png"
+          alt="Huddle"
+          className="w-16 h-16 animate-spin-slow"
+        />
+        <p className="text-sm text-muted mt-4">読み込み中...</p>
+      </main>
+      {/* PC: 空のメインエリア */}
+      <main className="flex-1 flex-col min-w-0 hidden lg:flex" />
     </>
   );
 }

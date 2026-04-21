@@ -86,6 +86,15 @@ body.native-app {
   animation: fade-in 0.15s ease-out;
 }
 
+/* ローディングスピナー（ゆっくり回転） */
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.animate-spin-slow {
+  animation: spin-slow 2s linear infinite;
+}
+
 /* ───── LP 用アニメーション ───── */
 @keyframes lp-fade-up {
   from { opacity: 0; transform: translateY(24px); }
