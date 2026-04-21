@@ -272,31 +272,13 @@ function ReactionBadges({
   reactions: Array<{ emoji: string; count: number; reacted: boolean; names: string[] }>;
   onReact?: (emoji: string) => void;
 }) {
-  const [longPressNames, setLongPressNames] = useState<{ emoji: string; names: string[] } | null>(null);
+  const [longPressNames, setLongPressNames] = useState<{ emoji: string; names: string[]; reacted: boolean } | null>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showQuickPicker, setShowQuickPicker] = useState(false);
 
-  function handleTouchStart(emoji: string, names: string[]) {
-    longPressTimer.current = setTimeout(() => {
-      longPressTimer.current = null;
-      setLongPressNames({ emoji, names });
-    }, 400);
-  }
-
-  function handleTouchEnd(emoji: string) {
-    if (longPressTimer.current) {
-      // 長押しが発火する前にタッチ終了 = タップ → トグル
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-      onReact?.(emoji);
-    }
-  }
-
-  function handleTouchCancel() {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
+  // モバイル: タップで誰がリアクションしたかモーダル表示
+  function handleTap(emoji: string, names: string[], reacted: boolean) {
+    setLongPressNames({ emoji, names, reacted });
   }
 
   return (
@@ -308,21 +290,14 @@ function ReactionBadges({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                // PC: クリックでトグル
                 if (typeof window !== "undefined" && window.innerWidth >= 1024) {
+                  // PC: クリックでトグル
                   onReact?.(emoji);
+                } else {
+                  // モバイル: タップで誰がリアクションしたかモーダル表示
+                  handleTap(emoji, names, reacted);
                 }
-                // モバイル: タッチイベントで処理するのでonClickは無視
               }}
-              onTouchStart={(e) => {
-                e.stopPropagation();
-                handleTouchStart(emoji, names);
-              }}
-              onTouchEnd={(e) => {
-                e.stopPropagation();
-                handleTouchEnd(emoji);
-              }}
-              onTouchCancel={handleTouchCancel}
               onContextMenu={(e) => e.preventDefault()}
               className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm border cursor-pointer transition-colors select-none ${
                 reacted
@@ -433,12 +408,26 @@ function ReactionBadges({
                 <div key={name} className="text-sm text-foreground">{name}</div>
               ))}
             </div>
-            <button
-              onClick={() => setLongPressNames(null)}
-              className="mt-4 w-full py-2 text-sm text-muted hover:text-foreground rounded-xl border border-border/50 transition-colors"
-            >
-              閉じる
-            </button>
+            <div className="flex gap-2 mt-4">
+              {onReact && (
+                <button
+                  onClick={() => { onReact(longPressNames.emoji); setLongPressNames(null); }}
+                  className={`flex-1 py-2 text-sm font-medium rounded-xl border transition-colors ${
+                    longPressNames.reacted
+                      ? "text-red-400 border-red-400/30 hover:bg-red-400/10"
+                      : "text-accent border-accent/30 hover:bg-accent/10"
+                  }`}
+                >
+                  {longPressNames.reacted ? "取り消す" : "追加する"}
+                </button>
+              )}
+              <button
+                onClick={() => setLongPressNames(null)}
+                className="flex-1 py-2 text-sm text-muted hover:text-foreground rounded-xl border border-border/50 transition-colors"
+              >
+                閉じる
+              </button>
+            </div>
           </div>
         </div>
       )}
