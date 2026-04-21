@@ -201,20 +201,38 @@ function MessageContent({
                   className="max-w-full sm:max-w-sm max-h-80 rounded-xl bg-black"
                 />
               </div>
-              {/* モバイル: タップでアプリ内ブラウザ再生（SFSafariViewControllerはHEVC対応、戻るボタンで即復帰） */}
+              {/* モバイル: タップでiOSネイティブフルスクリーンプレーヤー起動 */}
               <button
                 type="button"
                 className="lg:hidden max-w-full sm:max-w-sm rounded-xl bg-black/80 flex items-center justify-center py-6 px-10 w-full"
-                onClick={async () => {
-                  try {
-                    const { Capacitor } = await import("@capacitor/core");
-                    if (Capacitor.isNativePlatform()) {
-                      const { Browser } = await import("@capacitor/browser");
-                      await Browser.open({ url });
-                      return;
+                onClick={() => {
+                  // 非表示のvideo要素を作ってフルスクリーン再生（HEVCも対応）
+                  const v = document.createElement("video");
+                  v.src = url;
+                  v.setAttribute("playsinline", "true");
+                  v.style.position = "fixed";
+                  v.style.top = "-9999px";
+                  document.body.appendChild(v);
+                  // iOSネイティブフルスクリーンプレーヤーを起動
+                  const vAny = v as HTMLVideoElement & { webkitEnterFullscreen?: () => void };
+                  v.play().then(() => {
+                    if (vAny.webkitEnterFullscreen) {
+                      vAny.webkitEnterFullscreen();
+                    } else if (v.requestFullscreen) {
+                      v.requestFullscreen();
                     }
-                  } catch {}
-                  window.open(url, "_blank");
+                  }).catch(() => {
+                    // 再生失敗時はURLを直接開く
+                    window.open(url, "_blank");
+                  });
+                  // フルスクリーン終了時にクリーンアップ
+                  v.addEventListener("webkitendfullscreen", () => {
+                    v.pause();
+                    document.body.removeChild(v);
+                  });
+                  v.addEventListener("ended", () => {
+                    document.body.removeChild(v);
+                  });
                 }}
               >
                 <div className="flex items-center gap-3 text-white">
@@ -227,7 +245,6 @@ function MessageContent({
                   </div>
                 </div>
               </button>
-              <span className="text-xs text-muted mt-1 block lg:hidden">{fileName}</span>
             </div>
           );
         }
