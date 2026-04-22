@@ -139,8 +139,7 @@ function HitorigotoPostCardInner({
   const [showActions, setShowActions] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [reacterModal, setReacterModal] = useState<{ emoji: string; names: string[]; reacted: boolean } | null>(null);
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isLongPress = useRef(false);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   // 削除済みは非表示
   if (message.deleted_at) return null;
@@ -153,26 +152,11 @@ function HitorigotoPostCardInner({
   const reactions = message.reactions || [];
   const grouped = groupReactions(reactions);
 
-  // 長押しでアクションモーダル
-  const handleTouchStart = () => {
-    isLongPress.current = false;
-    longPressTimer.current = setTimeout(() => {
-      isLongPress.current = true;
-      setShowActions(true);
-    }, 500);
-  };
-  const handleTouchEnd = () => {
-    if (longPressTimer.current) clearTimeout(longPressTimer.current);
-  };
-
   return (
     <>
       <article
         id={`msg-${message.id}`}
         className="rounded-2xl border border-border bg-surface p-4 mb-3 transition-colors"
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-        onTouchCancel={handleTouchEnd}
       >
         {/* 返信先 */}
         {parentMessage && (
@@ -226,7 +210,7 @@ function HitorigotoPostCardInner({
           <div className="space-y-2 mb-2">
             {fileUrls.map((url, i) =>
               isImageFile(url) ? (
-                <img key={i} src={url} alt="" className="rounded-xl max-w-full max-h-80 object-cover" loading="lazy" />
+                <img key={i} src={url} alt="" className="rounded-xl max-w-full max-h-80 object-cover cursor-pointer" loading="lazy" onClick={() => setLightboxUrl(url)} />
               ) : isVideoFile(url) ? (
                 <video key={i} src={url} controls className="rounded-xl max-w-full max-h-80" preload="metadata" />
               ) : (
@@ -285,12 +269,70 @@ function HitorigotoPostCardInner({
 
           {/* 既読 */}
           {readCount >= 0 && (
-            <span className="text-[11px] text-muted ml-auto">
+            <span className="text-[11px] text-muted">
               {readCount === 0 ? "" : readCount === memberCount ? "既読" : `既読 ${readCount}`}
             </span>
           )}
+
+          {/* アクションボタン（返信・ブックマーク） */}
+          <div className="flex items-center gap-1 ml-auto">
+            {onReply && (
+              <button
+                onClick={() => onReply(message)}
+                className="p-1.5 rounded-lg text-muted hover:text-foreground transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                </svg>
+              </button>
+            )}
+            {onBookmark && (
+              <button
+                onClick={() => onBookmark(message.id)}
+                className={`p-1.5 rounded-lg transition-colors ${isBookmarked ? "text-accent" : "text-muted hover:text-foreground"}`}
+              >
+                <svg className="w-4 h-4" fill={isBookmarked ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                </svg>
+              </button>
+            )}
+            {message.user_id === currentUserId && onDelete && (
+              <button
+                onClick={() => { if (confirm("削除しますか？")) onDelete(message.id); }}
+                className="p-1.5 rounded-lg text-muted hover:text-red-400 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
       </article>
+
+      {/* 画像ライトボックス */}
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-[70] bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setLightboxUrl(null)}
+        >
+          <button
+            type="button"
+            onClick={() => setLightboxUrl(null)}
+            className="absolute top-4 right-4 z-10 w-12 h-12 rounded-full bg-black/60 border border-white/30 flex items-center justify-center"
+          >
+            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+          <img
+            src={lightboxUrl}
+            alt=""
+            className="max-w-full max-h-full object-contain rounded-lg"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
 
       {/* リアクターモーダル（LINE風下からスライド） */}
       {reacterModal && (
@@ -364,61 +406,6 @@ function HitorigotoPostCardInner({
         </div>
       )}
 
-      {/* モバイルアクションモーダル */}
-      {showActions && (
-        <div
-          className="fixed inset-0 z-[60] flex items-end justify-center lg:hidden"
-          onClick={() => setShowActions(false)}
-        >
-          <div className="absolute inset-0 bg-black/40" />
-          <div
-            className="relative w-full max-w-sm mx-4 mb-20 rounded-2xl bg-sidebar border border-border p-5 animate-slide-up"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="grid grid-cols-3 gap-3">
-              {onReply && (
-                <button
-                  onClick={() => { setShowActions(false); onReply(message); }}
-                  className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
-                >
-                  <span className="w-12 h-12 rounded-full border-2 border-muted/40 flex items-center justify-center">
-                    <svg className="w-5 h-5 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                    </svg>
-                  </span>
-                  <span className="text-xs text-foreground">返信</span>
-                </button>
-              )}
-              {onBookmark && (
-                <button
-                  onClick={() => { setShowActions(false); onBookmark(message.id); }}
-                  className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
-                >
-                  <span className={`w-12 h-12 rounded-full border-2 flex items-center justify-center ${isBookmarked ? "border-accent bg-accent/15" : "border-muted/40"}`}>
-                    <svg className={`w-5 h-5 ${isBookmarked ? "text-accent" : "text-foreground"}`} fill={isBookmarked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-                    </svg>
-                  </span>
-                  <span className="text-xs text-foreground">{isBookmarked ? "保存済" : "ブックマーク"}</span>
-                </button>
-              )}
-              {message.user_id === currentUserId && onDelete && (
-                <button
-                  onClick={() => { setShowActions(false); onDelete(message.id); }}
-                  className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
-                >
-                  <span className="w-12 h-12 rounded-full border-2 border-red-400/40 flex items-center justify-center">
-                    <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </span>
-                  <span className="text-xs text-red-400">削除</span>
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }
