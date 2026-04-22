@@ -1337,7 +1337,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
                 onClick={async () => {
                   if (!hitorigotoReplyContent.trim() || hitorigotoReplySending) return;
                   setHitorigotoReplySending(true);
-                  await handleSend(hitorigotoReplyContent.trim(), { userIds: [], broadcast: false }, { parentId: hitorigotoReplyTo.id });
+                  await handleSend(hitorigotoReplyContent.trim(), { userIds: [], broadcast: null }, { parentId: hitorigotoReplyTo.id });
                   setHitorigotoReplySending(false);
                   setHitorigotoReplyTo(null);
                 }}
