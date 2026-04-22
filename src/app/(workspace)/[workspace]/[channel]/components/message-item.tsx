@@ -207,17 +207,18 @@ function MessageContent({
                 className="lg:hidden max-w-full sm:max-w-sm rounded-xl bg-black/80 flex items-center justify-center py-6 px-10 w-full"
                 onClick={async () => {
                   try {
-                    // Capacitorブリッジ経由でネイティブプラグインを呼ぶ
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    const cap = (window as any).Capacitor as {
-                      isNativePlatform?: () => boolean;
-                      Plugins?: Record<string, { play?: (opts: { url: string }) => Promise<void> }>;
-                    } | undefined;
-                    if (cap?.isNativePlatform?.() && cap.Plugins?.VideoPlayer?.play) {
-                      await cap.Plugins.VideoPlayer.play({ url });
+                    const { Capacitor, registerPlugin } = await import("@capacitor/core");
+                    if (Capacitor.isNativePlatform()) {
+                      const VideoPlayer = registerPlugin<{ play: (opts: { url: string }) => Promise<void> }>("VideoPlayer");
+                      await VideoPlayer.play({ url });
                       return;
                     }
-                  } catch {}
+                  } catch (e) {
+                    // eslint-disable-next-line no-console
+                    console.error("[VideoPlayer] error:", e);
+                    // プラグイン失敗時はalertで通知（デバッグ用）
+                    alert("動画再生エラー: " + (e instanceof Error ? e.message : String(e)));
+                  }
                   window.open(url, "_blank");
                 }}
               >
