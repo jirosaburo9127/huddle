@@ -199,7 +199,6 @@ function MessageContent({
                     controls
                     playsInline
                     preload="metadata"
-                    crossOrigin="anonymous"
                     className="max-w-full max-h-80 rounded-xl bg-black"
                   />
                 ) : (
