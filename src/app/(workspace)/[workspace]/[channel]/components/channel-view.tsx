@@ -10,6 +10,8 @@ import { MessageItem } from "./message-item";
 import { HitorigotoPostCard } from "./hitorigoto-post-card";
 import { MessageInput, type MentionPayload } from "./message-input";
 import { CreatePollModal } from "./create-poll-modal";
+import { CreateEventModal } from "./create-event-modal";
+import { EventDisplay } from "./event-display";
 import { DateSeparator } from "./date-separator";
 import { ChannelWiki } from "./channel-wiki";
 import { ChannelMembersModal } from "@/components/channel-members-modal";
@@ -57,6 +59,10 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
 
   // 投票作成モーダル
   const [showCreatePoll, setShowCreatePoll] = useState(false);
+  // 予定作成モーダル
+  const [showCreateEvent, setShowCreateEvent] = useState(false);
+  // このチャンネルでイベントが紐づいているメッセージID集合
+  const [eventMessageIds, setEventMessageIds] = useState<Set<string>>(new Set());
   // このチャンネルで投票が紐づいているメッセージID集合
   const [pollMessageIds, setPollMessageIds] = useState<Set<string>>(new Set());
   // このタブが自分で送信して既に楽観的反映済みのメッセージID集合。
@@ -266,6 +272,22 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
       cancelled = true;
       supabase.removeChannel(sub);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channel.id]);
+
+  // イベントメッセージID を一括取得
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchEvents() {
+      const { data } = await supabase
+        .from("events")
+        .select("message_id")
+        .eq("channel_id", channel.id);
+      if (cancelled || !data) return;
+      setEventMessageIds(new Set(data.map((r: { message_id: string }) => r.message_id)));
+    }
+    fetchEvents();
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel.id]);
 
@@ -1261,6 +1283,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
                         isBookmarked={bookmarkedIds.has(message.id)}
                         isConsecutive={isConsecutive}
                         hasPoll={pollMessageIds.has(message.id)}
+                        hasEvent={eventMessageIds.has(message.id)}
                         readCount={getReadCount(message)}
                         memberCount={memberCountForRead}
                       />
@@ -1279,6 +1302,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
           channelId={channel.id}
           workspaceId={channel.workspace_id}
           onCreatePoll={() => setShowCreatePoll(true)}
+          onCreateEvent={() => setShowCreateEvent(true)}
           replyTo={replyTo}
           onCancelReply={() => { replyConsumedRef.current = false; setReplyTo(null); }}
         />
@@ -1289,6 +1313,18 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
         <CreatePollModal
           channelId={channel.id}
           onClose={() => setShowCreatePoll(false)}
+        />
+      )}
+
+      {/* 予定作成モーダル */}
+      {showCreateEvent && (
+        <CreateEventModal
+          channelId={channel.id}
+          onCreated={(messageId) => {
+            setShowCreateEvent(false);
+            setEventMessageIds((prev) => { const next = new Set(prev); next.add(messageId); return next; });
+          }}
+          onClose={() => setShowCreateEvent(false)}
         />
       )}
 

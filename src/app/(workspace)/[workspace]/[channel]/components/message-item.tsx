@@ -4,6 +4,7 @@ import { memo, useState, useRef, useEffect, useMemo } from "react";
 import type { MessageWithProfile, Reaction } from "@/lib/supabase/types";
 import { EmojiPicker } from "./emoji-picker";
 import { PollDisplay } from "./poll-display";
+import { EventDisplay } from "./event-display";
 
 type Props = {
   message: MessageWithProfile;
@@ -25,6 +26,7 @@ type Props = {
   isBookmarked?: boolean;
   isConsecutive?: boolean;
   hasPoll?: boolean;
+  hasEvent?: boolean;
   readCount?: number; // -1: 非表示（他人の投稿）、0以上: 既読数
   memberCount?: number; // 自分以外のメンバー数
 };
@@ -452,6 +454,7 @@ export const MessageItem = memo(function MessageItem({
   isBookmarked,
   isConsecutive,
   hasPoll,
+  hasEvent,
   readCount = -1,
   memberCount = 0,
 }: Props) {
@@ -782,6 +785,13 @@ export const MessageItem = memo(function MessageItem({
                   messageId={message.id}
                   currentUserId={currentUserId}
                   onMarkDecision={(id) => onDecision?.(id, true)}
+                />
+              )}
+              {/* 予定 (message に紐づく events 行がある時だけ) */}
+              {hasEvent && (
+                <EventDisplay
+                  messageId={message.id}
+                  currentUserId={currentUserId}
                 />
               )}
               {/* 連続メッセージで編集済みの場合、本文の後に表示 */}

@@ -78,11 +78,12 @@ type Props = {
   channelId?: string; // ファイルアップロード用
   workspaceId?: string; // メンション用
   onCreatePoll?: () => void; // 投票作成モーダルを開くコールバック
+  onCreateEvent?: () => void; // 予定作成モーダルを開くコールバック
   replyTo?: MessageWithProfile | null; // Chatwork風インライン返信の対象
   onCancelReply?: () => void;
 };
 
-export function MessageInput({ channelName, onSend, placeholder, channelId, workspaceId, onCreatePoll, replyTo, onCancelReply }: Props) {
+export function MessageInput({ channelName, onSend, placeholder, channelId, workspaceId, onCreatePoll, onCreateEvent, replyTo, onCancelReply }: Props) {
   const [content, setContent] = useState("");
   const [sending, setSending] = useState(false);
   const [sendAsDecision, setSendAsDecision] = useState(false);
@@ -806,6 +807,20 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 11l3 3L22 4M13 3H6a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+              </svg>
+            </button>
+          )}
+
+          {/* 予定作成ボタン */}
+          {onCreateEvent && (
+            <button
+              type="button"
+              onClick={onCreateEvent}
+              className="shrink-0 rounded-lg w-8 h-8 flex items-center justify-center text-muted hover:text-accent transition-colors"
+              title="予定を作成"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
               </svg>
             </button>
           )}

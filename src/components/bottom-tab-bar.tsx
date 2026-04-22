@@ -21,9 +21,9 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
   const [showBookmark, setShowBookmark] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
 
-  const isHome = !pathname.includes("/dm-list") && !pathname.includes("/in-progress") && !pathname.includes("/files") && !pathname.includes("/dashboard");
-  const isDm = pathname.includes("/dm-list");
+  const isHome = !pathname.includes("/dm-list") && !pathname.includes("/in-progress") && !pathname.includes("/calendar") && !pathname.includes("/files") && !pathname.includes("/dashboard");
   const isInProgress = pathname.includes("/in-progress");
+  const isCalendar = pathname.includes("/calendar");
   const isFiles = pathname.includes("/files");
 
   return (
@@ -43,20 +43,6 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
             <span className="text-[10px]">ホーム</span>
           </button>
 
-          {/* DM */}
-          <Link
-            href={`/${workspaceSlug}/dm-list`}
-            onClick={() => setSidebarOpen(false)}
-            className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-lg transition-colors ${
-              isDm ? "text-accent" : "text-muted"
-            }`}
-          >
-            <svg className="w-6 h-6" fill={isDm ? "currentColor" : "none"} stroke="currentColor" strokeWidth={isDm ? 0 : 1.5} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-            </svg>
-            <span className="text-[10px]">DM</span>
-          </Link>
-
           {/* 進行中 */}
           <Link
             href={`/${workspaceSlug}/in-progress`}
@@ -69,6 +55,20 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
               <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
             <span className="text-[10px]">進行中</span>
+          </Link>
+
+          {/* カレンダー */}
+          <Link
+            href={`/${workspaceSlug}/calendar`}
+            onClick={() => setSidebarOpen(false)}
+            className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-lg transition-colors ${
+              isCalendar ? "text-accent" : "text-muted"
+            }`}
+          >
+            <svg className="w-6 h-6" fill={isCalendar ? "currentColor" : "none"} stroke="currentColor" strokeWidth={isCalendar ? 0 : 1.5} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+            </svg>
+            <span className="text-[10px]">カレンダー</span>
           </Link>
 
           {/* 決定事項 */}
@@ -106,6 +106,18 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
           <div className="absolute inset-0 bg-black/40" />
           <div className="relative w-full mb-16 mx-4 rounded-2xl bg-sidebar border border-border p-4 animate-slide-up" onClick={(e) => e.stopPropagation()}>
             <div className="grid grid-cols-3 gap-3">
+              <Link
+                href={`/${workspaceSlug}/dm-list`}
+                onClick={() => setShowMore(false)}
+                className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
+              >
+                <span className="w-12 h-12 rounded-full border-2 border-muted/40 flex items-center justify-center">
+                  <svg className="w-5 h-5 text-foreground" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                </span>
+                <span className="text-xs text-foreground">DM</span>
+              </Link>
               <Link
                 href={`/${workspaceSlug}/files`}
                 onClick={() => setShowMore(false)}
