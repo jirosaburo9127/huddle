@@ -32,6 +32,10 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
   const [messages, setMessages] = useState<MessageWithProfile[]>(initialMessages);
   // Chatwork風インライン返信の返信対象
   const [replyTo, setReplyTo] = useState<MessageWithProfile | null>(null);
+  // 独り言チャンネル用X風返信モーダル
+  const [hitorigotoReplyTo, setHitorigotoReplyTo] = useState<MessageWithProfile | null>(null);
+  const [hitorigotoReplyContent, setHitorigotoReplyContent] = useState("");
+  const [hitorigotoReplySending, setHitorigotoReplySending] = useState(false);
   const [showMembersModal, setShowMembersModal] = useState(false);
   const [showDeleteChannel, setShowDeleteChannel] = useState(false);
   const [deletingChannel, setDeletingChannel] = useState(false);
@@ -171,13 +175,19 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showOverflowMenu]);
 
-  // 返信対象をセット (メッセージ入力欄に引用が出る)
+  // 返信対象をセット
   const handleReply = useCallback((msg: MessageWithProfile) => {
-    // モバイルのアクションシート/絵文字ピッカーを閉じる
+    if (channel.is_hitorigoto) {
+      // 独り言チャンネル: X風返信モーダル
+      setHitorigotoReplyTo(msg);
+      setHitorigotoReplyContent("");
+      return;
+    }
+    // 通常チャンネル: メッセージ入力欄に引用
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("huddle:closeAllActions"));
     }
-    replyConsumedRef.current = false; // 新しい返信操作 → refリセット
+    replyConsumedRef.current = false;
     setReplyTo(msg);
   }, []);
 
@@ -752,7 +762,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
   async function handleSend(
     content: string,
     mentions: MentionPayload,
-    options?: { isDecision?: boolean }
+    options?: { isDecision?: boolean; parentId?: string }
   ) {
     if (content.length > 4000) return;
 
@@ -760,12 +770,12 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     if (!user) return;
 
     const isDecision = options?.isDecision ?? false;
-    // テキスト＋添付を別々に onSend する場合、parent_id は最初の1回だけ付ける。
-    // React の setState はバッチ処理のため replyTo を null にしても次の onSend には
-    // 反映されないので ref で制御する。
-    const parentIdSnapshot = (replyTo && !replyConsumedRef.current)
-      ? replyTo.id
-      : null;
+    // 独り言X風返信の場合は直接parentIdを使う
+    const parentIdSnapshot = options?.parentId
+      ? options.parentId
+      : (replyTo && !replyConsumedRef.current)
+        ? replyTo.id
+        : null;
     if (parentIdSnapshot) replyConsumedRef.current = true;
 
     // 送信前にクライアント側で UUID を決めてしまうことで、
@@ -1314,6 +1324,62 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
           channelId={channel.id}
           onClose={() => setShowCreatePoll(false)}
         />
+      )}
+
+      {/* 独り言: X風返信モーダル */}
+      {hitorigotoReplyTo && (
+        <div className="fixed inset-0 z-[60] flex flex-col bg-background lg:bg-black/50 lg:items-center lg:justify-center" onClick={() => setHitorigotoReplyTo(null)}>
+          <div className="w-full max-w-lg flex-1 lg:flex-initial lg:max-h-[80vh] flex flex-col bg-background lg:rounded-2xl lg:border lg:border-border overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            {/* ヘッダー */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
+              <button onClick={() => setHitorigotoReplyTo(null)} className="text-sm text-muted hover:text-foreground">キャンセル</button>
+              <button
+                onClick={async () => {
+                  if (!hitorigotoReplyContent.trim() || hitorigotoReplySending) return;
+                  setHitorigotoReplySending(true);
+                  await handleSend(hitorigotoReplyContent.trim(), { userIds: [], broadcast: false }, { parentId: hitorigotoReplyTo.id });
+                  setHitorigotoReplySending(false);
+                  setHitorigotoReplyTo(null);
+                }}
+                disabled={!hitorigotoReplyContent.trim() || hitorigotoReplySending}
+                className="px-4 py-1.5 text-sm font-medium bg-accent text-white rounded-full disabled:opacity-50"
+              >
+                {hitorigotoReplySending ? "送信中..." : "返信"}
+              </button>
+            </div>
+            {/* 元の投稿 */}
+            <div className="flex-1 overflow-y-auto px-4 py-4">
+              <div className="flex gap-3 mb-4">
+                {hitorigotoReplyTo.profiles?.avatar_url ? (
+                  <img src={hitorigotoReplyTo.profiles.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover shrink-0" />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center shrink-0">
+                    <span className="text-sm font-bold text-accent">{hitorigotoReplyTo.profiles?.display_name?.[0]?.toUpperCase()}</span>
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-sm">{hitorigotoReplyTo.profiles?.display_name}</span>
+                    <span className="text-xs text-muted">{new Date(hitorigotoReplyTo.created_at).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo" })}</span>
+                  </div>
+                  <p className="text-sm text-foreground whitespace-pre-wrap break-words mt-1">{hitorigotoReplyTo.content}</p>
+                </div>
+              </div>
+              {/* 返信先表示 */}
+              <div className="text-xs text-muted mb-2">
+                <span className="text-accent">@{hitorigotoReplyTo.profiles?.display_name}</span> に返信
+              </div>
+              {/* 入力欄 */}
+              <textarea
+                autoFocus
+                value={hitorigotoReplyContent}
+                onChange={(e) => setHitorigotoReplyContent(e.target.value)}
+                placeholder="返信をポスト"
+                className="w-full min-h-[100px] bg-transparent text-sm text-foreground resize-none outline-none placeholder:text-muted/50"
+              />
+            </div>
+          </div>
+        </div>
       )}
 
       {/* 予定作成モーダル */}
