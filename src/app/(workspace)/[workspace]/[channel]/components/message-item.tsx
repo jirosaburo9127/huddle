@@ -205,21 +205,15 @@ function MessageContent({
               <button
                 type="button"
                 className="lg:hidden max-w-full sm:max-w-sm rounded-xl bg-black/80 flex items-center justify-center py-6 px-10 w-full"
-                onClick={async () => {
-                  try {
-                    const { Capacitor, registerPlugin } = await import("@capacitor/core");
-                    if (Capacitor.isNativePlatform()) {
-                      const VideoPlayer = registerPlugin<{ play: (opts: { url: string }) => Promise<void> }>("VideoPlayer");
-                      await VideoPlayer.play({ url });
-                      return;
-                    }
-                  } catch (e) {
-                    // eslint-disable-next-line no-console
-                    console.error("[VideoPlayer] error:", e);
-                    // プラグイン失敗時はalertで通知（デバッグ用）
-                    alert("動画再生エラー: " + (e instanceof Error ? e.message : String(e)));
+                onClick={() => {
+                  // iOSネイティブ: WKScriptMessageHandlerでAVPlayer起動
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  const webkit = (window as any).webkit;
+                  if (webkit?.messageHandlers?.playVideo) {
+                    webkit.messageHandlers.playVideo.postMessage(url);
+                  } else {
+                    window.open(url, "_blank");
                   }
-                  window.open(url, "_blank");
                 }}
               >
                 <div className="flex items-center gap-3 text-white">
