@@ -123,7 +123,7 @@ function parseMarkdown(text: string): string {
     (_m, before: string, name: string) => {
       // 旧来の @channel 表記は表示だけ @All に置き換える (DB互換のため)
       const displayName = name === "channel" ? "All" : name.replace(/\u00A0/g, " ");
-      return `${before}<span class="text-accent font-semibold">@${displayName}</span>`;
+      return `${before}<span class="text-accent font-semibold">@${displayName}</span><br/>`;
     }
   );
 

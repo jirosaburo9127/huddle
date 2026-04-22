@@ -67,7 +67,7 @@ function parseMarkdown(text: string): string {
     /(^|[\s>])@([\w.\-\u3000-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF\u00A0()（）]{1,30})(?=[\s<]|$)/g,
     (_m, before: string, name: string) => {
       const displayName = name === "channel" ? "All" : name.replace(/\u00A0/g, " ");
-      return `${before}<span class="text-accent font-semibold">@${displayName}</span>`;
+      return `${before}<span class="text-accent font-semibold">@${displayName}</span><br/>`;
     }
   );
   return html;
