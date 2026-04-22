@@ -626,10 +626,28 @@ export function Sidebar({
           </button>
           </div>
             </div>
+            {/* 独り言ボタン（モバイルのみ、アバター左に吹き出し風） */}
+            {hitorigotoChannel && (
+              <Link
+                href={`/${workspaceSlug}/${hitorigotoChannel.slug}`}
+                onClick={() => setSidebarOpen(false)}
+                className="lg:hidden relative shrink-0 ml-auto mr-2 px-3 py-1.5 rounded-2xl bg-accent/10 border border-accent/20 text-accent text-sm font-semibold flex items-center gap-1.5 hover:bg-accent/20 transition-colors"
+              >
+                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
+                </svg>
+                独り言
+                {(unreadState[hitorigotoChannel.id] ?? 0) > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-mention text-white text-[9px] font-bold rounded-full min-w-[16px] h-[16px] flex items-center justify-center px-0.5">
+                    {unreadState[hitorigotoChannel.id]}
+                  </span>
+                )}
+              </Link>
+            )}
             {/* 右上: プロフィールアイコン（大きく） */}
             <button
               onClick={() => setShowSettings(true)}
-              className="shrink-0 ml-3"
+              className="shrink-0 lg:ml-3"
               title="設定"
             >
               {(() => {
@@ -769,9 +787,9 @@ export function Sidebar({
             onNavigate={() => setSidebarOpen(false)}
           />
 
-          {/* 独り言チャンネル（カテゴリの下） */}
+          {/* 独り言チャンネル（カテゴリの下、PCのみ。モバイルはヘッダー横） */}
           {hitorigotoChannel && (
-            <div className="px-2 mt-2 mb-1">
+            <div className="hidden lg:block px-2 mt-2 mb-1">
               <Link
                 href={`/${workspaceSlug}/${hitorigotoChannel.slug}`}
                 onClick={() => setSidebarOpen(false)}
