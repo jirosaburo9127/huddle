@@ -196,18 +196,16 @@ export default function CalendarPage() {
                   onClick={() => setSelectedDay(day)}
                   className={`min-h-[3.5rem] p-1 flex flex-col items-center gap-0.5 transition-colors relative ${
                     isSelected
-                      ? "bg-accent text-white"
-                      : todayFlag
-                        ? "bg-accent/20"
-                        : "bg-sidebar hover:bg-white/[0.04]"
+                      ? "bg-blue-400/15"
+                      : "bg-sidebar hover:bg-white/[0.04]"
                   }`}
                 >
                   <span
-                    className={`text-xs font-medium leading-none mt-1 ${
+                    className={`text-xs font-medium leading-none mt-1 w-6 h-6 flex items-center justify-center rounded-full ${
                       isSelected
-                        ? "text-white font-bold"
+                        ? "bg-accent text-white font-bold"
                         : todayFlag
-                          ? "text-accent font-bold"
+                          ? "bg-accent text-white font-bold"
                           : dayOfWeek === 0
                             ? "text-red-400"
                             : dayOfWeek === 6
