@@ -217,7 +217,7 @@ export default function CalendarPage() {
                   {dayEvents.slice(0, 2).map((ev) => (
                     <div
                       key={ev.id}
-                      className="w-full rounded-sm px-0.5 truncate text-[9px] leading-tight bg-accent/30 text-accent"
+                      className="w-full rounded-sm px-0.5 truncate text-[9px] leading-tight bg-blue-500/80 text-white font-medium"
                     >
                       {ev.title}
                     </div>
