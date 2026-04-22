@@ -16,6 +16,8 @@ type Props = {
   hasPoll?: boolean;
   readCount?: number;
   memberCount?: number;
+  replyCount?: number;
+  onOpenThread?: () => void;
 };
 
 // Supabase Storage URL判定
@@ -135,6 +137,8 @@ function HitorigotoPostCardInner({
   hasPoll,
   readCount = -1,
   memberCount = 0,
+  replyCount = 0,
+  onOpenThread,
 }: Props) {
   const [showActions, setShowActions] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -156,7 +160,8 @@ function HitorigotoPostCardInner({
     <>
       <article
         id={`msg-${message.id}`}
-        className="rounded-2xl border border-border bg-surface p-4 mb-3 transition-colors"
+        className="rounded-2xl border border-border bg-surface p-4 mb-3 transition-colors cursor-pointer"
+        onClick={() => onOpenThread?.()}
       >
         {/* 返信先 */}
         {parentMessage && (
@@ -210,7 +215,7 @@ function HitorigotoPostCardInner({
           <div className="space-y-2 mb-2">
             {fileUrls.map((url, i) =>
               isImageFile(url) ? (
-                <img key={i} src={url} alt="" className="rounded-xl max-w-full max-h-80 object-cover cursor-pointer" loading="lazy" onClick={() => setLightboxUrl(url)} />
+                <img key={i} src={url} alt="" className="rounded-xl max-w-full max-h-80 object-cover cursor-pointer" loading="lazy" onClick={(e) => { e.stopPropagation(); setLightboxUrl(url); }} />
               ) : isVideoFile(url) ? (
                 <video key={i} src={url} controls className="rounded-xl max-w-full max-h-80" preload="metadata" />
               ) : (
@@ -228,7 +233,7 @@ function HitorigotoPostCardInner({
         )}
 
         {/* フッター: リアクション + 返信数 + 既読 */}
-        <div className="flex items-center gap-2 mt-2 flex-wrap">
+        <div className="flex items-center gap-2 mt-2 flex-wrap" onClick={(e) => e.stopPropagation()}>
           {/* リアクション */}
           {grouped.map((g) => (
             <button
@@ -274,8 +279,15 @@ function HitorigotoPostCardInner({
             </span>
           )}
 
-          {/* アクションボタン（返信・ブックマーク） */}
-          <div className="flex items-center gap-1 ml-auto">
+          {/* 返信数 */}
+          {replyCount > 0 && (
+            <button onClick={(e) => { e.stopPropagation(); onOpenThread?.(); }} className="text-xs text-accent hover:underline">
+              {replyCount}件の返信
+            </button>
+          )}
+
+          {/* アクションボタン */}
+          <div className="flex items-center gap-1 ml-auto" onClick={(e) => e.stopPropagation()}>
             {onReply && (
               <button
                 onClick={() => onReply(message)}

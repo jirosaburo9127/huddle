@@ -32,8 +32,8 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
   const [messages, setMessages] = useState<MessageWithProfile[]>(initialMessages);
   // Chatwork風インライン返信の返信対象
   const [replyTo, setReplyTo] = useState<MessageWithProfile | null>(null);
-  // 独り言チャンネル用X風返信モーダル
-  const [hitorigotoReplyTo, setHitorigotoReplyTo] = useState<MessageWithProfile | null>(null);
+  // 独り言チャンネル用X風スレッドモーダル
+  const [hitorigotoThread, setHitorigotoThread] = useState<MessageWithProfile | null>(null);
   const [hitorigotoReplyContent, setHitorigotoReplyContent] = useState("");
   const [hitorigotoReplySending, setHitorigotoReplySending] = useState(false);
   const [showMembersModal, setShowMembersModal] = useState(false);
@@ -178,8 +178,8 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
   // 返信対象をセット
   const handleReply = useCallback((msg: MessageWithProfile) => {
     if (channel.is_hitorigoto) {
-      // 独り言チャンネル: X風返信モーダル
-      setHitorigotoReplyTo(msg);
+      // 独り言チャンネル: X風スレッド表示
+      setHitorigotoThread(msg);
       setHitorigotoReplyContent("");
       return;
     }
@@ -1193,18 +1193,16 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
               )}
             </div>
           ) : channel.is_hitorigoto ? (
-            /* 独り言: Twitter/Threads風カード表示 */
+            /* 独り言: Twitter/Threads風カード表示（トップレベルのみ） */
             <div>
               {(() => {
-                const displayed = messages.filter((m) => !m.deleted_at);
-                const byId = new Map<string, MessageWithProfile>();
-                for (const m of messages) byId.set(m.id, m);
-                return displayed.map((message, index, arr) => {
+                const topLevel = messages.filter((m) => !m.deleted_at && !m.parent_id);
+                return topLevel.map((message, index, arr) => {
                   const prev = index > 0 ? arr[index - 1] : null;
                   const currentDate = new Date(message.created_at).toDateString();
                   const prevDate = prev ? new Date(prev.created_at).toDateString() : null;
                   const showDateSeparator = !prev || currentDate !== prevDate;
-                  const parentMessage = message.parent_id ? byId.get(message.parent_id) ?? null : null;
+                  const replyCount = messages.filter((m) => m.parent_id === message.id && !m.deleted_at).length;
 
                   return (
                     <div key={message.id} className="group">
@@ -1213,7 +1211,6 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
                       )}
                       <HitorigotoPostCard
                         message={message}
-                        parentMessage={parentMessage}
                         currentUserId={currentUserId}
                         onReply={handleReply}
                         onReact={handleReact}
@@ -1223,6 +1220,8 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
                         hasPoll={pollMessageIds.has(message.id)}
                         readCount={getReadCount(message)}
                         memberCount={memberCountForRead}
+                        replyCount={replyCount}
+                        onOpenThread={() => { setHitorigotoThread(message); setHitorigotoReplyContent(""); }}
                       />
                     </div>
                   );
@@ -1326,57 +1325,113 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
         />
       )}
 
-      {/* 独り言: X風返信モーダル */}
-      {hitorigotoReplyTo && (
-        <div className="fixed inset-0 z-[60] flex flex-col bg-background lg:bg-black/50 lg:items-center lg:justify-center" onClick={() => setHitorigotoReplyTo(null)}>
-          <div className="w-full max-w-lg flex-1 lg:flex-initial lg:max-h-[80vh] flex flex-col bg-background lg:rounded-2xl lg:border lg:border-border overflow-hidden" onClick={(e) => e.stopPropagation()}>
+      {/* 独り言: X風スレッドモーダル */}
+      {hitorigotoThread && (
+        <div className="fixed inset-0 z-[60] flex flex-col bg-background lg:bg-black/50 lg:items-center lg:justify-center" onClick={() => setHitorigotoThread(null)}>
+          <div className="w-full max-w-lg flex-1 lg:flex-initial lg:max-h-[85vh] flex flex-col bg-background lg:rounded-2xl lg:border lg:border-border overflow-hidden" onClick={(e) => e.stopPropagation()}>
             {/* ヘッダー */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
-              <button onClick={() => setHitorigotoReplyTo(null)} className="text-sm text-muted hover:text-foreground">キャンセル</button>
-              <button
-                onClick={async () => {
-                  if (!hitorigotoReplyContent.trim() || hitorigotoReplySending) return;
-                  setHitorigotoReplySending(true);
-                  await handleSend(hitorigotoReplyContent.trim(), { userIds: [], broadcast: null }, { parentId: hitorigotoReplyTo.id });
-                  setHitorigotoReplySending(false);
-                  setHitorigotoReplyTo(null);
-                }}
-                disabled={!hitorigotoReplyContent.trim() || hitorigotoReplySending}
-                className="px-4 py-1.5 text-sm font-medium bg-accent text-white rounded-full disabled:opacity-50"
-              >
-                {hitorigotoReplySending ? "送信中..." : "返信"}
+            <div className="flex items-center px-4 py-3 border-b border-border shrink-0">
+              <button onClick={() => setHitorigotoThread(null)} className="p-1 text-muted hover:text-foreground rounded transition-colors mr-3">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
               </button>
+              <h2 className="font-bold text-base">ポスト</h2>
             </div>
-            {/* 元の投稿 */}
-            <div className="flex-1 overflow-y-auto px-4 py-4">
-              <div className="flex gap-3 mb-4">
-                {hitorigotoReplyTo.profiles?.avatar_url ? (
-                  <img src={hitorigotoReplyTo.profiles.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover shrink-0" />
-                ) : (
-                  <div className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center shrink-0">
-                    <span className="text-sm font-bold text-accent">{hitorigotoReplyTo.profiles?.display_name?.[0]?.toUpperCase()}</span>
+            {/* スレッド内容 */}
+            <div className="flex-1 overflow-y-auto">
+              {/* 元の投稿 */}
+              <div className="px-4 py-4 border-b border-border">
+                <div className="flex gap-3">
+                  {hitorigotoThread.profiles?.avatar_url ? (
+                    <img src={hitorigotoThread.profiles.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover shrink-0" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center shrink-0">
+                      <span className="text-sm font-bold text-accent">{hitorigotoThread.profiles?.display_name?.[0]?.toUpperCase()}</span>
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-sm">{hitorigotoThread.profiles?.display_name}</span>
+                    </div>
+                    <p className="text-sm text-foreground whitespace-pre-wrap break-words mt-1">{hitorigotoThread.content}</p>
+                    <span className="text-xs text-muted mt-2 block">
+                      {new Date(hitorigotoThread.created_at).toLocaleDateString("ja-JP", { month: "long", day: "numeric", timeZone: "Asia/Tokyo" })}
+                      {" "}
+                      {new Date(hitorigotoThread.created_at).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo" })}
+                    </span>
                   </div>
-                )}
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-sm">{hitorigotoReplyTo.profiles?.display_name}</span>
-                    <span className="text-xs text-muted">{new Date(hitorigotoReplyTo.created_at).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo" })}</span>
-                  </div>
-                  <p className="text-sm text-foreground whitespace-pre-wrap break-words mt-1">{hitorigotoReplyTo.content}</p>
                 </div>
               </div>
-              {/* 返信先表示 */}
+              {/* 返信一覧 */}
+              {(() => {
+                const replies = messages.filter((m) => m.parent_id === hitorigotoThread.id && !m.deleted_at);
+                if (replies.length === 0) return null;
+                return (
+                  <div className="divide-y divide-border">
+                    {replies.map((reply) => (
+                      <div key={reply.id} className="px-4 py-3 flex gap-3">
+                        {reply.profiles?.avatar_url ? (
+                          <img src={reply.profiles.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center shrink-0">
+                            <span className="text-xs font-bold text-accent">{reply.profiles?.display_name?.[0]?.toUpperCase()}</span>
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-sm">{reply.profiles?.display_name}</span>
+                            <span className="text-xs text-muted">{new Date(reply.created_at).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo" })}</span>
+                          </div>
+                          <p className="text-sm text-foreground whitespace-pre-wrap break-words mt-0.5">{reply.content}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+            {/* X風返信入力 */}
+            <div className="border-t border-border px-4 py-3 shrink-0">
               <div className="text-xs text-muted mb-2">
-                <span className="text-accent">@{hitorigotoReplyTo.profiles?.display_name}</span> に返信
+                返信先: <span className="text-accent">@{hitorigotoThread.profiles?.display_name}</span>
               </div>
-              {/* 入力欄 */}
-              <textarea
-                autoFocus
-                value={hitorigotoReplyContent}
-                onChange={(e) => setHitorigotoReplyContent(e.target.value)}
-                placeholder="返信をポスト"
-                className="w-full min-h-[100px] bg-transparent text-sm text-foreground resize-none outline-none placeholder:text-muted/50"
-              />
+              <div className="flex items-end gap-3">
+                {myProfile?.avatar_url ? (
+                  <img src={myProfile.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center shrink-0">
+                    <span className="text-xs font-bold text-accent">{myProfile?.display_name?.[0]?.toUpperCase() || "?"}</span>
+                  </div>
+                )}
+                <input
+                  type="text"
+                  value={hitorigotoReplyContent}
+                  onChange={(e) => setHitorigotoReplyContent(e.target.value)}
+                  onKeyDown={async (e) => {
+                    if (e.key === "Enter" && !e.shiftKey && hitorigotoReplyContent.trim()) {
+                      e.preventDefault();
+                      setHitorigotoReplySending(true);
+                      await handleSend(hitorigotoReplyContent.trim(), { userIds: [], broadcast: null }, { parentId: hitorigotoThread.id });
+                      setHitorigotoReplyContent("");
+                      setHitorigotoReplySending(false);
+                    }
+                  }}
+                  placeholder="返信をポスト"
+                  className="flex-1 bg-input-bg border border-border rounded-full px-4 py-2 text-sm text-foreground outline-none focus:border-accent placeholder:text-muted/50"
+                />
+                <button
+                  onClick={async () => {
+                    if (!hitorigotoReplyContent.trim() || hitorigotoReplySending) return;
+                    setHitorigotoReplySending(true);
+                    await handleSend(hitorigotoReplyContent.trim(), { userIds: [], broadcast: null }, { parentId: hitorigotoThread.id });
+                    setHitorigotoReplyContent("");
+                    setHitorigotoReplySending(false);
+                  }}
+                  disabled={!hitorigotoReplyContent.trim() || hitorigotoReplySending}
+                  className="px-4 py-2 text-sm font-medium bg-accent text-white rounded-full disabled:opacity-50 shrink-0"
+                >
+                  返信
+                </button>
+              </div>
             </div>
           </div>
         </div>
