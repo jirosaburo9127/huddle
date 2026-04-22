@@ -201,16 +201,14 @@ export default function CalendarPage() {
                   }`}
                 >
                   <span
-                    className={`text-xs font-medium leading-none mt-1 w-6 h-6 flex items-center justify-center rounded-full ${
-                      isSelected
-                        ? "bg-accent text-white font-bold"
-                        : todayFlag
-                          ? "bg-accent text-white font-bold"
-                          : dayOfWeek === 0
-                            ? "text-red-400"
-                            : dayOfWeek === 6
-                              ? "text-blue-400"
-                              : "text-foreground"
+                    className={`text-xs font-medium leading-none mt-1 w-6 h-6 flex items-center justify-center ${
+                      todayFlag
+                        ? "bg-accent text-white font-bold rounded-full"
+                        : dayOfWeek === 0
+                          ? "text-red-400"
+                          : dayOfWeek === 6
+                            ? "text-blue-400"
+                            : "text-foreground"
                     }`}
                   >
                     {day}
@@ -219,17 +217,13 @@ export default function CalendarPage() {
                   {dayEvents.slice(0, 2).map((ev) => (
                     <div
                       key={ev.id}
-                      className={`w-full rounded-sm px-0.5 truncate text-[9px] leading-tight ${
-                        isSelected
-                          ? "bg-white/30 text-white"
-                          : "bg-accent/30 text-accent"
-                      }`}
+                      className="w-full rounded-sm px-0.5 truncate text-[9px] leading-tight bg-accent/30 text-accent"
                     >
                       {ev.title}
                     </div>
                   ))}
                   {dayEvents.length > 2 && (
-                    <span className={`text-[9px] ${isSelected ? "text-white/70" : "text-muted"}`}>
+                    <span className="text-[9px] text-muted">
                       +{dayEvents.length - 2}
                     </span>
                   )}
