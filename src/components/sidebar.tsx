@@ -284,10 +284,21 @@ export function Sidebar({
           const localHasUnread = Object.keys(prev).length > 0;
           if (serverCounts.length === 0 && localHasUnread) return prev;
 
+          // サーバーの値をベースにしつつ、表示中チャンネルは0にする
           const next: Record<string, number> = {};
           for (const row of serverCounts) {
             if (row.channel_id === currentChannelId) continue;
-            next[row.channel_id] = Number(row.unread_count);
+            const count = Number(row.unread_count);
+            if (count > 0) next[row.channel_id] = count;
+          }
+          // ローカルで増やした未読がサーバーに反映されていない場合は保持
+          for (const [chId, count] of Object.entries(prev)) {
+            if (chId === currentChannelId) continue;
+            if (!(chId in next) && count > 0) {
+              // サーバーに無いがローカルにある → Realtimeで受信した直後の可能性
+              // 次回のrefetchで正しい値に修正されるので、一旦保持
+              next[chId] = count;
+            }
           }
           return next;
         });
@@ -324,8 +335,13 @@ export function Sidebar({
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", onVisible);
     window.addEventListener("huddle:decisionsRead", onDecisionsRead);
+
+    // 15秒ごとにサーバーと同期（Realtime取りこぼし+既読状態の安定化）
+    const poll = setInterval(refetchUnread, 15000);
+
     return () => {
       cancelled = true;
+      clearInterval(poll);
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);
       window.removeEventListener("huddle:decisionsRead", onDecisionsRead);
