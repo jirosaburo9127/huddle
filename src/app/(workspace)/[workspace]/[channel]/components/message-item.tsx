@@ -190,23 +190,30 @@ function MessageContent({
         if (isVideoFile(url)) {
           return (
             <div key={i} className="mt-1" onClick={(e) => e.stopPropagation()}>
-              {/* PC: クリックで新しいタブで再生 */}
-              <a
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hidden lg:flex max-w-full sm:max-w-sm rounded-2xl bg-gradient-to-br from-black/70 to-black/90 border border-white/10 items-center gap-4 py-4 px-5 hover:from-black/60 hover:to-black/80 transition-colors"
-              >
-                <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-                  <svg className="w-6 h-6 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
-                </div>
-                <div className="text-left min-w-0">
-                  <div className="text-sm font-medium text-white">動画を再生</div>
-                  <div className="text-xs text-white/50 truncate">{fileName}</div>
-                </div>
-              </a>
+              {/* PC: インラインプレーヤー（再生できない形式はダウンロードリンク表示） */}
+              <div className="hidden lg:block max-w-full sm:max-w-sm">
+                {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                <video
+                  src={url}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  className="max-w-full max-h-80 rounded-xl bg-black"
+                  onError={(e) => {
+                    // 再生できない形式の場合、ダウンロードリンクに差し替え
+                    const target = e.currentTarget;
+                    const parent = target.parentElement;
+                    if (parent) {
+                      const link = document.createElement("a");
+                      link.href = url;
+                      link.download = fileName;
+                      link.className = "flex items-center gap-3 rounded-2xl bg-gradient-to-br from-black/70 to-black/90 border border-white/10 py-4 px-5";
+                      link.innerHTML = `<div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0"><svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg></div><div class="text-left"><div class="text-sm font-medium text-white">ダウンロード</div><div class="text-xs text-white/50">${fileName}</div></div>`;
+                      parent.replaceChild(link, target);
+                    }
+                  }}
+                />
+              </div>
               {/* モバイル: タップでネイティブ動画プレーヤー起動（Chatwork方式） */}
               <button
                 type="button"
