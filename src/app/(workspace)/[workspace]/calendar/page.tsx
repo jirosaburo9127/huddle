@@ -37,6 +37,11 @@ export default function CalendarPage() {
   const [selectedDay, setSelectedDay] = useState<number | null>(today.getDate());
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editStartAt, setEditStartAt] = useState("");
+  const [editLocation, setEditLocation] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
 
   // カレンダーグリッドの日付を計算
   const calendarDays = useMemo(() => {
@@ -99,6 +104,43 @@ export default function CalendarPage() {
       setMonth((m) => m + 1);
     }
     setSelectedDay(null);
+  };
+
+  // 編集開始
+  const startEdit = (ev: CalendarEvent) => {
+    setEditingEvent(ev);
+    setEditTitle(ev.title);
+    const d = new Date(ev.start_at);
+    const local = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}T${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    setEditStartAt(local);
+    setEditLocation(ev.location || "");
+  };
+
+  // 保存
+  const saveEdit = async () => {
+    if (!editingEvent || !editTitle.trim() || !editStartAt) return;
+    setEditSaving(true);
+    const supabase = createClient();
+    const dt = new Date(editStartAt);
+    await supabase.rpc("update_event", {
+      p_event_id: editingEvent.id,
+      p_title: editTitle.trim(),
+      p_start_at: dt.toISOString(),
+      p_location: editLocation.trim() || null,
+    });
+    // 一覧を再取得
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data } = await supabase.rpc("get_workspace_events", {
+        p_workspace_slug: params.workspace,
+        p_user_id: user.id,
+        p_year: year,
+        p_month: month,
+      });
+      if (data && Array.isArray(data)) setEvents(data as CalendarEvent[]);
+    }
+    setEditSaving(false);
+    setEditingEvent(null);
   };
 
   // 日ごとのイベントマップ
@@ -251,10 +293,9 @@ export default function CalendarPage() {
               </div>
             ) : (
               selectedEvents.map((ev) => (
-                <button
+                <div
                   key={ev.id}
-                  onClick={() => router.push(`/${params.workspace}/${ev.channel.slug}`)}
-                  className="block w-full text-left px-4 py-3 rounded-xl border border-border bg-surface hover:bg-white/[0.04] transition-colors"
+                  className="block w-full text-left px-4 py-3 rounded-xl border border-border bg-surface"
                 >
                   <div className="flex items-start gap-3">
                     <div className="text-sm font-mono text-accent shrink-0 mt-0.5">
@@ -300,13 +341,88 @@ export default function CalendarPage() {
                         <span className="text-xs text-muted truncate">#{ev.channel.name}</span>
                       </div>
                     </div>
+                    {/* 編集・チャンネルへ移動 */}
+                    <div className="flex flex-col gap-1 shrink-0 ml-2">
+                      <button
+                        onClick={() => startEdit(ev)}
+                        className="p-1.5 rounded-lg text-muted hover:text-foreground hover:bg-white/[0.06] transition-colors"
+                        title="編集"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => router.push(`/${params.workspace}/${ev.channel.slug}`)}
+                        className="p-1.5 rounded-lg text-muted hover:text-accent hover:bg-white/[0.06] transition-colors"
+                        title="チャンネルへ"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
-                </button>
+                </div>
               ))
             )}
           </div>
         </div>
       </div>
+
+      {/* 編集モーダル */}
+      {editingEvent && (
+        <div className="fixed inset-0 z-[60] flex items-end lg:items-center justify-center" onClick={() => setEditingEvent(null)}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div className="relative w-full max-w-md mx-4 mb-20 lg:mb-0 rounded-2xl bg-sidebar border border-border p-5 animate-slide-up" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-base font-bold text-foreground mb-4">予定を編集</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs text-muted mb-1">タイトル</label>
+                <input
+                  type="text"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className="w-full rounded-lg border border-border bg-input-bg px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-muted mb-1">日時</label>
+                <input
+                  type="datetime-local"
+                  value={editStartAt}
+                  onChange={(e) => setEditStartAt(e.target.value)}
+                  className="w-full max-w-full rounded-lg border border-border bg-input-bg px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none appearance-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-muted mb-1">場所（任意）</label>
+                <input
+                  type="text"
+                  value={editLocation}
+                  onChange={(e) => setEditLocation(e.target.value)}
+                  className="w-full rounded-lg border border-border bg-input-bg px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                onClick={() => setEditingEvent(null)}
+                className="px-4 py-2 text-sm text-muted hover:text-foreground rounded-lg transition-colors"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={saveEdit}
+                disabled={editSaving || !editTitle.trim() || !editStartAt}
+                className="px-4 py-2 text-sm font-medium bg-accent text-white rounded-lg hover:bg-accent-hover disabled:opacity-50 transition-colors"
+              >
+                {editSaving ? "保存中..." : "保存"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
