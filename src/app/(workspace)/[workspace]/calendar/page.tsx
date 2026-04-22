@@ -8,13 +8,12 @@ import { createClient } from "@/lib/supabase/client";
 type CalendarEvent = {
   id: string;
   title: string;
-  start_time: string;
-  end_time: string | null;
+  start_at: string;
   location: string | null;
-  channel_name: string;
-  channel_slug: string;
+  channel: { id: string; name: string; slug: string };
+  creator: { id: string; display_name: string; avatar_url: string | null };
   attendees: Array<{
-    user_id: string;
+    id: string;
     display_name: string;
     avatar_url: string | null;
   }>;
@@ -73,8 +72,10 @@ export default function CalendarPage() {
         p_month: month,
       });
 
-      if (!error && data) {
+      if (!error && data && Array.isArray(data)) {
         setEvents(data as CalendarEvent[]);
+      } else {
+        setEvents([]);
       }
       setLoading(false);
     })();
@@ -104,7 +105,7 @@ export default function CalendarPage() {
   const eventsByDay = useMemo(() => {
     const map = new Map<number, CalendarEvent[]>();
     for (const ev of events) {
-      const d = new Date(ev.start_time);
+      const d = new Date(ev.start_at);
       const day = d.getDate();
       if (!map.has(day)) map.set(day, []);
       map.get(day)!.push(ev);
@@ -260,12 +261,12 @@ export default function CalendarPage() {
               selectedEvents.map((ev) => (
                 <button
                   key={ev.id}
-                  onClick={() => router.push(`/${params.workspace}/${ev.channel_slug}`)}
+                  onClick={() => router.push(`/${params.workspace}/${ev.channel.slug}`)}
                   className="block w-full text-left px-4 py-3 rounded-xl border border-border bg-surface hover:bg-white/[0.04] transition-colors"
                 >
                   <div className="flex items-start gap-3">
                     <div className="text-sm font-mono text-accent shrink-0 mt-0.5">
-                      {formatTime(ev.start_time)}
+                      {formatTime(ev.start_at)}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-semibold text-foreground mb-1 truncate">
@@ -282,14 +283,14 @@ export default function CalendarPage() {
                           {ev.attendees.slice(0, 5).map((a) =>
                             a.avatar_url ? (
                               <img
-                                key={a.user_id}
+                                key={a.id}
                                 src={a.avatar_url}
                                 alt={a.display_name}
                                 className="w-5 h-5 rounded-full border border-surface object-cover"
                               />
                             ) : (
                               <div
-                                key={a.user_id}
+                                key={a.id}
                                 className="w-5 h-5 rounded-full bg-accent/20 border border-surface flex items-center justify-center"
                               >
                                 <span className="text-[8px] font-bold text-accent">
@@ -304,7 +305,7 @@ export default function CalendarPage() {
                             </div>
                           )}
                         </div>
-                        <span className="text-xs text-muted truncate">#{ev.channel_name}</span>
+                        <span className="text-xs text-muted truncate">#{ev.channel.name}</span>
                       </div>
                     </div>
                   </div>
