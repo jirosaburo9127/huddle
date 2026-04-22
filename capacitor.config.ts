@@ -21,10 +21,11 @@ const config: CapacitorConfig = {
       presentationOptions: ['badge', 'sound', 'alert'],
     },
     SplashScreen: {
-      launchAutoHide: true,
-      launchShowDuration: 500,
+      launchAutoHide: false,
+      launchShowDuration: 10000,
       backgroundColor: '#0f0f1a',
-      showSpinner: false,
+      showSpinner: true,
+      spinnerColor: '#6b6b80',
     },
   },
 };
