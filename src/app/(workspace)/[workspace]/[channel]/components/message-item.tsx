@@ -208,7 +208,7 @@ function MessageContent({
                       link.href = url;
                       link.download = fileName;
                       link.className = "flex items-center gap-3 rounded-2xl bg-gradient-to-br from-black/70 to-black/90 border border-white/10 py-4 px-5";
-                      link.innerHTML = `<div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0"><svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg></div><div class="text-left"><div class="text-sm font-medium text-white">ダウンロード</div><div class="text-xs text-white/50">${fileName}</div></div>`;
+                      link.innerHTML = `<div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0"><svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div><div class="text-left"><div class="text-sm font-medium text-white">動画を保存して再生</div><div class="text-xs text-white/50">${fileName}</div></div>`;
                       parent.replaceChild(link, target);
                     }
                   }}
