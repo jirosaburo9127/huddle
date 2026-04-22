@@ -770,7 +770,7 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
-            className="shrink-0 rounded-lg w-8 h-8 flex items-center justify-center text-muted hover:text-accent disabled:opacity-50 transition-colors"
+            className="shrink-0 rounded-lg w-10 h-10 flex items-center justify-center text-muted hover:text-accent disabled:opacity-50 transition-colors"
             title="ファイルを添付"
           >
             {uploading ? (
@@ -789,7 +789,7 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
           <button
             type="button"
             onClick={() => setShowMentionPicker((v) => !v)}
-            className="shrink-0 rounded-lg w-8 h-8 flex items-center justify-center text-base font-bold text-muted hover:text-accent transition-colors"
+            className="shrink-0 rounded-lg w-10 h-10 flex items-center justify-center text-lg font-bold text-muted hover:text-accent transition-colors"
             title="宛先を追加"
             aria-haspopup="listbox"
             aria-expanded={showMentionPicker}
@@ -802,7 +802,7 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
             <button
               type="button"
               onClick={onCreatePoll}
-              className="shrink-0 rounded-lg w-8 h-8 flex items-center justify-center text-muted hover:text-accent transition-colors"
+              className="shrink-0 rounded-lg w-10 h-10 flex items-center justify-center text-muted hover:text-accent transition-colors"
               title="投票を作成"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -816,7 +816,7 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
             <button
               type="button"
               onClick={onCreateEvent}
-              className="shrink-0 rounded-lg w-8 h-8 flex items-center justify-center text-muted hover:text-accent transition-colors"
+              className="shrink-0 rounded-lg w-10 h-10 flex items-center justify-center text-muted hover:text-accent transition-colors"
               title="予定を作成"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -830,7 +830,7 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
             <button
               type="button"
               onClick={toggleVoiceInput}
-              className={`shrink-0 rounded-lg w-8 h-8 flex items-center justify-center transition-colors ${
+              className={`shrink-0 rounded-lg w-10 h-10 flex items-center justify-center transition-colors ${
                 isListening
                   ? "text-red-400 bg-red-500/10 animate-pulse"
                   : "text-muted hover:text-accent"

@@ -129,11 +129,16 @@ export function CreateEventModal({ channelId, onCreated, onClose }: Props) {
       const locLine = location.trim() ? `\n📍 ${location.trim()}` : "";
       const content = `📅 ${trimmedTitle}\n${formatDateTimeJa(startAt)}${locLine}`;
 
+      // 現在のユーザーIDを取得
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { setError("認証エラー"); return; }
+
       // メッセージを作成
       const { data: msgData, error: msgErr } = await supabase
         .from("messages")
         .insert({
           channel_id: channelId,
+          user_id: user.id,
           content,
         })
         .select("id")
@@ -219,7 +224,7 @@ export function CreateEventModal({ channelId, onCreated, onClose }: Props) {
               value={startAt}
               onChange={(e) => setStartAt(e.target.value)}
               required
-              className="w-full rounded-lg border border-border bg-input-bg px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none"
+              className="w-full max-w-full rounded-lg border border-border bg-input-bg px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none appearance-none"
             />
           </div>
 
