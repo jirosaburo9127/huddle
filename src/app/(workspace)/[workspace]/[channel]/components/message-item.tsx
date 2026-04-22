@@ -190,17 +190,23 @@ function MessageContent({
         if (isVideoFile(url)) {
           return (
             <div key={i} className="mt-1" onClick={(e) => e.stopPropagation()}>
-              {/* PC: インラインプレーヤー */}
-              <div className="hidden lg:block">
-                {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-                <video
-                  src={url}
-                  controls
-                  playsInline
-                  preload="metadata"
-                  className="max-w-full sm:max-w-sm max-h-80 rounded-xl bg-black"
-                />
-              </div>
+              {/* PC: クリックで新しいタブで再生 */}
+              <a
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hidden lg:flex max-w-full sm:max-w-sm rounded-2xl bg-gradient-to-br from-black/70 to-black/90 border border-white/10 items-center gap-4 py-4 px-5 hover:from-black/60 hover:to-black/80 transition-colors"
+              >
+                <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                  <svg className="w-6 h-6 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                </div>
+                <div className="text-left min-w-0">
+                  <div className="text-sm font-medium text-white">動画を再生</div>
+                  <div className="text-xs text-white/50 truncate">{fileName}</div>
+                </div>
+              </a>
               {/* モバイル: タップでネイティブ動画プレーヤー起動（Chatwork方式） */}
               <button
                 type="button"
