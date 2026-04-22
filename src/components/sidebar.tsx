@@ -79,6 +79,7 @@ export function Sidebar({
   const [showBookmarkModal, setShowBookmarkModal] = useState(false);
   const [showWsMembers, setShowWsMembers] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [storageUsageMB, setStorageUsageMB] = useState<number | null>(null);
   const [showWsSwitcher, setShowWsSwitcher] = useState(false);
   const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [catList, setCatList] = useState(categories);
@@ -135,6 +136,28 @@ export function Sidebar({
   useEffect(() => {
     if (showSettings) {
       loadProfile();
+      // Storage使用量を取得
+      (async () => {
+        const supabase = sidebarSupabaseRef.current;
+        const { data } = await supabase.storage.from("chat-files").list("", { limit: 1 });
+        if (data) {
+          // チャンネルフォルダをリストして各フォルダのファイルサイズを集計
+          const { data: folders } = await supabase.storage.from("chat-files").list("", { limit: 1000 });
+          let totalBytes = 0;
+          if (folders) {
+            for (const folder of folders) {
+              if (folder.id) continue; // ファイルではなくフォルダ名の場合
+              const { data: files } = await supabase.storage.from("chat-files").list(folder.name, { limit: 1000 });
+              if (files) {
+                for (const f of files) {
+                  totalBytes += (f.metadata as { size?: number })?.size || 0;
+                }
+              }
+            }
+          }
+          setStorageUsageMB(Math.round(totalBytes / 1024 / 1024));
+        }
+      })();
     }
   }, [showSettings, loadProfile]);
 
@@ -1318,6 +1341,28 @@ export function Sidebar({
 
             {/* セキュリティ（デバイス一覧・ログイン履歴・MFA状態） */}
             <SecuritySettings currentUserId={currentUserId} />
+
+            {/* ストレージ使用量 */}
+            <div>
+              <h3 className="text-sm font-semibold text-foreground mb-3">ストレージ</h3>
+              <div className="rounded-xl border border-border bg-input-bg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-muted">使用量</span>
+                  <span className="text-sm font-medium text-foreground">
+                    {storageUsageMB !== null ? `${storageUsageMB >= 1024 ? `${(storageUsageMB / 1024).toFixed(1)} GB` : `${storageUsageMB} MB`}` : "計算中..."}
+                  </span>
+                </div>
+                <div className="w-full h-2 rounded-full bg-border/50 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${
+                      storageUsageMB !== null && storageUsageMB > 80 * 1024 ? "bg-red-400" : "bg-accent"
+                    }`}
+                    style={{ width: storageUsageMB !== null ? `${Math.min((storageUsageMB / (100 * 1024)) * 100, 100)}%` : "0%" }}
+                  />
+                </div>
+                <p className="text-xs text-muted mt-1.5">上限: 100 GB（Pro）・画像は30日で自動削除</p>
+              </div>
+            </div>
 
             {/* ログアウト */}
             <div className="pt-2 border-t border-border/50">
