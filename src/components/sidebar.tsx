@@ -1317,20 +1317,6 @@ export function Sidebar({
             </div>
 
             {/* 2段階認証 */}
-            <div>
-              <h3 className="text-sm font-semibold text-foreground mb-3">2段階認証</h3>
-              <MfaSetup />
-            </div>
-
-            {/* テーマ */}
-            <div>
-              <h3 className="text-sm font-semibold text-foreground mb-3">テーマ</h3>
-              <ThemeSelector />
-            </div>
-
-            {/* セキュリティ（デバイス一覧・ログイン履歴・MFA状態） */}
-            <SecuritySettings currentUserId={currentUserId} />
-
             {/* ストレージ使用量 */}
             <div>
               <h3 className="text-sm font-semibold text-foreground mb-3">ストレージ</h3>
@@ -1352,6 +1338,20 @@ export function Sidebar({
                 <p className="text-xs text-muted mt-1.5">上限: 100 GB（Pro）・画像は30日で自動削除</p>
               </div>
             </div>
+
+            <div>
+              <h3 className="text-sm font-semibold text-foreground mb-3">2段階認証</h3>
+              <MfaSetup />
+            </div>
+
+            {/* テーマ */}
+            <div>
+              <h3 className="text-sm font-semibold text-foreground mb-3">テーマ</h3>
+              <ThemeSelector />
+            </div>
+
+            {/* セキュリティ（デバイス一覧・ログイン履歴・MFA状態） */}
+            <SecuritySettings currentUserId={currentUserId} />
 
             {/* ログアウト */}
             <div className="pt-2 border-t border-border/50">
