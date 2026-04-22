@@ -192,30 +192,19 @@ function MessageContent({
             <div key={i} className="mt-1" onClick={(e) => e.stopPropagation()}>
               {/* PC: MP4はインライン再生、MOVは保存して再生 */}
               <div className="hidden lg:block max-w-full sm:max-w-sm">
-                {/\.mp4(\?.*)?$/i.test(url) ? (
-                  /* eslint-disable-next-line jsx-a11y/media-has-caption */
-                  <video
-                    src={url}
-                    controls
-                    playsInline
-                    preload="metadata"
-                    className="max-w-full max-h-80 rounded-xl bg-black"
-                  />
-                ) : (
-                  <a
-                    href={url}
-                    download={fileName}
-                    className="flex items-center gap-3 rounded-2xl bg-gradient-to-br from-black/70 to-black/90 border border-white/10 py-4 px-5"
-                  >
-                    <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-                      <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
-                    </div>
-                    <div className="text-left">
-                      <div className="text-sm font-medium text-white">動画を保存して再生</div>
-                      <div className="text-xs text-white/50">{fileName}</div>
-                    </div>
-                  </a>
-                )}
+                <a
+                  href={url}
+                  download={fileName}
+                  className="flex items-center gap-3 rounded-2xl bg-gradient-to-br from-black/70 to-black/90 border border-white/10 py-4 px-5 hover:from-black/60 hover:to-black/80 transition-colors"
+                >
+                  <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                    <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                  </div>
+                  <div className="text-left">
+                    <div className="text-sm font-medium text-white">動画を保存して再生</div>
+                    <div className="text-xs text-white/50">{fileName}</div>
+                  </div>
+                </a>
               </div>
               {/* モバイル: タップでネイティブ動画プレーヤー起動（Chatwork方式） */}
               <button
