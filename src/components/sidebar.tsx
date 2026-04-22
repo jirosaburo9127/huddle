@@ -136,26 +136,15 @@ export function Sidebar({
   useEffect(() => {
     if (showSettings) {
       loadProfile();
-      // Storage使用量を取得
+      // Storage使用量をDB経由で取得（メッセージ内のファイルURL数 × 平均サイズで概算）
       (async () => {
         const supabase = sidebarSupabaseRef.current;
-        const { data } = await supabase.storage.from("chat-files").list("", { limit: 1 });
-        if (data) {
-          // チャンネルフォルダをリストして各フォルダのファイルサイズを集計
-          const { data: folders } = await supabase.storage.from("chat-files").list("", { limit: 1000 });
-          let totalBytes = 0;
-          if (folders) {
-            for (const folder of folders) {
-              if (folder.id) continue; // ファイルではなくフォルダ名の場合
-              const { data: files } = await supabase.storage.from("chat-files").list(folder.name, { limit: 1000 });
-              if (files) {
-                for (const f of files) {
-                  totalBytes += (f.metadata as { size?: number })?.size || 0;
-                }
-              }
-            }
-          }
-          setStorageUsageMB(Math.round(totalBytes / 1024 / 1024));
+        // storage.objectsテーブルから直接集計
+        const { data, error } = await supabase.rpc("get_storage_usage");
+        if (!error && data !== null) {
+          setStorageUsageMB(Math.round((data as number) / 1024 / 1024));
+        } else {
+          setStorageUsageMB(0);
         }
       })();
     }
