@@ -10,6 +10,8 @@ type CalendarEvent = {
   title: string;
   start_at: string;
   location: string | null;
+  channel_id: string;
+  attendee_ids: string[];
   channel: { id: string; name: string; slug: string };
   creator: { id: string; display_name: string; avatar_url: string | null };
   attendees: Array<{
@@ -17,6 +19,12 @@ type CalendarEvent = {
     display_name: string;
     avatar_url: string | null;
   }>;
+};
+
+type ChannelMember = {
+  user_id: string;
+  display_name: string;
+  avatar_url: string | null;
 };
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
@@ -41,6 +49,8 @@ export default function CalendarPage() {
   const [editTitle, setEditTitle] = useState("");
   const [editStartAt, setEditStartAt] = useState("");
   const [editLocation, setEditLocation] = useState("");
+  const [editAttendeeIds, setEditAttendeeIds] = useState<Set<string>>(new Set());
+  const [editMembers, setEditMembers] = useState<ChannelMember[]>([]);
   const [editSaving, setEditSaving] = useState(false);
 
   // カレンダーグリッドの日付を計算
@@ -107,13 +117,26 @@ export default function CalendarPage() {
   };
 
   // 編集開始
-  const startEdit = (ev: CalendarEvent) => {
+  const startEdit = async (ev: CalendarEvent) => {
     setEditingEvent(ev);
     setEditTitle(ev.title);
     const d = new Date(ev.start_at);
     const local = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}T${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
     setEditStartAt(local);
     setEditLocation(ev.location || "");
+    setEditAttendeeIds(new Set(ev.attendee_ids || []));
+    // チャンネルメンバー取得
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("channel_members")
+      .select("user_id, profiles(display_name, avatar_url)")
+      .eq("channel_id", ev.channel_id);
+    if (data) {
+      setEditMembers(data.map((m: { user_id: string; profiles: { display_name: string; avatar_url: string | null } | Array<{ display_name: string; avatar_url: string | null }> }) => {
+        const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
+        return { user_id: m.user_id, display_name: p?.display_name || "", avatar_url: p?.avatar_url || null };
+      }));
+    }
   };
 
   // 保存
@@ -127,6 +150,7 @@ export default function CalendarPage() {
       p_title: editTitle.trim(),
       p_start_at: dt.toISOString(),
       p_location: editLocation.trim() || null,
+      p_attendee_ids: Array.from(editAttendeeIds),
     });
     // 一覧を再取得
     const { data: { user } } = await supabase.auth.getUser();
@@ -403,6 +427,52 @@ export default function CalendarPage() {
                   onChange={(e) => setEditLocation(e.target.value)}
                   className="w-full rounded-lg border border-border bg-input-bg px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none"
                 />
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs text-muted">参加者</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (editAttendeeIds.size === editMembers.length) {
+                        setEditAttendeeIds(new Set());
+                      } else {
+                        setEditAttendeeIds(new Set(editMembers.map((m) => m.user_id)));
+                      }
+                    }}
+                    className="text-xs text-accent hover:underline"
+                  >
+                    {editAttendeeIds.size === editMembers.length ? "全員解除" : "全員選択"}
+                  </button>
+                </div>
+                <div className="max-h-32 overflow-y-auto rounded-lg border border-border bg-input-bg p-2 space-y-1">
+                  {editMembers.map((m) => (
+                    <label key={m.user_id} className="flex items-center gap-2 py-1 px-1 rounded hover:bg-white/[0.04] cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={editAttendeeIds.has(m.user_id)}
+                        onChange={() => {
+                          setEditAttendeeIds((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(m.user_id)) next.delete(m.user_id);
+                            else next.add(m.user_id);
+                            return next;
+                          });
+                        }}
+                        className="rounded border-border"
+                      />
+                      {m.avatar_url ? (
+                        <img src={m.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover" />
+                      ) : (
+                        <div className="w-5 h-5 rounded-full bg-accent/20 flex items-center justify-center">
+                          <span className="text-[8px] font-bold text-accent">{m.display_name[0]?.toUpperCase()}</span>
+                        </div>
+                      )}
+                      <span className="text-sm text-foreground truncate">{m.display_name}</span>
+                    </label>
+                  ))}
+                </div>
+                <p className="text-xs text-muted mt-1">{editAttendeeIds.size}人選択中</p>
               </div>
             </div>
             <div className="flex justify-end gap-2 mt-4">

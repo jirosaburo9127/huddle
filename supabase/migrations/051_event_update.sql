@@ -11,7 +11,8 @@ CREATE OR REPLACE FUNCTION public.update_event(
   p_event_id UUID,
   p_title TEXT,
   p_start_at TIMESTAMPTZ,
-  p_location TEXT DEFAULT NULL
+  p_location TEXT DEFAULT NULL,
+  p_attendee_ids UUID[] DEFAULT '{}'
 )
 RETURNS JSON
 LANGUAGE plpgsql
@@ -29,7 +30,8 @@ BEGIN
   UPDATE public.events
   SET title = btrim(p_title),
       start_at = p_start_at,
-      location = p_location
+      location = p_location,
+      attendee_ids = p_attendee_ids
   WHERE id = p_event_id AND created_by = v_user_id
   RETURNING * INTO v_event;
 
@@ -49,4 +51,4 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.update_event(UUID, TEXT, TIMESTAMPTZ, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.update_event(UUID, TEXT, TIMESTAMPTZ, TEXT, UUID[]) TO authenticated;
