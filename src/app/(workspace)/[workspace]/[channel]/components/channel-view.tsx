@@ -1388,9 +1388,8 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
                   </div>
                 );
               })()}
-            </div>
-            {/* X風返信入力 */}
-            <div className="border-t border-border px-4 py-3 shrink-0">
+              {/* X風返信入力（スクロール内） */}
+              <div className="px-4 py-3">
               <div className="text-xs text-muted mb-2">
                 返信先: <span className="text-accent">@{hitorigotoThread.profiles?.display_name}</span>
               </div>
@@ -1432,6 +1431,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
                   返信
                 </button>
               </div>
+            </div>
             </div>
           </div>
         </div>
