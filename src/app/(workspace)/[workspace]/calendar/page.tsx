@@ -45,6 +45,16 @@ export default function CalendarPage() {
   const [selectedDay, setSelectedDay] = useState<number | null>(today.getDate());
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
+  const [createTitle, setCreateTitle] = useState("");
+  const [createStartAt, setCreateStartAt] = useState("");
+  const [createLocation, setCreateLocation] = useState("");
+  const [createChannelId, setCreateChannelId] = useState("");
+  const [createAttendeeIds, setCreateAttendeeIds] = useState<Set<string>>(new Set());
+  const [createMembers, setCreateMembers] = useState<ChannelMember[]>([]);
+  const [channels, setChannels] = useState<Array<{ id: string; name: string }>>([]);
+  const [createSaving, setCreateSaving] = useState(false);
+  const [createError, setCreateError] = useState("");
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editStartAt, setEditStartAt] = useState("");
@@ -114,6 +124,96 @@ export default function CalendarPage() {
       setMonth((m) => m + 1);
     }
     setSelectedDay(null);
+  };
+
+  // 新規作成モーダルを開く
+  const openCreate = async () => {
+    // デフォルト日時: 選択日の次の正時
+    const now = new Date();
+    const base = selectedDay ? new Date(year, month - 1, selectedDay, now.getHours() + 1, 0) : new Date(now.getTime() + 3600000);
+    const local = `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, "0")}-${String(base.getDate()).padStart(2, "0")}T${String(base.getHours()).padStart(2, "0")}:00`;
+    setCreateStartAt(local);
+    setCreateTitle("");
+    setCreateLocation("");
+    setCreateChannelId("");
+    setCreateAttendeeIds(new Set());
+    setCreateMembers([]);
+    setCreateError("");
+    // チャンネル一覧取得
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data: ws } = await supabase.from("workspaces").select("id").eq("slug", params.workspace).maybeSingle();
+    if (!ws) return;
+    const { data: chs } = await supabase
+      .from("channels")
+      .select("id, name")
+      .eq("workspace_id", ws.id)
+      .eq("is_dm", false)
+      .eq("is_hitorigoto", false)
+      .order("name");
+    if (chs) setChannels(chs);
+    setShowCreate(true);
+  };
+
+  // チャンネル選択時にメンバー取得
+  const onChannelSelect = async (channelId: string) => {
+    setCreateChannelId(channelId);
+    setCreateAttendeeIds(new Set());
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("channel_members")
+      .select("user_id, profiles(display_name, avatar_url)")
+      .eq("channel_id", channelId);
+    if (data) {
+      const members = data.map((m: { user_id: string; profiles: { display_name: string; avatar_url: string | null } | Array<{ display_name: string; avatar_url: string | null }> }) => {
+        const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
+        return { user_id: m.user_id, display_name: p?.display_name || "", avatar_url: p?.avatar_url || null };
+      });
+      setCreateMembers(members);
+      setCreateAttendeeIds(new Set(members.map((m: ChannelMember) => m.user_id)));
+    }
+  };
+
+  // 新規作成保存
+  const saveCreate = async () => {
+    if (!createTitle.trim() || !createStartAt || !createChannelId) return;
+    setCreateSaving(true);
+    setCreateError("");
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setCreateSaving(false); return; }
+    const dt = new Date(createStartAt);
+    const locLine = createLocation.trim() ? `\n📍 ${createLocation.trim()}` : "";
+    const content = `📅 ${createTitle.trim()}\n${dt.toLocaleDateString("ja-JP")} ${String(dt.getHours()).padStart(2, "0")}:${String(dt.getMinutes()).padStart(2, "0")}${locLine}`;
+    // メッセージ作成
+    const { data: msgData, error: msgErr } = await supabase
+      .from("messages")
+      .insert({ channel_id: createChannelId, user_id: user.id, content })
+      .select("id")
+      .single();
+    if (msgErr || !msgData) { setCreateError(msgErr?.message || "エラー"); setCreateSaving(false); return; }
+    // イベント作成
+    await supabase.rpc("create_event", {
+      p_message_id: msgData.id,
+      p_channel_id: createChannelId,
+      p_title: createTitle.trim(),
+      p_start_at: dt.toISOString(),
+      p_location: createLocation.trim() || null,
+      p_attendee_ids: Array.from(createAttendeeIds),
+    });
+    // 再取得
+    const { data: evData } = await supabase.rpc("get_workspace_events", {
+      p_workspace_slug: params.workspace,
+      p_user_id: user.id,
+      p_year: year,
+      p_month: month,
+    });
+    if (evData && Array.isArray(evData)) setEvents(evData as CalendarEvent[]);
+    setCreateSaving(false);
+    setShowCreate(false);
+    // 作成した日を選択
+    setSelectedDay(dt.getDate());
   };
 
   // 編集開始
@@ -201,7 +301,16 @@ export default function CalendarPage() {
           </svg>
         </button>
         <span className="mr-2 text-lg">📅</span>
-        <h1 className="font-bold text-lg">カレンダー</h1>
+        <h1 className="font-bold text-lg flex-1">カレンダー</h1>
+        <button
+          onClick={openCreate}
+          className="p-2 text-muted hover:text-accent rounded-lg hover:bg-white/[0.04] transition-colors"
+          title="予定を追加"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+        </button>
       </header>
 
       <div className="flex-1 overflow-y-auto p-4">
@@ -393,6 +502,79 @@ export default function CalendarPage() {
           </div>
         </div>
       </div>
+
+      {/* 新規作成モーダル */}
+      {showCreate && (
+        <div className="fixed inset-0 z-[60] flex items-end lg:items-center justify-center" onClick={() => setShowCreate(false)}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div className="relative w-full max-w-md mx-4 mb-20 lg:mb-0 rounded-2xl bg-sidebar border border-border p-5 animate-slide-up max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-base font-bold text-foreground mb-4">予定を追加</h3>
+            {createError && <p className="text-sm text-red-400 mb-3">{createError}</p>}
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs text-muted mb-1">チャンネル</label>
+                <select
+                  value={createChannelId}
+                  onChange={(e) => onChannelSelect(e.target.value)}
+                  className="w-full rounded-lg border border-border bg-input-bg px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none"
+                >
+                  <option value="">選択してください</option>
+                  {channels.map((ch) => (
+                    <option key={ch.id} value={ch.id}>#{ch.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-muted mb-1">タイトル</label>
+                <input type="text" value={createTitle} onChange={(e) => setCreateTitle(e.target.value)} className="w-full rounded-lg border border-border bg-input-bg px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs text-muted mb-1">日時</label>
+                <input type="datetime-local" value={createStartAt} onChange={(e) => setCreateStartAt(e.target.value)} className="w-full max-w-full rounded-lg border border-border bg-input-bg px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none appearance-none" />
+              </div>
+              <div>
+                <label className="block text-xs text-muted mb-1">場所（任意）</label>
+                <input type="text" value={createLocation} onChange={(e) => setCreateLocation(e.target.value)} className="w-full rounded-lg border border-border bg-input-bg px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none" />
+              </div>
+              {createMembers.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs text-muted">参加者</label>
+                    <button type="button" onClick={() => {
+                      if (createAttendeeIds.size === createMembers.length) setCreateAttendeeIds(new Set());
+                      else setCreateAttendeeIds(new Set(createMembers.map((m) => m.user_id)));
+                    }} className="text-xs text-accent hover:underline">
+                      {createAttendeeIds.size === createMembers.length ? "全員解除" : "全員選択"}
+                    </button>
+                  </div>
+                  <div className="max-h-32 overflow-y-auto rounded-lg border border-border bg-input-bg p-2 space-y-1">
+                    {createMembers.map((m) => (
+                      <label key={m.user_id} className="flex items-center gap-2 py-1 px-1 rounded hover:bg-white/[0.04] cursor-pointer">
+                        <input type="checkbox" checked={createAttendeeIds.has(m.user_id)} onChange={() => {
+                          setCreateAttendeeIds((prev) => { const next = new Set(prev); if (next.has(m.user_id)) next.delete(m.user_id); else next.add(m.user_id); return next; });
+                        }} className="rounded border-border" />
+                        {m.avatar_url ? (
+                          <img src={m.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover" />
+                        ) : (
+                          <div className="w-5 h-5 rounded-full bg-accent/20 flex items-center justify-center"><span className="text-[8px] font-bold text-accent">{m.display_name[0]?.toUpperCase()}</span></div>
+                        )}
+                        <span className="text-sm text-foreground truncate">{m.display_name}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted mt-1">{createAttendeeIds.size}人選択中</p>
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end gap-2 mt-4">
+              <button onClick={() => setShowCreate(false)} className="px-4 py-2 text-sm text-muted hover:text-foreground rounded-lg transition-colors">キャンセル</button>
+              <button onClick={saveCreate} disabled={createSaving || !createTitle.trim() || !createStartAt || !createChannelId} className="px-4 py-2 text-sm font-medium bg-accent text-white rounded-lg hover:bg-accent-hover disabled:opacity-50 transition-colors">
+                {createSaving ? "作成中..." : "作成"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 編集モーダル */}
       {editingEvent && (
