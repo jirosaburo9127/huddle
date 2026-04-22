@@ -217,7 +217,29 @@ function HitorigotoPostCardInner({
               isImageFile(url) ? (
                 <img key={i} src={url} alt="" className="rounded-xl max-w-full max-h-80 object-cover cursor-pointer" loading="lazy" onClick={(e) => { e.stopPropagation(); setLightboxUrl(url); }} />
               ) : isVideoFile(url) ? (
-                <video key={i} src={url} controls className="rounded-xl max-w-full max-h-80" preload="metadata" />
+                <button
+                  key={i}
+                  type="button"
+                  className="max-w-full sm:max-w-sm rounded-2xl bg-gradient-to-br from-black/70 to-black/90 border border-white/10 flex items-center gap-4 py-4 px-5 w-full"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    const webkit = (window as any).webkit;
+                    if (webkit?.messageHandlers?.playVideo) {
+                      webkit.messageHandlers.playVideo.postMessage(url);
+                    } else {
+                      window.open(url, "_blank");
+                    }
+                  }}
+                >
+                  <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                    <svg className="w-6 h-6 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                  </div>
+                  <div className="text-left min-w-0">
+                    <div className="text-sm font-medium text-white">動画を再生</div>
+                    <div className="text-xs text-white/50 truncate">{url.split("/").pop()}</div>
+                  </div>
+                </button>
               ) : (
                 <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="text-sm text-accent underline break-all block">{url.split("/").pop()}</a>
               )
