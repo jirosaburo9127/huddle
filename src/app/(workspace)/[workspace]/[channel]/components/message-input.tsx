@@ -480,6 +480,61 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
   }
 
   // ファイルをアップロードして保留キューに追加する (送信は送信ボタン待ち)
+  // 画像を圧縮（最大1920px、JPEG品質0.8）
+  async function compressImage(file: File): Promise<File> {
+    const MAX_DIMENSION = 1920;
+    const QUALITY = 0.8;
+
+    // GIF・SVGは圧縮しない
+    if (file.type === "image/gif" || file.type === "image/svg+xml") return file;
+    // 画像以外は対象外
+    if (!file.type.startsWith("image/")) return file;
+
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+
+        // リサイズ不要ならそのまま返す（小さい画像は圧縮しない）
+        if (width <= MAX_DIMENSION && height <= MAX_DIMENSION && file.size < 500 * 1024) {
+          resolve(file);
+          return;
+        }
+
+        // アスペクト比を保ってリサイズ
+        if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+          const ratio = Math.min(MAX_DIMENSION / width, MAX_DIMENSION / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { resolve(file); return; }
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob(
+          (blob) => {
+            if (!blob || blob.size >= file.size) {
+              // 圧縮後の方が大きい場合は元ファイルを使う
+              resolve(file);
+              return;
+            }
+            // 元のファイル名を維持（拡張子はjpegに）
+            const name = file.name.replace(/\.[^.]+$/, ".jpg");
+            resolve(new File([blob], name, { type: "image/jpeg" }));
+          },
+          "image/jpeg",
+          QUALITY
+        );
+      };
+      img.onerror = () => resolve(file);
+      img.src = URL.createObjectURL(file);
+    });
+  }
+
   async function uploadFile(file: File) {
     // ファイルサイズチェック
     if (file.size > MAX_FILE_SIZE) {
@@ -516,13 +571,16 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
     setUploading(true);
 
     try {
+      // 画像は自動圧縮（最大1920px、JPEG品質80%）
+      const compressed = await compressImage(file);
+
       const supabase = createClient();
-      const safeName = sanitizeFileName(file.name);
+      const safeName = sanitizeFileName(compressed.name);
       const path = `${channelId || "general"}/${crypto.randomUUID()}-${safeName}`;
 
       const { error: uploadErr } = await supabase.storage
         .from("chat-files")
-        .upload(path, file);
+        .upload(path, compressed);
 
       if (uploadErr) {
         setUploadError(`アップロード失敗: ${uploadErr.message}`);
