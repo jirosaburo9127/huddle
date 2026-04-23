@@ -688,14 +688,24 @@ export function Sidebar({
         </div>
 
         {/* 検索バー（PCのみ） */}
-        <div className="hidden lg:block px-3 py-2">
+        <div className="hidden lg:flex items-center gap-2 px-3 py-2">
           <input
             type="text"
             placeholder="チャンネルを検索..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-background/50 rounded-xl px-3 py-2 text-base border border-border/50 focus:border-accent focus:bg-input-bg placeholder-muted/60 transition-all outline-none"
+            className="flex-1 bg-background/50 rounded-xl px-3 py-2 text-base border border-border/50 focus:border-accent focus:bg-input-bg placeholder-muted/60 transition-all outline-none"
           />
+          <Link
+            href={`/${workspaceSlug}/search`}
+            onClick={() => setSidebarOpen(false)}
+            className="shrink-0 p-2 text-muted hover:text-accent rounded-lg hover:bg-white/[0.04] transition-colors"
+            title="投稿を検索"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </Link>
         </div>
 
         {/* チャンネル・DM一覧 */}

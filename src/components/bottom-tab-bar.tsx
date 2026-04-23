@@ -107,6 +107,18 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
           <div className="relative w-full mb-16 mx-4 rounded-2xl bg-sidebar border border-border p-4 animate-slide-up" onClick={(e) => e.stopPropagation()}>
             <div className="grid grid-cols-3 gap-3">
               <Link
+                href={`/${workspaceSlug}/search`}
+                onClick={() => setShowMore(false)}
+                className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
+              >
+                <span className="w-12 h-12 rounded-full border-2 border-muted/40 flex items-center justify-center">
+                  <svg className="w-5 h-5 text-foreground" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </span>
+                <span className="text-xs text-foreground">検索</span>
+              </Link>
+              <Link
                 href={`/${workspaceSlug}/dm-list`}
                 onClick={() => setShowMore(false)}
                 className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
