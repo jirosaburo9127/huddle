@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { RealtimePostgresInsertPayload, RealtimePostgresUpdatePayload } from "@supabase/supabase-js";
 import type { Channel, Message, MessageWithProfile, Reaction } from "@/lib/supabase/types";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { WorkspaceCategory } from "@/lib/channel-categories";
 import { MessageItem } from "./message-item";
 import { HitorigotoPostCard } from "./hitorigoto-post-card";
@@ -29,6 +29,10 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
   // zustand セレクタ形式: 購読範囲を setSidebarOpen のみに限定
   const setSidebarOpen = useMobileNavStore((s) => s.setSidebarOpen);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // 進行中まとめなど、外部からの投稿ジャンプ指定（?m=<messageId>）
+  // 同じIDで二重実行されないよう処理済みIDを保持
+  const jumpHandledIdRef = useRef<string | null>(null);
   const [messages, setMessages] = useState<MessageWithProfile[]>(initialMessages);
   // Chatwork風インライン返信の返信対象
   const [replyTo, setReplyTo] = useState<MessageWithProfile | null>(null);
@@ -199,6 +203,71 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     el.classList.add("reply-jump-highlight");
     setTimeout(() => el.classList.remove("reply-jump-highlight"), 1600);
   }, []);
+
+  // URL ?m=<messageId> で指定された投稿へジャンプ（進行中まとめ等からの遷移用）
+  // 初期ロードは直近50件のみのため、古い投稿はDBから追加取得してからスクロールする
+  useEffect(() => {
+    const target = searchParams?.get("m");
+    if (!target) return;
+    if (jumpHandledIdRef.current === target) return;
+
+    const msgInState = messagesRef.current.find((m) => m.id === target);
+
+    async function run() {
+      if (msgInState) {
+        // 既に読み込み済み: DOM描画完了を待ってからスクロール
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => handleJumpToMessage(target!));
+        });
+        jumpHandledIdRef.current = target!;
+        return;
+      }
+
+      // 未読込: 対象投稿の created_at を取得し、それ以降をまとめて取得してマージ
+      const { data: targetRow } = await supabase
+        .from("messages")
+        .select("created_at")
+        .eq("id", target!)
+        .eq("channel_id", channel.id)
+        .maybeSingle();
+
+      if (!targetRow) {
+        // 該当投稿が見つからない（削除済み or チャンネル違い）
+        jumpHandledIdRef.current = target!;
+        return;
+      }
+
+      const { data: range } = await supabase
+        .from("messages")
+        .select("*, profiles(*), reactions(*)")
+        .eq("channel_id", channel.id)
+        .gte("created_at", targetRow.created_at)
+        .order("created_at", { ascending: true })
+        .limit(500);
+
+      if (range && range.length > 0) {
+        setMessages((prev) => {
+          const existingIds = new Set(prev.map((m) => m.id));
+          const additions = (range as MessageWithProfile[]).filter((m) => !existingIds.has(m.id));
+          if (additions.length === 0) return prev;
+          const merged = [...prev, ...additions];
+          merged.sort(
+            (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          );
+          return merged;
+        });
+      }
+
+      // setState 反映後に DOM 取得できるよう次フレームで実行
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => handleJumpToMessage(target!));
+      });
+      jumpHandledIdRef.current = target!;
+    }
+
+    run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, channel.id]);
 
   // オンライン状態の更新（60秒ごと）
   useEffect(() => {

@@ -105,7 +105,7 @@ export default function InProgressPage() {
             items.map((item) => (
               <Link
                 key={item.id}
-                href={`/${params.workspace}/${item.channel_slug}`}
+                href={`/${params.workspace}/${item.channel_slug}?m=${item.id}`}
                 className="block px-4 py-3 rounded-xl bg-blue-400/[0.06] border border-blue-400/20 hover:bg-blue-400/[0.1] transition-colors"
               >
                 <div className="flex items-start gap-3">
