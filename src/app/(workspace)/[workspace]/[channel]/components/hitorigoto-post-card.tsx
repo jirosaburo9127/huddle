@@ -147,6 +147,15 @@ function HitorigotoPostCardInner({
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [reacterModal, setReacterModal] = useState<{ emoji: string; names: string[]; reacted: boolean } | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  // PCとモバイルでピッカーの実装を分ける（PC版の EmojiPicker の外側クリック検知が
+  // モバイルモーダル内のタップと競合するため、モバイルでは PC版を一切マウントしない）
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => {
+    const check = () => setIsDesktop(typeof window !== "undefined" && window.innerWidth >= 1024);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   // 削除済みは非表示
   if (message.deleted_at) return null;
@@ -306,15 +315,13 @@ function HitorigotoPostCardInner({
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                 </svg>
               </button>
-              {/* PC: 上方向ドロップダウン */}
-              {showEmojiPicker && (
-                <div className="hidden lg:block">
-                  <EmojiPicker
-                    onSelect={(em) => { setShowEmojiPicker(false); onReact(message.id, em); }}
-                    onClose={() => setShowEmojiPicker(false)}
-                    position="above"
-                  />
-                </div>
+              {/* PC: 上方向ドロップダウン（モバイルでは一切マウントしない） */}
+              {showEmojiPicker && isDesktop && (
+                <EmojiPicker
+                  onSelect={(em) => { setShowEmojiPicker(false); onReact(message.id, em); }}
+                  onClose={() => setShowEmojiPicker(false)}
+                  position="above"
+                />
               )}
             </div>
           )}
@@ -412,8 +419,8 @@ function HitorigotoPostCardInner({
       )}
 
       {/* モバイル絵文字ピッカー（通常チャンネルと同じ種類を表示） */}
-      {showEmojiPicker && (
-        <div className="fixed inset-0 z-[60] flex items-end lg:hidden" onClick={() => setShowEmojiPicker(false)}>
+      {showEmojiPicker && !isDesktop && (
+        <div className="fixed inset-0 z-[60] flex items-end" onClick={() => setShowEmojiPicker(false)}>
           <div className="absolute inset-0 bg-black/40" />
           <div className="relative w-full animate-slide-up" onClick={(e) => e.stopPropagation()}>
             <div className="w-full rounded-t-2xl bg-sidebar border-t border-border shadow-xl p-4 pb-20 max-h-[75vh] overflow-y-auto">
@@ -425,7 +432,13 @@ function HitorigotoPostCardInner({
                       {group.emojis.map((emoji) => (
                         <button
                           key={emoji}
-                          onClick={() => { onReact?.(message.id, emoji); setShowEmojiPicker(false); }}
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowEmojiPicker(false);
+                            onReact?.(message.id, emoji);
+                          }}
+                          style={{ touchAction: "manipulation" }}
                           className="px-3 py-2 rounded-xl border border-border/50 bg-white/[0.03] hover:bg-white/[0.06] text-sm font-medium text-foreground transition-colors"
                         >
                           {emoji}
@@ -437,7 +450,13 @@ function HitorigotoPostCardInner({
                       {group.emojis.map((emoji) => (
                         <button
                           key={emoji}
-                          onClick={() => { onReact?.(message.id, emoji); setShowEmojiPicker(false); }}
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowEmojiPicker(false);
+                            onReact?.(message.id, emoji);
+                          }}
+                          style={{ touchAction: "manipulation" }}
                           className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-white/[0.06] text-xl transition-colors"
                         >
                           {emoji}
