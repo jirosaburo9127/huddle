@@ -308,16 +308,16 @@ export function DashboardView({
             })}
           </div>
 
-          {/* チャンネルフィルタ（ピルバー・横スクロール可） */}
+          {/* チャンネルフィルタ（インデックス型 / 下線アクセント） */}
           {channelFacets.length > 0 && (
-            <div className="print:hidden flex gap-2 mb-4 overflow-x-auto pb-1 -mx-1 px-1">
+            <div className="print:hidden flex gap-1 mb-4 border-b border-border overflow-x-auto -mx-1 px-1">
               <button
                 type="button"
                 onClick={() => setSelectedChannelId(null)}
-                className={`shrink-0 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                className={`shrink-0 px-3 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
                   selectedChannelId === null
-                    ? "bg-accent text-white border-accent"
-                    : "border-border text-muted hover:text-foreground hover:bg-white/[0.04]"
+                    ? "text-accent border-accent"
+                    : "text-muted hover:text-foreground border-transparent"
                 }`}
               >
                 全て（{decisions.length}）
@@ -329,10 +329,10 @@ export function DashboardView({
                     key={ch.id}
                     type="button"
                     onClick={() => setSelectedChannelId(ch.id)}
-                    className={`shrink-0 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                    className={`shrink-0 px-3 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
                       active
-                        ? "bg-accent text-white border-accent"
-                        : "border-border text-muted hover:text-foreground hover:bg-white/[0.04]"
+                        ? "text-accent border-accent"
+                        : "text-muted hover:text-foreground border-transparent"
                     }`}
                   >
                     #{ch.name}（{ch.count}）

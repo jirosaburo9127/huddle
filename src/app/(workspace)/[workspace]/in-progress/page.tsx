@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
@@ -10,6 +10,7 @@ type InProgressItem = {
   id: string;
   content: string;
   created_at: string;
+  channel_id: string;
   channel_name: string;
   channel_slug: string;
   sender_name: string;
@@ -26,6 +27,8 @@ export default function InProgressPage() {
   const params = useParams<{ workspace: string }>();
   const [items, setItems] = useState<InProgressItem[]>([]);
   const [loading, setLoading] = useState(true);
+  // チャンネルフィルタ: null = 全て
+  const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -41,7 +44,7 @@ export default function InProgressPage() {
       const { data } = await supabase
         .from("messages")
         .select(
-          "id, content, created_at, channels!inner(name, slug, workspace_id, is_dm), profiles!inner(display_name, avatar_url)"
+          "id, content, created_at, channels!inner(id, name, slug, workspace_id, is_dm), profiles!inner(display_name, avatar_url)"
         )
         .eq("status", "in_progress")
         .is("deleted_at", null)
@@ -53,12 +56,13 @@ export default function InProgressPage() {
       if (data) {
         setItems(
           data.map((row: { id: string; content: string; created_at: string; channels: unknown; profiles: unknown }) => {
-            const ch = Array.isArray(row.channels) ? row.channels[0] : (row.channels as { name: string; slug: string });
+            const ch = Array.isArray(row.channels) ? row.channels[0] : (row.channels as { id: string; name: string; slug: string });
             const p = Array.isArray(row.profiles) ? row.profiles[0] : (row.profiles as { display_name: string; avatar_url: string | null });
             return {
               id: row.id,
               content: row.content,
               created_at: row.created_at,
+              channel_id: ch?.id || "",
               channel_name: ch?.name || "",
               channel_slug: ch?.slug || "",
               sender_name: p?.display_name || "メンバー",
@@ -70,6 +74,23 @@ export default function InProgressPage() {
       setLoading(false);
     })();
   }, [params.workspace]);
+
+  // チャンネル別に集計（タブ表示用）
+  const channelFacets = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; count: number }>();
+    for (const it of items) {
+      if (!it.channel_id) continue;
+      const existing = map.get(it.channel_id);
+      if (existing) existing.count += 1;
+      else map.set(it.channel_id, { id: it.channel_id, name: it.channel_name, count: 1 });
+    }
+    return Array.from(map.values()).sort((a, b) => b.count - a.count);
+  }, [items]);
+
+  const filteredItems = useMemo(() => {
+    if (!selectedChannelId) return items;
+    return items.filter((it) => it.channel_id === selectedChannelId);
+  }, [items, selectedChannelId]);
 
   return (
     <div className="flex flex-col h-full">
@@ -91,7 +112,42 @@ export default function InProgressPage() {
       </header>
 
       <div className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-3xl mx-auto space-y-3">
+        <div className="max-w-3xl mx-auto">
+          {/* チャンネルタブ（インデックス型 / 下線アクセント） */}
+          {!loading && channelFacets.length > 0 && (
+            <div className="flex gap-1 mb-4 border-b border-border overflow-x-auto -mx-1 px-1">
+              <button
+                type="button"
+                onClick={() => setSelectedChannelId(null)}
+                className={`shrink-0 px-3 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                  selectedChannelId === null
+                    ? "text-accent border-accent"
+                    : "text-muted hover:text-foreground border-transparent"
+                }`}
+              >
+                全て（{items.length}）
+              </button>
+              {channelFacets.map((ch) => {
+                const active = selectedChannelId === ch.id;
+                return (
+                  <button
+                    key={ch.id}
+                    type="button"
+                    onClick={() => setSelectedChannelId(ch.id)}
+                    className={`shrink-0 px-3 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                      active
+                        ? "text-accent border-accent"
+                        : "text-muted hover:text-foreground border-transparent"
+                    }`}
+                  >
+                    #{ch.name}（{ch.count}）
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="space-y-3">
           {loading ? (
             <div className="text-center py-16 text-muted">読み込み中...</div>
           ) : items.length === 0 ? (
@@ -101,8 +157,12 @@ export default function InProgressPage() {
               </svg>
               <p>進行中の項目はありません</p>
             </div>
+          ) : filteredItems.length === 0 ? (
+            <div className="text-center py-16 text-muted">
+              <p className="text-sm">このチャンネルの進行中項目はありません</p>
+            </div>
           ) : (
-            items.map((item) => (
+            filteredItems.map((item) => (
               <Link
                 key={item.id}
                 href={`/${params.workspace}/${item.channel_slug}?m=${item.id}`}
@@ -130,6 +190,7 @@ export default function InProgressPage() {
               </Link>
             ))
           )}
+          </div>
         </div>
       </div>
     </div>
