@@ -35,7 +35,6 @@ export function CreateChannelModal({
   onClose,
 }: Props) {
   const [name, setName] = useState("");
-  const [isPrivate, setIsPrivate] = useState(false);
   const [category, setCategory] = useState("");
   const [catOptions, setCatOptions] = useState(categories);
   const [showNewCat, setShowNewCat] = useState(false);
@@ -115,7 +114,8 @@ export function CreateChannelModal({
         p_workspace_id: workspaceId,
         p_name: name,
         p_slug: slug,
-        p_is_private: isPrivate,
+        // 012_channels_invite_only.sql で全チャンネルが invite-only になったため is_private は常に false
+        p_is_private: false,
         p_member_ids: Array.from(selectedMemberIds),
       }
     );
@@ -239,16 +239,6 @@ export function CreateChannelModal({
               </div>
             )}
           </div>
-
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={isPrivate}
-              onChange={(e) => setIsPrivate(e.target.checked)}
-              className="rounded border-border"
-            />
-            <span className="text-muted">プライベートチャンネルにする</span>
-          </label>
 
           {/* メンバー選択 */}
           <div>

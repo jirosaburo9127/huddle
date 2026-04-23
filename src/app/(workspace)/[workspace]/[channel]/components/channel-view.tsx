@@ -1543,7 +1543,6 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
           channelId={channel.id}
           workspaceId={channel.workspace_id}
           currentUserId={currentUserId}
-          isPrivate={channel.is_private}
           onClose={() => setShowMembersModal(false)}
         />
       )}

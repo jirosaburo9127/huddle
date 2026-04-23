@@ -18,7 +18,6 @@ type Props = {
   channelId: string;
   workspaceId: string;
   currentUserId: string;
-  isPrivate: boolean;
   onClose: () => void;
 };
 
@@ -26,7 +25,6 @@ export function ChannelMembersModal({
   channelId,
   workspaceId,
   currentUserId,
-  isPrivate,
   onClose,
 }: Props) {
   const [activeTab, setActiveTab] = useState<"members" | "add">("members");
@@ -267,12 +265,6 @@ export function ChannelMembersModal({
           )}
         </div>
 
-        {/* プライベートチャンネルの注意書き */}
-        {isPrivate && (
-          <p className="text-xs text-muted text-center">
-            プライベートチャンネル — 招待されたメンバーのみ参加できます
-          </p>
-        )}
       </div>
     </div>
   );

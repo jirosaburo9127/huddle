@@ -5,6 +5,7 @@ import type { MessageWithProfile, Reaction } from "@/lib/supabase/types";
 import { EmojiPicker } from "./emoji-picker";
 import { PollDisplay } from "./poll-display";
 import { EventDisplay } from "./event-display";
+import { ImageLightbox } from "@/components/image-lightbox";
 
 type Props = {
   message: MessageWithProfile;
@@ -1208,59 +1209,8 @@ export const MessageItem = memo(function MessageItem({
         </div>
       )}
 
-      {/* 画像ライトボックス（アプリ内フルスクリーン表示） */}
       {lightboxUrl && (
-        <div
-          className="fixed inset-0 z-[70] bg-black/90 flex items-center justify-center p-4"
-          onClick={() => setLightboxUrl(null)}
-        >
-          {/* 上部ボタン群 */}
-          <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
-            {/* 保存/共有ボタン */}
-            <button
-              type="button"
-              onClick={async (e) => {
-                e.stopPropagation();
-                try {
-                  const { Capacitor } = await import("@capacitor/core");
-                  if (Capacitor.isNativePlatform()) {
-                    const { Share } = await import("@capacitor/share");
-                    await Share.share({ url: lightboxUrl });
-                    return;
-                  }
-                } catch {}
-                // Web: 新しいタブで開く
-                window.open(lightboxUrl, "_blank");
-              }}
-              className="w-12 h-12 rounded-full bg-black/60 border border-white/30 hover:bg-black/80 flex items-center justify-center transition-colors shadow-lg"
-              aria-label="保存"
-            >
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
-            </button>
-            {/* 閉じるボタン */}
-            <button
-              type="button"
-              onClick={() => setLightboxUrl(null)}
-              className="w-12 h-12 rounded-full bg-black/60 border border-white/30 hover:bg-black/80 flex items-center justify-center transition-colors shadow-lg"
-              aria-label="閉じる"
-            >
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          {/* 画像 — ピンチズーム可能に */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={lightboxUrl}
-            alt="拡大画像"
-            className="max-w-full max-h-full object-contain rounded-lg select-none"
-            style={{ touchAction: "pinch-zoom" }}
-            onClick={(e) => e.stopPropagation()}
-          />
-        </div>
+        <ImageLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
       )}
     </>
   );
