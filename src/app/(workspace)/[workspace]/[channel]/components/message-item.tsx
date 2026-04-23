@@ -6,6 +6,7 @@ import { EmojiPicker } from "./emoji-picker";
 import { PollDisplay } from "./poll-display";
 import { EventDisplay } from "./event-display";
 import { ImageLightbox } from "@/components/image-lightbox";
+import { useReactorNames } from "@/lib/use-reactor-names";
 
 type Props = {
   message: MessageWithProfile;
@@ -499,6 +500,14 @@ export const MessageItem = memo(function MessageItem({
   const [metaSaving, setMetaSaving] = useState(false);
   const editTextareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // リアクションしたユーザーIDから display_name を解決（キャッシュ経由）
+  const reactionUserIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const r of message.reactions || []) set.add(r.user_id);
+    return Array.from(set);
+  }, [message.reactions]);
+  const reactorNames = useReactorNames(reactionUserIds);
+
   // リアクションを絵文字ごとにグループ化
   const groupedReactions = useMemo(() => {
     const reactions = message.reactions || [];
@@ -512,9 +521,11 @@ export const MessageItem = memo(function MessageItem({
       emoji,
       count: list.length,
       reacted: list.some((r) => r.user_id === currentUserId),
-      names: list.map((r) => r.display_name || "").filter(Boolean),
+      names: list
+        .map((r) => reactorNames[r.user_id] || r.display_name || "")
+        .filter(Boolean),
     }));
-  }, [message.reactions, currentUserId]);
+  }, [message.reactions, currentUserId, reactorNames]);
 
   // 絵文字ピッカーで選択時
   function handleEmojiSelect(emoji: string) {

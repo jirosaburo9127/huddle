@@ -1,9 +1,10 @@
 "use client";
 
-import { memo, useState, useRef, useEffect } from "react";
+import { memo, useState, useRef, useEffect, useMemo } from "react";
 import type { MessageWithProfile, Reaction } from "@/lib/supabase/types";
 import { PollDisplay } from "./poll-display";
 import { ImageLightbox } from "@/components/image-lightbox";
+import { useReactorNames } from "@/lib/use-reactor-names";
 
 type Props = {
   message: MessageWithProfile;
@@ -157,12 +158,19 @@ function HitorigotoPostCardInner({
   const reactions = message.reactions || [];
   const grouped = groupReactions(reactions);
 
+  // リアクションしたユーザーの display_name を user_id から解決
+  const reactionUserIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const r of reactions) set.add(r.user_id);
+    return Array.from(set);
+  }, [reactions]);
+  const reactorNames = useReactorNames(reactionUserIds);
+
   return (
     <>
       <article
         id={`msg-${message.id}`}
-        className="rounded-2xl border border-border bg-surface p-4 mb-3 transition-colors cursor-pointer"
-        onClick={() => onOpenThread?.()}
+        className="rounded-2xl border border-border bg-surface p-4 mb-3 transition-colors"
       >
         {/* 返信先 */}
         {parentMessage && (
@@ -265,7 +273,10 @@ function HitorigotoPostCardInner({
                 if (typeof window !== "undefined" && window.innerWidth >= 1024) {
                   onReact?.(message.id, g.emoji);
                 } else {
-                  setReacterModal({ emoji: g.emoji, names: g.users, reacted: g.userIds.includes(currentUserId) });
+                  const resolved = g.userIds
+                    .map((uid) => reactorNames[uid] || "")
+                    .filter(Boolean);
+                  setReacterModal({ emoji: g.emoji, names: resolved, reacted: g.userIds.includes(currentUserId) });
                 }
               }}
               className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs border transition-colors ${
