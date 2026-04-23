@@ -23,9 +23,12 @@ type Props = {
   channel: Channel;
   initialMessages: MessageWithProfile[];
   currentUserId: string;
+  // SSR 時点（= RPC による last_read_at 更新より前）の値。
+  // 未読区切り線を安定して表示するために必須。
+  initialLastReadAt: string | null;
 };
 
-export function ChannelView({ channel, initialMessages, currentUserId }: Props) {
+export function ChannelView({ channel, initialMessages, currentUserId, initialLastReadAt }: Props) {
   // zustand セレクタ形式: 購読範囲を setSidebarOpen のみに限定
   const setSidebarOpen = useMobileNavStore((s) => s.setSidebarOpen);
   const router = useRouter();
@@ -106,8 +109,9 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
   }, [currentUserId, supabase]);
 
   // 自分の最終既読時刻（チャンネル初回表示時点の値を保持。未読区切り線の位置に使用）
-  const [myLastReadAt, setMyLastReadAt] = useState<string | null>(null);
-  const myLastReadAtRef = useRef<string | null>(null);
+  // SSR で先取りした値を初期値に使う（RPC が last_read_at を NOW に更新する前の値）
+  const [myLastReadAt, setMyLastReadAt] = useState<string | null>(initialLastReadAt);
+  const myLastReadAtRef = useRef<string | null>(initialLastReadAt);
   const unreadLineRef = useRef<HTMLDivElement>(null);
 
   // 既読状態: チャンネルメンバーの last_read_at を取得して既読数を計算
@@ -388,8 +392,8 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
   const scrollToUnreadOrBottom = useCallback(() => {
     const unreadEl = unreadLineRef.current;
     if (unreadEl) {
-      // 未読区切り線の少し上にスクロール
-      unreadEl.scrollIntoView({ behavior: "auto", block: "center" });
+      // 未読の先頭が画面上部に来るように（= 未読区切り線を上端付近に）
+      unreadEl.scrollIntoView({ behavior: "auto", block: "start" });
     } else {
       scrollToBottom();
     }
@@ -412,7 +416,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
       if (armed && !jumpActiveRef.current) {
         const unreadEl = unreadLineRef.current;
         if (unreadEl) {
-          unreadEl.scrollIntoView({ behavior: "auto", block: "center" });
+          unreadEl.scrollIntoView({ behavior: "auto", block: "start" });
         } else {
           scrollToBottom();
         }
@@ -1337,20 +1341,28 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
                   const isConsecutive = false;
                   const parentMessage = message.parent_id ? byId.get(message.parent_id) ?? null : null;
 
-                  // 未読区切り線: 前のメッセージが既読で、このメッセージが未読の場合に表示
-                  const showUnreadLine = myLastReadAt &&
+                  // 未読区切り線: 自分以外のユーザーからの最初の未読メッセージの前に表示する。
+                  // 自分自身の投稿は「未読」にはしない（知っている内容なので）が、
+                  // 未読判定の「前メッセージが既読か」チェックでは、自分の投稿は "読んだもの扱い" にする。
+                  const lastReadTime = myLastReadAt ? new Date(myLastReadAt).getTime() : 0;
+                  const msgTime = new Date(message.created_at).getTime();
+                  const isNewForMe =
+                    !!myLastReadAt &&
                     message.user_id !== currentUserId &&
-                    prev !== null &&
-                    new Date(message.created_at).getTime() > new Date(myLastReadAt).getTime() &&
-                    (index === 0 || new Date(prev.created_at).getTime() <= new Date(myLastReadAt).getTime());
+                    msgTime > lastReadTime;
+                  const prevTreatedAsSeen =
+                    prev === null ||
+                    prev.user_id === currentUserId ||
+                    new Date(prev.created_at).getTime() <= lastReadTime;
+                  const showUnreadLine = isNewForMe && prevTreatedAsSeen;
 
                   return (
                     <div key={message.id}>
                       {showUnreadLine && (
-                        <div ref={unreadLineRef} className="flex items-center gap-3 my-3 px-2">
-                          <div className="flex-1 border-t border-red-400/60" />
-                          <span className="text-xs font-semibold text-red-400 shrink-0">未読メッセージ</span>
-                          <div className="flex-1 border-t border-red-400/60" />
+                        <div ref={unreadLineRef} className="flex items-center gap-2 my-5 px-2">
+                          <div className="flex-1 border-t-2 border-red-500" />
+                          <span className="text-[11px] font-bold text-white bg-red-500 rounded-full px-2.5 py-0.5 shrink-0">ここから未読</span>
+                          <div className="flex-1 border-t-2 border-red-500" />
                         </div>
                       )}
                       {showDateSeparator && (
