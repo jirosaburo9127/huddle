@@ -5,6 +5,7 @@ import type { MessageWithProfile, Reaction } from "@/lib/supabase/types";
 import { PollDisplay } from "./poll-display";
 import { ImageLightbox } from "@/components/image-lightbox";
 import { useReactorNames } from "@/lib/use-reactor-names";
+import { EMOJI_LIST, EmojiPicker } from "./emoji-picker";
 
 type Props = {
   message: MessageWithProfile;
@@ -124,8 +125,8 @@ function groupReactions(reactions: Reaction[]) {
   return Array.from(map.values());
 }
 
-const QUICK_EMOJIS = ["👍", "❤️", "😊", "🎉", "👀", "🙏"];
-const TEXT_REACTIONS = ["完了しました！", "了解！", "確認中", "対応します", "ありがとう！", "お疲れ様！"];
+// PC ホバー時に出る3つの即時リアクション
+const QUICK_HOVER_EMOJIS = ["👍", "❤️", "🎉"];
 
 function HitorigotoPostCardInner({
   message,
@@ -198,7 +199,7 @@ function HitorigotoPostCardInner({
           </div>
           {/* PCアクション */}
           <div className="hidden lg:flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            {onReact && QUICK_EMOJIS.slice(0, 3).map((e) => (
+            {onReact && QUICK_HOVER_EMOJIS.map((e) => (
               <button key={e} onClick={() => onReact(message.id, e)} className="text-lg hover:scale-125 transition-transform">{e}</button>
             ))}
             {onReply && (
@@ -294,16 +295,28 @@ function HitorigotoPostCardInner({
             </button>
           ))}
 
-          {/* +リアクション（モバイル） */}
+          {/* +リアクション（PC・モバイル両方） */}
           {onReact && (
-            <button
-              onClick={() => setShowEmojiPicker(true)}
-              className="lg:hidden inline-flex items-center px-2 py-1 rounded-full text-xs border border-border text-muted hover:text-foreground transition-colors"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-              </svg>
-            </button>
+            <div className="relative">
+              <button
+                onClick={(e) => { e.stopPropagation(); setShowEmojiPicker((v) => !v); }}
+                className="inline-flex items-center px-2 py-1 rounded-full text-xs border border-border text-muted hover:text-foreground transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+              </button>
+              {/* PC: 上方向ドロップダウン */}
+              {showEmojiPicker && (
+                <div className="hidden lg:block">
+                  <EmojiPicker
+                    onSelect={(em) => { setShowEmojiPicker(false); onReact(message.id, em); }}
+                    onClose={() => setShowEmojiPicker(false)}
+                    position="above"
+                  />
+                </div>
+              )}
+            </div>
           )}
 
           {/* 既読 */}
@@ -398,35 +411,42 @@ function HitorigotoPostCardInner({
         </div>
       )}
 
-      {/* モバイル絵文字ピッカー */}
+      {/* モバイル絵文字ピッカー（通常チャンネルと同じ種類を表示） */}
       {showEmojiPicker && (
         <div className="fixed inset-0 z-[60] flex items-end lg:hidden" onClick={() => setShowEmojiPicker(false)}>
           <div className="absolute inset-0 bg-black/40" />
           <div className="relative w-full animate-slide-up" onClick={(e) => e.stopPropagation()}>
-            <div className="w-full rounded-t-2xl bg-sidebar border-t border-border shadow-xl p-4 pb-20">
-              <div className="grid grid-cols-8 gap-2 mb-3">
-                {QUICK_EMOJIS.map((e) => (
-                  <button
-                    key={e}
-                    onClick={() => { onReact?.(message.id, e); setShowEmojiPicker(false); }}
-                    className="text-2xl p-2 rounded-lg hover:bg-white/[0.06] active:scale-90 transition-transform"
-                  >
-                    {e}
-                  </button>
-                ))}
-              </div>
-              <p className="text-[11px] text-muted font-medium mb-1.5">テキスト</p>
-              <div className="flex flex-wrap gap-1.5">
-                {TEXT_REACTIONS.map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => { onReact?.(message.id, t); setShowEmojiPicker(false); }}
-                    className="px-3 py-2 rounded-xl border border-border/50 bg-white/[0.03] hover:bg-white/[0.06] text-sm font-medium text-foreground transition-colors"
-                  >
-                    {t}
-                  </button>
-                ))}
-              </div>
+            <div className="w-full rounded-t-2xl bg-sidebar border-t border-border shadow-xl p-4 pb-20 max-h-[75vh] overflow-y-auto">
+              {EMOJI_LIST.map((group) => (
+                <div key={group.category} className="mb-3">
+                  <p className="text-[11px] text-muted font-medium mb-1.5">{group.category}</p>
+                  {group.category === "テキスト" ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {group.emojis.map((emoji) => (
+                        <button
+                          key={emoji}
+                          onClick={() => { onReact?.(message.id, emoji); setShowEmojiPicker(false); }}
+                          className="px-3 py-2 rounded-xl border border-border/50 bg-white/[0.03] hover:bg-white/[0.06] text-sm font-medium text-foreground transition-colors"
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-8 gap-1.5">
+                      {group.emojis.map((emoji) => (
+                        <button
+                          key={emoji}
+                          onClick={() => { onReact?.(message.id, emoji); setShowEmojiPicker(false); }}
+                          className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-white/[0.06] text-xl transition-colors"
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
         </div>

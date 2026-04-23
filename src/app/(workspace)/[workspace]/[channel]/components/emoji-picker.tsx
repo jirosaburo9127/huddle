@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Props = {
   onSelect: (emoji: string) => void;
@@ -9,7 +9,8 @@ type Props = {
 };
 
 // よく使う絵文字カテゴリ（外部ライブラリ不要）
-const EMOJI_LIST = [
+// 他所から再利用できるよう export しておく
+export const EMOJI_LIST = [
   { category: "よく使う", emojis: ["👍", "❤️", "😂", "🎉", "🔥", "👀", "💯", "✅"] },
   { category: "表情", emojis: ["😊", "😄", "🤔", "😮", "😢", "😡", "🥳", "😎"] },
   { category: "ジェスチャー", emojis: ["👏", "🙌", "🤝", "💪", "✌️", "🫡", "👋", "🙏"] },
@@ -19,6 +20,8 @@ const EMOJI_LIST = [
 
 export function EmojiPicker({ onSelect, onClose, position = "below" }: Props) {
   const ref = useRef<HTMLDivElement>(null);
+  // マウント時にビューポートから溢れていないかチェックし、必要なら水平方向へオフセットする
+  const [xOffset, setXOffset] = useState(0);
 
   // 外側クリックで閉じる
   useEffect(() => {
@@ -37,9 +40,23 @@ export function EmojiPicker({ onSelect, onClose, position = "below" }: Props) {
     };
   }, [onClose]);
 
+  // マウント直後に画面内に収まるよう水平位置を補正（左右どちらにはみ出しても対応）
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const margin = 8;
+    let dx = 0;
+    if (rect.left < margin) dx = margin - rect.left;
+    else if (rect.right > window.innerWidth - margin)
+      dx = window.innerWidth - margin - rect.right;
+    if (dx !== 0) setXOffset(dx);
+  }, []);
+
   return (
     <div
       ref={ref}
+      style={xOffset !== 0 ? { transform: `translateX(${xOffset}px)` } : undefined}
       className={`absolute right-0 w-72 rounded-2xl bg-sidebar border border-border shadow-xl p-3 z-[60] animate-fade-in ${
         position === "above" ? "bottom-full mb-2" : "top-full mt-2"
       }`}
