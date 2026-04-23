@@ -57,7 +57,7 @@ export function EmojiPicker({ onSelect, onClose, position = "below" }: Props) {
     <div
       ref={ref}
       style={xOffset !== 0 ? { transform: `translateX(${xOffset}px)` } : undefined}
-      className={`absolute right-0 w-72 rounded-2xl bg-sidebar border border-border shadow-xl p-3 z-[60] animate-fade-in ${
+      className={`absolute left-0 w-72 rounded-2xl bg-sidebar border border-border shadow-xl p-3 z-[60] animate-fade-in ${
         position === "above" ? "bottom-full mb-2" : "top-full mt-2"
       }`}
     >
