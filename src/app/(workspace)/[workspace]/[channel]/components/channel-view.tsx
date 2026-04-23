@@ -33,6 +33,9 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
   // 進行中まとめなど、外部からの投稿ジャンプ指定（?m=<messageId>）
   // 同じIDで二重実行されないよう処理済みIDを保持
   const jumpHandledIdRef = useRef<string | null>(null);
+  // ジャンプ進行中フラグ: 自動スクロール（未読線/最下部）を一時的に抑止するため
+  // ?m 指定がある間は true。ジャンプ完了後 2秒経ってから false に戻す
+  const jumpActiveRef = useRef<boolean>(false);
   const [messages, setMessages] = useState<MessageWithProfile[]>(initialMessages);
   // Chatwork風インライン返信の返信対象
   const [replyTo, setReplyTo] = useState<MessageWithProfile | null>(null);
@@ -211,58 +214,63 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     if (!target) return;
     if (jumpHandledIdRef.current === target) return;
 
-    const msgInState = messagesRef.current.find((m) => m.id === target);
+    // ジャンプ進行中フラグを立てる（既存の自動スクロールを抑止）
+    jumpActiveRef.current = true;
+    jumpHandledIdRef.current = target;
+
+    // ジャンプ実行後に時間差でスクロールをやり直す（ResizeObserver対策）
+    function runJump() {
+      handleJumpToMessage(target!);
+    }
 
     async function run() {
-      if (msgInState) {
-        // 既に読み込み済み: DOM描画完了を待ってからスクロール
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => handleJumpToMessage(target!));
-        });
-        jumpHandledIdRef.current = target!;
-        return;
+      const msgInState = messagesRef.current.find((m) => m.id === target);
+
+      if (!msgInState) {
+        // 未読込: 対象投稿の created_at を取得し、それ以降をまとめて取得してマージ
+        const { data: targetRow } = await supabase
+          .from("messages")
+          .select("created_at")
+          .eq("id", target!)
+          .eq("channel_id", channel.id)
+          .maybeSingle();
+
+        if (!targetRow) {
+          // 該当投稿が見つからない（削除済み or チャンネル違い）
+          jumpActiveRef.current = false;
+          return;
+        }
+
+        const { data: range } = await supabase
+          .from("messages")
+          .select("*, profiles(*), reactions(*)")
+          .eq("channel_id", channel.id)
+          .gte("created_at", targetRow.created_at)
+          .order("created_at", { ascending: true })
+          .limit(500);
+
+        if (range && range.length > 0) {
+          setMessages((prev) => {
+            const existingIds = new Set(prev.map((m) => m.id));
+            const additions = (range as MessageWithProfile[]).filter((m) => !existingIds.has(m.id));
+            if (additions.length === 0) return prev;
+            const merged = [...prev, ...additions];
+            merged.sort(
+              (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+            );
+            return merged;
+          });
+        }
       }
 
-      // 未読込: 対象投稿の created_at を取得し、それ以降をまとめて取得してマージ
-      const { data: targetRow } = await supabase
-        .from("messages")
-        .select("created_at")
-        .eq("id", target!)
-        .eq("channel_id", channel.id)
-        .maybeSingle();
-
-      if (!targetRow) {
-        // 該当投稿が見つからない（削除済み or チャンネル違い）
-        jumpHandledIdRef.current = target!;
-        return;
+      // 既存の初期スクロール(300ms)・ResizeObserver(最大3s)より後に複数回ジャンプし直して勝たせる
+      // 0ms, 400ms, 1000ms, 2000ms, 3100ms の5回
+      const delays = [0, 400, 1000, 2000, 3100];
+      for (const d of delays) {
+        setTimeout(runJump, d);
       }
-
-      const { data: range } = await supabase
-        .from("messages")
-        .select("*, profiles(*), reactions(*)")
-        .eq("channel_id", channel.id)
-        .gte("created_at", targetRow.created_at)
-        .order("created_at", { ascending: true })
-        .limit(500);
-
-      if (range && range.length > 0) {
-        setMessages((prev) => {
-          const existingIds = new Set(prev.map((m) => m.id));
-          const additions = (range as MessageWithProfile[]).filter((m) => !existingIds.has(m.id));
-          if (additions.length === 0) return prev;
-          const merged = [...prev, ...additions];
-          merged.sort(
-            (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-          );
-          return merged;
-        });
-      }
-
-      // setState 反映後に DOM 取得できるよう次フレームで実行
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => handleJumpToMessage(target!));
-      });
-      jumpHandledIdRef.current = target!;
+      // 抑止フラグは 3.5 秒後に解除（以降は通常の自動スクロールへ戻す）
+      setTimeout(() => { jumpActiveRef.current = false; }, 3500);
     }
 
     run();
@@ -391,6 +399,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
   useEffect(() => {
     // myLastReadAt の取得を待ってからスクロール
     const waitAndScroll = setTimeout(() => {
+      if (jumpActiveRef.current) return; // ジャンプ進行中はスキップ
       requestAnimationFrame(() => requestAnimationFrame(scrollToUnreadOrBottom));
     }, 300);
     prevMessageCountRef.current = initialMessages.length;
@@ -400,7 +409,7 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
     if (!container) return () => clearTimeout(waitAndScroll);
     let armed = true;
     const observer = new ResizeObserver(() => {
-      if (armed) {
+      if (armed && !jumpActiveRef.current) {
         const unreadEl = unreadLineRef.current;
         if (unreadEl) {
           unreadEl.scrollIntoView({ behavior: "auto", block: "center" });
@@ -418,7 +427,9 @@ export function ChannelView({ channel, initialMessages, currentUserId }: Props) 
   // メッセージ増加時: DOM 更新後に即座に最下部へ
   useEffect(() => {
     if (messages.length > prevMessageCountRef.current) {
-      requestAnimationFrame(scrollToBottom);
+      if (!jumpActiveRef.current) {
+        requestAnimationFrame(scrollToBottom);
+      }
     }
     prevMessageCountRef.current = messages.length;
   }, [messages.length, scrollToBottom]);
