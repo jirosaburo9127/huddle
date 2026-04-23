@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 
 type FileItem = {
   id: string;
+  message_id: string;
   content: string;
   created_at: string;
   channel_name: string;
@@ -104,6 +105,7 @@ export default function FilesPage() {
             const url = rawUrl.trim();
             files.push({
               id: `${row.id}-${url.slice(-8)}`,
+              message_id: row.id,
               content: url,
               created_at: row.created_at,
               channel_name: ch?.name || "",
@@ -226,9 +228,9 @@ export default function FilesPage() {
                 {/* アクション */}
                 <div className="flex items-center gap-1 shrink-0">
                   <Link
-                    href={`/${params.workspace}/${file.channel_slug}`}
+                    href={`/${params.workspace}/${file.channel_slug}?m=${file.message_id}`}
                     className="p-2 text-muted hover:text-accent rounded-lg hover:bg-accent/10 transition-colors"
-                    title="チャンネルを開く"
+                    title="元の投稿へ"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />

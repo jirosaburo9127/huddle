@@ -353,7 +353,7 @@ export function DashboardView({
               {filteredDecisions.map((d) => (
                 <Link
                   key={d.id}
-                  href={`/${workspaceSlug}/${d.channel_slug}`}
+                  href={`/${workspaceSlug}/${d.channel_slug}?m=${d.id}`}
                   className="print-card group block rounded-xl border border-border bg-surface hover:border-accent/40 hover:bg-accent/[0.04] transition-all"
                 >
                   {/* 上部メタ: チャンネルバッジ + 日付 */}

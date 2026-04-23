@@ -264,10 +264,13 @@ export function Sidebar({
   }, [currentUserId]);
 
   // タブタイトルに未読数を表示（Chatwork風: (3) Huddle）
+  // 現WSの他チャンネルの未読 + 他WSの未読を合算
   useEffect(() => {
-    const total = Object.values(unreadState).reduce((sum, n) => sum + n, 0);
+    const channelTotal = Object.values(unreadState).reduce((sum, n) => sum + n, 0);
+    const otherWsTotal = Object.values(unreadByWorkspace).reduce((sum, n) => sum + n, 0);
+    const total = channelTotal + otherWsTotal;
     document.title = total > 0 ? `(${total}) Huddle` : "Huddle";
-  }, [unreadState]);
+  }, [unreadState, unreadByWorkspace]);
 
   // フォアグラウンド復帰時 / マウント時 / ワークスペース切替時に未読カウントを再同期
   // モバイルで画面オフ→復帰した際にRealtime取りこぼしを補完するのと、
