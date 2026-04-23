@@ -34,6 +34,15 @@ type WorkspaceMember = {
   profiles: MemberProfile | MemberProfile[];
 };
 
+type SearchResult = {
+  id: string;
+  content: string;
+  created_at: string;
+  channel_name: string;
+  channel_slug: string;
+  sender_name: string;
+};
+
 type SidebarProps = {
   workspace: Workspace;
   channels: Channel[];
@@ -80,6 +89,8 @@ export function Sidebar({
   const [showWsMembers, setShowWsMembers] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [storageUsageMB, setStorageUsageMB] = useState<number | null>(null);
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showWsSwitcher, setShowWsSwitcher] = useState(false);
   const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [catList, setCatList] = useState(categories);
@@ -688,14 +699,55 @@ export function Sidebar({
         </div>
 
         {/* 投稿検索バー（PCのみ） */}
-        <div className="hidden lg:block px-3 py-2">
-          <Link
-            href={`/${workspaceSlug}/search`}
-            onClick={() => setSidebarOpen(false)}
-            className="block w-full bg-background/50 rounded-xl px-3 py-2 text-base border border-border/50 text-muted/60 hover:border-accent hover:bg-input-bg transition-all"
-          >
-            投稿を検索...
-          </Link>
+        <div className="hidden lg:block px-3 py-2 relative">
+          <input
+            type="text"
+            placeholder="投稿を検索..."
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              // デバウンス検索
+              if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+              const q = e.target.value;
+              searchTimerRef.current = setTimeout(async () => {
+                if (!q.trim()) { setSearchResults([]); return; }
+                const supabase = sidebarSupabaseRef.current;
+                const { data } = await supabase.rpc("search_messages", {
+                  p_user_id: currentUserId,
+                  p_workspace_id: workspace.id,
+                  p_query: q.trim(),
+                });
+                if (data && Array.isArray(data)) setSearchResults(data as SearchResult[]);
+                else setSearchResults([]);
+              }, 500);
+            }}
+            className="w-full bg-background/50 rounded-xl px-3 py-2 text-base border border-border/50 focus:border-accent focus:bg-input-bg placeholder-muted/60 transition-all outline-none"
+          />
+          {/* 検索結果ドロップダウン */}
+          {searchQuery.trim() && searchResults.length > 0 && (
+            <div className="absolute left-3 right-3 top-full mt-1 z-50 max-h-80 overflow-y-auto rounded-xl bg-sidebar border border-border shadow-xl">
+              {searchResults.map((r) => (
+                <Link
+                  key={r.id}
+                  href={`/${workspaceSlug}/${r.channel_slug}`}
+                  onClick={() => { setSearchQuery(""); setSearchResults([]); }}
+                  className="block px-3 py-2.5 border-b border-border/30 hover:bg-white/[0.04] transition-colors"
+                >
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="text-xs font-semibold text-foreground truncate max-w-[8em]">{r.sender_name}</span>
+                    <span className="text-[11px] text-muted">{new Date(r.created_at).toLocaleDateString("ja-JP", { month: "short", day: "numeric", timeZone: "Asia/Tokyo" })}</span>
+                    <span className="text-[11px] text-accent ml-auto">#{r.channel_name.length > 8 ? r.channel_name.slice(0, 8) + "…" : r.channel_name}</span>
+                  </div>
+                  <p className="text-xs text-foreground/70 line-clamp-1">{r.content.replace(/\n/g, " ").slice(0, 80)}</p>
+                </Link>
+              ))}
+            </div>
+          )}
+          {searchQuery.trim() && searchResults.length === 0 && (
+            <div className="absolute left-3 right-3 top-full mt-1 z-50 rounded-xl bg-sidebar border border-border shadow-xl px-3 py-4 text-center text-xs text-muted">
+              一致する投稿はありません
+            </div>
+          )}
         </div>
 
         {/* チャンネル・DM一覧 */}
