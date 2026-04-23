@@ -113,6 +113,8 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
   const [myLastReadAt, setMyLastReadAt] = useState<string | null>(initialLastReadAt);
   const myLastReadAtRef = useRef<string | null>(initialLastReadAt);
   const unreadLineRef = useRef<HTMLDivElement>(null);
+  // 未読区切り線の表示ステート: 画面に入って3秒 → fading → 0.5秒後にhiddenで完全に消す
+  const [unreadLineState, setUnreadLineState] = useState<"visible" | "fading" | "hidden">("visible");
 
   // 既読状態: チャンネルメンバーの last_read_at を取得して既読数を計算
   const [memberReadTimes, setMemberReadTimes] = useState<Array<{ user_id: string; last_read_at: string | null }>>([]);
@@ -398,6 +400,42 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
       scrollToBottom();
     }
   }, [scrollToBottom]);
+
+  // 未読区切り線が画面内に3秒入っていたら自動で消す（fade out）
+  useEffect(() => {
+    if (unreadLineState !== "visible") return;
+    const el = unreadLineRef.current;
+    if (!el) return;
+
+    let fadeTimer: ReturnType<typeof setTimeout> | null = null;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const isVisible = entries.some((e) => e.isIntersecting);
+        if (isVisible) {
+          if (!fadeTimer) {
+            fadeTimer = setTimeout(() => {
+              setUnreadLineState("fading");
+              // CSS トランジション分だけ待ってから DOM から消す
+              setTimeout(() => setUnreadLineState("hidden"), 600);
+            }, 3000);
+          }
+        } else {
+          if (fadeTimer) {
+            clearTimeout(fadeTimer);
+            fadeTimer = null;
+          }
+        }
+      },
+      { threshold: 0.5 }
+    );
+    observer.observe(el);
+
+    return () => {
+      observer.disconnect();
+      if (fadeTimer) clearTimeout(fadeTimer);
+    };
+    // messages.length に依存: 初回 DOM 構築後・メッセージ追加で ref が付け変わるタイミングで再セット
+  }, [unreadLineState, messages.length]);
 
   // チャンネル切替時: 未読位置または最下部に移動 + ResizeObserver
   useEffect(() => {
@@ -1354,12 +1392,17 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                     prev === null ||
                     prev.user_id === currentUserId ||
                     new Date(prev.created_at).getTime() <= lastReadTime;
-                  const showUnreadLine = isNewForMe && prevTreatedAsSeen;
+                  const showUnreadLine = isNewForMe && prevTreatedAsSeen && unreadLineState !== "hidden";
 
                   return (
                     <div key={message.id}>
                       {showUnreadLine && (
-                        <div ref={unreadLineRef} className="flex items-center gap-2 my-5 px-2">
+                        <div
+                          ref={unreadLineRef}
+                          className={`flex items-center gap-2 my-5 px-2 transition-opacity duration-500 ${
+                            unreadLineState === "fading" ? "opacity-0" : "opacity-100"
+                          }`}
+                        >
                           <div className="flex-1 border-t-2 border-red-500" />
                           <span className="text-[11px] font-bold text-white bg-red-500 rounded-full px-2.5 py-0.5 shrink-0">ここから未読</span>
                           <div className="flex-1 border-t-2 border-red-500" />
