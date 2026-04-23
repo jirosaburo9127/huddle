@@ -616,8 +616,14 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
       }
     }
 
+    // iOS Capacitor: アプリ復帰時の取りこぼし補完（visibilitychange が発火しないケース）
+    function onAppResume() {
+      syncMissedMessages();
+    }
+
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", onVisible);
+    window.addEventListener("huddle:appResumed", onAppResume);
 
     // 保険: 10秒ごとにポーリング（Capacitor/WKWebViewでRealtimeが途切れた場合の補完）
     const poll = setInterval(syncMissedMessages, 10000);
@@ -627,6 +633,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
       clearInterval(poll);
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);
+      window.removeEventListener("huddle:appResumed", onAppResume);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel.id]);

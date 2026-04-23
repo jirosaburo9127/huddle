@@ -19,6 +19,7 @@ import { useMobileNavStore } from "@/stores/mobile-nav-store";
 import { createClient } from "@/lib/supabase/client";
 import { showMessageNotification } from "@/lib/notification";
 import { setupPushNotifications, syncAppBadgeFromServer } from "@/lib/push-notifications";
+import { setupAppStateHandler } from "@/lib/app-state";
 import type { RealtimePostgresInsertPayload } from "@supabase/supabase-js";
 import type { Message } from "@/lib/supabase/types";
 
@@ -261,6 +262,9 @@ export function Sidebar({
   // Web ブラウザでは中で early return するので副作用なし
   useEffect(() => {
     setupPushNotifications(currentUserId);
+    // iOS Capacitor の appStateChange を huddle:appResumed に橋渡し
+    // （visibilitychange / focus が復帰時に発火しないケースの救済）
+    setupAppStateHandler();
   }, [currentUserId]);
 
   // タブタイトルに未読数を表示（Chatwork風: (3) Huddle）
@@ -337,6 +341,11 @@ export function Sidebar({
       refetchUnread();
     }
 
+    // iOS Capacitor: app-state.ts が appStateChange を受けてディスパッチするイベント
+    function onAppResume() {
+      refetchUnread();
+    }
+
     // ダッシュボードが既読マークした瞬間にバッジを 0 にする
     function onDecisionsRead() {
       setDecisionUnreadCount(0);
@@ -344,6 +353,7 @@ export function Sidebar({
 
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", onVisible);
+    window.addEventListener("huddle:appResumed", onAppResume);
     window.addEventListener("huddle:decisionsRead", onDecisionsRead);
 
     // 15秒ごとにサーバーと同期（Realtime取りこぼし+既読状態の安定化）
@@ -354,6 +364,7 @@ export function Sidebar({
       clearInterval(poll);
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);
+      window.removeEventListener("huddle:appResumed", onAppResume);
       window.removeEventListener("huddle:decisionsRead", onDecisionsRead);
     };
     // currentChannelId を依存配列に含めない:
