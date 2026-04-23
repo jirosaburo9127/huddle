@@ -285,34 +285,16 @@ export function Sidebar({
       }
 
       if (channelRes.data && Array.isArray(channelRes.data)) {
-        // サーバデータをマージ: サーバが返したカウントで更新しつつ、
-        // サーバに無い（=未読0の）チャンネルはローカルからも消す。
-        // ただしサーバが空配列を返した場合はRPCエラーの可能性があるため
-        // ローカルに未読がある場合はスキップして既存バッジを維持する。
-        setUnreadState((prev) => {
-          const serverCounts = channelRes.data as Array<{ channel_id: string; unread_count: number }>;
-          // サーバが空なのにローカルに未読がある → RPCエラーの疑い → 既存維持
-          const localHasUnread = Object.keys(prev).length > 0;
-          if (serverCounts.length === 0 && localHasUnread) return prev;
-
-          // サーバーの値をベースにしつつ、表示中チャンネルは0にする
-          const next: Record<string, number> = {};
-          for (const row of serverCounts) {
-            if (row.channel_id === currentChannelId) continue;
-            const count = Number(row.unread_count);
-            if (count > 0) next[row.channel_id] = count;
-          }
-          // ローカルで増やした未読がサーバーに反映されていない場合は保持
-          for (const [chId, count] of Object.entries(prev)) {
-            if (chId === currentChannelId) continue;
-            if (!(chId in next) && count > 0) {
-              // サーバーに無いがローカルにある → Realtimeで受信した直後の可能性
-              // 次回のrefetchで正しい値に修正されるので、一旦保持
-              next[chId] = count;
-            }
-          }
-          return next;
-        });
+        // サーバーの値を常に信頼する（シンプルに上書き）
+        const serverCounts = channelRes.data as Array<{ channel_id: string; unread_count: number }>;
+        const next: Record<string, number> = {};
+        for (const row of serverCounts) {
+          // 表示中のチャンネルは既読扱い
+          if (row.channel_id === currentChannelId) continue;
+          const count = Number(row.unread_count);
+          if (count > 0) next[row.channel_id] = count;
+        }
+        setUnreadState(next);
       }
 
       if (wsRes.data) {
@@ -348,7 +330,7 @@ export function Sidebar({
     window.addEventListener("huddle:decisionsRead", onDecisionsRead);
 
     // 15秒ごとにサーバーと同期（Realtime取りこぼし+既読状態の安定化）
-    const poll = setInterval(refetchUnread, 15000);
+    const poll = setInterval(refetchUnread, 10000);
 
     return () => {
       cancelled = true;
@@ -422,12 +404,18 @@ export function Sidebar({
             return;
           }
 
-          // 表示中チャンネル → 自動既読（ただし通知は出す — 別タブやバックグラウンド対応）
+          // 表示中チャンネル → 自動既読 + バッジも消す
           if (msg.channel_id === currentChannelId) {
             supabase
               .rpc("mark_channel_read", { p_channel_id: msg.channel_id })
               .then(() => {});
-            // 表示中チャンネルでもブラウザ通知は出す（フォーカス判定は showMessageNotification 内で行う）
+            // バッジが残らないよう明示的に消す
+            setUnreadState((prev) => {
+              if (!prev[msg.channel_id]) return prev;
+              const next = { ...prev };
+              delete next[msg.channel_id];
+              return next;
+            });
           } else {
             // 未読カウント増加（返信メッセージはサーバー側 get_unread_counts と一致させるためスキップ）
             if (!isReply) {
