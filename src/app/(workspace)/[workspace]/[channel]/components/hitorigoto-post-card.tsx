@@ -351,16 +351,26 @@ function HitorigotoPostCardInner({
           onClick={() => setLightboxUrl(null)}
         >
           <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
-            <a
-              href={lightboxUrl}
-              download
-              onClick={(e) => e.stopPropagation()}
+            <button
+              type="button"
+              onClick={async (e) => {
+                e.stopPropagation();
+                try {
+                  const { Capacitor } = await import("@capacitor/core");
+                  if (Capacitor.isNativePlatform()) {
+                    const { Share } = await import("@capacitor/share");
+                    await Share.share({ url: lightboxUrl });
+                    return;
+                  }
+                } catch {}
+                window.open(lightboxUrl, "_blank");
+              }}
               className="w-12 h-12 rounded-full bg-black/60 border border-white/30 hover:bg-black/80 flex items-center justify-center transition-colors shadow-lg"
             >
               <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
               </svg>
-            </a>
+            </button>
             <button
               type="button"
               onClick={() => setLightboxUrl(null)}
