@@ -1214,17 +1214,32 @@ export const MessageItem = memo(function MessageItem({
           className="fixed inset-0 z-[70] bg-black/90 flex items-center justify-center p-4"
           onClick={() => setLightboxUrl(null)}
         >
-          {/* 閉じるボタン */}
-          <button
-            type="button"
-            onClick={() => setLightboxUrl(null)}
-            className="absolute top-4 right-4 z-10 w-12 h-12 rounded-full bg-black/60 border border-white/30 hover:bg-black/80 flex items-center justify-center transition-colors shadow-lg"
-            aria-label="閉じる"
-          >
-            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          {/* 上部ボタン群 */}
+          <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+            {/* ダウンロードボタン */}
+            <a
+              href={lightboxUrl}
+              download
+              onClick={(e) => e.stopPropagation()}
+              className="w-12 h-12 rounded-full bg-black/60 border border-white/30 hover:bg-black/80 flex items-center justify-center transition-colors shadow-lg"
+              aria-label="ダウンロード"
+            >
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+            </a>
+            {/* 閉じるボタン */}
+            <button
+              type="button"
+              onClick={() => setLightboxUrl(null)}
+              className="w-12 h-12 rounded-full bg-black/60 border border-white/30 hover:bg-black/80 flex items-center justify-center transition-colors shadow-lg"
+              aria-label="閉じる"
+            >
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
           {/* 画像 — ピンチズーム可能に */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
