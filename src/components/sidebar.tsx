@@ -219,6 +219,13 @@ export function Sidebar({
     return found?.id ?? null;
   }, [pathname, channels, dmChannels]);
 
+  // polling の refetchUnread は [currentUserId, workspace.id] だけに依存させているため
+  // currentChannelId はクロージャで初期値に固定される。最新値を参照するため ref を使う
+  const currentChannelIdRef = useRef<string | null>(currentChannelId);
+  useEffect(() => {
+    currentChannelIdRef.current = currentChannelId;
+  }, [currentChannelId]);
+
   // 表示中のチャンネルが切り替わったら:
   // 1. 楽観的にバッジを即消す
   // 2. DB の last_read_at を更新
@@ -285,16 +292,23 @@ export function Sidebar({
       }
 
       if (channelRes.data && Array.isArray(channelRes.data)) {
-        // サーバーの値を常に信頼する（シンプルに上書き）
         const serverCounts = channelRes.data as Array<{ channel_id: string; unread_count: number }>;
-        const next: Record<string, number> = {};
-        for (const row of serverCounts) {
-          // 表示中のチャンネルは既読扱い
-          if (row.channel_id === currentChannelId) continue;
-          const count = Number(row.unread_count);
-          if (count > 0) next[row.channel_id] = count;
-        }
-        setUnreadState(next);
+        const currentId = currentChannelIdRef.current;
+        setUnreadState((prev) => {
+          // サーバが空配列を返した場合、ローカルに未読があるなら RPC の一過性エラーを疑って既存を維持する。
+          // （サーバの値を信頼して全消しすると、10秒ポーリング1回のエラーで全バッジが消える回帰になる）
+          const localHasUnread = Object.values(prev).some((n) => n > 0);
+          if (serverCounts.length === 0 && localHasUnread) return prev;
+
+          const next: Record<string, number> = {};
+          for (const row of serverCounts) {
+            // 表示中のチャンネルは既読扱い
+            if (row.channel_id === currentId) continue;
+            const count = Number(row.unread_count);
+            if (count > 0) next[row.channel_id] = count;
+          }
+          return next;
+        });
       }
 
       if (wsRes.data) {
