@@ -50,6 +50,14 @@ body.native-app {
   border-radius: 3px;
 }
 
+/* スクロールバー非表示ユーティリティ（スクロール機能は維持） */
+.hide-scrollbar {
+  scrollbar-width: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* ページ遷移時のフェードイン（カクカク感を解消） */
 @keyframes page-enter {
   from { opacity: 0; }

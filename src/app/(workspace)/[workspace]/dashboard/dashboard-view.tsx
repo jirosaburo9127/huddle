@@ -224,7 +224,7 @@ export function DashboardView({
         <span className="ml-2 text-sm text-muted">{workspace.name}</span>
       </header>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto hide-scrollbar">
         <div className="max-w-4xl mx-auto p-6 space-y-8">
         {/* 決定事項一覧 */}
         <section className="print-area">
@@ -308,16 +308,16 @@ export function DashboardView({
             })}
           </div>
 
-          {/* チャンネルフィルタ（インデックス型 / 下線アクセント） */}
+          {/* チャンネルフィルタ（ファイルタブ型 / 角丸上+下線ベース） */}
           {channelFacets.length > 0 && (
-            <div className="print:hidden flex gap-1 mb-4 border-b border-border overflow-x-auto -mx-1 px-1">
+            <div className="print:hidden flex items-end gap-1 mb-4 border-b border-border overflow-x-auto -mx-1 px-1">
               <button
                 type="button"
                 onClick={() => setSelectedChannelId(null)}
-                className={`shrink-0 px-3 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                className={`shrink-0 px-4 py-2 text-sm font-medium rounded-t-lg border border-b-0 -mb-px transition-colors ${
                   selectedChannelId === null
-                    ? "text-accent border-accent"
-                    : "text-muted hover:text-foreground border-transparent"
+                    ? "bg-accent text-white border-accent"
+                    : "bg-white/[0.03] text-muted hover:text-foreground hover:bg-white/[0.08] border-border"
                 }`}
               >
                 全て（{decisions.length}）
@@ -329,10 +329,10 @@ export function DashboardView({
                     key={ch.id}
                     type="button"
                     onClick={() => setSelectedChannelId(ch.id)}
-                    className={`shrink-0 px-3 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                    className={`shrink-0 px-4 py-2 text-sm font-medium rounded-t-lg border border-b-0 -mb-px transition-colors ${
                       active
-                        ? "text-accent border-accent"
-                        : "text-muted hover:text-foreground border-transparent"
+                        ? "bg-accent text-white border-accent"
+                        : "bg-white/[0.03] text-muted hover:text-foreground hover:bg-white/[0.08] border-border"
                     }`}
                   >
                     #{ch.name}（{ch.count}）
