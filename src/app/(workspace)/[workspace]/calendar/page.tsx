@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 
 type CalendarEvent = {
   id: string;
+  message_id: string;
   title: string;
   start_at: string;
   location: string | null;
@@ -62,6 +63,8 @@ export default function CalendarPage() {
   const [editAttendeeIds, setEditAttendeeIds] = useState<Set<string>>(new Set());
   const [editMembers, setEditMembers] = useState<ChannelMember[]>([]);
   const [editSaving, setEditSaving] = useState(false);
+  const [editDeleting, setEditDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   // カレンダーグリッドの日付を計算
   const calendarDays = useMemo(() => {
@@ -219,6 +222,7 @@ export default function CalendarPage() {
   // 編集開始
   const startEdit = async (ev: CalendarEvent) => {
     setEditingEvent(ev);
+    setConfirmDelete(false);
     setEditTitle(ev.title);
     const d = new Date(ev.start_at);
     const local = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}T${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
@@ -264,6 +268,34 @@ export default function CalendarPage() {
       if (data && Array.isArray(data)) setEvents(data as CalendarEvent[]);
     }
     setEditSaving(false);
+    setEditingEvent(null);
+  };
+
+  // 削除
+  const deleteEvent = async () => {
+    if (!editingEvent || editDeleting) return;
+    setEditDeleting(true);
+    const supabase = createClient();
+    // events_delete RLS で作成者のみに限定されている
+    const { error: delErr } = await supabase
+      .from("events")
+      .delete()
+      .eq("id", editingEvent.id);
+    if (delErr) {
+      setEditDeleting(false);
+      return;
+    }
+    // チャンネルタイムライン側にも反映させるためメッセージをソフト削除
+    await supabase
+      .from("messages")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", editingEvent.message_id);
+
+    // 一覧から即座に除去（再取得を待たずに反映）
+    setEvents((prev) => prev.filter((e) => e.id !== editingEvent.id));
+
+    setEditDeleting(false);
+    setConfirmDelete(false);
     setEditingEvent(null);
   };
 
@@ -657,7 +689,36 @@ export default function CalendarPage() {
                 <p className="text-xs text-muted mt-1">{editAttendeeIds.size}人選択中</p>
               </div>
             </div>
-            <div className="flex justify-end gap-2 mt-4">
+            <div className="flex items-center gap-2 mt-4">
+              {/* 削除: 確認前は赤文字ボタン、確認後は「本当に削除?」の確定ボタン */}
+              {!confirmDelete ? (
+                <button
+                  onClick={() => setConfirmDelete(true)}
+                  disabled={editSaving || editDeleting}
+                  className="px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  削除
+                </button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted">本当に削除?</span>
+                  <button
+                    onClick={deleteEvent}
+                    disabled={editDeleting}
+                    className="px-3 py-1.5 text-xs font-medium bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 transition-colors"
+                  >
+                    {editDeleting ? "削除中..." : "削除"}
+                  </button>
+                  <button
+                    onClick={() => setConfirmDelete(false)}
+                    disabled={editDeleting}
+                    className="px-2 py-1.5 text-xs text-muted hover:text-foreground transition-colors"
+                  >
+                    戻る
+                  </button>
+                </div>
+              )}
+              <div className="flex-1" />
               <button
                 onClick={() => setEditingEvent(null)}
                 className="px-4 py-2 text-sm text-muted hover:text-foreground rounded-lg transition-colors"
@@ -666,7 +727,7 @@ export default function CalendarPage() {
               </button>
               <button
                 onClick={saveEdit}
-                disabled={editSaving || !editTitle.trim() || !editStartAt}
+                disabled={editSaving || editDeleting || !editTitle.trim() || !editStartAt}
                 className="px-4 py-2 text-sm font-medium bg-accent text-white rounded-lg hover:bg-accent-hover disabled:opacity-50 transition-colors"
               >
                 {editSaving ? "保存中..." : "保存"}
