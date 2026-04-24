@@ -591,9 +591,6 @@ export function Sidebar({
         <div className="px-4 py-3 border-b border-border/50">
           <div className="flex items-center justify-between">
             <div className="flex-1 min-w-0">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted mb-1">
-                WORKSPACE
-              </div>
           <div className="flex items-center gap-1">
           <div className="relative min-w-0" ref={wsSwitcherRef}>
             <button
@@ -711,7 +708,7 @@ export function Sidebar({
           {/* WSメンバー一覧ボタン（PCのみ） */}
           <button
             onClick={() => setShowWsMembers(true)}
-            className="hidden lg:block shrink-0 p-1.5 text-muted hover:text-foreground rounded-lg hover:bg-white/[0.04] transition-colors"
+            className="hidden lg:flex shrink-0 w-9 h-9 items-center justify-center text-muted hover:text-foreground rounded-lg hover:bg-white/[0.04] transition-colors"
             title="ワークスペースメンバー"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -725,9 +722,9 @@ export function Sidebar({
               type="button"
               onClick={() => setShowActivity(true)}
               aria-label="アクティビティ"
-              className="relative shrink-0 p-1.5 text-muted hover:text-foreground rounded-lg hover:bg-white/[0.04] transition-colors"
+              className="relative shrink-0 w-9 h-9 flex items-center justify-center text-muted hover:text-foreground rounded-lg hover:bg-white/[0.04] transition-colors"
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
               </svg>
               {hasUnreadActivity && (
@@ -757,10 +754,10 @@ export function Sidebar({
                 )}
               </Link>
             )}
-            {/* 右上: プロフィールアイコン（大きく） */}
+            {/* 右上: プロフィールアイコン */}
             <button
               onClick={() => setShowSettings(true)}
-              className="shrink-0 lg:ml-3"
+              className="shrink-0 lg:ml-1"
               title="設定"
             >
               {(() => {
@@ -768,9 +765,9 @@ export function Sidebar({
                 const profile = me?.profiles;
                 const p = Array.isArray(profile) ? profile[0] : profile;
                 return p?.avatar_url ? (
-                  <img src={p.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover" />
+                  <img src={p.avatar_url} alt="" className="w-9 h-9 rounded-full object-cover" />
                 ) : (
-                  <span className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center text-sm font-bold text-accent">
+                  <span className="w-9 h-9 rounded-full bg-accent/20 flex items-center justify-center text-sm font-bold text-accent">
                     {(p?.display_name || "?")[0].toUpperCase()}
                   </span>
                 );
@@ -845,7 +842,7 @@ export function Sidebar({
               <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <span className="text-[10px]">決定</span>
+              <span className="text-[10px] whitespace-nowrap">決定</span>
               {decisionUnreadCount > 0 && (
                 <span className="absolute -top-1 -right-1 bg-accent text-white text-[9px] font-bold rounded-full min-w-[16px] h-[16px] flex items-center justify-center px-0.5">
                   {decisionUnreadCount > 99 ? "99+" : decisionUnreadCount}
@@ -862,7 +859,7 @@ export function Sidebar({
               <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
-              <span className="text-[10px]">進行中</span>
+              <span className="text-[10px] whitespace-nowrap">進行中</span>
             </Link>
             <Link
               href={`/${workspaceSlug}/calendar`}
@@ -874,7 +871,7 @@ export function Sidebar({
               <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
               </svg>
-              <span className="text-[10px]">カレンダー</span>
+              <span className="text-[10px] whitespace-nowrap">カレンダー</span>
             </Link>
             <Link
               href={`/${workspaceSlug}/files`}
@@ -885,7 +882,7 @@ export function Sidebar({
               <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
               </svg>
-              <span className="text-[10px]">ファイル</span>
+              <span className="text-[10px] whitespace-nowrap">ファイル</span>
             </Link>
             <button
               onClick={() => setShowBookmarkModal(true)}
@@ -895,7 +892,7 @@ export function Sidebar({
               <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
               </svg>
-              <span className="text-[10px]">保存</span>
+              <span className="text-[10px] whitespace-nowrap">保存</span>
             </button>
           </div>
 
