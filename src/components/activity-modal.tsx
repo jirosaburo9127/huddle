@@ -89,7 +89,10 @@ export function ActivityModal({ workspaceSlug, workspaceId, onClose }: Props) {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto hide-scrollbar">
+        <div
+          className="flex-1 overflow-y-auto overflow-x-hidden hide-scrollbar"
+          style={{ touchAction: "pan-y", overscrollBehavior: "contain" }}
+        >
           {loading ? (
             <div className="text-center py-10 text-sm text-muted">読み込み中...</div>
           ) : items.length === 0 ? (
