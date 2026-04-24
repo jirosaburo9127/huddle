@@ -1,34 +1,25 @@
-const CACHE_NAME = "huddle-v1";
-const OFFLINE_URL = "/offline.html";
+const CACHE_NAME = "huddle-v2";
 
-// インストール時にオフラインページをキャッシュ
-self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.add(OFFLINE_URL))
-  );
+// インストール時は即 activate する
+self.addEventListener("install", () => {
   self.skipWaiting();
 });
 
-// アクティベート時に古いキャッシュを削除
+// アクティベート時に古いキャッシュを全削除（v1 時代のオフラインキャッシュも除去）
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))
-      )
-    )
+    (async () => {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+      await self.clients.claim();
+    })()
   );
-  self.clients.claim();
 });
 
-// ネットワークファースト、失敗時にオフラインページ
-self.addEventListener("fetch", (event) => {
-  if (event.request.mode === "navigate") {
-    event.respondWith(
-      fetch(event.request).catch(() => caches.match(OFFLINE_URL))
-    );
-  }
-});
+// navigate fetch はブラウザに任せる（respondWith しない）
+// iOS WKWebView で SW が fetch を握ると <a href> のナビゲーションが
+// 発火しない症状が出たため、SW による navigation 横取りを完全に停止する。
+// （プッシュ通知の受信・クリックは下の handler で処理）
 
 // プッシュ通知受信
 self.addEventListener("push", (event) => {
