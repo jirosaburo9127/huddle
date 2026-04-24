@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
 import { createClient } from "@/lib/supabase/client";
+import { extractDisplayFileName } from "@/lib/file-name";
 
 type FileItem = {
   id: string;
@@ -24,16 +25,7 @@ const IMAGE_EXT = /\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i;
 const VIDEO_EXT = /\.(mp4|mov|webm|m4v)(\?.*)?$/i;
 const PDF_EXT = /\.pdf(\?.*)?$/i;
 
-function extractFileName(url: string): string {
-  try {
-    const segments = new URL(url).pathname.split("/");
-    const last = segments[segments.length - 1];
-    const match = last.match(/^[0-9a-f-]+-(.+)$/);
-    return match ? decodeURIComponent(match[1]) : decodeURIComponent(last);
-  } catch {
-    return "ファイル";
-  }
-}
+const extractFileName = extractDisplayFileName;
 
 function getFileType(url: string): FileItem["fileType"] {
   // URL全体とファイル名の両方で拡張子を探す

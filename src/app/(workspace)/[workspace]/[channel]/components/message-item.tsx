@@ -7,6 +7,7 @@ import { PollDisplay } from "./poll-display";
 import { EventDisplay } from "./event-display";
 import { ImageLightbox } from "@/components/image-lightbox";
 import { useReactorNames } from "@/lib/use-reactor-names";
+import { extractDisplayFileName } from "@/lib/file-name";
 
 type Props = {
   message: MessageWithProfile;
@@ -51,19 +52,8 @@ function isVideoFile(url: string): boolean {
   return /\.(mp4|mov|webm|m4v)(\?.*)?$/i.test(url);
 }
 
-// URLからファイル名を抽出
-function extractFileName(url: string): string {
-  try {
-    const pathname = new URL(url).pathname;
-    const segments = pathname.split("/");
-    const lastSegment = segments[segments.length - 1];
-    // UUID-filename.ext の形式からファイル名部分を取得
-    const match = lastSegment.match(/^[0-9a-f-]+-(.+)$/);
-    return match ? decodeURIComponent(match[1]) : decodeURIComponent(lastSegment);
-  } catch {
-    return "ファイル";
-  }
-}
+// URLからファイル名を抽出（#name=... を優先、なければ UUID プレフィックスを除去）
+const extractFileName = extractDisplayFileName;
 
 // HTMLタグをエスケープ（XSS対策）
 function escapeHtml(text: string): string {

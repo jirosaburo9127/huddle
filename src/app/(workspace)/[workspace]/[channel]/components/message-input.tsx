@@ -591,11 +591,15 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
         .from("chat-files")
         .getPublicUrl(path);
 
+      // 公開URLに元のファイル名を #name=... として埋め込む
+      // ストレージはサニタイズ名で保存するが、表示は元の名前を使いたいため
+      const urlWithName = `${urlData.publicUrl}#name=${encodeURIComponent(file.name)}`;
+
       // 即送信せず保留キューに入れる
       setPendingAttachments((prev) => [
         ...prev,
         {
-          url: urlData.publicUrl,
+          url: urlWithName,
           name: file.name,
           type: file.type,
           isImage: file.type.startsWith("image/"),
