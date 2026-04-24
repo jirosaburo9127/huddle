@@ -131,6 +131,13 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
               </a>
               <a
                 href={`/${workspaceSlug}/files`}
+                onClick={(e) => {
+                  // 診断: タップが届いているか / ナビゲートが始まるか
+                  // eslint-disable-next-line no-alert
+                  alert(`files tap: about to navigate to /${workspaceSlug}/files`);
+                  // デフォルトのナビゲーションを止めない（preventDefault しない）
+                  void e;
+                }}
                 className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
               >
                 <span className="w-12 h-12 rounded-full border-2 border-muted/40 flex items-center justify-center">
