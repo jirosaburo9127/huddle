@@ -21,11 +21,27 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
   const [showBookmark, setShowBookmark] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
 
-  // URL が変わったらモーダルを閉じる（click ハンドラで setState すると
+  // URL が変わったらポップオーバーを閉じる（click ハンドラで setState すると
   // iOS WKWebView で Link の navigation が消える問題への対処）
   useEffect(() => {
     setShowMore(false);
   }, [pathname]);
+
+  // ポップオーバー外タップで閉じる（その他ボタン自身と中身は除外）
+  useEffect(() => {
+    if (!showMore) return;
+    function onDown(e: MouseEvent | TouchEvent) {
+      const target = e.target as Node | null;
+      if (!target) return;
+      const popover = document.querySelector("[data-more-popover]");
+      const trigger = document.querySelector("[data-more-trigger]");
+      if (popover?.contains(target)) return;
+      if (trigger?.contains(target)) return;
+      setShowMore(false);
+    }
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [showMore]);
 
   const isHome = !pathname.includes("/dm-list") && !pathname.includes("/in-progress") && !pathname.includes("/calendar") && !pathname.includes("/files") && !pathname.includes("/dashboard");
   const isInProgress = pathname.includes("/in-progress");
@@ -93,6 +109,7 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
 
           {/* その他 */}
           <button
+            data-more-trigger
             onClick={() => setShowMore((v) => !v)}
             className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-lg transition-colors ${
               showMore ? "text-accent" : "text-muted"
@@ -106,11 +123,16 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
         </div>
       </nav>
 
-      {/* その他メニュー */}
+      {/* その他メニュー（オーバーレイを使わずに下タブ上に浮くドロップアップ）
+          fixed inset-0 で全画面を覆う overlay + backdrop の構造は
+          iOS WKWebView で内部リンクの navigation を阻害する既知問題があったため、
+          ポップオーバー風の部分的な fixed 配置に変更 */}
       {showMore && (
-        <div className="fixed inset-0 z-[60] flex items-end lg:hidden" onClick={() => setShowMore(false)}>
-          <div className="absolute inset-0 bg-black/40" />
-          <div className="relative w-full mb-16 mx-4 rounded-2xl bg-sidebar border border-border p-4 animate-slide-up" onClick={(e) => e.stopPropagation()}>
+        <div
+          data-more-popover
+          className="fixed bottom-14 left-0 right-0 z-[56] mx-4 rounded-2xl bg-sidebar border border-border p-4 animate-slide-up shadow-xl lg:hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
             <div className="grid grid-cols-3 gap-3">
               <Link
                 href={`/${workspaceSlug}/search`}
@@ -168,7 +190,6 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
                 <span className="text-xs text-foreground">メンバー</span>
               </button>
             </div>
-          </div>
         </div>
       )}
 
