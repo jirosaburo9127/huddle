@@ -21,11 +21,13 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
   const [showBookmark, setShowBookmark] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
 
-  // URL が変わったらポップオーバーを閉じる（click ハンドラで setState すると
-  // iOS WKWebView で Link の navigation が消える問題への対処）
+  // URL が変わったらポップオーバーとサイドバーを閉じる。
+  // （iOS で "タップしても画面変わらない" と見えていたのは、実は navigation は
+  // 成功していて、開きっぱなしのサイドバーが新しいページの上を覆っていただけ）
   useEffect(() => {
     setShowMore(false);
-  }, [pathname]);
+    setSidebarOpen(false);
+  }, [pathname, setSidebarOpen]);
 
   // ポップオーバー外タップで閉じる（その他ボタン自身と中身は除外）
   useEffect(() => {
