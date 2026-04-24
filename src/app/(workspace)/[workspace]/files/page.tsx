@@ -70,18 +70,26 @@ export default function FilesPage() {
     (async () => {
       try {
         const supabase = createClient();
-        // workspaces → channels → messages を1ラウンドトリップで取得
-        const { data, error } = await supabase
+        // 15秒タイムアウトで「永遠にローディング」を防ぐ
+        const timeout = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("timeout")), 15000)
+        );
+        // has_file 生成列+部分インデックス (055 migration) を使って高速取得
+        const query = supabase
           .from("messages")
           .select(
             "id, content, created_at, channels!inner(name, slug, is_dm, workspaces!inner(slug)), profiles!inner(display_name, avatar_url)"
           )
           .is("deleted_at", null)
+          .eq("has_file", true)
           .eq("channels.is_dm", false)
           .eq("channels.workspaces.slug", params.workspace)
-          .like("content", "%supabase%storage%chat-files%")
           .order("created_at", { ascending: false })
           .limit(100);
+        const { data, error } = await Promise.race([
+          query,
+          timeout as unknown as ReturnType<typeof query>,
+        ]);
 
         if (cancelled) return;
 
