@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
@@ -61,8 +61,7 @@ export default function FilesPage() {
   const [items, setItems] = useState<FileItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
-  const tabScrollRef = useRef<HTMLDivElement>(null);
-  useHorizontalOnlyScroll(tabScrollRef);
+  const tabsRef = useHorizontalOnlyScroll();
   const [filter, setFilter] = useState<"all" | FileItem["fileType"]>("all");
 
   useEffect(() => {
@@ -82,7 +81,7 @@ export default function FilesPage() {
           .eq("channels.workspaces.slug", params.workspace)
           .like("content", "%supabase%storage%chat-files%")
           .order("created_at", { ascending: false })
-          .limit(200);
+          .limit(100);
 
         if (cancelled) return;
 
@@ -183,7 +182,7 @@ export default function FilesPage() {
           {/* フィルタータブ + 検索ボックス（決定事項ページと同じファイルタブ型） */}
           <div className="flex items-end gap-2 mb-4 border-b border-border -mx-1 px-1">
             <div
-              ref={tabScrollRef}
+              ref={tabsRef}
               className="flex-1 flex items-end gap-0.5 overflow-x-auto hide-scrollbar min-w-0"
               style={{ touchAction: "pan-x" }}
             >

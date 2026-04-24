@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
@@ -30,8 +30,7 @@ export default function InProgressPage() {
   const [loading, setLoading] = useState(true);
   // チャンネルフィルタ: null = 全て
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
-  const tabScrollRef = useRef<HTMLDivElement>(null);
-  useHorizontalOnlyScroll(tabScrollRef);
+  const tabsRef = useHorizontalOnlyScroll();
 
   useEffect(() => {
     (async () => {
@@ -119,7 +118,7 @@ export default function InProgressPage() {
         <div className="px-6 pt-4 shrink-0">
           <div className="max-w-3xl mx-auto">
             <div
-              ref={tabScrollRef}
+              ref={tabsRef}
               className="flex items-end gap-1 border-b border-border overflow-x-auto hide-scrollbar -mx-1 px-1"
               style={{ touchAction: "pan-x" }}
             >

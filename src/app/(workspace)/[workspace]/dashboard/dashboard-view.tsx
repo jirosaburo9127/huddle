@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
 import { createClient } from "@/lib/supabase/client";
@@ -93,8 +93,7 @@ export function DashboardView({
   // 期間フィルタ: null = 全期間
   type DateRange = "week" | "month" | null;
   const [dateRange, setDateRange] = useState<DateRange>(null);
-  const tabScrollRef = useRef<HTMLDivElement>(null);
-  useHorizontalOnlyScroll(tabScrollRef);
+  const tabsRef = useHorizontalOnlyScroll();
 
   // 決定事項に登場するチャンネルをユニーク抽出（件数も集計）
   const channelFacets = useMemo(() => {
@@ -314,7 +313,7 @@ export function DashboardView({
           {/* チャンネルフィルタ（ファイルタブ型 / 角丸上+下線ベース） */}
           {channelFacets.length > 0 && (
             <div
-              ref={tabScrollRef}
+              ref={tabsRef}
               className="print:hidden flex items-end gap-1 mb-4 border-b border-border overflow-x-auto hide-scrollbar -mx-1 px-1"
               style={{ touchAction: "pan-x" }}
             >
