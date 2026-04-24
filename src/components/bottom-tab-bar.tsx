@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
@@ -24,7 +24,14 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
   // URL が変わったらポップオーバーとサイドバーを閉じる。
   // （iOS で "タップしても画面変わらない" と見えていたのは、実は navigation は
   // 成功していて、開きっぱなしのサイドバーが新しいページの上を覆っていただけ）
+  // ただし初回マウント時は skip: ワークスペーストップ /ws-xxx でサイドバーを
+  // 自動表示する WorkspaceLobby の setSidebarOpen(true) を打ち消してしまうため
+  const initialMountRef = useRef(true);
   useEffect(() => {
+    if (initialMountRef.current) {
+      initialMountRef.current = false;
+      return;
+    }
     setShowMore(false);
     setSidebarOpen(false);
   }, [pathname, setSidebarOpen]);
