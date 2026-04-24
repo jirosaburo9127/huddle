@@ -273,6 +273,16 @@ function ReactionBadges({
   const [longPressNames, setLongPressNames] = useState<{ emoji: string; names: string[]; reacted: boolean } | null>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showQuickPicker, setShowQuickPicker] = useState(false);
+  // PCピッカーをモバイルで常時マウントすると、ピッカーの外側クリック検知が
+  // モバイル側モーダルの絵文字タップを「外側クリック」扱いでモーダルを閉じてしまい
+  // 結果として onReact が発火しない。デバイス幅で排他的にマウントする。
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => {
+    const check = () => setIsDesktop(typeof window !== "undefined" && window.innerWidth >= 1024);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   // モバイル: タップで誰がリアクションしたかモーダル表示
   function handleTap(emoji: string, names: string[], reacted: boolean) {
@@ -334,10 +344,10 @@ function ReactionBadges({
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
               </svg>
             </button>
-            {showQuickPicker && (
+            {showQuickPicker && !isDesktop && (
               <>
                 {/* モバイル: 画面下からスライドアップ（LINE方式） */}
-                <div className="fixed inset-0 z-[60] flex items-end lg:hidden" onClick={() => setShowQuickPicker(false)}>
+                <div className="fixed inset-0 z-[60] flex items-end" onClick={() => setShowQuickPicker(false)}>
                   <div className="absolute inset-0 bg-black/40" />
                   <div className="relative w-full animate-slide-up" onClick={(e) => e.stopPropagation()}>
                     <div className="w-full rounded-t-2xl bg-sidebar border-t border-border shadow-xl p-4 pb-20">
@@ -376,15 +386,15 @@ function ReactionBadges({
                     </div>
                   </div>
                 </div>
-                {/* PC: 上方向に表示 */}
-                <div className="hidden lg:block">
-                  <EmojiPicker
-                    onSelect={(em) => { setShowQuickPicker(false); onReact(em); }}
-                    onClose={() => setShowQuickPicker(false)}
-                    position="above"
-                  />
-                </div>
               </>
+            )}
+            {showQuickPicker && isDesktop && onReact && (
+              /* PC: 上方向に表示（モバイルでは一切マウントしない） */
+              <EmojiPicker
+                onSelect={(em) => { setShowQuickPicker(false); onReact(em); }}
+                onClose={() => setShowQuickPicker(false)}
+                position="above"
+              />
             )}
           </div>
         )}
