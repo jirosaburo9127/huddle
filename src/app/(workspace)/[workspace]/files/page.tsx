@@ -102,24 +102,18 @@ export default function FilesPage() {
   useEffect(() => {
     (async () => {
       const supabase = createClient();
-      const { data: ws } = await supabase
-        .from("workspaces")
-        .select("id")
-        .eq("slug", params.workspace)
-        .maybeSingle();
-      if (!ws) { setLoading(false); return; }
-
-      // Storage URLを含むメッセージを取得
+      // workspaces → channels → messages を1ラウンドトリップで取得
       const { data } = await supabase
         .from("messages")
         .select(
-          "id, content, created_at, channels!inner(name, slug, workspace_id, is_dm), profiles!inner(display_name, avatar_url)"
+          "id, content, created_at, channels!inner(name, slug, is_dm, workspaces!inner(slug)), profiles!inner(display_name, avatar_url)"
         )
         .is("deleted_at", null)
-        .eq("channels.workspace_id", ws.id)
+        .eq("channels.is_dm", false)
+        .eq("channels.workspaces.slug", params.workspace)
         .like("content", "%supabase%storage%chat-files%")
         .order("created_at", { ascending: false })
-        .limit(500);
+        .limit(200);
 
       if (data) {
         const files: FileItem[] = [];
@@ -169,21 +163,34 @@ export default function FilesPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <header className="flex items-center px-6 py-3 border-b border-border bg-header shrink-0">
+      <header className="flex items-center gap-2 px-6 py-3 border-b border-border bg-header shrink-0">
         <button
           type="button"
           onClick={() => setSidebarOpen(true)}
-          className="lg:hidden mr-2 p-1 text-muted hover:text-foreground rounded transition-colors"
+          className="lg:hidden p-1 text-muted hover:text-foreground rounded transition-colors shrink-0"
           aria-label="戻る"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
-        <svg className="w-5 h-5 text-muted mr-2" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+        <svg className="w-5 h-5 text-muted shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
         </svg>
-        <h1 className="font-bold text-lg">ファイル</h1>
+        <h1 className="font-bold text-lg shrink-0">ファイル</h1>
+        {/* モバイル: ヘッダー右端に検索 */}
+        <div className="lg:hidden ml-auto relative flex-1 max-w-[220px]">
+          <svg className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted pointer-events-none" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 10a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="ファイル名で検索"
+            className="w-full bg-input-bg border border-border rounded-lg pl-7 pr-2 py-1 text-xs text-foreground placeholder:text-muted/60 outline-none focus:border-accent transition-colors"
+          />
+        </div>
       </header>
 
       <div className="flex-1 overflow-y-auto p-4 hide-scrollbar">
@@ -217,7 +224,8 @@ export default function FilesPage() {
                 );
               })}
             </div>
-            <div className="shrink-0 pb-1">
+            {/* PC 専用の検索ボックス（モバイルはヘッダーに移動） */}
+            <div className="hidden lg:block shrink-0 pb-1">
               <div className="relative">
                 <svg className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted pointer-events-none" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 10a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -227,7 +235,7 @@ export default function FilesPage() {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="ファイル名で検索"
-                  className="w-28 lg:w-44 bg-input-bg border border-border rounded-lg pl-7 pr-2 py-1 text-xs lg:text-sm text-foreground placeholder:text-muted/60 outline-none focus:border-accent transition-colors"
+                  className="w-44 bg-input-bg border border-border rounded-lg pl-7 pr-2 py-1 text-sm text-foreground placeholder:text-muted/60 outline-none focus:border-accent transition-colors"
                 />
               </div>
             </div>
