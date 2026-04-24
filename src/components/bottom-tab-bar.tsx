@@ -72,18 +72,18 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
             <span className="text-[10px]">カレンダー</span>
           </Link>
 
-          {/* 決定事項 */}
+          {/* [DIAG] 決定 → /files に一時的に向ける (切り分けテスト) */}
           <Link
-            href={`/${workspaceSlug}/dashboard`}
+            href={`/${workspaceSlug}/files`}
             onClick={() => setSidebarOpen(false)}
             className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-lg transition-colors ${
-              pathname.includes("/dashboard") ? "text-accent" : "text-muted"
+              pathname.includes("/files") ? "text-accent" : "text-muted"
             }`}
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <span className="text-[10px]">決定</span>
+            <span className="text-[10px]">決定=files</span>
           </Link>
 
           {/* その他 */}
@@ -123,10 +123,10 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
                 <span className="text-xs text-foreground">検索</span>
               </a>
               <a
-                href={`/${workspaceSlug}/dm-list`}
+                href={`/${workspaceSlug}/in-progress`}
                 onPointerUp={(e) => {
                   e.preventDefault();
-                  window.open(`/${workspaceSlug}/dm-list`, "_self");
+                  window.open(`/${workspaceSlug}/in-progress`, "_self");
                 }}
                 className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
               >
