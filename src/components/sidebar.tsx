@@ -563,7 +563,7 @@ export function Sidebar({
             </button>
             {/* ワークスペース切り替えドロップダウン */}
             {showWsSwitcher && (
-              <div className="absolute left-0 top-full mt-1 w-full bg-sidebar border border-border rounded-xl shadow-lg z-50 py-1 animate-fade-in">
+              <div className="absolute left-0 top-full mt-1 w-56 bg-sidebar border border-border rounded-xl shadow-lg z-50 py-1 animate-fade-in">
                 {allWorkspaces.map((ws) => {
                   const wsUnread = unreadByWorkspace[ws.id] || 0;
                   return (
