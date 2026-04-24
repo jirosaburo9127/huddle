@@ -12,6 +12,7 @@ import { InviteModal } from "@/components/invite-modal";
 import { BookmarkModal } from "@/components/bookmark-modal";
 import { WsMembersModal } from "@/components/ws-members-modal";
 import { ChannelMembersModal } from "@/components/channel-members-modal";
+import { ActivityModal } from "@/components/activity-modal";
 import { ThemeSelector } from "@/components/theme-selector";
 import { MfaSetup } from "@/components/mfa-setup";
 import { SecuritySettings } from "@/components/security-settings";
@@ -103,6 +104,9 @@ export function Sidebar({
   const [channelMembersMap, setChannelMembersMap] = useState<Record<string, string[]>>({});
   // チャンネルメンバー一覧モーダル: 開いているチャンネルID (null = 閉)
   const [membersModalChannelId, setMembersModalChannelId] = useState<string | null>(null);
+  // アクティビティ（自分の投稿へのリアクション通知）
+  const [showActivity, setShowActivity] = useState(false);
+  const [hasUnreadActivity, setHasUnreadActivity] = useState(false);
 
   async function handleAddCategory() {
     if (!newCatLabel.trim() || catAdding) return;
@@ -361,6 +365,14 @@ export function Sidebar({
 
       // ネイティブ（iOS）アプリアイコンのバッジもここで一緒に同期
       syncAppBadgeFromServer(currentUserId);
+
+      // アクティビティ (自分の投稿へのリアクション) 未読判定
+      const { data: hasAct } = await supabase.rpc("has_unread_activity", {
+        p_user_id: currentUserId,
+      });
+      if (!cancelled && typeof hasAct === "boolean") {
+        setHasUnreadActivity(hasAct);
+      }
     }
 
     // マウント直後・ワークスペース切替直後に必ず1回同期する
@@ -382,10 +394,16 @@ export function Sidebar({
       setDecisionUnreadCount(0);
     }
 
+    // アクティビティモーダルで既読にした瞬間にバッジを消す
+    function onActivitySeen() {
+      setHasUnreadActivity(false);
+    }
+
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", onVisible);
     window.addEventListener("huddle:appResumed", onAppResume);
     window.addEventListener("huddle:decisionsRead", onDecisionsRead);
+    window.addEventListener("huddle:activitySeen", onActivitySeen);
 
     // 15秒ごとにサーバーと同期（Realtime取りこぼし+既読状態の安定化）
     const poll = setInterval(refetchUnread, 10000);
@@ -397,6 +415,7 @@ export function Sidebar({
       window.removeEventListener("focus", onVisible);
       window.removeEventListener("huddle:appResumed", onAppResume);
       window.removeEventListener("huddle:decisionsRead", onDecisionsRead);
+      window.removeEventListener("huddle:activitySeen", onActivitySeen);
     };
     // currentChannelId を依存配列に含めない:
     // チャンネル切替ごとに get_unread_counts を呼ぶと、RPCの結果で
@@ -700,6 +719,20 @@ export function Sidebar({
           </button>
           </div>
             </div>
+            {/* アクティビティ (ベル): モバイルは独り言左、PCはプロフィール左 */}
+            <button
+              type="button"
+              onClick={() => setShowActivity(true)}
+              aria-label="アクティビティ"
+              className="relative shrink-0 p-1.5 text-muted hover:text-foreground rounded-lg hover:bg-white/[0.04] transition-colors"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
+              </svg>
+              {hasUnreadActivity && (
+                <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-mention" aria-hidden="true" />
+              )}
+            </button>
             {/* 独り言ボタン（モバイルのみ、アバター左に吹き出し風） */}
             {hitorigotoChannel && (
               <Link
@@ -1187,6 +1220,14 @@ export function Sidebar({
           workspaceId={workspace.id}
           currentUserId={currentUserId}
           onClose={() => setMembersModalChannelId(null)}
+        />
+      )}
+
+      {/* アクティビティ（自分の投稿へのリアクション一覧） */}
+      {showActivity && (
+        <ActivityModal
+          workspaceSlug={workspaceSlug}
+          onClose={() => setShowActivity(false)}
         />
       )}
 
