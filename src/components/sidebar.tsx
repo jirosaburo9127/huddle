@@ -544,12 +544,12 @@ export function Sidebar({
                 WORKSPACE
               </div>
           <div className="flex items-center gap-1">
-          <div className="relative flex-1 min-w-0" ref={wsSwitcherRef}>
+          <div className="relative min-w-0" ref={wsSwitcherRef}>
             <button
               onClick={() => setShowWsSwitcher((prev) => !prev)}
-              className="flex items-center gap-1.5 text-lg font-bold text-foreground hover:text-accent transition-colors truncate w-full text-left"
+              className="flex items-center gap-1.5 text-lg font-bold text-foreground hover:text-accent transition-colors text-left max-w-full"
             >
-              <span className="truncate">{workspace.name}</span>
+              <span className="truncate max-w-[7em]">{workspace.name}</span>
               {/* 他のワークスペースに未読がある時はドットを表示 */}
               {Object.keys(unreadByWorkspace).length > 0 && (
                 <span
