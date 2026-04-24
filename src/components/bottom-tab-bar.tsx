@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
 import { BookmarkModal } from "@/components/bookmark-modal";
 import { WsMembersModal } from "@/components/ws-members-modal";
@@ -16,11 +16,16 @@ type Props = {
 
 export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, members }: Props) {
   const pathname = usePathname();
-  const router = useRouter();
   const setSidebarOpen = useMobileNavStore((s) => s.setSidebarOpen);
   const [showMore, setShowMore] = useState(false);
   const [showBookmark, setShowBookmark] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
+
+  // URL が変わったらモーダルを閉じる（click ハンドラで setState すると
+  // iOS WKWebView で Link の navigation が消える問題への対処）
+  useEffect(() => {
+    setShowMore(false);
+  }, [pathname]);
 
   const isHome = !pathname.includes("/dm-list") && !pathname.includes("/in-progress") && !pathname.includes("/calendar") && !pathname.includes("/files") && !pathname.includes("/dashboard");
   const isInProgress = pathname.includes("/in-progress");
@@ -72,18 +77,18 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
             <span className="text-[10px]">カレンダー</span>
           </Link>
 
-          {/* [DIAG] 決定 → /files に一時的に向ける (切り分けテスト) */}
+          {/* 決定事項 */}
           <Link
-            href={`/${workspaceSlug}/files`}
+            href={`/${workspaceSlug}/dashboard`}
             onClick={() => setSidebarOpen(false)}
             className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-lg transition-colors ${
-              pathname.includes("/files") ? "text-accent" : "text-muted"
+              pathname.includes("/dashboard") ? "text-accent" : "text-muted"
             }`}
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <span className="text-[10px]">決定=files</span>
+            <span className="text-[10px]">決定</span>
           </Link>
 
           {/* その他 */}
@@ -107,12 +112,8 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
           <div className="absolute inset-0 bg-black/40" />
           <div className="relative w-full mb-16 mx-4 rounded-2xl bg-sidebar border border-border p-4 animate-slide-up" onClick={(e) => e.stopPropagation()}>
             <div className="grid grid-cols-3 gap-3">
-              <a
+              <Link
                 href={`/${workspaceSlug}/search`}
-                onPointerUp={(e) => {
-                  e.preventDefault();
-                  window.open(`/${workspaceSlug}/search`, "_self");
-                }}
                 className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
               >
                 <span className="w-12 h-12 rounded-full border-2 border-muted/40 flex items-center justify-center">
@@ -121,13 +122,9 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
                   </svg>
                 </span>
                 <span className="text-xs text-foreground">検索</span>
-              </a>
-              <a
-                href={`/${workspaceSlug}/in-progress`}
-                onPointerUp={(e) => {
-                  e.preventDefault();
-                  window.open(`/${workspaceSlug}/in-progress`, "_self");
-                }}
+              </Link>
+              <Link
+                href={`/${workspaceSlug}/dm-list`}
                 className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
               >
                 <span className="w-12 h-12 rounded-full border-2 border-muted/40 flex items-center justify-center">
@@ -136,13 +133,9 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
                   </svg>
                 </span>
                 <span className="text-xs text-foreground">DM</span>
-              </a>
-              <a
+              </Link>
+              <Link
                 href={`/${workspaceSlug}/files`}
-                onPointerUp={(e) => {
-                  e.preventDefault();
-                  window.open(`/${workspaceSlug}/files`, "_self");
-                }}
                 className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
               >
                 <span className="w-12 h-12 rounded-full border-2 border-muted/40 flex items-center justify-center">
@@ -151,7 +144,7 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
                   </svg>
                 </span>
                 <span className="text-xs text-foreground">ファイル</span>
-              </a>
+              </Link>
               <button
                 onClick={() => { setShowMore(false); setShowBookmark(true); }}
                 className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
