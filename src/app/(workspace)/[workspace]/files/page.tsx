@@ -63,6 +63,9 @@ export default function FilesPage() {
   const [query, setQuery] = useState("");
   const tabsRef = useHorizontalOnlyScroll();
   const [filter, setFilter] = useState<"all" | FileItem["fileType"]>("all");
+  // SSR/CSR のハイドレーション不整合を回避: マウント完了後に描画する
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -152,6 +155,10 @@ export default function FilesPage() {
     for (const f of items) c[f.fileType] = (c[f.fileType] || 0) + 1;
     return c;
   }, [items]);
+
+  if (!mounted) {
+    return <div className="flex flex-col h-full" />;
+  }
 
   return (
     <div className="flex flex-col h-full">
