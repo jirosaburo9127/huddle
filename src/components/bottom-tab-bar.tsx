@@ -107,12 +107,8 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
           <div className="absolute inset-0 bg-black/40" />
           <div className="relative w-full mb-16 mx-4 rounded-2xl bg-sidebar border border-border p-4 animate-slide-up" onClick={(e) => e.stopPropagation()}>
             <div className="grid grid-cols-3 gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowMore(false);
-                  window.location.href = `/${workspaceSlug}/search`;
-                }}
+              <a
+                href={`/${workspaceSlug}/search`}
                 className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
               >
                 <span className="w-12 h-12 rounded-full border-2 border-muted/40 flex items-center justify-center">
@@ -121,13 +117,9 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
                   </svg>
                 </span>
                 <span className="text-xs text-foreground">検索</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowMore(false);
-                  window.location.href = `/${workspaceSlug}/dm-list`;
-                }}
+              </a>
+              <a
+                href={`/${workspaceSlug}/dm-list`}
                 className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
               >
                 <span className="w-12 h-12 rounded-full border-2 border-muted/40 flex items-center justify-center">
@@ -136,13 +128,9 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
                   </svg>
                 </span>
                 <span className="text-xs text-foreground">DM</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowMore(false);
-                  window.location.href = `/${workspaceSlug}/files`;
-                }}
+              </a>
+              <a
+                href={`/${workspaceSlug}/files`}
                 className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
               >
                 <span className="w-12 h-12 rounded-full border-2 border-muted/40 flex items-center justify-center">
@@ -151,7 +139,7 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
                   </svg>
                 </span>
                 <span className="text-xs text-foreground">ファイル</span>
-              </button>
+              </a>
               <button
                 onClick={() => { setShowMore(false); setShowBookmark(true); }}
                 className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
