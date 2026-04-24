@@ -70,15 +70,19 @@ export default function FilesPage() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    // 15秒経っても返ってこないなら強制的に諦める
+    const hardTimeout = setTimeout(() => {
+      if (!cancelled) {
+        cancelled = true;
+        setItems([]);
+        setLoading(false);
+      }
+    }, 15000);
     (async () => {
       try {
         const supabase = createClient();
-        // 15秒タイムアウトで「永遠にローディング」を防ぐ
-        const timeout = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("timeout")), 15000)
-        );
         // has_file 生成列+部分インデックス (055 migration) を使って高速取得
-        const query = supabase
+        const { data, error } = await supabase
           .from("messages")
           .select(
             "id, content, created_at, channels!inner(name, slug, is_dm, workspaces!inner(slug)), profiles!inner(display_name, avatar_url)"
@@ -89,10 +93,6 @@ export default function FilesPage() {
           .eq("channels.workspaces.slug", params.workspace)
           .order("created_at", { ascending: false })
           .limit(100);
-        const { data, error } = await Promise.race([
-          query,
-          timeout as unknown as ReturnType<typeof query>,
-        ]);
 
         if (cancelled) return;
 
@@ -137,9 +137,13 @@ export default function FilesPage() {
         setItems([]);
       } finally {
         if (!cancelled) setLoading(false);
+        clearTimeout(hardTimeout);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      clearTimeout(hardTimeout);
+    };
   }, [params.workspace]);
 
   const filtered = useMemo(() => {

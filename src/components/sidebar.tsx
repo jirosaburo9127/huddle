@@ -841,7 +841,6 @@ export function Sidebar({
             </Link>
             <Link
               href={`/${workspaceSlug}/files`}
-              prefetch
               onClick={() => setSidebarOpen(false)}
               className="flex flex-col items-center gap-1 px-2 py-1 rounded-lg text-muted hover:text-accent transition-colors"
               title="ファイル"
