@@ -98,8 +98,6 @@ export function Sidebar({
   const [newCatLabel, setNewCatLabel] = useState("");
   const [catAdding, setCatAdding] = useState(false);
   const [catError, setCatError] = useState("");
-  // 各チャンネルの所属ユーザーID (カテゴリ展開時の在室メンバー一覧に使う)
-  const [channelMembersMap, setChannelMembersMap] = useState<Record<string, string[]>>({});
 
   async function handleAddCategory() {
     if (!newCatLabel.trim() || catAdding) return;
@@ -250,32 +248,6 @@ export function Sidebar({
     const supabase = sidebarSupabaseRef.current;
     supabase.rpc("mark_channel_read", { p_channel_id: currentChannelId });
   }, [currentChannelId]);
-
-  // 各チャンネルの所属ユーザーIDを取得（カテゴリ展開時の在室メンバー表示用）
-  useEffect(() => {
-    let cancelled = false;
-    async function fetchChannelMembers() {
-      const supabase = sidebarSupabaseRef.current;
-      const ids = channels.map((c) => c.id);
-      if (ids.length === 0) {
-        if (!cancelled) setChannelMembersMap({});
-        return;
-      }
-      const { data } = await supabase
-        .from("channel_members")
-        .select("channel_id, user_id")
-        .in("channel_id", ids);
-      if (cancelled || !data) return;
-      const next: Record<string, string[]> = {};
-      for (const row of data as Array<{ channel_id: string; user_id: string }>) {
-        if (!next[row.channel_id]) next[row.channel_id] = [];
-        next[row.channel_id].push(row.user_id);
-      }
-      setChannelMembersMap(next);
-    }
-    fetchChannelMembers();
-    return () => { cancelled = true; };
-  }, [channels]);
 
   // ブラウザ通知許可リクエスト（マウント時に一度だけ）
   useEffect(() => {
@@ -685,6 +657,39 @@ export function Sidebar({
               </div>
             )}
           </div>
+          {/* ワークスペースメンバーのアバター列（参加者表示） */}
+          {members.length > 0 && (
+            <div className="flex items-center shrink-0">
+              <div className="flex -space-x-1.5">
+                {members.slice(0, 5).map((m) => {
+                  const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
+                  if (!p) return null;
+                  const initial = (p.display_name || "?")[0]?.toUpperCase();
+                  return p.avatar_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      key={m.user_id}
+                      src={p.avatar_url}
+                      alt={p.display_name}
+                      title={p.display_name}
+                      className="w-5 h-5 rounded-full object-cover border border-sidebar"
+                    />
+                  ) : (
+                    <div
+                      key={m.user_id}
+                      title={p.display_name}
+                      className="w-5 h-5 rounded-full bg-accent/20 flex items-center justify-center border border-sidebar"
+                    >
+                      <span className="text-[9px] font-bold text-accent leading-none">{initial}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              {members.length > 5 && (
+                <span className="ml-1 text-[10px] text-muted">+{members.length - 5}</span>
+              )}
+            </div>
+          )}
           {/* WSメンバー一覧ボタン（PCのみ） */}
           <button
             onClick={() => setShowWsMembers(true)}
@@ -901,8 +906,6 @@ export function Sidebar({
             pathname={pathname}
             unreadState={unreadState}
             onNavigate={() => setSidebarOpen(false)}
-            channelMembersMap={channelMembersMap}
-            workspaceMembers={members}
           />
 
           {/* 独り言チャンネル（カテゴリの下、PCのみ。モバイルはヘッダー横） */}
@@ -1524,10 +1527,6 @@ type ChannelCategoryListProps = {
   pathname: string;
   unreadState: Record<string, number>;
   onNavigate: () => void;
-  // channel.id → その channel に所属するユーザーID配列
-  channelMembersMap: Record<string, string[]>;
-  // ワークスペースメンバー（user_id → profile を引くための元ネタ）
-  workspaceMembers: WorkspaceMember[];
 };
 
 const COLLAPSED_KEY = "huddle:sidebar:collapsedCategories";
@@ -1539,18 +1538,7 @@ function ChannelCategoryList({
   pathname,
   unreadState,
   onNavigate,
-  channelMembersMap,
-  workspaceMembers,
 }: ChannelCategoryListProps) {
-  // user_id → profile
-  const profileById = useMemo(() => {
-    const m = new Map<string, { display_name: string; avatar_url: string | null }>();
-    for (const mem of workspaceMembers) {
-      const p = Array.isArray(mem.profiles) ? mem.profiles[0] : mem.profiles;
-      if (p) m.set(mem.user_id, { display_name: p.display_name, avatar_url: p.avatar_url });
-    }
-    return m;
-  }, [workspaceMembers]);
   // 折りたたみ状態をlocalStorageに保存。初期値は「全カテゴリ折りたたみ」
   const [collapsed, setCollapsed] = useState<Set<string>>(() => {
     const all = new Set<string>(categories.map((c) => c.slug));
@@ -1621,19 +1609,6 @@ function ChannelCategoryList({
     { key: "__uncategorized__", label: UNCATEGORIZED_LABEL },
   ], [categories]);
 
-  // 各カテゴリ内のチャンネルに所属する全ユーザーID (ユニーク化)
-  const memberIdsByCategory = useMemo(() => {
-    const result = new Map<string, string[]>();
-    for (const [key, list] of grouped.entries()) {
-      const set = new Set<string>();
-      for (const ch of list) {
-        for (const uid of channelMembersMap[ch.id] || []) set.add(uid);
-      }
-      result.set(key, Array.from(set));
-    }
-    return result;
-  }, [grouped, channelMembersMap]);
-
   return (
     <div className="space-y-0.5">
       {sections.map(({ key, label }) => {
@@ -1645,7 +1620,6 @@ function ChannelCategoryList({
           (sum, ch) => sum + (unreadState[ch.id] || 0),
           0
         );
-        const catMemberIds = memberIdsByCategory.get(key) || [];
         return (
           <div key={key} className="mb-1">
             <div className="w-full flex items-center">
@@ -1672,38 +1646,6 @@ function ChannelCategoryList({
                   </span>
                 )}
               </button>
-              {/* 展開時: カテゴリ見出しの右にメンバーアバター列（重なり表示） */}
-              {!isCollapsed && catMemberIds.length > 0 && (
-                <div className="flex items-center shrink-0 pr-3">
-                  <div className="flex -space-x-1.5">
-                    {catMemberIds.slice(0, 5).map((uid) => {
-                      const p = profileById.get(uid);
-                      if (!p) return null;
-                      const initial = (p.display_name || "?")[0]?.toUpperCase();
-                      return p.avatar_url ? (
-                        <img
-                          key={uid}
-                          src={p.avatar_url}
-                          alt={p.display_name}
-                          title={p.display_name}
-                          className="w-4 h-4 rounded-full object-cover border border-sidebar"
-                        />
-                      ) : (
-                        <div
-                          key={uid}
-                          title={p.display_name}
-                          className="w-4 h-4 rounded-full bg-accent/20 flex items-center justify-center border border-sidebar"
-                        >
-                          <span className="text-[8px] font-bold text-accent leading-none">{initial}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {catMemberIds.length > 5 && (
-                    <span className="ml-1 text-[10px] text-muted">+{catMemberIds.length - 5}</span>
-                  )}
-                </div>
-              )}
             </div>
             {!isCollapsed &&
               list.map((channel) => {
