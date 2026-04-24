@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
@@ -60,6 +60,43 @@ export default function FilesPage() {
   const [items, setItems] = useState<FileItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
+  const tabScrollRef = useRef<HTMLDivElement>(null);
+
+  // iOS Capacitor: 横スクロール中に親ページの縦スクロールも発火して
+  // タブが上下に揺れる問題を JS で完全ブロックする
+  useEffect(() => {
+    const el = tabScrollRef.current;
+    if (!el) return;
+    let startX = 0;
+    let startY = 0;
+    let decided: "x" | "y" | null = null;
+
+    function onTouchStart(e: TouchEvent) {
+      if (e.touches.length !== 1) return;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      decided = null;
+    }
+    function onTouchMove(e: TouchEvent) {
+      if (e.touches.length !== 1) return;
+      const dx = e.touches[0].clientX - startX;
+      const dy = e.touches[0].clientY - startY;
+      if (decided === null) {
+        if (Math.abs(dx) > 6 || Math.abs(dy) > 6) {
+          decided = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+        }
+      }
+      // 横方向ジェスチャーと判定されたら、縦のスクロールを一切起こさない
+      if (decided === "x") e.preventDefault();
+    }
+
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    return () => {
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+    };
+  }, []);
   const [filter, setFilter] = useState<"all" | FileItem["fileType"]>("all");
 
   useEffect(() => {
@@ -154,8 +191,13 @@ export default function FilesPage() {
           {/* フィルタータブ + 検索ボックス（決定事項ページと同じファイルタブ型） */}
           <div className="flex items-end gap-2 mb-4 border-b border-border -mx-1 px-1">
             <div
+              ref={tabScrollRef}
               className="flex-1 flex items-end gap-0.5 overflow-x-auto hide-scrollbar min-w-0"
-              style={{ touchAction: "pan-x", overscrollBehavior: "contain" }}
+              style={{
+                touchAction: "pan-x",
+                overscrollBehavior: "none",
+                WebkitOverflowScrolling: "auto",
+              }}
             >
               {(["all", "pdf", "image", "video", "other"] as const).map((type) => {
                 const active = filter === type;
