@@ -1646,63 +1646,66 @@ function ChannelCategoryList({
           (sum, ch) => sum + (unreadState[ch.id] || 0),
           0
         );
+        const catMemberIds = memberIdsByCategory.get(key) || [];
         return (
           <div key={key} className="mb-1">
-            <button
-              type="button"
-              onClick={() => toggleCollapsed(key)}
-              className="w-full flex items-center gap-1.5 px-3 py-2 text-base font-semibold text-muted hover:text-foreground transition-colors"
-            >
-              <svg
-                className={`w-3.5 h-3.5 shrink-0 transition-transform ${
-                  isCollapsed ? "-rotate-90" : ""
-                }`}
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2.5}
-                viewBox="0 0 24 24"
+            <div className="w-full flex items-center">
+              <button
+                type="button"
+                onClick={() => toggleCollapsed(key)}
+                className="flex-1 min-w-0 flex items-center gap-1.5 px-3 py-2 text-base font-semibold text-muted hover:text-foreground transition-colors"
               >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-              </svg>
-              <span className="flex-1 text-left">■ {label}</span>
-              {isCollapsed && unreadTotal > 0 && (
-                <span className="bg-accent text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
-                  {unreadTotal > 99 ? "99+" : unreadTotal}
-                </span>
-              )}
-            </button>
-            {/* 展開時: カテゴリの所属メンバーアバター列 */}
-            {!isCollapsed && (memberIdsByCategory.get(key) || []).length > 0 && (
-              <div className="flex items-center flex-wrap gap-1 px-3 pb-2 -mt-1">
-                {(memberIdsByCategory.get(key) || []).slice(0, 8).map((uid) => {
-                  const p = profileById.get(uid);
-                  if (!p) return null;
-                  const initial = (p.display_name || "?")[0]?.toUpperCase();
-                  return p.avatar_url ? (
-                    <img
-                      key={uid}
-                      src={p.avatar_url}
-                      alt={p.display_name}
-                      title={p.display_name}
-                      className="w-6 h-6 rounded-full object-cover border border-border"
-                    />
-                  ) : (
-                    <div
-                      key={uid}
-                      title={p.display_name}
-                      className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center border border-border"
-                    >
-                      <span className="text-[10px] font-bold text-accent">{initial}</span>
-                    </div>
-                  );
-                })}
-                {(memberIdsByCategory.get(key) || []).length > 8 && (
-                  <span className="text-[11px] text-muted ml-0.5">
-                    +{(memberIdsByCategory.get(key) || []).length - 8}
+                <svg
+                  className={`w-3.5 h-3.5 shrink-0 transition-transform ${
+                    isCollapsed ? "-rotate-90" : ""
+                  }`}
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2.5}
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+                <span className="truncate text-left">■ {label}</span>
+                {isCollapsed && unreadTotal > 0 && (
+                  <span className="ml-auto bg-accent text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                    {unreadTotal > 99 ? "99+" : unreadTotal}
                   </span>
                 )}
-              </div>
-            )}
+              </button>
+              {/* 展開時: カテゴリ見出しの右にメンバーアバター列（重なり表示） */}
+              {!isCollapsed && catMemberIds.length > 0 && (
+                <div className="flex items-center shrink-0 pr-3">
+                  <div className="flex -space-x-1.5">
+                    {catMemberIds.slice(0, 5).map((uid) => {
+                      const p = profileById.get(uid);
+                      if (!p) return null;
+                      const initial = (p.display_name || "?")[0]?.toUpperCase();
+                      return p.avatar_url ? (
+                        <img
+                          key={uid}
+                          src={p.avatar_url}
+                          alt={p.display_name}
+                          title={p.display_name}
+                          className="w-4 h-4 rounded-full object-cover border border-sidebar"
+                        />
+                      ) : (
+                        <div
+                          key={uid}
+                          title={p.display_name}
+                          className="w-4 h-4 rounded-full bg-accent/20 flex items-center justify-center border border-sidebar"
+                        >
+                          <span className="text-[8px] font-bold text-accent leading-none">{initial}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {catMemberIds.length > 5 && (
+                    <span className="ml-1 text-[10px] text-muted">+{catMemberIds.length - 5}</span>
+                  )}
+                </div>
+              )}
+            </div>
             {!isCollapsed &&
               list.map((channel) => {
                 const href = `/${workspaceSlug}/${channel.slug}`;
