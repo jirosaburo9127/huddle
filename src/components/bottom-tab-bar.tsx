@@ -110,8 +110,8 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
               <button
                 type="button"
                 onClick={() => {
-                  router.push(`/${workspaceSlug}/search`);
                   setShowMore(false);
+                  window.location.href = `/${workspaceSlug}/search`;
                 }}
                 className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
               >
@@ -125,8 +125,8 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
               <button
                 type="button"
                 onClick={() => {
-                  router.push(`/${workspaceSlug}/dm-list`);
                   setShowMore(false);
+                  window.location.href = `/${workspaceSlug}/dm-list`;
                 }}
                 className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
               >
@@ -140,8 +140,8 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
               <button
                 type="button"
                 onClick={() => {
-                  router.push(`/${workspaceSlug}/files`);
                   setShowMore(false);
+                  window.location.href = `/${workspaceSlug}/files`;
                 }}
                 className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
               >
