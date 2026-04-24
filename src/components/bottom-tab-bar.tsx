@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
 import { BookmarkModal } from "@/components/bookmark-modal";
 import { WsMembersModal } from "@/components/ws-members-modal";
@@ -16,6 +16,7 @@ type Props = {
 
 export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, members }: Props) {
   const pathname = usePathname();
+  const router = useRouter();
   const setSidebarOpen = useMobileNavStore((s) => s.setSidebarOpen);
   const [showMore, setShowMore] = useState(false);
   const [showBookmark, setShowBookmark] = useState(false);
@@ -106,9 +107,12 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
           <div className="absolute inset-0 bg-black/40" />
           <div className="relative w-full mb-16 mx-4 rounded-2xl bg-sidebar border border-border p-4 animate-slide-up" onClick={(e) => e.stopPropagation()}>
             <div className="grid grid-cols-3 gap-3">
-              <Link
-                href={`/${workspaceSlug}/search`}
-                onClick={() => setShowMore(false)}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMore(false);
+                  requestAnimationFrame(() => router.push(`/${workspaceSlug}/search`));
+                }}
                 className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
               >
                 <span className="w-12 h-12 rounded-full border-2 border-muted/40 flex items-center justify-center">
@@ -117,10 +121,13 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
                   </svg>
                 </span>
                 <span className="text-xs text-foreground">検索</span>
-              </Link>
-              <Link
-                href={`/${workspaceSlug}/dm-list`}
-                onClick={() => setShowMore(false)}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMore(false);
+                  requestAnimationFrame(() => router.push(`/${workspaceSlug}/dm-list`));
+                }}
                 className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
               >
                 <span className="w-12 h-12 rounded-full border-2 border-muted/40 flex items-center justify-center">
@@ -129,10 +136,14 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
                   </svg>
                 </span>
                 <span className="text-xs text-foreground">DM</span>
-              </Link>
-              <Link
-                href={`/${workspaceSlug}/files`}
-                onClick={() => setShowMore(false)}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMore(false);
+                  // モーダルが閉じた後のフレームでナビゲーション（モバイルで Link が発火しない対策）
+                  requestAnimationFrame(() => router.push(`/${workspaceSlug}/files`));
+                }}
                 className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
               >
                 <span className="w-12 h-12 rounded-full border-2 border-muted/40 flex items-center justify-center">
@@ -141,7 +152,7 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
                   </svg>
                 </span>
                 <span className="text-xs text-foreground">ファイル</span>
-              </Link>
+              </button>
               <button
                 onClick={() => { setShowMore(false); setShowBookmark(true); }}
                 className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
