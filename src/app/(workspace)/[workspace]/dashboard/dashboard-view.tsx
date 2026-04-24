@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
 import { createClient } from "@/lib/supabase/client";
@@ -9,6 +9,7 @@ import {
   revokeShareToken,
 } from "@/lib/actions/share-tokens";
 import { generateDecisionsPdf, savePdf } from "@/lib/pdf-export";
+import { useHorizontalOnlyScroll } from "@/lib/use-horizontal-only-scroll";
 
 // メッセージ本文が画像URLかを判定（Supabase Storage公開URLは拡張子で判別）
 const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|bmp|avif)(\?.*)?$/i;
@@ -92,6 +93,8 @@ export function DashboardView({
   // 期間フィルタ: null = 全期間
   type DateRange = "week" | "month" | null;
   const [dateRange, setDateRange] = useState<DateRange>(null);
+  const tabScrollRef = useRef<HTMLDivElement>(null);
+  useHorizontalOnlyScroll(tabScrollRef);
 
   // 決定事項に登場するチャンネルをユニーク抽出（件数も集計）
   const channelFacets = useMemo(() => {
@@ -310,7 +313,11 @@ export function DashboardView({
 
           {/* チャンネルフィルタ（ファイルタブ型 / 角丸上+下線ベース） */}
           {channelFacets.length > 0 && (
-            <div className="print:hidden flex items-end gap-1 mb-4 border-b border-border overflow-x-auto -mx-1 px-1">
+            <div
+              ref={tabScrollRef}
+              className="print:hidden flex items-end gap-1 mb-4 border-b border-border overflow-x-auto hide-scrollbar -mx-1 px-1"
+              style={{ touchAction: "pan-x" }}
+            >
               <button
                 type="button"
                 onClick={() => setSelectedChannelId(null)}

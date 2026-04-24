@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
 import { createClient } from "@/lib/supabase/client";
 import { extractDisplayFileName } from "@/lib/file-name";
+import { useHorizontalOnlyScroll } from "@/lib/use-horizontal-only-scroll";
 
 type FileItem = {
   id: string;
@@ -61,90 +62,74 @@ export default function FilesPage() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const tabScrollRef = useRef<HTMLDivElement>(null);
-
-  // iOS Capacitor: 横スクロール中に親ページの縦スクロールも発火して
-  // タブが上下に揺れる問題を JS で完全ブロックする
-  useEffect(() => {
-    const el = tabScrollRef.current;
-    if (!el) return;
-    let startX = 0;
-    let startY = 0;
-    let decided: "x" | "y" | null = null;
-
-    function onTouchStart(e: TouchEvent) {
-      if (e.touches.length !== 1) return;
-      startX = e.touches[0].clientX;
-      startY = e.touches[0].clientY;
-      decided = null;
-    }
-    function onTouchMove(e: TouchEvent) {
-      if (e.touches.length !== 1) return;
-      const dx = e.touches[0].clientX - startX;
-      const dy = e.touches[0].clientY - startY;
-      if (decided === null) {
-        if (Math.abs(dx) > 6 || Math.abs(dy) > 6) {
-          decided = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
-        }
-      }
-      // 横方向ジェスチャーと判定されたら、縦のスクロールを一切起こさない
-      if (decided === "x") e.preventDefault();
-    }
-
-    el.addEventListener("touchstart", onTouchStart, { passive: true });
-    el.addEventListener("touchmove", onTouchMove, { passive: false });
-    return () => {
-      el.removeEventListener("touchstart", onTouchStart);
-      el.removeEventListener("touchmove", onTouchMove);
-    };
-  }, []);
+  useHorizontalOnlyScroll(tabScrollRef);
   const [filter, setFilter] = useState<"all" | FileItem["fileType"]>("all");
 
   useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
     (async () => {
-      const supabase = createClient();
-      // workspaces → channels → messages を1ラウンドトリップで取得
-      const { data } = await supabase
-        .from("messages")
-        .select(
-          "id, content, created_at, channels!inner(name, slug, is_dm, workspaces!inner(slug)), profiles!inner(display_name, avatar_url)"
-        )
-        .is("deleted_at", null)
-        .eq("channels.is_dm", false)
-        .eq("channels.workspaces.slug", params.workspace)
-        .like("content", "%supabase%storage%chat-files%")
-        .order("created_at", { ascending: false })
-        .limit(200);
+      try {
+        const supabase = createClient();
+        // workspaces → channels → messages を1ラウンドトリップで取得
+        const { data, error } = await supabase
+          .from("messages")
+          .select(
+            "id, content, created_at, channels!inner(name, slug, is_dm, workspaces!inner(slug)), profiles!inner(display_name, avatar_url)"
+          )
+          .is("deleted_at", null)
+          .eq("channels.is_dm", false)
+          .eq("channels.workspaces.slug", params.workspace)
+          .like("content", "%supabase%storage%chat-files%")
+          .order("created_at", { ascending: false })
+          .limit(200);
 
-      if (data) {
-        const files: FileItem[] = [];
-        for (const row of data as Array<{
-          id: string; content: string; created_at: string;
-          channels: unknown; profiles: unknown;
-        }>) {
-          const ch = Array.isArray(row.channels) ? row.channels[0] : (row.channels as { name: string; slug: string });
-          const p = Array.isArray(row.profiles) ? row.profiles[0] : (row.profiles as { display_name: string; avatar_url: string | null });
-          // メッセージ内の全Storage URLを抽出
-          const rawUrls = row.content.match(STORAGE_URL_RE) || [];
-          for (const rawUrl of rawUrls) {
-            const url = rawUrl.trim();
-            files.push({
-              id: `${row.id}-${url.slice(-8)}`,
-              message_id: row.id,
-              content: url,
-              created_at: row.created_at,
-              channel_name: ch?.name || "",
-              channel_slug: ch?.slug || "",
-              sender_name: p?.display_name || "メンバー",
-              sender_avatar: p?.avatar_url || null,
-              fileName: extractFileName(url),
-              fileType: getFileType(url),
-            });
-          }
+        if (cancelled) return;
+
+        if (error) {
+          // eslint-disable-next-line no-console
+          console.error("[files] fetch error:", error);
+          setItems([]);
+          return;
         }
-        setItems(files);
+
+        if (data) {
+          const files: FileItem[] = [];
+          for (const row of data as Array<{
+            id: string; content: string; created_at: string;
+            channels: unknown; profiles: unknown;
+          }>) {
+            const ch = Array.isArray(row.channels) ? row.channels[0] : (row.channels as { name: string; slug: string });
+            const p = Array.isArray(row.profiles) ? row.profiles[0] : (row.profiles as { display_name: string; avatar_url: string | null });
+            const rawUrls = row.content.match(STORAGE_URL_RE) || [];
+            for (const rawUrl of rawUrls) {
+              const url = rawUrl.trim();
+              files.push({
+                id: `${row.id}-${url.slice(-8)}`,
+                message_id: row.id,
+                content: url,
+                created_at: row.created_at,
+                channel_name: ch?.name || "",
+                channel_slug: ch?.slug || "",
+                sender_name: p?.display_name || "メンバー",
+                sender_avatar: p?.avatar_url || null,
+                fileName: extractFileName(url),
+                fileType: getFileType(url),
+              });
+            }
+          }
+          setItems(files);
+        }
+      } catch (err) {
+        if (cancelled) return;
+        // eslint-disable-next-line no-console
+        console.error("[files] exception:", err);
+        setItems([]);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      setLoading(false);
     })();
+    return () => { cancelled = true; };
   }, [params.workspace]);
 
   const filtered = useMemo(() => {
@@ -200,11 +185,7 @@ export default function FilesPage() {
             <div
               ref={tabScrollRef}
               className="flex-1 flex items-end gap-0.5 overflow-x-auto hide-scrollbar min-w-0"
-              style={{
-                touchAction: "pan-x",
-                overscrollBehavior: "none",
-                WebkitOverflowScrolling: "auto",
-              }}
+              style={{ touchAction: "pan-x" }}
             >
               {(["all", "pdf", "image", "video", "other"] as const).map((type) => {
                 const active = filter === type;

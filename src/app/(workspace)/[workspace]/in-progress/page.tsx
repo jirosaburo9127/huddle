@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
 import { createClient } from "@/lib/supabase/client";
+import { useHorizontalOnlyScroll } from "@/lib/use-horizontal-only-scroll";
 
 type InProgressItem = {
   id: string;
@@ -29,6 +30,8 @@ export default function InProgressPage() {
   const [loading, setLoading] = useState(true);
   // チャンネルフィルタ: null = 全て
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
+  const tabScrollRef = useRef<HTMLDivElement>(null);
+  useHorizontalOnlyScroll(tabScrollRef);
 
   useEffect(() => {
     (async () => {
@@ -111,11 +114,15 @@ export default function InProgressPage() {
         <h1 className="font-bold text-lg">進行中</h1>
       </header>
 
-      <div className="flex-1 overflow-y-auto p-6 hide-scrollbar">
-        <div className="max-w-3xl mx-auto">
-          {/* チャンネルタブ（ファイルタブ型 / 角丸上+下線ベース） */}
-          {!loading && channelFacets.length > 0 && (
-            <div className="flex items-end gap-1 mb-4 border-b border-border overflow-x-auto -mx-1 px-1">
+      {/* チャンネルタブ（縦スクロール領域の外に配置して iOS での縦揺れを防ぐ） */}
+      {!loading && channelFacets.length > 0 && (
+        <div className="px-6 pt-4 shrink-0">
+          <div className="max-w-3xl mx-auto">
+            <div
+              ref={tabScrollRef}
+              className="flex items-end gap-1 border-b border-border overflow-x-auto hide-scrollbar -mx-1 px-1"
+              style={{ touchAction: "pan-x" }}
+            >
               <button
                 type="button"
                 onClick={() => setSelectedChannelId(null)}
@@ -145,8 +152,12 @@ export default function InProgressPage() {
                 );
               })}
             </div>
-          )}
+          </div>
+        </div>
+      )}
 
+      <div className="flex-1 overflow-y-auto px-6 pt-4 pb-6 hide-scrollbar">
+        <div className="max-w-3xl mx-auto">
           <div className="space-y-3">
           {loading ? (
             <div className="text-center py-16 text-muted">読み込み中...</div>
