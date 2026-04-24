@@ -20,6 +20,7 @@ type Activity = {
 
 type Props = {
   workspaceSlug: string;
+  workspaceId: string;
   onClose: () => void;
 };
 
@@ -40,7 +41,7 @@ function previewContent(content: string): string {
   return firstLine.length > 40 ? firstLine.slice(0, 40) + "…" : firstLine;
 }
 
-export function ActivityModal({ workspaceSlug, onClose }: Props) {
+export function ActivityModal({ workspaceSlug, workspaceId, onClose }: Props) {
   const [items, setItems] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -52,6 +53,7 @@ export function ActivityModal({ workspaceSlug, onClose }: Props) {
       if (!user) { if (!cancelled) setLoading(false); return; }
       const { data } = await supabase.rpc("get_my_activities", {
         p_user_id: user.id,
+        p_workspace_id: workspaceId,
         p_limit: 50,
       });
       if (cancelled) return;
@@ -65,7 +67,7 @@ export function ActivityModal({ workspaceSlug, onClose }: Props) {
       setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [workspaceId]);
 
   return (
     <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center" onClick={onClose}>

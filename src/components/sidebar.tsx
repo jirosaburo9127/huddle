@@ -366,9 +366,10 @@ export function Sidebar({
       // ネイティブ（iOS）アプリアイコンのバッジもここで一緒に同期
       syncAppBadgeFromServer(currentUserId);
 
-      // アクティビティ (自分の投稿へのリアクション) 未読判定
+      // アクティビティ (自分の投稿へのリアクション) 未読判定（現WSのみ）
       const { data: hasAct } = await supabase.rpc("has_unread_activity", {
         p_user_id: currentUserId,
+        p_workspace_id: workspace.id,
       });
       if (!cancelled && typeof hasAct === "boolean") {
         setHasUnreadActivity(hasAct);
@@ -1227,6 +1228,7 @@ export function Sidebar({
       {showActivity && (
         <ActivityModal
           workspaceSlug={workspaceSlug}
+          workspaceId={workspace.id}
           onClose={() => setShowActivity(false)}
         />
       )}
