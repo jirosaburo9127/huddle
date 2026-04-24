@@ -123,16 +123,17 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
         </div>
       </nav>
 
-      {/* その他メニュー（オーバーレイを使わずに下タブ上に浮くドロップアップ）
-          fixed inset-0 で全画面を覆う overlay + backdrop の構造は
-          iOS WKWebView で内部リンクの navigation を阻害する既知問題があったため、
-          ポップオーバー風の部分的な fixed 配置に変更 */}
-      {showMore && (
-        <div
-          data-more-popover
-          className="fixed bottom-14 left-0 right-0 z-[56] mx-4 rounded-2xl bg-sidebar border border-border p-4 animate-slide-up shadow-xl lg:hidden"
-          onClick={(e) => e.stopPropagation()}
-        >
+      {/* その他メニュー
+          条件付きマウント({showMore && ...})だと iOS WKWebView でリンクの
+          navigation が壊れるケースがあったため、常にマウントして CSS で
+          visibility を切り替える方式に変更。 */}
+      <div
+        data-more-popover
+        aria-hidden={!showMore}
+        className={`fixed bottom-14 left-0 right-0 z-[56] mx-4 rounded-2xl bg-sidebar border border-border p-4 shadow-xl lg:hidden transition-opacity ${
+          showMore ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        }`}
+      >
             <div className="grid grid-cols-3 gap-3">
               <Link
                 href={`/${workspaceSlug}/search`}
@@ -190,8 +191,7 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
                 <span className="text-xs text-foreground">メンバー</span>
               </button>
             </div>
-        </div>
-      )}
+      </div>
 
       {showBookmark && (
         <BookmarkModal
