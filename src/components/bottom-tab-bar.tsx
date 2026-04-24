@@ -110,8 +110,8 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
               <button
                 type="button"
                 onClick={() => {
+                  router.push(`/${workspaceSlug}/search`);
                   setShowMore(false);
-                  requestAnimationFrame(() => router.push(`/${workspaceSlug}/search`));
                 }}
                 className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
               >
@@ -125,8 +125,8 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
               <button
                 type="button"
                 onClick={() => {
+                  router.push(`/${workspaceSlug}/dm-list`);
                   setShowMore(false);
-                  requestAnimationFrame(() => router.push(`/${workspaceSlug}/dm-list`));
                 }}
                 className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
               >
@@ -140,9 +140,8 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
               <button
                 type="button"
                 onClick={() => {
+                  router.push(`/${workspaceSlug}/files`);
                   setShowMore(false);
-                  // モーダルが閉じた後のフレームでナビゲーション（モバイルで Link が発火しない対策）
-                  requestAnimationFrame(() => router.push(`/${workspaceSlug}/files`));
                 }}
                 className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
               >
