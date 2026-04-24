@@ -1543,11 +1543,13 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                     <span className="text-xs font-bold text-accent">{myProfile?.display_name?.[0]?.toUpperCase() || "?"}</span>
                   </div>
                 )}
-                <input
-                  type="text"
+                <textarea
                   value={hitorigotoReplyContent}
                   onChange={(e) => setHitorigotoReplyContent(e.target.value)}
                   onKeyDown={async (e) => {
+                    // IME変換中の Enter は送信しない（変換確定が送信扱いになる問題の対策）
+                    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+                    // Shift+Enter は改行、通常の Enter だけ送信
                     if (e.key === "Enter" && !e.shiftKey && hitorigotoReplyContent.trim()) {
                       e.preventDefault();
                       setHitorigotoReplySending(true);
@@ -1556,8 +1558,9 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                       setHitorigotoReplySending(false);
                     }
                   }}
+                  rows={1}
                   placeholder="返信をポスト"
-                  className="flex-1 bg-input-bg border border-border rounded-full px-4 py-2 text-sm text-foreground outline-none focus:border-accent placeholder:text-muted/50"
+                  className="flex-1 bg-input-bg border border-border rounded-2xl px-4 py-2 text-sm text-foreground outline-none focus:border-accent placeholder:text-muted/50 resize-none leading-relaxed max-h-40"
                 />
                 <button
                   onClick={async () => {
