@@ -46,7 +46,6 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
   const isHome = !pathname.includes("/dm-list") && !pathname.includes("/in-progress") && !pathname.includes("/calendar") && !pathname.includes("/files") && !pathname.includes("/dashboard");
   const isInProgress = pathname.includes("/in-progress");
   const isCalendar = pathname.includes("/calendar");
-  const isFiles = pathname.includes("/files");
 
   return (
     <>
