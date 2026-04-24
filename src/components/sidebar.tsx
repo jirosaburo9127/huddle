@@ -11,6 +11,7 @@ import { CreateDmModal } from "@/components/create-dm-modal";
 import { InviteModal } from "@/components/invite-modal";
 import { BookmarkModal } from "@/components/bookmark-modal";
 import { WsMembersModal } from "@/components/ws-members-modal";
+import { ChannelMembersModal } from "@/components/channel-members-modal";
 import { ThemeSelector } from "@/components/theme-selector";
 import { MfaSetup } from "@/components/mfa-setup";
 import { SecuritySettings } from "@/components/security-settings";
@@ -100,6 +101,8 @@ export function Sidebar({
   const [catError, setCatError] = useState("");
   // 各チャンネルの所属ユーザーID (チャンネル行に参加者アバターを表示するため)
   const [channelMembersMap, setChannelMembersMap] = useState<Record<string, string[]>>({});
+  // チャンネルメンバー一覧モーダル: 開いているチャンネルID (null = 閉)
+  const [membersModalChannelId, setMembersModalChannelId] = useState<string | null>(null);
 
   async function handleAddCategory() {
     if (!newCatLabel.trim() || catAdding) return;
@@ -903,6 +906,7 @@ export function Sidebar({
             onNavigate={() => setSidebarOpen(false)}
             channelMembersMap={channelMembersMap}
             workspaceMembers={members}
+            onOpenMembers={(id) => setMembersModalChannelId(id)}
           />
 
           {/* 独り言チャンネル（カテゴリの下、PCのみ。モバイルはヘッダー横） */}
@@ -1173,6 +1177,16 @@ export function Sidebar({
           workspaceId={workspace.id}
           currentUserId={currentUserId}
           onClose={() => setShowWsMembers(false)}
+        />
+      )}
+
+      {/* チャンネルメンバー一覧モーダル (サイドバーのチャンネル行のアバタータップで開く) */}
+      {membersModalChannelId && (
+        <ChannelMembersModal
+          channelId={membersModalChannelId}
+          workspaceId={workspace.id}
+          currentUserId={currentUserId}
+          onClose={() => setMembersModalChannelId(null)}
         />
       )}
 
@@ -1528,6 +1542,8 @@ type ChannelCategoryListProps = {
   channelMembersMap: Record<string, string[]>;
   // ユーザーID → プロフィール解決用
   workspaceMembers: WorkspaceMember[];
+  // アバタータップで所属メンバー一覧モーダルを開くためのコールバック
+  onOpenMembers: (channelId: string) => void;
 };
 
 const COLLAPSED_KEY = "huddle:sidebar:collapsedCategories";
@@ -1541,6 +1557,7 @@ function ChannelCategoryList({
   onNavigate,
   channelMembersMap,
   workspaceMembers,
+  onOpenMembers,
 }: ChannelCategoryListProps) {
   // user_id → profile 変換マップ
   const profileById = useMemo(() => {
@@ -1695,9 +1712,19 @@ function ChannelCategoryList({
                     >
                       {channel.name}
                     </span>
-                    {/* チャンネル所属メンバーのアバター（最大3名、以上は +N） */}
+                    {/* チャンネル所属メンバーのアバター（最大3名、以上は +N）。タップでメンバー一覧モーダル */}
                     {chMemberIds.length > 0 && (
-                      <span className="flex items-center shrink-0 ml-2">
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        aria-label="このチャンネルのメンバー"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onOpenMembers(channel.id);
+                        }}
+                        className="flex items-center shrink-0 ml-2 p-0.5 rounded hover:bg-white/[0.08] active:bg-white/[0.12] transition-colors cursor-pointer"
+                      >
                         <span className="flex -space-x-1">
                           {chMemberIds.slice(0, 3).map((uid) => {
                             const p = profileById.get(uid);
