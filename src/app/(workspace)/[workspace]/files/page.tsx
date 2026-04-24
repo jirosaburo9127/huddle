@@ -153,14 +153,17 @@ export default function FilesPage() {
         <div className="max-w-3xl mx-auto">
           {/* フィルタータブ + 検索ボックス（決定事項ページと同じファイルタブ型） */}
           <div className="flex items-end gap-2 mb-4 border-b border-border -mx-1 px-1">
-            <div className="flex-1 flex items-end gap-1 overflow-x-auto hide-scrollbar min-w-0">
+            <div
+              className="flex-1 flex items-end gap-0.5 overflow-x-auto hide-scrollbar min-w-0"
+              style={{ touchAction: "pan-x", overscrollBehavior: "contain" }}
+            >
               {(["all", "pdf", "image", "video", "other"] as const).map((type) => {
                 const active = filter === type;
                 return (
                   <button
                     key={type}
                     onClick={() => setFilter(type)}
-                    className={`shrink-0 px-4 py-2 text-sm font-medium rounded-t-lg border border-b-0 -mb-px transition-colors ${
+                    className={`shrink-0 px-2.5 py-1.5 text-xs lg:text-sm font-medium rounded-t-lg border border-b-0 -mb-px transition-colors ${
                       active
                         ? "bg-accent text-white border-accent"
                         : "bg-white/[0.03] text-muted hover:text-foreground hover:bg-white/[0.08] border-border"
@@ -172,9 +175,9 @@ export default function FilesPage() {
                 );
               })}
             </div>
-            <div className="shrink-0 pb-1.5">
+            <div className="shrink-0 pb-1">
               <div className="relative">
-                <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted pointer-events-none" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <svg className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted pointer-events-none" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 10a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
                 <input
@@ -182,7 +185,7 @@ export default function FilesPage() {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="ファイル名で検索"
-                  className="w-36 lg:w-56 bg-input-bg border border-border rounded-lg pl-8 pr-3 py-1.5 text-sm text-foreground placeholder:text-muted/60 outline-none focus:border-accent transition-colors"
+                  className="w-28 lg:w-44 bg-input-bg border border-border rounded-lg pl-7 pr-2 py-1 text-xs lg:text-sm text-foreground placeholder:text-muted/60 outline-none focus:border-accent transition-colors"
                 />
               </div>
             </div>
