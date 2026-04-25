@@ -610,7 +610,7 @@ export function Sidebar({
           <div className="relative min-w-0" ref={wsSwitcherRef}>
             <button
               onClick={() => setShowWsSwitcher((prev) => !prev)}
-              className="flex items-center gap-1.5 text-lg font-bold text-foreground hover:text-accent transition-colors text-left max-w-full"
+              className="flex items-center gap-1.5 text-lg font-bold text-white hover:text-white/80 transition-colors text-left max-w-full"
             >
               <span className="truncate max-w-[7em]">{workspace.name}</span>
               {/* 他のワークスペースに未読がある時はドットを表示 */}
@@ -723,7 +723,7 @@ export function Sidebar({
           {/* WSメンバー一覧ボタン（PCのみ） */}
           <button
             onClick={() => setShowWsMembers(true)}
-            className="hidden lg:flex shrink-0 w-9 h-9 items-center justify-center text-muted hover:text-foreground rounded-lg hover:bg-white/[0.04] transition-colors"
+            className="hidden lg:flex shrink-0 w-9 h-9 items-center justify-center text-white/80 hover:text-white rounded-lg hover:bg-white/[0.1] transition-colors"
             title="ワークスペースメンバー"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -737,7 +737,7 @@ export function Sidebar({
               type="button"
               onClick={() => setShowActivity(true)}
               aria-label="アクティビティ"
-              className="relative shrink-0 w-9 h-9 flex items-center justify-center text-muted hover:text-foreground rounded-lg hover:bg-white/[0.04] transition-colors"
+              className="relative shrink-0 w-9 h-9 flex items-center justify-center text-white/80 hover:text-white rounded-lg hover:bg-white/[0.1] transition-colors"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
