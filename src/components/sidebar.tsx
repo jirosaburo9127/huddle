@@ -236,24 +236,30 @@ export function Sidebar({
     currentChannelIdRef.current = currentChannelId;
   }, [currentChannelId]);
 
+  // チャンネル ID ごとに「最後に楽観的削除した時刻 (ms)」を記録する。
+  // mark_channel_read の DB 反映前に走るポーリングがサーバの古い値で
+  // バッジを復活させてしまうのを防ぐため、ガード時間内 (READ_GUARD_MS) は
+  // そのチャンネルだけサーバ値を採用しない。
+  // 単一の Map で管理することで、過去にあった「全バッジ消失」「ad-hoc 空配列ガード」
+  // 「current チャンネルだけ除外」といった条件分岐の重なりを排除する。
+  const lastOptimisticReadRef = useRef<Map<string, number>>(new Map());
+  const READ_GUARD_MS = 2000;
+
   // 表示中のチャンネルが切り替わったら:
   // 1. 楽観的にバッジを即消す
-  // 2. DB の last_read_at を更新
-  // ※ 以前は get_unread_counts で全チャンネルを再同期していたが、
-  //   RPC が空を返すと他チャンネルのバッジも消える問題があったため、
-  //   現在のチャンネルのバッジだけ消す方式に変更。
+  // 2. 楽観的削除の時刻を記録（ポーリングのガード用）
+  // 3. DB の last_read_at を更新
   useEffect(() => {
     if (!currentChannelId) return;
 
-    // 楽観的にバッジを即消す
     setUnreadState((prev) => {
       if (!prev[currentChannelId]) return prev;
       const next = { ...prev };
       delete next[currentChannelId];
       return next;
     });
+    lastOptimisticReadRef.current.set(currentChannelId, Date.now());
 
-    // サーバの now() で last_read_at を更新する
     const supabase = sidebarSupabaseRef.current;
     supabase.rpc("mark_channel_read", { p_channel_id: currentChannelId });
   }, [currentChannelId]);
@@ -336,17 +342,25 @@ export function Sidebar({
       if (channelRes.data && Array.isArray(channelRes.data)) {
         const serverCounts = channelRes.data as Array<{ channel_id: string; unread_count: number }>;
         const currentId = currentChannelIdRef.current;
-        setUnreadState((prev) => {
-          const localHasUnread = Object.values(prev).some((n) => n > 0);
-          if (serverCounts.length === 0 && localHasUnread) {
-            return prev;
-          }
-
+        const now = Date.now();
+        // サーバを真実とみなして state を置換する。
+        // 例外は次の2つだけ:
+        //   - 表示中のチャンネル (currentId): 開いた瞬間に既読扱いするので除外
+        //   - 直近 READ_GUARD_MS 以内に楽観的削除したチャンネル: mark_channel_read の
+        //     DB 反映待ちで一時的にサーバが古い未読を返すケースを無視する
+        // この方針で「server 空配列 → 全消失」「複数経路の競合」を構造的に防ぐ。
+        setUnreadState(() => {
           const next: Record<string, number> = {};
           for (const row of serverCounts) {
             if (row.channel_id === currentId) continue;
+            const lastReadAt = lastOptimisticReadRef.current.get(row.channel_id);
+            if (lastReadAt && now - lastReadAt < READ_GUARD_MS) continue;
             const count = Number(row.unread_count);
             if (count > 0) next[row.channel_id] = count;
+          }
+          // ガード期限切れのエントリを掃除（メモリリーク防止）
+          for (const [chId, ts] of lastOptimisticReadRef.current) {
+            if (now - ts >= READ_GUARD_MS) lastOptimisticReadRef.current.delete(chId);
           }
           return next;
         });
@@ -487,13 +501,14 @@ export function Sidebar({
             supabase
               .rpc("mark_channel_read", { p_channel_id: msg.channel_id })
               .then(() => {});
-            // バッジが残らないよう明示的に消す
+            // バッジが残らないよう明示的に消す + ポーリングガードに登録
             setUnreadState((prev) => {
               if (!prev[msg.channel_id]) return prev;
               const next = { ...prev };
               delete next[msg.channel_id];
               return next;
             });
+            lastOptimisticReadRef.current.set(msg.channel_id, Date.now());
           } else {
             // 未読カウント増加（返信メッセージはサーバー側 get_unread_counts と一致させるためスキップ）
             if (!isReply) {
