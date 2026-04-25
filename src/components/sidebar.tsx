@@ -1693,7 +1693,7 @@ function ChannelCategoryList({
   ], [categories]);
 
   return (
-    <div className="space-y-0.5">
+    <div className="space-y-3">
       {sections.map(({ key, label }) => {
         const list = grouped.get(key) || [];
         if (list.length === 0) return null;
@@ -1704,7 +1704,7 @@ function ChannelCategoryList({
           0
         );
         return (
-          <div key={key} className="mb-1">
+          <div key={key} className="space-y-1">
             <div className="w-full flex items-center">
               <button
                 type="button"
