@@ -250,9 +250,6 @@ export function Sidebar({
       if (!prev[currentChannelId]) return prev;
       const next = { ...prev };
       delete next[currentChannelId];
-      window.dispatchEvent(new CustomEvent("huddle:debug", {
-        detail: `[UNREAD] optimistic delete ${currentChannelId.slice(0, 6)} | prev=${Object.keys(prev).map(k=>k.slice(0,6)+":"+prev[k]).join(",")} → next=${Object.keys(next).map(k=>k.slice(0,6)+":"+next[k]).join(",")}`,
-      }));
       return next;
     });
 
@@ -342,9 +339,6 @@ export function Sidebar({
         setUnreadState((prev) => {
           const localHasUnread = Object.values(prev).some((n) => n > 0);
           if (serverCounts.length === 0 && localHasUnread) {
-            window.dispatchEvent(new CustomEvent("huddle:debug", {
-              detail: `[UNREAD] poll kept prev (server empty, local has unread)`,
-            }));
             return prev;
           }
 
@@ -354,9 +348,6 @@ export function Sidebar({
             const count = Number(row.unread_count);
             if (count > 0) next[row.channel_id] = count;
           }
-          window.dispatchEvent(new CustomEvent("huddle:debug", {
-            detail: `[UNREAD] poll set | server=${serverCounts.map(r=>r.channel_id.slice(0,6)+":"+r.unread_count).join(",") || "(empty)"} curr=${currentId?.slice(0,6) ?? "-"} → ${Object.keys(next).map(k=>k.slice(0,6)+":"+next[k]).join(",") || "(empty)"}`,
-          }));
           return next;
         });
       }
