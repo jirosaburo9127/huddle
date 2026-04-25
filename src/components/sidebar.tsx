@@ -250,6 +250,9 @@ export function Sidebar({
       if (!prev[currentChannelId]) return prev;
       const next = { ...prev };
       delete next[currentChannelId];
+      window.dispatchEvent(new CustomEvent("huddle:debug", {
+        detail: `[UNREAD] optimistic delete ${currentChannelId.slice(0, 6)} | prev=${Object.keys(prev).map(k=>k.slice(0,6)+":"+prev[k]).join(",")} → next=${Object.keys(next).map(k=>k.slice(0,6)+":"+next[k]).join(",")}`,
+      }));
       return next;
     });
 
@@ -337,18 +340,23 @@ export function Sidebar({
         const serverCounts = channelRes.data as Array<{ channel_id: string; unread_count: number }>;
         const currentId = currentChannelIdRef.current;
         setUnreadState((prev) => {
-          // サーバが空配列を返した場合、ローカルに未読があるなら RPC の一過性エラーを疑って既存を維持する。
-          // （サーバの値を信頼して全消しすると、10秒ポーリング1回のエラーで全バッジが消える回帰になる）
           const localHasUnread = Object.values(prev).some((n) => n > 0);
-          if (serverCounts.length === 0 && localHasUnread) return prev;
+          if (serverCounts.length === 0 && localHasUnread) {
+            window.dispatchEvent(new CustomEvent("huddle:debug", {
+              detail: `[UNREAD] poll kept prev (server empty, local has unread)`,
+            }));
+            return prev;
+          }
 
           const next: Record<string, number> = {};
           for (const row of serverCounts) {
-            // 表示中のチャンネルは既読扱い
             if (row.channel_id === currentId) continue;
             const count = Number(row.unread_count);
             if (count > 0) next[row.channel_id] = count;
           }
+          window.dispatchEvent(new CustomEvent("huddle:debug", {
+            detail: `[UNREAD] poll set | server=${serverCounts.map(r=>r.channel_id.slice(0,6)+":"+r.unread_count).join(",") || "(empty)"} curr=${currentId?.slice(0,6) ?? "-"} → ${Object.keys(next).map(k=>k.slice(0,6)+":"+next[k]).join(",") || "(empty)"}`,
+          }));
           return next;
         });
       }
