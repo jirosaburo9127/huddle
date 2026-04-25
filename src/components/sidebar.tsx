@@ -760,7 +760,7 @@ export function Sidebar({
                   </svg>
                   独り言
                   {/* 吹き出しの三角（右向き） — 小さく内側に配置 */}
-                  <div className="absolute -right-[3px] top-1/2 -translate-y-1/2 w-2 h-2 bg-sidebar rotate-45 shadow-sm" />
+                  <div className="absolute -right-[3px] top-1/2 -translate-y-1/2 w-2 h-2 bg-sidebar rotate-45" />
                 </div>
                 {(unreadState[hitorigotoChannel.id] ?? 0) > 0 && (
                   <span className="absolute -top-1.5 -right-1.5 bg-mention text-white text-[9px] font-bold rounded-full min-w-[16px] h-[16px] flex items-center justify-center px-0.5">
