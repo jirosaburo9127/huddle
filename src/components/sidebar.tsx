@@ -912,7 +912,7 @@ export function Sidebar({
           </div>
 
           {/* チャンネルセクション */}
-          <div className="px-3 mb-1 flex items-center justify-between">
+          <div className="px-3 mt-4 mb-1 flex items-center justify-between">
             <span className="text-sm font-semibold uppercase text-muted tracking-wider">
               チャンネル
             </span>
