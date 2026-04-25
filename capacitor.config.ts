@@ -13,6 +13,8 @@ const config: CapacitorConfig = {
     scheme: 'Huddle',
     allowsLinkPreview: false,
     preferredContentMode: 'mobile',
+    // ステータスバー領域（時計・Wi-Fi）の親ビュー背景を黒に統一する
+    backgroundColor: '#000000',
   },
   plugins: {
     PushNotifications: {
