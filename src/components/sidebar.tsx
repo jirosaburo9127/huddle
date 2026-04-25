@@ -602,8 +602,8 @@ export function Sidebar({
         `}
       >
         {/* ヘッダー: ワークスペース名 + 右上にプロフィールアイコン（大） */}
-        {/* bg-black + safe-area-inset-top の padding で iOS ステータスバー領域まで連続した黒に */}
-        <div className="px-4 pb-3 border-b border-border/50 bg-black text-white" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 0.75rem)" }}>
+        {/* status bar 領域は Capacitor の ios.backgroundColor (#000000) で同色化 */}
+        <div className="px-4 py-3 border-b border-border/50 bg-black text-white">
           <div className="flex items-center justify-between">
             <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1">
