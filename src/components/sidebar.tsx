@@ -653,6 +653,16 @@ export function Sidebar({
                 <div className="border-t border-border/50 mt-1 pt-1">
                   <button
                     type="button"
+                    onClick={() => {
+                      setShowWsSwitcher(false);
+                      setShowInviteModal(true);
+                    }}
+                    className="block w-full px-3 py-2 text-sm text-foreground hover:bg-white/[0.04] transition-colors rounded-lg mx-1 text-left"
+                  >
+                    メンバーを招待
+                  </button>
+                  <button
+                    type="button"
                     onClick={async () => {
                       setShowWsSwitcher(false);
                       const input = prompt(
