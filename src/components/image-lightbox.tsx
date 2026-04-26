@@ -170,7 +170,28 @@ export function ImageLightbox({ url, onClose, authorName, authorAvatar, timestam
       try {
         const { Capacitor } = await import("@capacitor/core");
         if (!Capacitor.isNativePlatform()) {
-          window.open(url, "_blank");
+          // PC/Web: blob として fetch して即ダウンロード
+          // （cross-origin の <a download> は無視される可能性があるため、blob URL 経由で確実にトリガする）
+          setSaving(true);
+          const res = await fetch(url);
+          const blob = await res.blob();
+          let ext = "jpg";
+          const mime = blob.type || "";
+          if (mime.includes("png")) ext = "png";
+          else if (mime.includes("gif")) ext = "gif";
+          else if (mime.includes("webp")) ext = "webp";
+          else {
+            const m = url.split("?")[0].match(/\.([a-zA-Z0-9]+)$/);
+            if (m) ext = m[1].toLowerCase();
+          }
+          const blobUrl = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = blobUrl;
+          a.download = `huddle-${Date.now()}.${ext}`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(blobUrl);
           return;
         }
         setSaving(true);

@@ -605,10 +605,8 @@ export function Sidebar({
         {/* status bar 領域は Capacitor の ios.backgroundColor (#000000) で同色化 */}
         {/* PC では右側のチャンネルヘッダーと高さを揃える (lg:h-14)
             PC では Huddle 黒ヘッダーとの境界をはっきりさせるためグレー寄りの色に */}
-        <div className="px-4 py-3 lg:py-0 lg:h-14 lg:flex lg:items-center border-b border-border/50 bg-black text-white lg:bg-zinc-800">
-          <div className="flex items-center justify-between">
-            <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1">
+        <div className="px-4 py-3 lg:py-0 lg:h-14 lg:min-h-14 lg:max-h-14 flex items-center justify-between gap-2 border-b border-border/50 bg-black text-white lg:bg-zinc-800">
+          {/* 左: WS 名（▼ ドロップダウン） */}
           <div className="relative min-w-0" ref={wsSwitcherRef}>
             <button
               onClick={() => setShowWsSwitcher((prev) => !prev)}
@@ -732,18 +730,18 @@ export function Sidebar({
               </div>
             )}
           </div>
-          {/* WSメンバー一覧ボタン（PCのみ） */}
-          <button
-            onClick={() => setShowWsMembers(true)}
-            className="hidden lg:flex shrink-0 w-9 h-9 items-center justify-center text-white/80 hover:text-white rounded-lg hover:bg-white/[0.1] transition-colors"
-            title="ワークスペースメンバー"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-            </svg>
-          </button>
-          </div>
-            </div>
+          {/* 右: アイコン群（WS 名の長さに関係なく常に右寄せ） */}
+          <div className="flex items-center gap-1 shrink-0">
+            {/* WSメンバー一覧ボタン（PCのみ） */}
+            <button
+              onClick={() => setShowWsMembers(true)}
+              className="hidden lg:flex shrink-0 w-9 h-9 items-center justify-center text-white/80 hover:text-white rounded-lg hover:bg-white/[0.1] transition-colors"
+              title="ワークスペースメンバー"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+            </button>
             {/* アクティビティ (ベル): モバイルは独り言左、PCはプロフィール左 */}
             <button
               type="button"
@@ -763,7 +761,7 @@ export function Sidebar({
               <Link
                 href={`/${workspaceSlug}/${hitorigotoChannel.slug}`}
                 onClick={() => setSidebarOpen(false)}
-                className="lg:hidden relative shrink-0 ml-auto mr-3"
+                className="lg:hidden relative shrink-0 mr-2"
               >
                 {/* 吹き出し本体 — pill 型 + 控えめな影 */}
                 <div className="relative bg-sidebar rounded-full pl-3 pr-3.5 py-1.5 text-foreground text-sm font-semibold flex items-center gap-1.5 shadow-sm hover:bg-sidebar-hover transition-colors">
