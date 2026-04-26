@@ -1,22 +1,24 @@
 @import "tailwindcss";
 
+/* デフォルトは Dawn（ライト）。data-theme 未設定でも初回ロード時にちらつかない。
+   ダークモードに切り替える場合は [data-theme="midnight"] が下で上書きする。 */
 @theme {
-  --color-background: #111116;
-  --color-surface: #1a1a22;
-  --color-sidebar: #16161e;
-  --color-sidebar-hover: #22222e;
-  --color-sidebar-active: #2a2a38;
-  --color-header: #141418;
-  --color-input-bg: #1e1e28;
-  --color-border: #28283a;
-  --color-border-subtle: #1f1f2e;
-  --color-foreground: #e4e4ed;
-  --color-muted: #6b6b80;
-  /* Midnight のアクセントはダーク背景上で白テキストが読めるダークグレーに統一 */
-  --color-accent: #3a3a4a;
-  --color-accent-hover: #4a4a5a;
-  --color-online: #34d399;
-  --color-mention: #f87171;
+  --color-background: #f7f7fa;
+  --color-surface: #ffffff;
+  --color-sidebar: #ebebf2;
+  --color-sidebar-hover: #dddde8;
+  --color-sidebar-active: #d0d0e0;
+  --color-header: #f7f7fa;
+  --color-input-bg: #ebebf2;
+  --color-border: #c8c8d8;
+  --color-border-subtle: #dddde8;
+  --color-foreground: #0f0f1a;
+  --color-muted: #55556a;
+  /* Dawn は完全モノクロ */
+  --color-accent: #0f0f1a;
+  --color-accent-hover: #000000;
+  --color-online: #22c55e;
+  --color-mention: #ef4444;
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -318,24 +320,23 @@ html {
   display: none;
 }
 
-/* Dawn（ライトモード） */
-[data-theme="dawn"] {
-  --color-background: #f7f7fa;
-  --color-surface: #ffffff;
-  --color-sidebar: #ebebf2;
-  --color-sidebar-hover: #dddde8;
-  --color-sidebar-active: #d0d0e0;
-  --color-header: #f7f7fa;
-  --color-input-bg: #ebebf2;
-  --color-border: #c8c8d8;
-  --color-border-subtle: #dddde8;
-  --color-foreground: #0f0f1a;
-  --color-muted: #55556a;
-  /* Dawn（デフォルト）は黒ベース — 紫をやめて完全モノクロ */
-  --color-accent: #0f0f1a;
-  --color-accent-hover: #000000;
-  --color-online: #22c55e;
-  --color-mention: #ef4444;
+/* Midnight（ダークモード） */
+[data-theme="midnight"] {
+  --color-background: #111116;
+  --color-surface: #1a1a22;
+  --color-sidebar: #16161e;
+  --color-sidebar-hover: #22222e;
+  --color-sidebar-active: #2a2a38;
+  --color-header: #141418;
+  --color-input-bg: #1e1e28;
+  --color-border: #28283a;
+  --color-border-subtle: #1f1f2e;
+  --color-foreground: #e4e4ed;
+  --color-muted: #6b6b80;
+  --color-accent: #3a3a4a;
+  --color-accent-hover: #4a4a5a;
+  --color-online: #34d399;
+  --color-mention: #f87171;
 }
 
 /* 引用元メッセージへのジャンプ時に一瞬ハイライト */
