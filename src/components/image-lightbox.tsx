@@ -232,7 +232,7 @@ export function ImageLightbox({ url, onClose, authorName, authorAvatar, timestam
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center p-4 overflow-hidden"
+      className="fixed inset-0 z-[70] flex items-center justify-center pt-16 pb-12 px-4 overflow-hidden"
       style={{ backgroundColor: `rgba(0, 0, 0, ${0.9 - dismissProgress * 0.7})` }}
       onClick={onClose}
     >
