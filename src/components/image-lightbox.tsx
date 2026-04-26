@@ -5,12 +5,28 @@ import { useCallback, useEffect, useRef, useState } from "react";
 type Props = {
   url: string;
   onClose: () => void;
+  // Slack 風の上部メタ情報（任意）
+  authorName?: string;
+  authorAvatar?: string | null;
+  timestamp?: string; // ISO string
+  contextLabel?: string; // 例: "#channel-name"
 };
+
+// "2026年4月22日 11:43" 形式
+function formatLightboxTimestamp(iso: string): string {
+  const d = new Date(iso);
+  const yyyy = d.getFullYear();
+  const m = d.getMonth() + 1;
+  const day = d.getDate();
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${yyyy}年${m}月${day}日 ${hh}:${mm}`;
+}
 
 // ピンチズーム・パン・ダブルタップでの拡大を備えた画像ライトボックス。
 // 保存ボタンは iOS の Share シートに「写真に保存」を出すため、
 // 画像を一旦キャッシュに書き出してからファイル URI を渡す。
-export function ImageLightbox({ url, onClose }: Props) {
+export function ImageLightbox({ url, onClose, authorName, authorAvatar, timestamp, contextLabel }: Props) {
   const [scale, setScale] = useState(1);
   const [tx, setTx] = useState(0);
   const [ty, setTy] = useState(0);
@@ -220,7 +236,43 @@ export function ImageLightbox({ url, onClose }: Props) {
       style={{ backgroundColor: `rgba(0, 0, 0, ${0.9 - dismissProgress * 0.7})` }}
       onClick={onClose}
     >
-      {/* 上部ボタン群 */}
+      {/* 上部左: 投稿者・時刻・コンテキスト（Slack 風） */}
+      {(authorName || contextLabel) && (
+        <div
+          className="absolute top-4 left-4 right-28 z-10 flex items-center"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center gap-2.5 px-3 py-2 rounded-full bg-black/60 border border-white/30 shadow-lg max-w-full">
+            {authorAvatar ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={authorAvatar}
+                alt={authorName || ""}
+                className="w-8 h-8 rounded-full object-cover shrink-0"
+              />
+            ) : authorName ? (
+              <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                {authorName[0]?.toUpperCase()}
+              </div>
+            ) : null}
+            <div className="min-w-0 text-white">
+              <div className="text-sm font-semibold truncate">
+                {authorName}
+                {timestamp && (
+                  <span className="ml-2 font-normal text-white/70 text-xs">
+                    {formatLightboxTimestamp(timestamp)}
+                  </span>
+                )}
+              </div>
+              {contextLabel && (
+                <div className="text-xs text-white/70 truncate">{contextLabel}</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 上部右: ボタン群 */}
       <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
         <button
           type="button"
@@ -270,7 +322,7 @@ export function ImageLightbox({ url, onClose }: Props) {
           if (scale > 1) resetZoom();
           else setScale(2);
         }}
-        className="max-w-full max-h-full object-contain rounded-lg select-none"
+        className="max-w-full max-h-full object-contain select-none"
         style={{
           transform: `translate(${tx}px, ${ty}px) scale(${scale})`,
           transformOrigin: "center center",

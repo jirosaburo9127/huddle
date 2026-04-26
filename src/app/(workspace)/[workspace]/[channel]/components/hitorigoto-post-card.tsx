@@ -377,7 +377,13 @@ function HitorigotoPostCardInner({
       </article>
 
       {lightboxUrl && (
-        <ImageLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
+        <ImageLightbox
+          url={lightboxUrl}
+          onClose={() => setLightboxUrl(null)}
+          authorName={displayName}
+          authorAvatar={avatarUrl}
+          timestamp={message.created_at}
+        />
       )}
 
       {/* リアクターモーダル（LINE風下からスライド） */}

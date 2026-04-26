@@ -1221,7 +1221,13 @@ export const MessageItem = memo(function MessageItem({
       )}
 
       {lightboxUrl && (
-        <ImageLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
+        <ImageLightbox
+          url={lightboxUrl}
+          onClose={() => setLightboxUrl(null)}
+          authorName={profile?.display_name}
+          authorAvatar={profile?.avatar_url}
+          timestamp={message.created_at}
+        />
       )}
     </>
   );
