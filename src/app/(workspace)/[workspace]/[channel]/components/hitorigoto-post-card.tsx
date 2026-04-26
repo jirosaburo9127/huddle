@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import type { MessageWithProfile, Reaction } from "@/lib/supabase/types";
 import { PollDisplay } from "./poll-display";
 import { ImageLightbox } from "@/components/image-lightbox";
+import { extractDisplayFileName } from "@/lib/file-name";
 import { useReactorNames } from "@/lib/use-reactor-names";
 import { EMOJI_LIST, EmojiPicker } from "./emoji-picker";
 
@@ -264,7 +265,37 @@ function HitorigotoPostCardInner({
                   </div>
                 </button>
               ) : (
-                <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="text-sm text-accent underline break-all block">{url.split("/").pop()}</a>
+                <a
+                  key={i}
+                  href={url}
+                  download={extractDisplayFileName(url)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    try {
+                      const { Capacitor } = await import("@capacitor/core");
+                      if (Capacitor.isNativePlatform()) return;
+                      e.preventDefault();
+                      const fileName = extractDisplayFileName(url);
+                      const res = await fetch(url);
+                      const blob = await res.blob();
+                      const blobUrl = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = blobUrl;
+                      a.download = fileName;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      URL.revokeObjectURL(blobUrl);
+                    } catch {
+                      // 失敗時は標準のリンク動作にフォールバック
+                    }
+                  }}
+                  className="text-sm text-accent underline break-all block"
+                >
+                  {extractDisplayFileName(url)}
+                </a>
               )
             )}
           </div>

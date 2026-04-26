@@ -190,6 +190,24 @@ function MessageContent({
                 <a
                   href={url}
                   download={fileName}
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    try {
+                      const res = await fetch(url);
+                      const blob = await res.blob();
+                      const blobUrl = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = blobUrl;
+                      a.download = fileName;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      URL.revokeObjectURL(blobUrl);
+                    } catch {
+                      window.open(url, "_blank");
+                    }
+                  }}
                   className="flex items-center gap-3 rounded-2xl bg-gradient-to-br from-black/70 to-black/90 border border-white/10 py-4 px-5 hover:from-black/60 hover:to-black/80 transition-colors"
                 >
                   <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0">
@@ -233,8 +251,31 @@ function MessageContent({
           <a
             key={i}
             href={url}
+            download={fileName}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={async (e) => {
+              e.stopPropagation();
+              // PC/Web では blob fetch して元ファイル名で即ダウンロード
+              // iOS Capacitor では既存通り別タブ表示（プレビュー可能）
+              try {
+                const { Capacitor } = await import("@capacitor/core");
+                if (Capacitor.isNativePlatform()) return;
+                e.preventDefault();
+                const res = await fetch(url);
+                const blob = await res.blob();
+                const blobUrl = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = blobUrl;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(blobUrl);
+              } catch {
+                // 失敗時は標準のリンク動作にフォールバック
+              }
+            }}
             className="inline-flex items-center gap-2 mt-1 px-3 py-2 rounded-xl bg-white/[0.03] border border-border/50 hover:border-accent/30 transition-colors"
           >
             <svg className="w-5 h-5 text-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>

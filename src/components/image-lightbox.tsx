@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { extractDisplayFileName } from "@/lib/file-name";
 
 type Props = {
   url: string;
@@ -175,19 +176,12 @@ export function ImageLightbox({ url, onClose, authorName, authorAvatar, timestam
           setSaving(true);
           const res = await fetch(url);
           const blob = await res.blob();
-          let ext = "jpg";
-          const mime = blob.type || "";
-          if (mime.includes("png")) ext = "png";
-          else if (mime.includes("gif")) ext = "gif";
-          else if (mime.includes("webp")) ext = "webp";
-          else {
-            const m = url.split("?")[0].match(/\.([a-zA-Z0-9]+)$/);
-            if (m) ext = m[1].toLowerCase();
-          }
+          // 元ファイル名 (#name=... または URL 末尾の {uuid}-{name} から復元) で保存
+          const downloadName = extractDisplayFileName(url) || `huddle-${Date.now()}`;
           const blobUrl = URL.createObjectURL(blob);
           const a = document.createElement("a");
           a.href = blobUrl;
-          a.download = `huddle-${Date.now()}.${ext}`;
+          a.download = downloadName;
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);
@@ -214,19 +208,22 @@ export function ImageLightbox({ url, onClose, authorName, authorAvatar, timestam
           reader.readAsDataURL(blob);
         });
 
-        // 拡張子をURLまたはMIMEから推定
-        let ext = "jpg";
-        const mime = blob.type || "";
-        if (mime.includes("png")) ext = "png";
-        else if (mime.includes("gif")) ext = "gif";
-        else if (mime.includes("webp")) ext = "webp";
-        else if (mime.includes("heic")) ext = "heic";
-        else {
-          const m = url.split("?")[0].match(/\.([a-zA-Z0-9]+)$/);
-          if (m) ext = m[1].toLowerCase();
+        // 元ファイル名で保存（フラグメント or UUID プレフィックス除去）
+        // フォールバックで MIME / URL から拡張子を推定
+        let fileName = extractDisplayFileName(url);
+        if (!fileName || fileName === "ファイル") {
+          let ext = "jpg";
+          const mime = blob.type || "";
+          if (mime.includes("png")) ext = "png";
+          else if (mime.includes("gif")) ext = "gif";
+          else if (mime.includes("webp")) ext = "webp";
+          else if (mime.includes("heic")) ext = "heic";
+          else {
+            const m = url.split("?")[0].match(/\.([a-zA-Z0-9]+)$/);
+            if (m) ext = m[1].toLowerCase();
+          }
+          fileName = `huddle-${Date.now()}.${ext}`;
         }
-
-        const fileName = `huddle-${Date.now()}.${ext}`;
         const saved = await Filesystem.writeFile({
           path: fileName,
           data: base64,
