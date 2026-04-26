@@ -92,13 +92,21 @@ export function ImageLightbox({ url, onClose }: Props) {
       const d = distance(e.touches);
       const next = Math.max(1, Math.min(5, (d / g.startDist) * g.startScale));
       setScale(next);
-    } else if (g.mode === "pan" && e.touches.length === 1 && scale > 1) {
+    } else if (g.mode === "pan" && e.touches.length === 1) {
       e.stopPropagation();
       e.preventDefault();
       const dx = e.touches[0].clientX - g.startX;
       const dy = e.touches[0].clientY - g.startY;
-      setTx(g.startTx + dx);
-      setTy(g.startTy + dy);
+      if (scale > 1) {
+        // ズーム時: 自由にパン
+        setTx(g.startTx + dx);
+        setTy(g.startTy + dy);
+      } else {
+        // 等倍時: iPhone 写真アプリ風の下スワイプで閉じるジェスチャー
+        // 上方向や横方向は弱反応で「下に流す」感じだけ残す
+        setTx(g.startTx + dx * 0.3);
+        setTy(g.startTy + (dy > 0 ? dy : dy * 0.3));
+      }
     }
   }
 
@@ -106,8 +114,12 @@ export function ImageLightbox({ url, onClose }: Props) {
     const g = gestureRef.current;
     if (e.touches.length === 0) {
       g.mode = "idle";
-      // ズーム1倍に戻ったら位置もリセット
       if (scale <= 1.01) {
+        // 下に 100px 以上スワイプされていたら閉じる、未満なら元位置に戻す
+        if (ty > 100) {
+          onClose();
+          return;
+        }
         setTx(0);
         setTy(0);
       }
@@ -120,6 +132,9 @@ export function ImageLightbox({ url, onClose }: Props) {
       g.startTy = ty;
     }
   }
+
+  // 等倍時の下スワイプ進捗 (0〜1) — 背景と画像の opacity を連動させる
+  const dismissProgress = scale <= 1.01 && ty > 0 ? Math.min(1, ty / 250) : 0;
 
   // Esc キーで閉じる
   useEffect(() => {
@@ -201,7 +216,8 @@ export function ImageLightbox({ url, onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-[70] bg-black/90 flex items-center justify-center p-4 overflow-hidden"
+      className="fixed inset-0 z-[70] flex items-center justify-center p-4 overflow-hidden"
+      style={{ backgroundColor: `rgba(0, 0, 0, ${0.9 - dismissProgress * 0.7})` }}
       onClick={onClose}
     >
       {/* 上部ボタン群 */}
@@ -258,7 +274,11 @@ export function ImageLightbox({ url, onClose }: Props) {
         style={{
           transform: `translate(${tx}px, ${ty}px) scale(${scale})`,
           transformOrigin: "center center",
-          transition: gestureRef.current.mode === "idle" ? "transform 0.15s ease-out" : "none",
+          opacity: 1 - dismissProgress * 0.4,
+          transition:
+            gestureRef.current.mode === "idle"
+              ? "transform 0.2s ease-out, opacity 0.2s ease-out"
+              : "none",
           touchAction: "none",
           WebkitUserSelect: "none",
           userSelect: "none",
