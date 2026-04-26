@@ -46,8 +46,9 @@ export default async function WorkspaceLayout({
   return (
     <div className="flex flex-col h-full">
       {/* PC のみ: Huddle ロゴを表示するグローバルヘッダー（モバイルでは非表示） */}
-      <header className="hidden lg:flex h-12 shrink-0 items-center justify-center px-4 bg-black border-b border-white/10">
-        <span className="text-white font-bold text-lg tracking-tight">Huddle</span>
+      <header className="hidden lg:flex h-12 shrink-0 items-center px-4 bg-black border-b border-white/10">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/icons/icon-192.png" alt="Huddle" className="h-7 w-7 rounded" />
       </header>
       <div className="flex-1 flex min-h-0">
         <Suspense fallback={<WorkspaceSkeleton />}>
