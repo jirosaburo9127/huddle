@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useState, useRef, useEffect, useMemo } from "react";
+import { usePathname } from "next/navigation";
 import type { MessageWithProfile, Reaction } from "@/lib/supabase/types";
 import { PollDisplay } from "./poll-display";
 import { ImageLightbox } from "@/components/image-lightbox";
@@ -147,6 +148,9 @@ function HitorigotoPostCardInner({
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [reacterModal, setReacterModal] = useState<{ emoji: string; names: string[]; reacted: boolean } | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  // 画像ライトボックスの上部に表示するチャンネル名 (pathname から slug を抜く)
+  const pathname = usePathname();
+  const channelSlug = pathname?.split("/")[2] ?? null;
   // PCとモバイルでピッカーの実装を分ける（PC版の EmojiPicker の外側クリック検知が
   // モバイルモーダル内のタップと競合するため、モバイルでは PC版を一切マウントしない）
   const [isDesktop, setIsDesktop] = useState(false);
@@ -383,6 +387,7 @@ function HitorigotoPostCardInner({
           authorName={displayName}
           authorAvatar={avatarUrl}
           timestamp={message.created_at}
+          contextLabel={channelSlug ? `#${channelSlug}` : undefined}
         />
       )}
 

@@ -256,16 +256,15 @@ export function ImageLightbox({ url, onClose, authorName, authorAvatar, timestam
               </div>
             ) : null}
             <div className="min-w-0 text-white">
-              <div className="text-sm font-semibold truncate">
-                {authorName}
-                {timestamp && (
-                  <span className="ml-2 font-normal text-white/70 text-xs">
-                    {formatLightboxTimestamp(timestamp)}
-                  </span>
-                )}
-              </div>
-              {contextLabel && (
-                <div className="text-xs text-white/70 truncate">{contextLabel}</div>
+              {authorName && (
+                <div className="text-sm font-semibold truncate">{authorName}</div>
+              )}
+              {(timestamp || contextLabel) && (
+                <div className="text-xs text-white/70 truncate flex items-center gap-1.5">
+                  {timestamp && <span>{formatLightboxTimestamp(timestamp)}</span>}
+                  {timestamp && contextLabel && <span>·</span>}
+                  {contextLabel && <span>{contextLabel}</span>}
+                </div>
               )}
             </div>
           </div>

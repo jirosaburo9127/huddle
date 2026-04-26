@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useState, useRef, useEffect, useMemo } from "react";
+import { usePathname } from "next/navigation";
 import type { MessageWithProfile, Reaction } from "@/lib/supabase/types";
 import { EmojiPicker } from "./emoji-picker";
 import { PollDisplay } from "./poll-display";
@@ -462,6 +463,9 @@ export const MessageItem = memo(function MessageItem({
 }: Props) {
   const profile = message.profiles;
   const isOwn = message.user_id === currentUserId;
+  // 画像ライトボックスの上部に表示するチャンネル名 (pathname から slug を抜く)
+  const pathname = usePathname();
+  const channelSlug = pathname?.split("/")[2] ?? null;
   // timeZone を固定して SSR/CSR の hydration mismatch を防ぐ
   const time = new Date(message.created_at).toLocaleTimeString("ja-JP", {
     hour: "2-digit",
@@ -1227,6 +1231,7 @@ export const MessageItem = memo(function MessageItem({
           authorName={profile?.display_name}
           authorAvatar={profile?.avatar_url}
           timestamp={message.created_at}
+          contextLabel={channelSlug ? `#${channelSlug}` : undefined}
         />
       )}
     </>
