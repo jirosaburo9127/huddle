@@ -1056,7 +1056,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
       {/* チャンネルエリア */}
       <div className="flex flex-col h-full flex-1 min-w-0">
         {/* チャンネルヘッダー */}
-        <header className="flex items-center gap-2 px-3 sm:px-4 py-3 border-b border-border bg-header shrink-0">
+        <header className="flex items-center gap-2 px-3 sm:px-4 py-3 lg:py-0 lg:h-14 border-b border-border bg-header shrink-0">
           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
             {/* モバイル戻るボタン */}
             <button
