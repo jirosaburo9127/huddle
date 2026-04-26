@@ -242,7 +242,7 @@ export function ImageLightbox({ url, onClose, authorName, authorAvatar, timestam
           className="absolute top-4 left-4 right-28 z-10 flex items-center"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex items-center gap-2.5 px-3 py-2 rounded-full bg-black/60 border border-white/30 shadow-lg max-w-full">
+          <div className="flex items-center gap-2.5 max-w-full">
             {authorAvatar ? (
               /* eslint-disable-next-line @next/next/no-img-element */
               <img
