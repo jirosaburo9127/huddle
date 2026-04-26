@@ -603,8 +603,9 @@ export function Sidebar({
       >
         {/* ヘッダー: ワークスペース名 + 右上にプロフィールアイコン（大） */}
         {/* status bar 領域は Capacitor の ios.backgroundColor (#000000) で同色化 */}
-        {/* PC では右側のチャンネルヘッダーと高さを揃える (lg:h-14) */}
-        <div className="px-4 py-3 lg:py-0 lg:h-14 lg:flex lg:items-center border-b border-border/50 bg-black text-white">
+        {/* PC では右側のチャンネルヘッダーと高さを揃える (lg:h-14)
+            PC では Huddle 黒ヘッダーとの境界をはっきりさせるためグレー寄りの色に */}
+        <div className="px-4 py-3 lg:py-0 lg:h-14 lg:flex lg:items-center border-b border-border/50 bg-black text-white lg:bg-zinc-800">
           <div className="flex items-center justify-between">
             <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1">
