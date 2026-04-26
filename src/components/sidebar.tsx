@@ -865,10 +865,10 @@ export function Sidebar({
               className="relative flex flex-col items-center gap-1 px-2 py-1 rounded-lg text-muted hover:text-accent transition-colors"
               title="決定事項"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <span className="text-[10px] whitespace-nowrap">決定</span>
+              <span className="text-xs whitespace-nowrap">決定</span>
               {decisionUnreadCount > 0 && (
                 <span className="absolute -top-1 -right-1 bg-accent text-white text-[9px] font-bold rounded-full min-w-[16px] h-[16px] flex items-center justify-center px-0.5">
                   {decisionUnreadCount > 99 ? "99+" : decisionUnreadCount}
@@ -882,10 +882,10 @@ export function Sidebar({
               className="flex flex-col items-center gap-1 px-2 py-1 rounded-lg text-muted hover:text-blue-400 transition-colors"
               title="進行中"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
-              <span className="text-[10px] whitespace-nowrap">進行中</span>
+              <span className="text-xs whitespace-nowrap">進行中</span>
             </Link>
             <Link
               href={`/${workspaceSlug}/calendar`}
@@ -894,10 +894,10 @@ export function Sidebar({
               className="flex flex-col items-center gap-1 px-2 py-1 rounded-lg text-muted hover:text-accent transition-colors"
               title="カレンダー"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
               </svg>
-              <span className="text-[10px] whitespace-nowrap">カレンダー</span>
+              <span className="text-xs whitespace-nowrap">カレンダー</span>
             </Link>
             <Link
               href={`/${workspaceSlug}/files`}
@@ -905,20 +905,20 @@ export function Sidebar({
               className="flex flex-col items-center gap-1 px-2 py-1 rounded-lg text-muted hover:text-accent transition-colors"
               title="ファイル"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
               </svg>
-              <span className="text-[10px] whitespace-nowrap">ファイル</span>
+              <span className="text-xs whitespace-nowrap">ファイル</span>
             </Link>
             <button
               onClick={() => setShowBookmarkModal(true)}
               className="flex flex-col items-center gap-1 px-2 py-1 rounded-lg text-muted hover:text-accent transition-colors"
               title="ブックマーク"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
               </svg>
-              <span className="text-[10px] whitespace-nowrap">保存</span>
+              <span className="text-xs whitespace-nowrap">保存</span>
             </button>
           </div>
 
