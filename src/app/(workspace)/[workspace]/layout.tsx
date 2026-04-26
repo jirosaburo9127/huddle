@@ -46,7 +46,7 @@ export default async function WorkspaceLayout({
   return (
     <div className="flex flex-col h-full">
       {/* PC のみ: Huddle ロゴを表示するグローバルヘッダー（モバイルでは非表示） */}
-      <header className="hidden lg:flex h-12 shrink-0 items-center px-4 bg-black border-b border-white/10">
+      <header className="hidden lg:flex h-12 shrink-0 items-center justify-center px-4 bg-black border-b border-white/10">
         <span className="text-white font-bold text-lg tracking-tight">Huddle</span>
       </header>
       <div className="flex-1 flex min-h-0">
