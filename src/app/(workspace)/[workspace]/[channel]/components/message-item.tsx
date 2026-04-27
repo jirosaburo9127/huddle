@@ -590,17 +590,15 @@ export const MessageItem = memo(function MessageItem({
     }
   }, [isEditing]);
 
-  // 投票締切・決定登録のシステムメッセージ — 控えめなセンタリング表示
+  // 投票締切・決定登録・メンバー加入のシステムメッセージ — 控えめなセンタリング表示
   if (
     message.system_event === "poll_closed" ||
-    message.system_event === "decision_marked"
+    message.system_event === "decision_marked" ||
+    message.system_event === "member_joined"
   ) {
     return (
       <div className="flex justify-center my-2">
         <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-accent/30 bg-accent/5 text-xs text-accent">
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
           <span className="truncate max-w-xs">{message.content}</span>
         </div>
       </div>
