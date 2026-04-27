@@ -613,11 +613,13 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
     }
   }
 
-  // ファイル選択ハンドラ
+  // ファイル選択ハンドラ（複数選択対応 — 順次アップロード）
   async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    await uploadFile(file);
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    for (const file of Array.from(files)) {
+      await uploadFile(file);
+    }
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
@@ -1005,6 +1007,7 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
         <input
           ref={fileInputRef}
           type="file"
+          multiple
           className="hidden"
           onChange={handleFileSelect}
           accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip,.json,.xml"
