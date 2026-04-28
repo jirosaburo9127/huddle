@@ -7,6 +7,7 @@ import { EmojiPicker } from "./emoji-picker";
 import { PollDisplay } from "./poll-display";
 import { EventDisplay } from "./event-display";
 import { ImageLightbox } from "@/components/image-lightbox";
+import { VideoThumbnail } from "@/components/video-thumbnail";
 import { useReactorNames } from "@/lib/use-reactor-names";
 import { extractDisplayFileName } from "@/lib/file-name";
 
@@ -184,67 +185,38 @@ function MessageContent({
         }
         if (isVideoFile(url)) {
           return (
-            <div key={i} className="mt-1" onClick={(e) => e.stopPropagation()}>
-              {/* PC: MP4はインライン再生、MOVは保存して再生 */}
-              <div className="hidden lg:block max-w-full sm:max-w-sm">
-                <a
-                  href={url}
-                  download={fileName}
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    try {
-                      const res = await fetch(url);
-                      const blob = await res.blob();
-                      const blobUrl = URL.createObjectURL(blob);
-                      const a = document.createElement("a");
-                      a.href = blobUrl;
-                      a.download = fileName;
-                      document.body.appendChild(a);
-                      a.click();
-                      document.body.removeChild(a);
-                      URL.revokeObjectURL(blobUrl);
-                    } catch {
-                      window.open(url, "_blank");
-                    }
-                  }}
-                  className="flex items-center gap-3 rounded-2xl bg-gradient-to-br from-black/70 to-black/90 border border-white/10 py-4 px-5 hover:from-black/60 hover:to-black/80 transition-colors"
-                >
-                  <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-                    <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+            <button
+              key={i}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                // iOS Capacitor: ネイティブ AVPlayer 起動
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const webkit = (window as any).webkit;
+                if (webkit?.messageHandlers?.playVideo) {
+                  webkit.messageHandlers.playVideo.postMessage(url);
+                  return;
+                }
+                // PC/Web: 別タブで再生（インライン再生したいなら lightbox 化を後で検討）
+                window.open(url, "_blank");
+              }}
+              className="block mt-1 max-w-full sm:max-w-sm rounded-2xl overflow-hidden bg-black/80 hover:opacity-95 transition-opacity"
+            >
+              <div className="relative aspect-video bg-black">
+                <VideoThumbnail
+                  url={url}
+                  className="absolute inset-0 w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                  <div className="w-14 h-14 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
+                    <svg className="w-7 h-7 text-black ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
                   </div>
-                  <div className="text-left">
-                    <div className="text-sm font-medium text-white">動画を保存して再生</div>
-                    <div className="text-xs text-white/50">{fileName}</div>
-                  </div>
-                </a>
+                </div>
               </div>
-              {/* モバイル: タップでネイティブ動画プレーヤー起動（Chatwork方式） */}
-              <button
-                type="button"
-                className="lg:hidden max-w-full sm:max-w-sm rounded-2xl bg-gradient-to-br from-black/70 to-black/90 border border-white/10 flex items-center gap-4 py-4 px-5 w-full"
-                onClick={() => {
-                  // iOSネイティブ: WKScriptMessageHandlerでAVPlayer起動
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  const webkit = (window as any).webkit;
-                  if (webkit?.messageHandlers?.playVideo) {
-                    webkit.messageHandlers.playVideo.postMessage(url);
-                  } else {
-                    window.open(url, "_blank");
-                  }
-                }}
-              >
-                <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-                  <svg className="w-6 h-6 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
-                </div>
-                <div className="text-left min-w-0">
-                  <div className="text-sm font-medium text-white">動画を再生</div>
-                  <div className="text-xs text-white/50 truncate">{fileName}</div>
-                </div>
-              </button>
-            </div>
+              <div className="px-4 py-2 text-xs text-white/80 truncate text-left">{fileName}</div>
+            </button>
           );
         }
         return (

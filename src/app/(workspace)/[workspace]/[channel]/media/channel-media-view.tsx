@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ImageLightbox, type MediaItem } from "@/components/image-lightbox";
+import { VideoThumbnail } from "@/components/video-thumbnail";
 
 // メッセージ content に含まれる Storage URL を抽出
 const FILE_URL_RE = /https:\/\/[^\s]*\/storage\/v1\/object\/public\/chat-files\/[^\s]+/g;
@@ -123,15 +124,12 @@ export function ChannelMediaView({ workspaceSlug, channelSlug, channelName, rawR
                   />
                 ) : (
                   <>
-                    {/* 動画はサムネイル代わりに video の最初のフレーム + ▶ オーバーレイ */}
-                    <video
-                      src={item.url}
-                      preload="metadata"
-                      muted
-                      playsInline
+                    {/* 動画は canvas キャプチャしたサムネイル + ▶ オーバーレイ */}
+                    <VideoThumbnail
+                      url={item.url}
                       className="absolute inset-0 w-full h-full object-cover"
                     />
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/20">
                       <div className="w-10 h-10 rounded-full bg-white/90 flex items-center justify-center">
                         <svg className="w-5 h-5 text-black ml-0.5" fill="currentColor" viewBox="0 0 24 24">
                           <path d="M8 5v14l11-7z" />

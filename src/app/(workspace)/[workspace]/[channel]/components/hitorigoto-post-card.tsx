@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import type { MessageWithProfile, Reaction } from "@/lib/supabase/types";
 import { PollDisplay } from "./poll-display";
 import { ImageLightbox } from "@/components/image-lightbox";
+import { VideoThumbnail } from "@/components/video-thumbnail";
 import { extractDisplayFileName } from "@/lib/file-name";
 import { useReactorNames } from "@/lib/use-reactor-names";
 import { EMOJI_LIST, EmojiPicker } from "./emoji-picker";
@@ -244,7 +245,7 @@ function HitorigotoPostCardInner({
                 <button
                   key={i}
                   type="button"
-                  className="max-w-full sm:max-w-sm rounded-2xl bg-gradient-to-br from-black/70 to-black/90 border border-white/10 flex items-center gap-4 py-4 px-5 w-full"
+                  className="block max-w-full sm:max-w-sm rounded-2xl overflow-hidden bg-black/80 hover:opacity-95 transition-opacity w-full"
                   onClick={(e) => {
                     e.stopPropagation();
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -256,12 +257,21 @@ function HitorigotoPostCardInner({
                     }
                   }}
                 >
-                  <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-                    <svg className="w-6 h-6 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                  <div className="relative aspect-video bg-black">
+                    <VideoThumbnail
+                      url={url}
+                      className="absolute inset-0 w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                      <div className="w-14 h-14 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
+                        <svg className="w-7 h-7 text-black ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M8 5v14l11-7z" />
+                        </svg>
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-left min-w-0">
-                    <div className="text-sm font-medium text-white">動画を再生</div>
-                    <div className="text-xs text-white/50 truncate">{url.split("/").pop()}</div>
+                  <div className="px-4 py-2 text-xs text-white/80 truncate text-left">
+                    {extractDisplayFileName(url)}
                   </div>
                 </button>
               ) : (
