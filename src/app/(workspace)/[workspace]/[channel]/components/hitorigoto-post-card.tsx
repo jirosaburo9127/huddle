@@ -149,7 +149,8 @@ function HitorigotoPostCardInner({
   const [showActions, setShowActions] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [reacterModal, setReacterModal] = useState<{ emoji: string; names: string[]; reacted: boolean } | null>(null);
-  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  // 連続閲覧対応: 投稿内の画像URL配列とクリックされたインデックスを保持
+  const [lightboxState, setLightboxState] = useState<{ urls: string[]; index: number } | null>(null);
   // 画像ライトボックスの上部に表示するチャンネル名 (pathname から slug を抜く)
   const pathname = usePathname();
   const channelSlug = pathname?.split("/")[2] ?? null;
@@ -236,11 +237,25 @@ function HitorigotoPostCardInner({
         )}
 
         {/* ファイル（画像・動画） */}
-        {fileUrls.length > 0 && (
+        {fileUrls.length > 0 && (() => {
+          // 投稿内の画像URLのみのリスト（連続閲覧用）
+          const imageUrls = fileUrls.filter((u) => isImageFile(u));
+          return (
           <div className="space-y-2 mb-2">
             {fileUrls.map((url, i) =>
               isImageFile(url) ? (
-                <img key={i} src={url} alt="" className="rounded-xl max-w-full max-h-80 object-cover cursor-pointer" loading="lazy" onClick={(e) => { e.stopPropagation(); setLightboxUrl(url); }} />
+                <img
+                  key={i}
+                  src={url}
+                  alt=""
+                  className="rounded-xl max-w-full max-h-80 object-cover cursor-pointer"
+                  loading="lazy"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const idx = imageUrls.indexOf(url);
+                    setLightboxState({ urls: imageUrls, index: idx >= 0 ? idx : 0 });
+                  }}
+                />
               ) : isVideoFile(url) ? (
                 <button
                   key={i}
@@ -309,7 +324,8 @@ function HitorigotoPostCardInner({
               )
             )}
           </div>
-        )}
+          );
+        })()}
 
         {/* 投票 */}
         {hasPoll && (
@@ -421,13 +437,19 @@ function HitorigotoPostCardInner({
         </div>
       </article>
 
-      {lightboxUrl && (
+      {lightboxState && (
         <ImageLightbox
-          url={lightboxUrl}
-          onClose={() => setLightboxUrl(null)}
-          authorName={displayName}
-          authorAvatar={avatarUrl}
-          timestamp={message.created_at}
+          mediaList={lightboxState.urls.map((u) => ({
+            url: u,
+            authorName: displayName,
+            authorAvatar: avatarUrl,
+            timestamp: message.created_at,
+          }))}
+          currentIndex={lightboxState.index}
+          onIndexChange={(newIndex) =>
+            setLightboxState((prev) => (prev ? { ...prev, index: newIndex } : null))
+          }
+          onClose={() => setLightboxState(null)}
           contextLabel={channelSlug ? `#${channelSlug}` : undefined}
         />
       )}

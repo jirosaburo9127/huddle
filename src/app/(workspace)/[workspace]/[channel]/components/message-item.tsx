@@ -149,10 +149,13 @@ function MessageContent({
   content: string;
   imageError: boolean;
   onImageError: () => void;
-  onImageClick?: (url: string) => void;
+  // クリックされた画像と、そのメッセージ内の全画像URL配列を渡す（連続閲覧用）
+  onImageClick?: (allImageUrls: string[], clickedIndex: number) => void;
 }) {
   const { textLines, fileUrls } = splitContentAndFiles(content);
   const textContent = textLines.join("\n").trim();
+  // このメッセージ内の画像URLのみのリスト（連続閲覧用）
+  const imageUrls = fileUrls.filter((u) => isImageFile(u));
 
   return (
     <div>
@@ -175,7 +178,8 @@ function MessageContent({
                 className="max-w-full sm:max-w-xs max-h-80 rounded-xl cursor-pointer hover:opacity-90 transition-opacity"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onImageClick?.(url);
+                  const idx = imageUrls.indexOf(url);
+                  onImageClick?.(imageUrls, idx >= 0 ? idx : 0);
                 }}
                 onError={onImageError}
               />
@@ -510,7 +514,8 @@ export const MessageItem = memo(function MessageItem({
     window.addEventListener("huddle:closeAllActions", close);
     return () => window.removeEventListener("huddle:closeAllActions", close);
   }, []);
-  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  // 連続閲覧対応: クリックされたメッセージ内の画像URL配列とインデックスを保持
+  const [lightboxState, setLightboxState] = useState<{ urls: string[]; index: number } | null>(null);
   const [showDecisionMetaModal, setShowDecisionMetaModal] = useState(false);
   const [metaWhyInput, setMetaWhyInput] = useState("");
   const [metaDueInput, setMetaDueInput] = useState("");
@@ -804,7 +809,7 @@ export const MessageItem = memo(function MessageItem({
                 content={message.content}
                 imageError={imageError}
                 onImageError={() => setImageError(true)}
-                onImageClick={setLightboxUrl}
+                onImageClick={(urls, index) => setLightboxState({ urls, index })}
               />
               {/* 投票 (message に紐づく polls 行がある時だけ) */}
               {hasPoll && (
@@ -1235,13 +1240,19 @@ export const MessageItem = memo(function MessageItem({
         </div>
       )}
 
-      {lightboxUrl && (
+      {lightboxState && (
         <ImageLightbox
-          url={lightboxUrl}
-          onClose={() => setLightboxUrl(null)}
-          authorName={profile?.display_name}
-          authorAvatar={profile?.avatar_url}
-          timestamp={message.created_at}
+          mediaList={lightboxState.urls.map((u) => ({
+            url: u,
+            authorName: profile?.display_name,
+            authorAvatar: profile?.avatar_url,
+            timestamp: message.created_at,
+          }))}
+          currentIndex={lightboxState.index}
+          onIndexChange={(newIndex) =>
+            setLightboxState((prev) => (prev ? { ...prev, index: newIndex } : null))
+          }
+          onClose={() => setLightboxState(null)}
           contextLabel={channelSlug ? `#${channelSlug}` : undefined}
         />
       )}
