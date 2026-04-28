@@ -261,8 +261,14 @@ export function Sidebar({
     lastOptimisticReadRef.current.set(currentChannelId, Date.now());
 
     const supabase = sidebarSupabaseRef.current;
-    supabase.rpc("mark_channel_read", { p_channel_id: currentChannelId });
-  }, [currentChannelId]);
+    supabase
+      .rpc("mark_channel_read", { p_channel_id: currentChannelId })
+      .then(() => {
+        // iOS アプリアイコンのバッジを即時にサーバ真実と同期
+        // （ポーリングを待たずに一瞬で減るようにする）
+        syncAppBadgeFromServer(currentUserId);
+      });
+  }, [currentChannelId, currentUserId]);
 
   // 各チャンネルの所属ユーザーIDを取得（チャンネル行のメンバーアバター表示用）
   useEffect(() => {
@@ -344,12 +350,18 @@ export function Sidebar({
         const currentId = currentChannelIdRef.current;
         const now = Date.now();
         // サーバを真実とみなして state を置換する。
-        // 例外は次の2つだけ:
+        // 例外:
         //   - 表示中のチャンネル (currentId): 開いた瞬間に既読扱いするので除外
         //   - 直近 READ_GUARD_MS 以内に楽観的削除したチャンネル: mark_channel_read の
         //     DB 反映待ちで一時的にサーバが古い未読を返すケースを無視する
-        // この方針で「server 空配列 → 全消失」「複数経路の競合」を構造的に防ぐ。
-        setUnreadState(() => {
+        //   - サーバが空配列を返したのに local に未読がある場合: サーバ側の一時的な
+        //     不具合と判断して local を維持する（"他チャンネルを既読にしたら別チャンネルの
+        //     バッジも消える" 再発防止）
+        setUnreadState((prev) => {
+          if (serverCounts.length === 0 && Object.keys(prev).length > 0) {
+            return prev;
+          }
+
           const next: Record<string, number> = {};
           for (const row of serverCounts) {
             if (row.channel_id === currentId) continue;
@@ -500,7 +512,9 @@ export function Sidebar({
           if (msg.channel_id === currentChannelId) {
             supabase
               .rpc("mark_channel_read", { p_channel_id: msg.channel_id })
-              .then(() => {});
+              .then(() => {
+                syncAppBadgeFromServer(currentUserId);
+              });
             // バッジが残らないよう明示的に消す + ポーリングガードに登録
             setUnreadState((prev) => {
               if (!prev[msg.channel_id]) return prev;
