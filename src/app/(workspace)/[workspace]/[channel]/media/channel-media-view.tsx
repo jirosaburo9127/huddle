@@ -98,7 +98,19 @@ export function ChannelMediaView({ workspaceSlug, channelSlug, channelName, rawR
               <button
                 key={`${item.url}-${i}`}
                 type="button"
-                onClick={() => setActiveIndex(i)}
+                onClick={() => {
+                  // 動画は iOS ネイティブ AVPlayer で再生（既存メッセージ内の挙動と統一）
+                  // PC/Web は通常通り Lightbox で再生
+                  if (item.type === "video") {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    const webkit = (window as any).webkit;
+                    if (webkit?.messageHandlers?.playVideo) {
+                      webkit.messageHandlers.playVideo.postMessage(item.url);
+                      return;
+                    }
+                  }
+                  setActiveIndex(i);
+                }}
                 className="relative aspect-square overflow-hidden rounded-md bg-black/10 hover:opacity-90 transition-opacity group"
               >
                 {item.type === "image" ? (

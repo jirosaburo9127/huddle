@@ -442,18 +442,12 @@ export function ImageLightbox(props: Props) {
         <video
           src={url}
           controls
-          autoPlay
           playsInline
+          preload="metadata"
           onClick={(e) => e.stopPropagation()}
-          className="max-w-full max-h-full object-contain select-none"
+          className="max-w-full max-h-full object-contain select-none bg-black"
           style={{
-            transform: `translate(${tx}px, ${ty}px) scale(${scale})`,
-            transformOrigin: "center center",
             opacity: 1 - dismissProgress * 0.4,
-            transition:
-              gestureRef.current.mode === "idle"
-                ? "transform 0.2s ease-out, opacity 0.2s ease-out"
-                : "none",
           }}
         />
       ) : (
