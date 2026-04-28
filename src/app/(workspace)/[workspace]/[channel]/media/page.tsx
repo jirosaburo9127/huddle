@@ -16,19 +16,23 @@ export default async function ChannelMediaPage({
 
   const supabase = await createClient();
 
+  // ワークスペースを先に取得（独り言など同名 slug のチャンネルが複数 WS に存在するため、WS で絞る必要がある）
+  const { data: ws } = await supabase
+    .from("workspaces")
+    .select("id")
+    .eq("slug", workspaceSlug)
+    .maybeSingle();
+  if (!ws) redirect("/");
+
   // チャンネル ID + 名前を取得（権限はチャンネルメンバーであることが前提、RLS でブロックされる）
   const { data: ch } = await supabase
     .from("channels")
-    .select("id, name, slug, workspace_id, workspaces(slug)")
+    .select("id, name, slug")
+    .eq("workspace_id", ws.id)
     .eq("slug", channelSlug)
     .maybeSingle();
 
   if (!ch) redirect(`/${workspaceSlug}`);
-
-  const wsSlug = Array.isArray(ch.workspaces)
-    ? ch.workspaces[0]?.slug
-    : (ch.workspaces as { slug: string } | null)?.slug;
-  if (wsSlug !== workspaceSlug) redirect(`/${workspaceSlug}`);
 
   // メディア取得
   const { data: rows } = await supabase.rpc("get_channel_media", {
