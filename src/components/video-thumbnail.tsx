@@ -1,11 +1,14 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+
 // 動画ファイルのサムネイル表示。
-// canvas キャプチャは iOS WKWebView の crossOrigin/CORS 制約で失敗するため、
-// シンプルに <video> タグでメディアフラグメント (#t=0.1) を使い、
-// 0.1秒地点のフレームを「ポスター画像」のように表示させる。
-// pointer-events: none で親要素のクリックを通すので、サムネ全体を
-// クリッカブルなカードにできる。
+// iOS WKWebView は <video> の preload="metadata" や #t=0.1 メディアフラグメントを
+// 律儀に守ってくれず、最初のフレームが黒のままになる。確実にフレームを描画させるため、
+// autoplay + muted で一瞬再生 → onLoadedData で pause + 0.1秒地点に seek する。
+//
+// pointer-events: none で親要素のクリックを通すので、サムネ全体をクリッカブルな
+// カードにできる。
 
 type Props = {
   url: string;
@@ -15,27 +18,52 @@ type Props = {
 };
 
 export function VideoThumbnail({ url, className, captureAt = 0.1 }: Props) {
-  // メディアフラグメントで初期表示フレームを指定。
-  // 既に "#" を含む URL（#name=... など）でも壊さないように追記の形で。
-  const sep = url.includes("#") ? "&" : "#";
-  const srcWithFragment = `${url}${sep}t=${captureAt}`;
+  const ref = useRef<HTMLVideoElement | null>(null);
+
+  // マウント直後にフレームを確実に描画させる
+  useEffect(() => {
+    const v = ref.current;
+    if (!v) return;
+    // 既に loadeddata 済みなら直接 seek + pause（再マウント時の救済）
+    if (v.readyState >= 2) {
+      try {
+        v.pause();
+        if (v.currentTime === 0) v.currentTime = captureAt;
+      } catch {
+        // 失敗は無視
+      }
+    }
+  }, [url, captureAt]);
 
   return (
     <video
-      src={srcWithFragment}
+      ref={ref}
+      src={url}
       muted
+      // iOS Safari でフルスクリーン化させない
       playsInline
-      preload="metadata"
+      autoPlay
+      preload="auto"
       className={className}
       style={{ pointerEvents: "none" }}
-      onLoadedMetadata={(e) => {
-        // メディアフラグメントが効かないブラウザの保険: 明示的に seek
+      onLoadedData={(e) => {
+        // autoplay で一瞬走り出した動画を即停止して、フレームをサムネとして固定
         const v = e.currentTarget;
-        if (v.currentTime === 0) {
+        try {
+          v.pause();
+          v.currentTime = captureAt;
+        } catch {
+          // 失敗時はそのまま（最初フレームのまま）
+        }
+      }}
+      onCanPlay={(e) => {
+        // 一部ブラウザは onLoadedData では pause できないので保険
+        const v = e.currentTarget;
+        if (!v.paused) {
           try {
-            v.currentTime = captureAt;
+            v.pause();
           } catch {
-            // 失敗時は無視（最初フレームのまま）
+            // 失敗は無視
           }
         }
       }}
