@@ -139,18 +139,8 @@ export async function setupPushNotifications(userId: string): Promise<void> {
           }
         );
 
-        await PushNotifications.addListener(
-          "pushNotificationActionPerformed",
-          (action) => {
-            // eslint-disable-next-line no-console
-            console.log("[push] action:", action);
-            const data = action.notification.data as { url?: string } | undefined;
-            const url = data?.url;
-            if (url && typeof window !== "undefined") {
-              window.location.href = url;
-            }
-          }
-        );
+        // pushNotificationActionPerformed はレイアウト側の <PushTapHandler /> で
+        // 早期に登録するため、ここでは登録しない（cold start の取りこぼし防止）
       }
 
       // 3. 毎回 register() を呼び出してトークンを取得／更新

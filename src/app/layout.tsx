@@ -6,6 +6,7 @@ import { ServiceWorkerRegister } from "@/components/sw-register";
 import { SplashDismisser } from "@/components/splash-dismisser";
 import { NativeAppDetector } from "@/components/native-app-detector";
 import { AppResumeHandler } from "@/components/app-resume-handler";
+import { PushTapHandler } from "@/components/push-tap-handler";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -64,6 +65,7 @@ export default function RootLayout({
         <SplashDismisser />
         <NativeAppDetector />
         <AppResumeHandler />
+        <PushTapHandler />
         {children}
       </body>
     </html>
