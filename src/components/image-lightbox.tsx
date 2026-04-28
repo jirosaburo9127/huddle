@@ -3,14 +3,27 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { extractDisplayFileName } from "@/lib/file-name";
 
-type Props = {
+export type MediaItem = {
   url: string;
-  onClose: () => void;
-  // Slack 風の上部メタ情報（任意）
   authorName?: string;
   authorAvatar?: string | null;
-  timestamp?: string; // ISO string
-  contextLabel?: string; // 例: "#channel-name"
+  timestamp?: string;
+};
+
+type Props = {
+  // 単一閲覧モード（既存呼び出しとの互換）
+  url?: string;
+  authorName?: string;
+  authorAvatar?: string | null;
+  timestamp?: string;
+  // 共通: 閉じる
+  onClose: () => void;
+  // 共通: 上部に表示するチャンネル名 (#channel-name)
+  contextLabel?: string;
+  // 連続閲覧モード（メディア一覧から起動するとき）
+  mediaList?: MediaItem[];
+  currentIndex?: number;
+  onIndexChange?: (newIndex: number) => void;
 };
 
 // "2026年4月22日 11:43" 形式
@@ -24,10 +37,37 @@ function formatLightboxTimestamp(iso: string): string {
   return `${yyyy}年${m}月${day}日 ${hh}:${mm}`;
 }
 
-// ピンチズーム・パン・ダブルタップでの拡大を備えた画像ライトボックス。
-// 保存ボタンは iOS の Share シートに「写真に保存」を出すため、
-// 画像を一旦キャッシュに書き出してからファイル URI を渡す。
-export function ImageLightbox({ url, onClose, authorName, authorAvatar, timestamp, contextLabel }: Props) {
+// 動画拡張子判定（メディア一覧から動画も渡される可能性があるため）
+function isVideoUrl(u: string): boolean {
+  return /\.(mp4|mov|webm|m4v)(\?|#|$)/i.test(u);
+}
+
+// ピンチズーム・パン・ダブルタップ・下スワイプで閉じる + 連続閲覧（mediaList 指定時）対応のライトボックス。
+export function ImageLightbox(props: Props) {
+  const {
+    url: singleUrl,
+    onClose,
+    authorName: singleAuthorName,
+    authorAvatar: singleAuthorAvatar,
+    timestamp: singleTimestamp,
+    contextLabel,
+    mediaList,
+    currentIndex = 0,
+    onIndexChange,
+  } = props;
+
+  const usingList = !!(mediaList && mediaList.length > 0);
+  const activeMedia: MediaItem | null = usingList
+    ? mediaList![Math.max(0, Math.min(currentIndex, mediaList!.length - 1))]
+    : null;
+  const url = activeMedia?.url ?? singleUrl ?? "";
+  const authorName = activeMedia?.authorName ?? singleAuthorName;
+  const authorAvatar = activeMedia?.authorAvatar ?? singleAuthorAvatar;
+  const timestamp = activeMedia?.timestamp ?? singleTimestamp;
+
+  const canPrev = usingList && currentIndex > 0;
+  const canNext = usingList && currentIndex < (mediaList!.length - 1);
+
   const [scale, setScale] = useState(1);
   const [tx, setTx] = useState(0);
   const [ty, setTy] = useState(0);
@@ -63,6 +103,20 @@ export function ImageLightbox({ url, onClose, authorName, authorAvatar, timestam
     setTx(0);
     setTy(0);
   }, []);
+
+  const goPrev = useCallback(() => {
+    if (canPrev && onIndexChange) {
+      onIndexChange(currentIndex - 1);
+      resetZoom();
+    }
+  }, [canPrev, currentIndex, onIndexChange, resetZoom]);
+
+  const goNext = useCallback(() => {
+    if (canNext && onIndexChange) {
+      onIndexChange(currentIndex + 1);
+      resetZoom();
+    }
+  }, [canNext, currentIndex, onIndexChange, resetZoom]);
 
   function distance(touches: React.TouchList): number {
     const [a, b] = [touches[0], touches[1]];
@@ -119,10 +173,17 @@ export function ImageLightbox({ url, onClose, authorName, authorAvatar, timestam
         setTx(g.startTx + dx);
         setTy(g.startTy + dy);
       } else {
-        // 等倍時: iPhone 写真アプリ風の下スワイプで閉じるジェスチャー
-        // 上方向や横方向は弱反応で「下に流す」感じだけ残す
-        setTx(g.startTx + dx * 0.3);
-        setTy(g.startTy + (dy > 0 ? dy : dy * 0.3));
+        // 等倍時: 下スワイプで閉じる + 横スワイプで前後ナビ（mediaList 指定時のみ）
+        // 横と縦のうち、どちらの動きが大きいかで挙動を分岐
+        if (Math.abs(dx) > Math.abs(dy) && usingList) {
+          // 横方向: 画像を引きずる感じだけ（実際の遷移は touchEnd で判定）
+          setTx(g.startTx + dx * 0.5);
+          setTy(g.startTy + dy * 0.2);
+        } else {
+          // 縦方向（dismiss）
+          setTx(g.startTx + dx * 0.3);
+          setTy(g.startTy + (dy > 0 ? dy : dy * 0.3));
+        }
       }
     }
   }
@@ -132,10 +193,21 @@ export function ImageLightbox({ url, onClose, authorName, authorAvatar, timestam
     if (e.touches.length === 0) {
       g.mode = "idle";
       if (scale <= 1.01) {
-        // 下に 100px 以上スワイプされていたら閉じる、未満なら元位置に戻す
+        // 下に 100px 以上スワイプされていたら閉じる
         if (ty > 100) {
           onClose();
           return;
+        }
+        // 横に 80px 以上スワイプされていたら前後にナビ（mediaList 指定時のみ）
+        if (usingList && Math.abs(tx) > 80 && Math.abs(tx) > Math.abs(ty) * 1.5) {
+          if (tx < 0 && canNext) {
+            goNext();
+            return;
+          }
+          if (tx > 0 && canPrev) {
+            goPrev();
+            return;
+          }
         }
         setTx(0);
         setTy(0);
@@ -153,17 +225,24 @@ export function ImageLightbox({ url, onClose, authorName, authorAvatar, timestam
   // 等倍時の下スワイプ進捗 (0〜1) — 背景と画像の opacity を連動させる
   const dismissProgress = scale <= 1.01 && ty > 0 ? Math.min(1, ty / 250) : 0;
 
-  // Esc キーで閉じる
+  // Esc / ←→ キー
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
+      else if (e.key === "ArrowLeft") goPrev();
+      else if (e.key === "ArrowRight") goNext();
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, goPrev, goNext]);
+
+  // メディア切替時はズーム位置をリセット
+  useEffect(() => {
+    resetZoom();
+  }, [url, resetZoom]);
 
   // 保存: iOS では画像をキャッシュに書き出して file URI で Share.share することで
-  // Share シートに「写真に保存」を表示させる。Web は新規タブで開く。
+  // Share シートに「写真に保存」を表示させる。Web は blob fetch で即ダウンロード。
   const handleSave = useCallback(
     async (e: React.MouseEvent) => {
       e.stopPropagation();
@@ -172,11 +251,9 @@ export function ImageLightbox({ url, onClose, authorName, authorAvatar, timestam
         const { Capacitor } = await import("@capacitor/core");
         if (!Capacitor.isNativePlatform()) {
           // PC/Web: blob として fetch して即ダウンロード
-          // （cross-origin の <a download> は無視される可能性があるため、blob URL 経由で確実にトリガする）
           setSaving(true);
           const res = await fetch(url);
           const blob = await res.blob();
-          // 元ファイル名 (#name=... または URL 末尾の {uuid}-{name} から復元) で保存
           const downloadName = extractDisplayFileName(url) || `huddle-${Date.now()}`;
           const blobUrl = URL.createObjectURL(blob);
           const a = document.createElement("a");
@@ -193,14 +270,12 @@ export function ImageLightbox({ url, onClose, authorName, authorAvatar, timestam
           import("@capacitor/filesystem"),
           import("@capacitor/share"),
         ]);
-        // 画像を取得 → base64
         const res = await fetch(url);
         const blob = await res.blob();
         const base64 = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => {
             const r = reader.result as string;
-            // "data:image/png;base64,xxxxx" から後半だけ抜く
             const comma = r.indexOf(",");
             resolve(comma >= 0 ? r.slice(comma + 1) : r);
           };
@@ -208,8 +283,6 @@ export function ImageLightbox({ url, onClose, authorName, authorAvatar, timestam
           reader.readAsDataURL(blob);
         });
 
-        // 元ファイル名で保存（フラグメント or UUID プレフィックス除去）
-        // フォールバックで MIME / URL から拡張子を推定
         let fileName = extractDisplayFileName(url);
         if (!fileName || fileName === "ファイル") {
           let ext = "jpg";
@@ -234,7 +307,6 @@ export function ImageLightbox({ url, onClose, authorName, authorAvatar, timestam
           files: [saved.uri],
         });
       } catch (err) {
-        // 失敗時は従来のURL共有にフォールバック
         try {
           const { Share } = await import("@capacitor/share");
           await Share.share({ url });
@@ -247,6 +319,8 @@ export function ImageLightbox({ url, onClose, authorName, authorAvatar, timestam
     },
     [url, saving]
   );
+
+  const isVideo = isVideoUrl(url);
 
   return (
     <div
@@ -324,35 +398,94 @@ export function ImageLightbox({ url, onClose, authorName, authorAvatar, timestam
         </button>
       </div>
 
-      {/* 画像本体 */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={url}
-        alt="拡大画像"
-        draggable={false}
-        onClick={(e) => e.stopPropagation()}
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
-        onDoubleClick={(e) => {
-          e.stopPropagation();
-          if (scale > 1) resetZoom();
-          else setScale(2);
-        }}
-        className="max-w-full max-h-full object-contain select-none"
-        style={{
-          transform: `translate(${tx}px, ${ty}px) scale(${scale})`,
-          transformOrigin: "center center",
-          opacity: 1 - dismissProgress * 0.4,
-          transition:
-            gestureRef.current.mode === "idle"
-              ? "transform 0.2s ease-out, opacity 0.2s ease-out"
-              : "none",
-          touchAction: "none",
-          WebkitUserSelect: "none",
-          userSelect: "none",
-        }}
-      />
+      {/* 連続閲覧時の前へ/次へボタン */}
+      {usingList && canPrev && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            goPrev();
+          }}
+          aria-label="前へ"
+          className="absolute left-4 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-black/60 border border-white/30 hover:bg-black/80 flex items-center justify-center text-white shadow-lg"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+      )}
+      {usingList && canNext && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            goNext();
+          }}
+          aria-label="次へ"
+          className="absolute right-4 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-black/60 border border-white/30 hover:bg-black/80 flex items-center justify-center text-white shadow-lg"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      )}
+
+      {/* インデックス表示（連続閲覧時のみ） */}
+      {usingList && mediaList && mediaList.length > 1 && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 px-3 py-1 rounded-full bg-black/60 border border-white/20 text-white text-xs">
+          {currentIndex + 1} / {mediaList.length}
+        </div>
+      )}
+
+      {/* メディア本体（画像 or 動画） */}
+      {isVideo ? (
+        <video
+          src={url}
+          controls
+          autoPlay
+          playsInline
+          onClick={(e) => e.stopPropagation()}
+          className="max-w-full max-h-full object-contain select-none"
+          style={{
+            transform: `translate(${tx}px, ${ty}px) scale(${scale})`,
+            transformOrigin: "center center",
+            opacity: 1 - dismissProgress * 0.4,
+            transition:
+              gestureRef.current.mode === "idle"
+                ? "transform 0.2s ease-out, opacity 0.2s ease-out"
+                : "none",
+          }}
+        />
+      ) : (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img
+          src={url}
+          alt="拡大画像"
+          draggable={false}
+          onClick={(e) => e.stopPropagation()}
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+          onDoubleClick={(e) => {
+            e.stopPropagation();
+            if (scale > 1) resetZoom();
+            else setScale(2);
+          }}
+          className="max-w-full max-h-full object-contain select-none"
+          style={{
+            transform: `translate(${tx}px, ${ty}px) scale(${scale})`,
+            transformOrigin: "center center",
+            opacity: 1 - dismissProgress * 0.4,
+            transition:
+              gestureRef.current.mode === "idle"
+                ? "transform 0.2s ease-out, opacity 0.2s ease-out"
+                : "none",
+            touchAction: "none",
+            WebkitUserSelect: "none",
+            userSelect: "none",
+          }}
+        />
+      )}
     </div>
   );
 }

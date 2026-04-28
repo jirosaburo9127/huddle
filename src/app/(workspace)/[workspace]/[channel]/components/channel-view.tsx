@@ -4,7 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { RealtimePostgresInsertPayload, RealtimePostgresUpdatePayload } from "@supabase/supabase-js";
 import type { Channel, Message, MessageWithProfile, Reaction } from "@/lib/supabase/types";
-import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import type { WorkspaceCategory } from "@/lib/channel-categories";
 import { MessageItem } from "./message-item";
 import { HitorigotoPostCard } from "./hitorigoto-post-card";
@@ -33,6 +34,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
   const setSidebarOpen = useMobileNavStore((s) => s.setSidebarOpen);
   const router = useRouter();
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   // 進行中まとめなど、外部からの投稿ジャンプ指定（?m=<messageId>）
   // 同じIDで二重実行されないよう処理済みIDを保持
   const jumpHandledIdRef = useRef<string | null>(null);
@@ -1182,6 +1184,19 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                       {showWiki ? "Wikiを閉じる" : "Wiki"}
                     </button>
                   )}
+
+                  {/* 写真・動画一覧 */}
+                  <Link
+                    href={`${pathname}/media`}
+                    role="menuitem"
+                    onClick={() => setShowOverflowMenu(false)}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-white/[0.04] transition-colors"
+                  >
+                    <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    写真・動画
+                  </Link>
 
                   {/* メンバー管理（DMでは非表示） */}
                   {!channel.is_dm && (
