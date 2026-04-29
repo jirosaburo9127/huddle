@@ -299,12 +299,16 @@ Deno.serve(async (req) => {
     const senderName = sender?.display_name || "メンバー";
 
     // 通知文: メッセージ内容そのままを表示。ファイル URL のみの行は絵文字に置換。
+    // メンショントークン (@<displayName> / @here / @All) はタイトルに「がメンション」と
+    // 出るので、本文では冗長なため除去する。
     function buildBody(content: string, systemEvent: string | null | undefined): string {
       if (systemEvent === "poll_created") return "投票を作成しました";
       if (systemEvent === "poll_closed") return "投票が締め切られました";
       if (systemEvent === "decision_marked") return "決定事項を登録しました";
       if (systemEvent === "member_joined") return "ワークスペースに参加しました";
-      const lines = (content || "").split("\n");
+      // 行頭/空白の直後にある @トークンを除去（NBSP=U+00A0 も非空白扱いで1トークンにマッチ）
+      const stripped = (content || "").replace(/(^|\s)@\S{1,40}/g, "$1");
+      const lines = stripped.split("\n");
       const transformed = lines
         .map((line) => {
           const t = line.trim();
@@ -316,6 +320,7 @@ Deno.serve(async (req) => {
           return line;
         })
         .join("\n")
+        .replace(/[ \t]+/g, " ") // メンション除去後の余分な連続空白を1つに
         .trim();
       if (!transformed) return "新しいメッセージ";
       return transformed.length > 120 ? transformed.slice(0, 120) + "…" : transformed;
