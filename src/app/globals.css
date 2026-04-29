@@ -40,6 +40,18 @@ body.native-app {
   font-size: 17px;
 }
 
+/* iOS Safari がサムネ用 <video> に出す「斜線入り再生不可」アイコンを隠す。
+   サムネ用途では autoplay 拒否で iOS が自動表示するこの UI が邪魔なので消す。
+   再生は親要素の onClick で AVPlayer ブリッジに飛ばすので、ここで再生 UI は不要。 */
+.video-thumbnail::-webkit-media-controls-start-playback-button,
+.video-thumbnail::-webkit-media-controls-overlay-play-button,
+.video-thumbnail::-webkit-media-controls-panel,
+.video-thumbnail::-webkit-media-controls {
+  display: none !important;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
 /* スクロールバー非表示（全体・スクロール機能は維持） */
 html {
   scrollbar-width: none;

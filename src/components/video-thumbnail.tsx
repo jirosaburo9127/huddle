@@ -35,6 +35,7 @@ export function VideoThumbnail({ url, className, captureAt = 0.1 }: Props) {
     }
   }, [url, captureAt]);
 
+  // globals.css の .video-thumbnail で iOS Safari の斜線入り再生不可アイコンを隠す
   return (
     <video
       ref={ref}
@@ -44,7 +45,7 @@ export function VideoThumbnail({ url, className, captureAt = 0.1 }: Props) {
       playsInline
       autoPlay
       preload="auto"
-      className={className}
+      className={`${className ?? ""} video-thumbnail`}
       style={{ pointerEvents: "none" }}
       onLoadedData={(e) => {
         // autoplay で一瞬走り出した動画を即停止して、フレームをサムネとして固定
