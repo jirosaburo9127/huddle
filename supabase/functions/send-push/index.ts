@@ -297,8 +297,30 @@ Deno.serve(async (req) => {
     }
 
     const senderName = sender?.display_name || "メンバー";
-    // プライバシー保護: 通知にメッセージ内容を表示しない
-    const bodyPlain = "新しいメッセージがあります";
+
+    // 通知文: メッセージ内容そのままを表示。ファイル URL のみの行は絵文字に置換。
+    function buildBody(content: string, systemEvent: string | null | undefined): string {
+      if (systemEvent === "poll_created") return "投票を作成しました";
+      if (systemEvent === "poll_closed") return "投票が締め切られました";
+      if (systemEvent === "decision_marked") return "決定事項を登録しました";
+      if (systemEvent === "member_joined") return "ワークスペースに参加しました";
+      const lines = (content || "").split("\n");
+      const transformed = lines
+        .map((line) => {
+          const t = line.trim();
+          if (/^https:\/\/[^\s]*\/storage\/v1\/object\/public\/chat-files\//.test(t)) {
+            if (/\.(jpg|jpeg|png|gif|webp|svg|heic)(\?|#|$)/i.test(t)) return "📷 画像";
+            if (/\.(mp4|mov|webm|m4v)(\?|#|$)/i.test(t)) return "🎥 動画";
+            return "📎 ファイル";
+          }
+          return line;
+        })
+        .join("\n")
+        .trim();
+      if (!transformed) return "新しいメッセージ";
+      return transformed.length > 120 ? transformed.slice(0, 120) + "…" : transformed;
+    }
+    const bodyPlain = buildBody(record.content, record.system_event);
 
     // 受信者ごとに通知内容を組み立てる
     function buildTitle(isMentioned: boolean): string {
