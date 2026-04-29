@@ -1,14 +1,15 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Capacitor } from "@capacitor/core";
 
 // 動画ファイルのサムネイル表示。
-// iOS WKWebView は <video> の preload="metadata" や #t=0.1 メディアフラグメントを
-// 律儀に守ってくれず、最初のフレームが黒のままになる。確実にフレームを描画させるため、
-// autoplay + muted で一瞬再生 → onLoadedData で pause + 0.1秒地点に seek する。
 //
-// pointer-events: none で親要素のクリックを通すので、サムネ全体をクリッカブルな
-// カードにできる。
+// iOS WKWebView では autoplay が拒否されると <video> が斜線入りの「再生不可」
+// アイコンを OS 標準で表示してしまう（CSS では完全に隠しきれない）。
+// そのため iOS ネイティブ環境では <video> 自体を opacity 0 で隠し、
+// 親側で重ねてある ▶ オーバーレイだけ見せる。PC ブラウザではフレームが
+// サムネとして表示される。
 
 type Props = {
   url: string;
@@ -19,52 +20,56 @@ type Props = {
 
 export function VideoThumbnail({ url, className, captureAt = 0.1 }: Props) {
   const ref = useRef<HTMLVideoElement | null>(null);
+  // SSR/hydration では false（PC のフォールバック挙動）にしておき、
+  // mount 後に Capacitor 判定でネイティブのみ非表示化
+  const [hideForNative, setHideForNative] = useState(false);
 
-  // マウント直後にフレームを確実に描画させる
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) setHideForNative(true);
+  }, []);
+
   useEffect(() => {
     const v = ref.current;
     if (!v) return;
-    // 既に loadeddata 済みなら直接 seek + pause（再マウント時の救済）
     if (v.readyState >= 2) {
       try {
         v.pause();
         if (v.currentTime === 0) v.currentTime = captureAt;
       } catch {
-        // 失敗は無視
+        // 無視
       }
     }
   }, [url, captureAt]);
 
-  // globals.css の .video-thumbnail で iOS Safari の斜線入り再生不可アイコンを隠す
   return (
     <video
       ref={ref}
       src={url}
       muted
-      // iOS Safari でフルスクリーン化させない
       playsInline
       autoPlay
       preload="auto"
       className={`${className ?? ""} video-thumbnail`}
-      style={{ pointerEvents: "none" }}
+      style={{
+        pointerEvents: "none",
+        opacity: hideForNative ? 0 : 1,
+      }}
       onLoadedData={(e) => {
-        // autoplay で一瞬走り出した動画を即停止して、フレームをサムネとして固定
         const v = e.currentTarget;
         try {
           v.pause();
           v.currentTime = captureAt;
         } catch {
-          // 失敗時はそのまま（最初フレームのまま）
+          // 無視
         }
       }}
       onCanPlay={(e) => {
-        // 一部ブラウザは onLoadedData では pause できないので保険
         const v = e.currentTarget;
         if (!v.paused) {
           try {
             v.pause();
           } catch {
-            // 失敗は無視
+            // 無視
           }
         }
       }}
