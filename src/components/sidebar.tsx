@@ -431,12 +431,24 @@ export function Sidebar({
     window.addEventListener("huddle:decisionsRead", onDecisionsRead);
     window.addEventListener("huddle:activitySeen", onActivitySeen);
 
-    // 15秒ごとにサーバーと同期（Realtime取りこぼし+既読状態の安定化）
-    const poll = setInterval(refetchUnread, 10000);
+    // 5秒ごとにサーバーと同期（Realtime取りこぼし+既読状態の安定化）
+    // 10秒だとドリフトが目立ちやすかったので半分に短縮
+    const poll = setInterval(refetchUnread, 5000);
+
+    // 5分ごとに「フル再同期」: ローカル state と楽観的削除フラグをすべてクリアして、
+    // サーバの真実だけを取りに行く。長時間使用時のドリフト解消のため。
+    const FULL_RESYNC_INTERVAL_MS = 5 * 60 * 1000;
+    const fullResync = setInterval(() => {
+      if (cancelled) return;
+      // 楽観的削除フラグを全クリア（サーバ値をそのまま受け入れる）
+      lastOptimisticReadRef.current.clear();
+      refetchUnread();
+    }, FULL_RESYNC_INTERVAL_MS);
 
     return () => {
       cancelled = true;
       clearInterval(poll);
+      clearInterval(fullResync);
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);
       window.removeEventListener("huddle:appResumed", onAppResume);
