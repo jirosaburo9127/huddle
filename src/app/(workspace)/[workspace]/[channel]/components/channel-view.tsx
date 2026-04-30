@@ -42,6 +42,10 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
   // ?m 指定がある間は true。ジャンプ完了後 2秒経ってから false に戻す
   const jumpActiveRef = useRef<boolean>(false);
   const [messages, setMessages] = useState<MessageWithProfile[]>(initialMessages);
+  // 過去メッセージの追加読み込み用
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  // 初期取得で 50 件未満しか返ってこなかったら、それ以前の履歴は無いとみなす
+  const [hasMoreOlder, setHasMoreOlder] = useState(initialMessages.length >= 50);
   // Chatwork風インライン返信の返信対象
   const [replyTo, setReplyTo] = useState<MessageWithProfile | null>(null);
   // 独り言チャンネル用X風スレッドモーダル
@@ -1319,6 +1323,60 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
 
         {/* メッセージ一覧 */}
         <div ref={scrollContainerRef} className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-4">
+          {/* もっと前のメッセージを読み込むボタン（最上部） */}
+          {messages.length > 0 && hasMoreOlder && (
+            <div className="flex justify-center mb-4">
+              <button
+                type="button"
+                onClick={async () => {
+                  if (loadingOlder) return;
+                  const oldest = messages[0];
+                  if (!oldest) return;
+                  setLoadingOlder(true);
+                  // スクロール位置を維持するため、現在のスクロール高さを保存
+                  const container = scrollContainerRef.current;
+                  const prevScrollHeight = container?.scrollHeight ?? 0;
+                  const prevScrollTop = container?.scrollTop ?? 0;
+                  try {
+                    const { data } = await supabase
+                      .from("messages")
+                      .select("*, profiles(*), reactions(*)")
+                      .eq("channel_id", channel.id)
+                      .lt("created_at", oldest.created_at)
+                      .is("deleted_at", null)
+                      .order("created_at", { ascending: false })
+                      .limit(50);
+                    if (!data || data.length === 0) {
+                      setHasMoreOlder(false);
+                    } else {
+                      const additions = (data as MessageWithProfile[])
+                        .slice()
+                        .reverse();
+                      setMessages((prev) => {
+                        const existingIds = new Set(prev.map((m) => m.id));
+                        const fresh = additions.filter((m) => !existingIds.has(m.id));
+                        return [...fresh, ...prev];
+                      });
+                      if (data.length < 50) setHasMoreOlder(false);
+                      // 新しい古いメッセージが上に追加されたぶんだけスクロール位置を補正して
+                      // 見た目の表示位置をキープする
+                      requestAnimationFrame(() => {
+                        if (!container) return;
+                        const newScrollHeight = container.scrollHeight;
+                        container.scrollTop = newScrollHeight - prevScrollHeight + prevScrollTop;
+                      });
+                    }
+                  } finally {
+                    setLoadingOlder(false);
+                  }
+                }}
+                disabled={loadingOlder}
+                className="px-4 py-2 text-xs rounded-full border border-border bg-sidebar hover:bg-sidebar-hover transition-colors text-muted disabled:opacity-50"
+              >
+                {loadingOlder ? "読み込み中…" : "もっと前のメッセージを読み込む"}
+              </button>
+            </div>
+          )}
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-muted">
               {channel.is_hitorigoto ? (
