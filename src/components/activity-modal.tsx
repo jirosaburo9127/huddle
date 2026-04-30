@@ -90,7 +90,7 @@ function Avatar({ url, name }: { url: string | null; name: string }) {
 }
 
 export function ActivityModal({ workspaceSlug, workspaceId, onClose }: Props) {
-  const [tab, setTab] = useState<Tab>("reactions");
+  const [tab, setTab] = useState<Tab>("mentions");
   const [reactions, setReactions] = useState<ReactionActivity[]>([]);
   const [mentions, setMentions] = useState<MentionActivity[]>([]);
   const [replies, setReplies] = useState<ReplyActivity[]>([]);
@@ -200,9 +200,9 @@ export function ActivityModal({ workspaceSlug, workspaceId, onClose }: Props) {
         {/* タブバー */}
         <div className="flex border-b border-border/50 shrink-0">
           {([
-            ["reactions", "リアクション"],
             ["mentions", "メンション"],
             ["replies", "返信"],
+            ["reactions", "リアクション"],
           ] as [Tab, string][]).map(([key, label]) => (
             <button
               key={key}
