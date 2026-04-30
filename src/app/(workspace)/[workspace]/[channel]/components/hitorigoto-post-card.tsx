@@ -241,22 +241,43 @@ function HitorigotoPostCardInner({
           // 投稿内の画像URLのみのリスト（連続閲覧用）
           const imageUrls = fileUrls.filter((u) => isImageFile(u));
           return (
-          <div className="space-y-2 mb-2">
+          <div className="mb-2">
+            {/* 画像: 1枚なら単独、2枚以上は X 風の横スライドカルーセル */}
+            {imageUrls.length === 1 && (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={imageUrls[0]}
+                alt=""
+                className="rounded-xl max-w-full max-h-80 object-cover cursor-pointer mb-2"
+                loading="lazy"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setLightboxState({ urls: imageUrls, index: 0 });
+                }}
+              />
+            )}
+            {imageUrls.length >= 2 && (
+              <div className="-mx-1 mb-2 flex gap-2 overflow-x-auto snap-x snap-mandatory hide-scrollbar">
+                {imageUrls.map((url, idx) => (
+                  <button
+                    key={url + idx}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setLightboxState({ urls: imageUrls, index: idx });
+                    }}
+                    className="snap-start shrink-0 w-[78%] sm:w-[260px] aspect-square rounded-xl overflow-hidden bg-black/5 first:ml-1 last:mr-1 hover:opacity-90 transition-opacity"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={url} alt="" loading="lazy" className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
+            {/* 動画・その他のファイル（画像はすでに上で描画済みなのでスキップ） */}
+            <div className="space-y-2">
             {fileUrls.map((url, i) =>
-              isImageFile(url) ? (
-                <img
-                  key={i}
-                  src={url}
-                  alt=""
-                  className="rounded-xl max-w-full max-h-80 object-cover cursor-pointer"
-                  loading="lazy"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const idx = imageUrls.indexOf(url);
-                    setLightboxState({ urls: imageUrls, index: idx >= 0 ? idx : 0 });
-                  }}
-                />
-              ) : isVideoFile(url) ? (
+              isImageFile(url) ? null : isVideoFile(url) ? (
                 <button
                   key={i}
                   type="button"
@@ -323,6 +344,7 @@ function HitorigotoPostCardInner({
                 </a>
               )
             )}
+            </div>
           </div>
           );
         })()}

@@ -166,27 +166,51 @@ function MessageContent({
           dangerouslySetInnerHTML={{ __html: parseMarkdown(textContent) }}
         />
       )}
-      {/* ファイル部分 */}
-      {fileUrls.map((url, i) => {
-        const fileName = extractFileName(url);
-        if (isImageFile(url) && !imageError) {
-          return (
-            <div key={i} className="mt-1">
+      {/* 画像: 1枚なら単独表示、2枚以上は X 風の横スライドカルーセル */}
+      {imageUrls.length === 1 && !imageError && (
+        <div className="mt-1">
+          <img
+            src={imageUrls[0]}
+            alt={extractFileName(imageUrls[0])}
+            className="max-w-full sm:max-w-xs max-h-80 rounded-xl cursor-pointer hover:opacity-90 transition-opacity"
+            onClick={(e) => {
+              e.stopPropagation();
+              onImageClick?.(imageUrls, 0);
+            }}
+            onError={onImageError}
+          />
+        </div>
+      )}
+      {imageUrls.length >= 2 && !imageError && (
+        <div
+          className="mt-1 -mx-1 flex gap-2 overflow-x-auto snap-x snap-mandatory hide-scrollbar"
+          style={{ scrollPaddingLeft: "0.25rem" }}
+        >
+          {imageUrls.map((url, idx) => (
+            <button
+              key={url + idx}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onImageClick?.(imageUrls, idx);
+              }}
+              className="snap-start shrink-0 w-[78%] sm:w-[260px] aspect-square rounded-xl overflow-hidden bg-black/5 first:ml-1 last:mr-1 hover:opacity-90 transition-opacity"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={url}
-                alt={fileName}
-                className="max-w-full sm:max-w-xs max-h-80 rounded-xl cursor-pointer hover:opacity-90 transition-opacity"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const idx = imageUrls.indexOf(url);
-                  onImageClick?.(imageUrls, idx >= 0 ? idx : 0);
-                }}
+                alt={extractFileName(url)}
+                className="w-full h-full object-cover"
                 onError={onImageError}
               />
-              <span className="text-xs text-muted mt-1 block">{fileName}</span>
-            </div>
-          );
-        }
+            </button>
+          ))}
+        </div>
+      )}
+      {/* 動画・その他のファイル（画像はすでに上で描画済みなのでスキップ） */}
+      {fileUrls.map((url, i) => {
+        const fileName = extractFileName(url);
+        if (isImageFile(url)) return null;
         if (isVideoFile(url)) {
           return (
             <button
