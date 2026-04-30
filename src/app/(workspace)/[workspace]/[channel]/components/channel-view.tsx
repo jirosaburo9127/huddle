@@ -19,6 +19,7 @@ import { ChannelMembersModal } from "@/components/channel-members-modal";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
 import { showMessageNotification } from "@/lib/notification";
 import { clearPushBadge } from "@/lib/push-notifications";
+import { fetchSincePeriod, mergeById } from "@/lib/sync-fetcher";
 
 type Props = {
   channel: Channel;
@@ -576,48 +577,20 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
       // Realtime再接続時にも呼べるようrefに登録
       syncMissedRef.current = syncMissedMessages;
 
-      // 直近 1 週間のメッセージを全件取り直して、ローカルに無いものをマージする。
-      // 旧仕様は「最新50件」固定で取得していたため、1週間で 50件超のチャンネルでは
-      // バックグラウンド復帰時に「中間期間」のメッセージを取りこぼす設計欠陥があった。
-      // ID で重複排除しつつ全件マージするので、同じ期間で何度走っても安全。
-      const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-      const collected: MessageWithProfile[] = [];
-      let cursor = since;
-      // 最大 1万件 (500 × 20) まで安全上限
-      for (let i = 0; i < 20; i++) {
-        if (cancelled) return;
-        const { data } = await supabase
-          .from("messages")
-          .select("*, profiles(*), reactions(*)")
-          .eq("channel_id", channel.id)
-          .gte("created_at", cursor)
-          .order("created_at", { ascending: true })
-          .limit(500);
-        if (!data || data.length === 0) break;
-        const rows = data as MessageWithProfile[];
-        collected.push(...rows);
-        if (rows.length < 500) break;
-        // cursor を最後の created_at + 1ms に進める（同タイムスタンプの重複取得回避）
-        const last = new Date(rows[rows.length - 1].created_at).getTime() + 1;
-        cursor = new Date(last).toISOString();
-      }
-
-      if (cancelled || collected.length === 0) return;
-
-      const fresh = collected;
-
-      setMessages((prev) => {
-        const existingIds = new Set(prev.map((m) => m.id));
-        const additions = fresh.filter((m) => !existingIds.has(m.id));
-        if (additions.length === 0) return prev;
-        const merged = [...prev, ...additions];
-        merged.sort(
-          (a, b) =>
-            new Date(a.created_at).getTime() -
-            new Date(b.created_at).getTime()
-        );
-        return merged;
+      // 「直近1週間を毎回フル取得 → ID で mergeById」が中抜けを起こさない唯一の正解。
+      // 詳細と禁止パターン: AGENTS.md / src/lib/sync-fetcher.ts
+      const fresh = await fetchSincePeriod<MessageWithProfile>({
+        supabase,
+        table: "messages",
+        select: "*, profiles(*), reactions(*)",
+        eq: { channel_id: channel.id },
+        sinceDays: 7,
+        isCancelled: () => cancelled,
       });
+
+      if (cancelled || fresh.length === 0) return;
+
+      setMessages((prev) => mergeById(prev, fresh));
     }
 
     // マウント直後に1回必ず走らせる
