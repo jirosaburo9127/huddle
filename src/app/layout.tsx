@@ -24,7 +24,8 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "black-translucent",
+    // 白背景 + 黒文字の標準スタイル（時計・バッテリー表示が黒文字になる）
+    statusBarStyle: "default",
     title: "Huddle",
     startupImage: "/icons/icon-512.png",
   },
@@ -35,7 +36,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#000000",
+  themeColor: "#FFFFFF",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -55,7 +56,7 @@ export default function RootLayout({
     >
       <head>
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="Huddle" />
         {/* favicon / apple-touch-icon は metadata.icons で /icons/icon-192.png を指定（monoクロのHuddleアプリアイコン） */}
       </head>
