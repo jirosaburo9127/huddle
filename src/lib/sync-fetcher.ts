@@ -78,25 +78,51 @@ export async function fetchSincePeriod<T extends Row>(
   const collected: T[] = [];
   let cursor = since;
 
-  for (let i = 0; i < maxPages; i++) {
-    if (isCancelled?.()) return collected;
-
-    let query = supabase
+  // 同じ条件のクエリを毎回新規構築する（Supabase の query builder は一度 await
+  // すると再利用できないため、リトライ時は再構築が必要）
+  const buildQuery = () => {
+    let q = supabase
       .from(table)
       .select(select)
       .gte("created_at", cursor)
       .order("created_at", { ascending: true })
       .limit(pageSize);
-
     for (const [key, value] of Object.entries(eq)) {
-      query = query.eq(key, value);
+      q = q.eq(key, value);
     }
     if (excludeDeleted) {
-      query = query.is("deleted_at", null);
+      q = q.is("deleted_at", null);
+    }
+    return q;
+  };
+
+  for (let i = 0; i < maxPages; i++) {
+    if (isCancelled?.()) return collected;
+
+    let { data, error } = await buildQuery();
+
+    // エラー時は 500ms 待って 1回だけリトライ（一時的なネットワーク揺らぎを救う）。
+    // 永続的に失敗しても、呼び出し側のポーリング（典型的に 10秒ごと）が次回また
+    // 全期間を取り直すので最終的にセルフヒーリングする。ここで throw して loop を
+    // 巻き戻すより、ログを残して部分結果でも返すほうが UX が静か。
+    if (error) {
+      console.error(
+        `[sync-fetcher] ${table} page ${i} fetch error, retrying once:`,
+        error
+      );
+      await new Promise((r) => setTimeout(r, 500));
+      if (isCancelled?.()) return collected;
+      ({ data, error } = await buildQuery());
+      if (error) {
+        console.error(
+          `[sync-fetcher] ${table} page ${i} retry also failed, aborting this run:`,
+          error
+        );
+        break;
+      }
     }
 
-    const { data, error } = await query;
-    if (error || !data || data.length === 0) break;
+    if (!data || data.length === 0) break;
 
     const rows = data as unknown as T[];
     collected.push(...rows);
