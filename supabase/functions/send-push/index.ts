@@ -15,13 +15,14 @@ const APNS_KEY_ID = Deno.env.get("APNS_KEY_ID")!;
 const APNS_TEAM_ID = Deno.env.get("APNS_TEAM_ID")!;
 const APNS_BUNDLE_ID = Deno.env.get("APNS_BUNDLE_ID")!;
 const APNS_PRIVATE_KEY = Deno.env.get("APNS_PRIVATE_KEY")!;
-// 送信先エンドポイント: development (Xcode Debugビルド) or production (TestFlight/App Store)
-// デフォルトは development (sandbox)。TestFlight配布時に "production" に切り替える。
-const APNS_ENV = Deno.env.get("APNS_ENV") ?? "development";
-const APNS_HOST =
-  APNS_ENV === "production"
-    ? "api.push.apple.com"
-    : "api.sandbox.push.apple.com";
+// 送信先エンドポイント: production (TestFlight/App Store) と sandbox (Xcode Debugビルド) の2つ。
+// APNS_ENV はデフォルトの優先順位だけ決め、実際は失敗したら反対側へ自動フォールバックするので
+// 配布時に環境変数を切り替え忘れても通知が届く（一度入れれば永久に切替不要）。
+const APNS_ENV = Deno.env.get("APNS_ENV") ?? "production";
+const APNS_HOST_PRODUCTION = "api.push.apple.com";
+const APNS_HOST_SANDBOX = "api.sandbox.push.apple.com";
+const APNS_HOST_PRIMARY = APNS_ENV === "production" ? APNS_HOST_PRODUCTION : APNS_HOST_SANDBOX;
+const APNS_HOST_FALLBACK = APNS_ENV === "production" ? APNS_HOST_SANDBOX : APNS_HOST_PRODUCTION;
 
 // JWT は最大1時間有効。再生成コストを抑えるため50分キャッシュ
 let cachedJwt: { token: string; expiresAt: number } | null = null;
@@ -80,7 +81,8 @@ async function getApnsJwt(): Promise<string> {
   return jwt;
 }
 
-async function sendPushOnce(
+async function sendPushToHost(
+  host: string,
   deviceToken: string,
   title: string,
   body: string,
@@ -104,7 +106,7 @@ async function sendPushOnce(
       }
     }
     const response = await fetch(
-      `https://${APNS_HOST}/3/device/${deviceToken}`,
+      `https://${host}/3/device/${deviceToken}`,
       {
         method: "POST",
         headers: {
@@ -134,8 +136,37 @@ async function sendPushOnce(
   }
 }
 
-// リトライ付き送信: 5xx / ネットワークエラー (status === 0) のみリトライ
-// 4xx (BadDeviceToken 等) は即座に諦めて返す
+// 単一ホスト + リトライ: 5xx / ネットワークエラー (status === 0) のみリトライ。
+// 4xx (BadDeviceToken 等) は即座に諦めて返す。
+async function sendPushOnce(
+  host: string,
+  deviceToken: string,
+  title: string,
+  body: string,
+  badge: number,
+  url: string,
+  showBanner: boolean,
+  isMention: boolean
+): Promise<{ ok: boolean; status: number; error?: string }> {
+  const DELAYS = [250, 750, 2000];
+  let result = await sendPushToHost(host, deviceToken, title, body, badge, url, showBanner, isMention);
+  for (const delay of DELAYS) {
+    if (result.ok) return result;
+    const retriable =
+      result.status === 0 ||
+      result.status === 408 ||
+      (result.status >= 500 && result.status < 600);
+    if (!retriable) return result;
+    await new Promise((r) => setTimeout(r, delay));
+    result = await sendPushToHost(host, deviceToken, title, body, badge, url, showBanner, isMention);
+  }
+  return result;
+}
+
+// production / sandbox 自動フォールバック付き送信。
+// まず PRIMARY (= APNS_ENV) で試し、BadDeviceToken なら反対側で再試行する。
+// これにより Xcode 開発ビルドと TestFlight/App Store 配布の切り替えで
+// APNS_ENV を毎回変える必要がなくなる。
 async function sendPush(
   deviceToken: string,
   title: string,
@@ -145,20 +176,13 @@ async function sendPush(
   showBanner: boolean,
   isMention: boolean
 ): Promise<{ ok: boolean; status: number; error?: string }> {
-  const DELAYS = [250, 750, 2000]; // ms. 合計 ~3秒
-  let result = await sendPushOnce(deviceToken, title, body, badge, url, showBanner, isMention);
-  for (const delay of DELAYS) {
-    if (result.ok) return result;
-    // リトライ可能エラー: 5xx, 408, 0 (network)
-    const retriable =
-      result.status === 0 ||
-      result.status === 408 ||
-      (result.status >= 500 && result.status < 600);
-    if (!retriable) return result;
-    await new Promise((r) => setTimeout(r, delay));
-    result = await sendPushOnce(deviceToken, title, body, badge, url, showBanner, isMention);
-  }
-  return result;
+  const primary = await sendPushOnce(APNS_HOST_PRIMARY, deviceToken, title, body, badge, url, showBanner, isMention);
+  if (primary.ok) return primary;
+  // BadDeviceToken (400) のみフォールバック対象。それ以外の 4xx (例: 410 Unregistered) は即返す。
+  const isBadToken = primary.status === 400 && (primary.error || "").includes("BadDeviceToken");
+  if (!isBadToken) return primary;
+  const fallback = await sendPushOnce(APNS_HOST_FALLBACK, deviceToken, title, body, badge, url, showBanner, isMention);
+  return fallback.ok ? fallback : primary;
 }
 
 interface MessageRecord {
