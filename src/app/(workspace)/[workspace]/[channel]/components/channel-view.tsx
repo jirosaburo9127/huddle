@@ -575,15 +575,16 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
     async function syncMissedMessages() {
       // Realtime再接続時にも呼べるようrefに登録
       syncMissedRef.current = syncMissedMessages;
-      // 直近50件をDBから取り直し、ローカルに無いものだけマージする
+      // 直近200件をDBから取り直し、ローカルに無いものだけマージする
       //（最新が消える系のバグは「ローカルに無いはずの新しい行」を補えれば直る）
       // 返信(parent_id あり)も含めて取得する。Chatwork風インライン表示でタイムラインに流すため
+      // 50 件だと 1 日で埋まり「中抜け」が起きやすかったので 200 に増量
       const { data } = await supabase
         .from("messages")
         .select("*, profiles(*), reactions(*)")
         .eq("channel_id", channel.id)
         .order("created_at", { ascending: false })
-        .limit(50);
+        .limit(200);
 
       if (cancelled || !data || data.length === 0) return;
 
