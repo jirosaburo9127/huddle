@@ -100,6 +100,37 @@ export function ActivityModal({ workspaceSlug, workspaceId, onClose }: Props) {
     mentions: false,
     replies: false,
   });
+  // 各タブに未読があるか（タブ名の右にドット表示）
+  // モーダルを開いた瞬間にサーバから1回だけ取得し、以降はタブを開くごとに該当タブだけ false に落とす
+  const [unread, setUnread] = useState<Record<Tab, boolean>>({
+    reactions: false,
+    mentions: false,
+    replies: false,
+  });
+
+  // モーダルマウント時に一度だけ「どのタブに未読があるか」を取得
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const supabase = createClient();
+      const { data } = await supabase.rpc("get_activity_unread_breakdown", {
+        p_user_id: (await supabase.auth.getUser()).data.user?.id,
+        p_workspace_id: workspaceId,
+      });
+      if (cancelled) return;
+      const row = Array.isArray(data) ? data[0] : data;
+      if (row) {
+        setUnread({
+          reactions: !!row.has_reactions,
+          mentions: !!row.has_mentions,
+          replies: !!row.has_replies,
+        });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceId]);
 
   // タブを開いた時に対応するデータと既読マークを取得
   useEffect(() => {
@@ -154,6 +185,9 @@ export function ActivityModal({ workspaceSlug, workspaceId, onClose }: Props) {
         await supabase.rpc("mark_reply_seen");
       }
 
+      // 開いたタブのドットだけ即座に消す
+      setUnread((u) => ({ ...u, [tab]: false }));
+
       // サイドバーのドットを即時に消す
       window.dispatchEvent(new CustomEvent("huddle:activitySeen"));
     })();
@@ -207,13 +241,21 @@ export function ActivityModal({ workspaceSlug, workspaceId, onClose }: Props) {
             <button
               key={key}
               onClick={() => setTab(key)}
-              className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
+              className={`flex-1 py-2.5 text-sm font-medium transition-colors relative ${
                 tab === key
                   ? "text-foreground border-b-2 border-accent -mb-px"
                   : "text-muted hover:text-foreground"
               }`}
             >
-              {label}
+              <span className="inline-flex items-center gap-1.5">
+                {label}
+                {unread[key] && (
+                  <span
+                    aria-label="未読あり"
+                    className="inline-block w-1.5 h-1.5 rounded-full bg-red-500"
+                  />
+                )}
+              </span>
             </button>
           ))}
         </div>
