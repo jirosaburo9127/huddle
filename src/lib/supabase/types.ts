@@ -28,6 +28,7 @@ export type Channel = {
   is_private: boolean;
   is_dm: boolean;
   is_hitorigoto: boolean;
+  mikan_enabled?: boolean;
   topic: string | null;
   category: ChannelCategory | null;
   created_by: string;

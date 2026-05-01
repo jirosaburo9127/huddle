@@ -64,6 +64,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
   const [categorySaving, setCategorySaving] = useState(false);
   const [wsCategories, setWsCategories] = useState<WorkspaceCategory[]>([]);
   const [isMuted, setIsMuted] = useState(false);
+  const [mikanEnabled, setMikanEnabled] = useState<boolean>(!!channel.mikan_enabled);
   const overflowMenuRef = useRef<HTMLDivElement>(null);
   const prevMessageCountRef = useRef(initialMessages.length);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1112,6 +1113,34 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                     </svg>
                     {showDecisionsOnly ? "すべて表示" : "決定事項のみ表示"}
                   </button>
+
+                  {/* みかん（AIファシリ）トグル: DM・独り言以外で表示 */}
+                  {!channel.is_dm && !channel.is_hitorigoto && (
+                    <button
+                      role="menuitem"
+                      onClick={async () => {
+                        setShowOverflowMenu(false);
+                        const next = !mikanEnabled;
+                        const { error } = await supabase.rpc("set_mikan_enabled", {
+                          p_channel_id: channel.id,
+                          p_enabled: next,
+                        });
+                        if (error) {
+                          alert("みかんの設定変更に失敗しました: " + error.message);
+                          return;
+                        }
+                        setMikanEnabled(next);
+                      }}
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-white/[0.04] transition-colors ${
+                        mikanEnabled ? "text-accent" : "text-foreground"
+                      }`}
+                    >
+                      <span className="w-4 h-4 shrink-0 inline-flex items-center justify-center text-base leading-none">
+                        🍊
+                      </span>
+                      {mikanEnabled ? "みかんを無効にする" : "みかんを有効にする"}
+                    </button>
+                  )}
 
                   {/* ミュートトグル */}
                   <button
