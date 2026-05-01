@@ -21,7 +21,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const MIKAN_USER_ID = "00000000-0000-0000-0000-00000000aaaa";
-const MODEL = "claude-haiku-4-5";
+const MODEL = "claude-haiku-4-5-20251001";
 const CONTEXT_WINDOW_MESSAGES = 50;
 const MAX_OUTPUT_TOKENS = 400;
 
@@ -186,7 +186,8 @@ Deno.serve(async (req) => {
     if (!aiRes.ok) {
       const errText = await aiRes.text();
       console.error("[mikan] anthropic api failed:", aiRes.status, errText);
-      return new Response("ai failed", { status: 200 });
+      // 一時的に診断用に詳細を返す（PoC 期間のみ）
+      return new Response(`ai failed: ${aiRes.status} ${errText}`, { status: 200 });
     }
 
     const aiJson = await aiRes.json() as {

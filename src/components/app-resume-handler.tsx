@@ -1,12 +1,11 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { Capacitor } from "@capacitor/core";
 
-// アプリがバックグラウンドから復帰した瞬間に未読カウントを再取得させるための
-// 中央集権的なハンドラ。サイドバーが mount されていない画面でも動かせるように
-// レイアウト直下に配置する。
+// アプリがバックグラウンドから復帰した時に "huddle:appResumed" カスタムイベントを発火する。
+// データ再取得は各購読者 (sidebar の refetchUnread / channel-view の syncMissedMessages 等) が
+// このイベントを listen して個別に行う。
 //
 // 検出経路:
 //   1. document.visibilitychange (visible 化)
@@ -15,12 +14,13 @@ import { Capacitor } from "@capacitor/core";
 //   4. Capacitor App.appStateChange (iOS ネイティブ復帰)
 //
 // 1.5 秒のクールダウンで連続発火を抑制。
-// router.refresh() で SSR 由来の unreadCounts も再取得する。
+//
+// ※ 以前は router.refresh() を呼んでいたが、復帰のたびに画面全体が再レンダリングされ
+// 「チカっ」と見える原因になっていた。各購読者がイベントで自前再取得するので、
+// 全体 refresh は不要。
 let nativeListenerAdded = false;
 
 export function AppResumeHandler() {
-  const router = useRouter();
-
   useEffect(() => {
     let lastFiredAt = 0;
 
@@ -29,7 +29,6 @@ export function AppResumeHandler() {
       if (now - lastFiredAt < 1500) return;
       lastFiredAt = now;
       window.dispatchEvent(new CustomEvent("huddle:appResumed"));
-      router.refresh();
     }
 
     function onVisible() {
@@ -65,7 +64,7 @@ export function AppResumeHandler() {
       window.removeEventListener("pageshow", onPageShow);
       // ネイティブリスナーは module スコープのフラグで管理しているので解除しない
     };
-  }, [router]);
+  }, []);
 
   return null;
 }
