@@ -12,11 +12,7 @@ type Props = {
   message: MessageWithProfile;
   currentUserId: string;
   onDelete?: (messageId: string) => Promise<void>;
-  onBookmark?: (messageId: string) => Promise<void>;
-  isBookmarked?: boolean;
   hasPoll?: boolean;
-  readCount?: number;
-  memberCount?: number;
 };
 
 // Supabase Storage URL判定
@@ -96,11 +92,7 @@ function HitorigotoPostCardInner({
   message,
   currentUserId,
   onDelete,
-  onBookmark,
-  isBookmarked,
   hasPoll,
-  readCount = -1,
-  memberCount = 0,
 }: Props) {
   const [lightboxState, setLightboxState] = useState<{ urls: string[]; index: number } | null>(null);
   const pathname = usePathname();
@@ -263,38 +255,19 @@ function HitorigotoPostCardInner({
           </div>
         )}
 
-        {/* フッター: 既読 + ブックマーク + 削除 (リアクション/返信なし) */}
-        <div className="flex items-center gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
-          {/* 既読 */}
-          {readCount >= 0 && (
-            <span className="text-[11px] text-muted">
-              {readCount === 0 ? "" : readCount === memberCount ? "既読" : `既読 ${readCount}`}
-            </span>
-          )}
-
-          <div className="flex items-center gap-1 ml-auto">
-            {onBookmark && (
-              <button
-                onClick={() => onBookmark(message.id)}
-                className={`p-1.5 rounded-lg transition-colors ${isBookmarked ? "text-accent" : "text-muted hover:text-foreground"}`}
-              >
-                <svg className="w-4 h-4" fill={isBookmarked ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-                </svg>
-              </button>
-            )}
-            {message.user_id === currentUserId && onDelete && (
-              <button
-                onClick={() => { if (confirm("削除しますか？")) onDelete(message.id); }}
-                className="p-1.5 rounded-lg text-muted hover:text-red-400 transition-colors"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </button>
-            )}
+        {/* フッター: 削除のみ (自分の投稿のみ表示) */}
+        {message.user_id === currentUserId && onDelete && (
+          <div className="flex items-center justify-end mt-2" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => { if (confirm("削除しますか？")) onDelete(message.id); }}
+              className="p-1.5 rounded-lg text-muted hover:text-red-400 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
           </div>
-        </div>
+        )}
       </article>
 
       {lightboxState && (

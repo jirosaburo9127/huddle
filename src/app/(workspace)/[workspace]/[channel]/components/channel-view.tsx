@@ -1387,11 +1387,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                         message={message}
                         currentUserId={currentUserId}
                         onDelete={handleDelete}
-                        onBookmark={handleBookmark}
-                        isBookmarked={bookmarkedIds.has(message.id)}
                         hasPoll={pollMessageIds.has(message.id)}
-                        readCount={getReadCount(message)}
-                        memberCount={memberCountForRead}
                       />
                     </div>
                   );
