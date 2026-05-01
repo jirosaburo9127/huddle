@@ -321,8 +321,6 @@ export function PollDisplay({ messageId, currentUserId, onMarkDecision }: Props)
       <div className="space-y-2">
         {poll.options.map((opt, idx) => {
           const count = counts.get(idx) || 0;
-          // メンバー全員を母数にした割合（LINE方式）
-          const fillPercent = memberCount > 0 ? (count / memberCount) * 100 : 0;
           const isMyChoice = myVotes.includes(idx);
           const isTop = topOption?.index === idx && count > 0;
 
@@ -332,26 +330,13 @@ export function PollDisplay({ messageId, currentUserId, onMarkDecision }: Props)
               type="button"
               onClick={() => handleVote(idx)}
               disabled={!isActive || voting}
-              className={`relative w-full rounded-xl border px-3 py-2.5 text-left overflow-hidden transition-colors ${
+              className={`w-full rounded-xl border px-3 py-2.5 text-left transition-colors ${
                 isMyChoice
-                  ? "border-accent"
+                  ? "border-accent bg-accent/5"
                   : "border-border hover:border-accent/40"
               } ${!isActive ? "cursor-default" : "cursor-pointer"}`}
             >
-              {/* 背景塗りつぶし（LINE方式: 選択肢の背景が得票率で伸びる） */}
-              <div
-                className={`absolute inset-y-0 left-0 transition-all duration-500 ${
-                  isMyChoice
-                    ? "bg-accent/15"
-                    : isTop && !isActive
-                      ? "bg-accent/10"
-                      : "bg-foreground/[0.04]"
-                }`}
-                style={{ width: `${fillPercent}%` }}
-                aria-hidden="true"
-              />
-              {/* テキスト行 */}
-              <div className="relative flex items-center justify-between gap-2 text-[13px]">
+              <div className="flex items-center justify-between gap-2 text-[13px]">
                 <div className="flex items-center gap-2 min-w-0 flex-1">
                   {isMyChoice && (
                     <svg className="w-4 h-4 shrink-0 text-accent" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
@@ -367,11 +352,13 @@ export function PollDisplay({ messageId, currentUserId, onMarkDecision }: Props)
                     </span>
                   )}
                 </div>
-                {count > 0 && (
-                  <span className="shrink-0 text-[12px] font-medium text-muted tabular-nums">
-                    {count}
-                  </span>
-                )}
+                <span
+                  className={`shrink-0 text-[12px] font-semibold tabular-nums ${
+                    count > 0 ? "text-foreground" : "text-muted/50"
+                  }`}
+                >
+                  {count}票
+                </span>
               </div>
             </button>
           );
