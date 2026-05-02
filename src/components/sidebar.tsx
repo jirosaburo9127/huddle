@@ -222,12 +222,15 @@ export function Sidebar({
   };
 
   // 現在開いているチャンネルのID（pathname → slug → channel）
+  // 独り言チャンネルは別フィールド (hitorigotoChannel) に入っているので、
+  // ここで明示的に含めないと mark_channel_read が呼ばれず既読バッジが消えない
   const currentChannelId = useMemo(() => {
     const slug = pathname.split("/")[2]; // /[workspace]/[channel]
     if (!slug) return null;
+    if (hitorigotoChannel?.slug === slug) return hitorigotoChannel.id;
     const found = [...channels, ...dmChannels].find((c) => c.slug === slug);
     return found?.id ?? null;
-  }, [pathname, channels, dmChannels]);
+  }, [pathname, channels, dmChannels, hitorigotoChannel]);
 
   // polling の refetchUnread は [currentUserId, workspace.id] だけに依存させているため
   // currentChannelId はクロージャで初期値に固定される。最新値を参照するため ref を使う

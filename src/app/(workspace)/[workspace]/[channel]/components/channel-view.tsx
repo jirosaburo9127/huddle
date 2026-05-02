@@ -445,7 +445,10 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
     }, 300);
     prevMessageCountRef.current = initialMessages.length;
 
-    // 初期表示中 (3秒間) はコンテンツ高さの変化を監視
+    // 初期表示中はコンテンツ高さの変化を監視してスクロール位置を維持。
+    // 独り言は画像・動画が多く遅延ロードでレイアウトシフトが続くので、
+    // 通常 3 秒のところを 10 秒に延長する。
+    const armedDurationMs = channel.is_hitorigoto ? 10000 : 3000;
     const container = scrollContainerRef.current;
     if (!container) return () => clearTimeout(waitAndScroll);
     let armed = true;
@@ -461,9 +464,9 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
     });
     const inner = container.firstElementChild;
     if (inner) observer.observe(inner);
-    const timer = setTimeout(() => { armed = false; observer.disconnect(); }, 3000);
+    const timer = setTimeout(() => { armed = false; observer.disconnect(); }, armedDurationMs);
     return () => { armed = false; clearTimeout(waitAndScroll); clearTimeout(timer); observer.disconnect(); };
-  }, [channel.id, initialMessages.length, scrollToBottom]);
+  }, [channel.id, channel.is_hitorigoto, initialMessages.length, scrollToBottom]);
 
   // メッセージ増加時: DOM 更新後に即座に最下部へ
   useEffect(() => {
