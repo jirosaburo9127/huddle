@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
+import { useUnreadStore } from "@/stores/unread-store";
 import { BookmarkModal } from "@/components/bookmark-modal";
 import { WsMembersModal } from "@/components/ws-members-modal";
 
@@ -17,6 +18,7 @@ type Props = {
 export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, members }: Props) {
   const pathname = usePathname();
   const setSidebarOpen = useMobileNavStore((s) => s.setSidebarOpen);
+  const dmUnreadCount = useUnreadStore((s) => s.dmUnreadCount);
   const [showMore, setShowMore] = useState(false);
   const [showBookmark, setShowBookmark] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
@@ -115,7 +117,7 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
             <span className="text-[10px]">決定</span>
           </Link>
 
-          {/* その他 */}
+          {/* その他 (DM 未読があればアイコン右上にバッジ) */}
           <button
             data-more-trigger
             onClick={() => setShowMore((v) => !v)}
@@ -123,9 +125,16 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
               showMore ? "text-accent" : "text-muted"
             }`}
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM12.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM18.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
-            </svg>
+            <span className="relative">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM12.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM18.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
+              </svg>
+              {dmUnreadCount > 0 && (
+                <span className="absolute -top-1 -right-1.5 min-w-[16px] h-[16px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-[16px] text-center">
+                  {dmUnreadCount > 99 ? "99+" : dmUnreadCount}
+                </span>
+              )}
+            </span>
             <span className="text-[10px]">その他</span>
           </button>
         </div>
@@ -158,10 +167,15 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
                 href={`/${workspaceSlug}/dm-list`}
                 className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
               >
-                <span className="w-12 h-12 rounded-full border-2 border-muted/40 flex items-center justify-center">
+                <span className="relative w-12 h-12 rounded-full border-2 border-muted/40 flex items-center justify-center">
                   <svg className="w-5 h-5 text-foreground" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                   </svg>
+                  {dmUnreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-[18px] text-center">
+                      {dmUnreadCount > 99 ? "99+" : dmUnreadCount}
+                    </span>
+                  )}
                 </span>
                 <span className="text-xs text-foreground">DM</span>
               </Link>

@@ -18,6 +18,7 @@ import { MfaSetup } from "@/components/mfa-setup";
 import { SecuritySettings } from "@/components/security-settings";
 import { signOut } from "@/lib/actions";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
+import { useUnreadStore } from "@/stores/unread-store";
 import { createClient } from "@/lib/supabase/client";
 import { showMessageNotification } from "@/lib/notification";
 import { setupPushNotifications, syncAppBadgeFromServer } from "@/lib/push-notifications";
@@ -325,6 +326,18 @@ export function Sidebar({
     const total = channelTotal + otherWsTotal;
     document.title = total > 0 ? `(${total}) Huddle` : "Huddle";
   }, [unreadState, unreadByWorkspace]);
+
+  // DM の未読合計を Zustand に書き出し、BottomTabBar の「その他」「DM」に
+  // バッジ表示できるようにする
+  const setDmUnreadCount = useUnreadStore((s) => s.setDmUnreadCount);
+  useEffect(() => {
+    const dmIds = new Set(dmChannels.map((c) => c.id));
+    const dmTotal = Object.entries(unreadState).reduce(
+      (sum, [id, n]) => (dmIds.has(id) ? sum + n : sum),
+      0
+    );
+    setDmUnreadCount(dmTotal);
+  }, [unreadState, dmChannels, setDmUnreadCount]);
 
   // フォアグラウンド復帰時 / マウント時 / ワークスペース切替時に未読カウントを再同期
   // モバイルで画面オフ→復帰した際にRealtime取りこぼしを補完するのと、
