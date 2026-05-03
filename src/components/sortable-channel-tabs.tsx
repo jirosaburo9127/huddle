@@ -58,56 +58,64 @@ function SortableRow({
     isDragging,
   } = useSortable({ id: item.id });
 
+  // 行全体をドラッグ対象 + タップで選択にする。
+  // iOS Safari の長押しによるテキスト選択 / コピーメニューを抑止するため
+  // user-select / -webkit-touch-callout を切る (タップ自体は dnd-kit の
+  // activationConstraint.delay の前に release されれば onClick が走る)
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.4 : 1,
     zIndex: isDragging ? 10 : undefined,
+    WebkitTouchCallout: "none",
+    WebkitUserSelect: "none",
+    userSelect: "none",
+    touchAction: "none",
   };
 
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex items-center gap-1 rounded-lg ${
+      {...attributes}
+      {...listeners}
+      onClick={onSelect}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+      className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors cursor-grab active:cursor-grabbing ${
         active ? "bg-accent" : "hover:bg-white/[0.04]"
       }`}
     >
-      {/* ドラッグハンドル */}
-      <button
-        type="button"
-        {...attributes}
-        {...listeners}
-        aria-label="並び替え"
-        className={`shrink-0 px-1.5 py-2 cursor-grab active:cursor-grabbing touch-none ${
-          active ? "text-white/70" : "text-muted/60"
+      {/* ドラッグハンドル (装飾。長押しは行全体で受ける) */}
+      <svg
+        className={`shrink-0 w-4 h-4 ${active ? "text-white/70" : "text-muted/60"}`}
+        fill="currentColor"
+        viewBox="0 0 20 20"
+        aria-hidden="true"
+      >
+        <circle cx="7" cy="5" r="1.5" />
+        <circle cx="13" cy="5" r="1.5" />
+        <circle cx="7" cy="10" r="1.5" />
+        <circle cx="13" cy="10" r="1.5" />
+        <circle cx="7" cy="15" r="1.5" />
+        <circle cx="13" cy="15" r="1.5" />
+      </svg>
+      <span className={`flex-1 min-w-0 truncate text-sm text-left ${active ? "text-white" : "text-foreground"}`}>
+        #{item.name}
+      </span>
+      <span
+        className={`shrink-0 text-[11px] tabular-nums ${
+          active ? "text-white/80" : "text-muted"
         }`}
       >
-        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-          <circle cx="7" cy="5" r="1.5" />
-          <circle cx="13" cy="5" r="1.5" />
-          <circle cx="7" cy="10" r="1.5" />
-          <circle cx="13" cy="10" r="1.5" />
-          <circle cx="7" cy="15" r="1.5" />
-          <circle cx="13" cy="15" r="1.5" />
-        </svg>
-      </button>
-      <button
-        type="button"
-        onClick={onSelect}
-        className={`flex-1 min-w-0 text-left pr-3 py-2 text-sm transition-colors flex items-center justify-between gap-2 ${
-          active ? "text-white" : "text-foreground"
-        }`}
-      >
-        <span className="truncate">#{item.name}</span>
-        <span
-          className={`shrink-0 text-[11px] tabular-nums ${
-            active ? "text-white/80" : "text-muted"
-          }`}
-        >
-          {item.count}
-        </span>
-      </button>
+        {item.count}
+      </span>
     </div>
   );
 }

@@ -235,7 +235,7 @@ export default function InProgressPage() {
             <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
               <div>
                 <h3 className="text-sm font-semibold text-foreground">チャンネルで絞り込み</h3>
-                <p className="text-[11px] text-muted mt-0.5">左の点々を長押しで並び替え</p>
+                <p className="text-[11px] text-muted mt-0.5">行を長押しで並び替え</p>
               </div>
               <button
                 type="button"
