@@ -290,27 +290,27 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
     //  @を入力してもサジェストが出ない問題を引き起こしていた）
 
     const cursorPos = e.target.selectionStart ?? value.length;
-    // カーソル位置から逆方向に@を探す
     const textBeforeCursor = value.slice(0, cursorPos);
-    const atIndex = textBeforeCursor.lastIndexOf("@");
+    // カーソル位置から逆方向に @ または全角＠ を探す
+    // 半角@ と 全角＠ の両方をトリガとして扱う (日本語キーボードの IME 経由でも反応)
+    const halfAt = textBeforeCursor.lastIndexOf("@");
+    const fullAt = textBeforeCursor.lastIndexOf("＠");
+    const atIndex = Math.max(halfAt, fullAt);
 
     if (atIndex >= 0) {
-      // @の前がスペースまたは行頭であることを確認
-      const charBefore = atIndex > 0 ? textBeforeCursor[atIndex - 1] : " ";
-      if (charBefore === " " || charBefore === "\n" || atIndex === 0) {
-        const query = textBeforeCursor.slice(atIndex + 1);
-        // クエリにスペースが含まれていない場合のみサジェスト表示
-        if (!query.includes(" ") && !query.includes("\n")) {
-          setShowMention(true);
-          setMentionQuery(query);
-          setMentionStartPos(atIndex);
-          setMentionIndex(0);
-          return;
-        }
+      const query = textBeforeCursor.slice(atIndex + 1);
+      // クエリにスペース/改行が含まれていない場合のみサジェスト表示
+      // (前の文字種は問わない: 日本語の途中、行頭、行末どこでも @ 打った瞬間に出る)
+      if (!query.includes(" ") && !query.includes("\n")) {
+        setShowMention(true);
+        setMentionQuery(query);
+        setMentionStartPos(atIndex);
+        setMentionIndex(0);
+        return;
       }
     }
     setShowMention(false);
-  }, [isComposing]);
+  }, []);
 
   // メンション選択時の挿入
   // 表示名に含まれる半角スペースは NBSP (U+00A0) に置換して 1 トークン扱いにする。
