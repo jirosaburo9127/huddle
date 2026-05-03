@@ -9,7 +9,6 @@ import {
   revokeShareToken,
 } from "@/lib/actions/share-tokens";
 import { generateDecisionsPdf, savePdf } from "@/lib/pdf-export";
-import { useHorizontalOnlyScroll } from "@/lib/use-horizontal-only-scroll";
 
 // メッセージ本文が画像URLかを判定（Supabase Storage公開URLは拡張子で判別）
 const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|bmp|avif)(\?.*)?$/i;
@@ -93,7 +92,6 @@ export function DashboardView({
   // 期間フィルタ: null = 全期間
   type DateRange = "week" | "month" | null;
   const [dateRange, setDateRange] = useState<DateRange>(null);
-  const tabsRef = useHorizontalOnlyScroll();
 
   // 決定事項に登場するチャンネルをユニーク抽出（件数も集計）
   const channelFacets = useMemo(() => {
@@ -226,7 +224,48 @@ export function DashboardView({
         <span className="ml-2 text-sm text-muted">{workspace.name}</span>
       </header>
 
-      <div className="flex-1 overflow-y-auto hide-scrollbar">
+      <div className="flex-1 flex min-h-0 overflow-hidden">
+        {/* 左サイド: 縦型チャンネルタブ (印刷時は非表示) */}
+        {channelFacets.length > 0 && (
+          <aside className="print:hidden w-36 sm:w-44 lg:w-56 shrink-0 border-r border-border overflow-y-auto hide-scrollbar p-2 space-y-1">
+            <button
+              type="button"
+              onClick={() => setSelectedChannelId(null)}
+              className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors flex items-center justify-between gap-2 ${
+                selectedChannelId === null
+                  ? "bg-accent text-white"
+                  : "text-muted hover:text-foreground hover:bg-white/[0.04]"
+              }`}
+            >
+              <span className="truncate">全て</span>
+              <span className={`shrink-0 text-[11px] tabular-nums ${selectedChannelId === null ? "text-white/80" : "text-muted"}`}>
+                {decisions.length}
+              </span>
+            </button>
+            {channelFacets.map((ch) => {
+              const active = selectedChannelId === ch.id;
+              return (
+                <button
+                  key={ch.id}
+                  type="button"
+                  onClick={() => setSelectedChannelId(ch.id)}
+                  className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors flex items-center justify-between gap-2 ${
+                    active
+                      ? "bg-accent text-white"
+                      : "text-muted hover:text-foreground hover:bg-white/[0.04]"
+                  }`}
+                >
+                  <span className="truncate">#{ch.name}</span>
+                  <span className={`shrink-0 text-[11px] tabular-nums ${active ? "text-white/80" : "text-muted"}`}>
+                    {ch.count}
+                  </span>
+                </button>
+              );
+            })}
+          </aside>
+        )}
+
+        <div className="flex-1 min-w-0 overflow-y-auto hide-scrollbar">
         <div className="max-w-4xl mx-auto p-6 space-y-8">
         {/* 決定事項一覧 */}
         <section className="print-area">
@@ -309,44 +348,6 @@ export function DashboardView({
               );
             })}
           </div>
-
-          {/* チャンネルフィルタ（ファイルタブ型 / 角丸上+下線ベース） */}
-          {channelFacets.length > 0 && (
-            <div
-              ref={tabsRef}
-              className="print:hidden flex items-end gap-1 mb-4 border-b border-border overflow-x-auto hide-scrollbar -mx-1 px-1"
-              style={{ touchAction: "pan-x" }}
-            >
-              <button
-                type="button"
-                onClick={() => setSelectedChannelId(null)}
-                className={`shrink-0 px-4 py-2 text-sm font-medium rounded-t-lg border border-b-0 -mb-px transition-colors ${
-                  selectedChannelId === null
-                    ? "bg-accent text-white border-accent"
-                    : "bg-white/[0.03] text-muted hover:text-foreground hover:bg-white/[0.08] border-border"
-                }`}
-              >
-                全て（{decisions.length}）
-              </button>
-              {channelFacets.map((ch) => {
-                const active = selectedChannelId === ch.id;
-                return (
-                  <button
-                    key={ch.id}
-                    type="button"
-                    onClick={() => setSelectedChannelId(ch.id)}
-                    className={`shrink-0 px-4 py-2 text-sm font-medium rounded-t-lg border border-b-0 -mb-px transition-colors ${
-                      active
-                        ? "bg-accent text-white border-accent"
-                        : "bg-white/[0.03] text-muted hover:text-foreground hover:bg-white/[0.08] border-border"
-                    }`}
-                  >
-                    #{ch.name}（{ch.count}）
-                  </button>
-                );
-              })}
-            </div>
-          )}
 
           {filteredDecisions.length === 0 ? (
             <div className="rounded-2xl border border-border bg-white/[0.02] p-8 text-center text-sm text-muted">
@@ -555,6 +556,7 @@ export function DashboardView({
             )}
           </section>
         )}
+        </div>
         </div>
       </div>
     </div>

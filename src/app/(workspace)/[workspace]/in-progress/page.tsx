@@ -5,7 +5,6 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
 import { createClient } from "@/lib/supabase/client";
-import { useHorizontalOnlyScroll } from "@/lib/use-horizontal-only-scroll";
 
 type InProgressItem = {
   id: string;
@@ -30,7 +29,6 @@ export default function InProgressPage() {
   const [loading, setLoading] = useState(true);
   // チャンネルフィルタ: null = 全て
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
-  const tabsRef = useHorizontalOnlyScroll();
 
   useEffect(() => {
     (async () => {
@@ -113,51 +111,51 @@ export default function InProgressPage() {
         <h1 className="font-bold text-lg">進行中</h1>
       </header>
 
-      {/* チャンネルタブ（縦スクロール領域の外に配置して iOS での縦揺れを防ぐ） */}
-      {!loading && channelFacets.length > 0 && (
-        <div className="px-6 pt-4 shrink-0">
-          <div className="max-w-3xl mx-auto">
-            <div
-              ref={tabsRef}
-              className="flex items-end gap-1 border-b border-border overflow-x-auto hide-scrollbar -mx-1 px-1"
-              style={{ touchAction: "pan-x" }}
+      <div className="flex-1 flex min-h-0 overflow-hidden">
+        {/* 左サイド: 縦型チャンネルタブ */}
+        {!loading && channelFacets.length > 0 && (
+          <aside className="w-36 sm:w-44 lg:w-56 shrink-0 border-r border-border overflow-y-auto hide-scrollbar p-2 space-y-1">
+            <button
+              type="button"
+              onClick={() => setSelectedChannelId(null)}
+              className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors flex items-center justify-between gap-2 ${
+                selectedChannelId === null
+                  ? "bg-accent text-white"
+                  : "text-muted hover:text-foreground hover:bg-white/[0.04]"
+              }`}
             >
-              <button
-                type="button"
-                onClick={() => setSelectedChannelId(null)}
-                className={`shrink-0 px-4 py-2 text-sm font-medium rounded-t-lg border border-b-0 -mb-px transition-colors ${
-                  selectedChannelId === null
-                    ? "bg-accent text-white border-accent"
-                    : "bg-white/[0.03] text-muted hover:text-foreground hover:bg-white/[0.08] border-border"
-                }`}
-              >
-                全て（{items.length}）
-              </button>
-              {channelFacets.map((ch) => {
-                const active = selectedChannelId === ch.id;
-                return (
-                  <button
-                    key={ch.id}
-                    type="button"
-                    onClick={() => setSelectedChannelId(ch.id)}
-                    className={`shrink-0 px-4 py-2 text-sm font-medium rounded-t-lg border border-b-0 -mb-px transition-colors ${
-                      active
-                        ? "bg-accent text-white border-accent"
-                        : "bg-white/[0.03] text-muted hover:text-foreground hover:bg-white/[0.08] border-border"
-                    }`}
-                  >
-                    #{ch.name}（{ch.count}）
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
+              <span className="truncate">全て</span>
+              <span className={`shrink-0 text-[11px] tabular-nums ${selectedChannelId === null ? "text-white/80" : "text-muted"}`}>
+                {items.length}
+              </span>
+            </button>
+            {channelFacets.map((ch) => {
+              const active = selectedChannelId === ch.id;
+              return (
+                <button
+                  key={ch.id}
+                  type="button"
+                  onClick={() => setSelectedChannelId(ch.id)}
+                  className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors flex items-center justify-between gap-2 ${
+                    active
+                      ? "bg-accent text-white"
+                      : "text-muted hover:text-foreground hover:bg-white/[0.04]"
+                  }`}
+                >
+                  <span className="truncate">#{ch.name}</span>
+                  <span className={`shrink-0 text-[11px] tabular-nums ${active ? "text-white/80" : "text-muted"}`}>
+                    {ch.count}
+                  </span>
+                </button>
+              );
+            })}
+          </aside>
+        )}
 
-      <div className="flex-1 overflow-y-auto px-6 pt-4 pb-6 hide-scrollbar">
-        <div className="max-w-3xl mx-auto">
-          <div className="space-y-3">
+        {/* 右側: 本文 */}
+        <div className="flex-1 min-w-0 overflow-y-auto px-6 pt-4 pb-6 hide-scrollbar">
+          <div className="max-w-3xl mx-auto">
+            <div className="space-y-3">
           {loading ? (
             <div className="text-center py-16 text-muted">読み込み中...</div>
           ) : items.length === 0 ? (
@@ -200,6 +198,7 @@ export default function InProgressPage() {
               </Link>
             ))
           )}
+            </div>
           </div>
         </div>
       </div>
