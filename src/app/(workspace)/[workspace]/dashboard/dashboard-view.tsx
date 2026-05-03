@@ -92,6 +92,8 @@ export function DashboardView({
   // 期間フィルタ: null = 全期間
   type DateRange = "week" | "month" | null;
   const [dateRange, setDateRange] = useState<DateRange>(null);
+  // モバイルのフィルタボトムシート開閉
+  const [showFilter, setShowFilter] = useState(false);
 
   // 決定事項に登場するチャンネルをユニーク抽出（件数も集計）
   const channelFacets = useMemo(() => {
@@ -225,9 +227,9 @@ export function DashboardView({
       </header>
 
       <div className="flex-1 flex min-h-0 overflow-hidden">
-        {/* 左サイド: 縦型チャンネルタブ (印刷時は非表示) */}
+        {/* 左サイド: 縦型チャンネルタブ (lg 以上、印刷時は非表示) */}
         {channelFacets.length > 0 && (
-          <aside className="print:hidden w-36 sm:w-44 lg:w-56 shrink-0 border-r border-border overflow-y-auto hide-scrollbar p-2 space-y-1">
+          <aside className="print:hidden hidden lg:flex flex-col w-56 shrink-0 border-r border-border overflow-y-auto hide-scrollbar p-2 space-y-1">
             <button
               type="button"
               onClick={() => setSelectedChannelId(null)}
@@ -319,6 +321,34 @@ export function DashboardView({
           {exportError && (
             <div className="print:hidden mb-3 text-xs text-mention bg-mention/10 border border-mention/30 rounded-lg px-3 py-2">
               PDF生成エラー: {exportError}
+            </div>
+          )}
+
+          {/* モバイル用フィルタチップ (lg 未満で表示) */}
+          {channelFacets.length > 0 && (
+            <div className="print:hidden lg:hidden mb-3">
+              <button
+                type="button"
+                onClick={() => setShowFilter(true)}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.05] border border-border text-sm text-foreground hover:bg-white/[0.08] transition-colors max-w-full"
+              >
+                <svg className="w-3.5 h-3.5 text-muted shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                </svg>
+                <span className="truncate">
+                  {selectedChannelId
+                    ? `#${channelFacets.find((c) => c.id === selectedChannelId)?.name ?? ""}`
+                    : "全て"}
+                </span>
+                <span className="text-muted text-xs tabular-nums shrink-0">
+                  {selectedChannelId
+                    ? channelFacets.find((c) => c.id === selectedChannelId)?.count ?? 0
+                    : decisions.length}
+                </span>
+                <svg className="w-3 h-3 text-muted shrink-0" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
             </div>
           )}
 
@@ -559,6 +589,75 @@ export function DashboardView({
         </div>
         </div>
       </div>
+
+      {/* モバイル用フィルタボトムシート */}
+      {showFilter && (
+        <div
+          className="lg:hidden fixed inset-0 z-50 bg-black/40 flex items-end animate-fade-in"
+          onClick={() => setShowFilter(false)}
+        >
+          <div
+            className="w-full bg-sidebar rounded-t-2xl max-h-[70vh] flex flex-col animate-slide-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
+              <h3 className="text-sm font-semibold text-foreground">チャンネルで絞り込み</h3>
+              <button
+                type="button"
+                onClick={() => setShowFilter(false)}
+                className="text-muted hover:text-foreground transition-colors"
+                aria-label="閉じる"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-2 space-y-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedChannelId(null);
+                  setShowFilter(false);
+                }}
+                className={`w-full text-left px-3 py-2.5 text-sm rounded-lg transition-colors flex items-center justify-between gap-2 ${
+                  selectedChannelId === null
+                    ? "bg-accent text-white"
+                    : "text-foreground hover:bg-white/[0.04]"
+                }`}
+              >
+                <span className="truncate">全て</span>
+                <span className={`shrink-0 text-xs tabular-nums ${selectedChannelId === null ? "text-white/80" : "text-muted"}`}>
+                  {decisions.length}
+                </span>
+              </button>
+              {channelFacets.map((ch) => {
+                const active = selectedChannelId === ch.id;
+                return (
+                  <button
+                    key={ch.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedChannelId(ch.id);
+                      setShowFilter(false);
+                    }}
+                    className={`w-full text-left px-3 py-2.5 text-sm rounded-lg transition-colors flex items-center justify-between gap-2 ${
+                      active
+                        ? "bg-accent text-white"
+                        : "text-foreground hover:bg-white/[0.04]"
+                    }`}
+                  >
+                    <span className="truncate">#{ch.name}</span>
+                    <span className={`shrink-0 text-xs tabular-nums ${active ? "text-white/80" : "text-muted"}`}>
+                      {ch.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
