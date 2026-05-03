@@ -394,6 +394,13 @@ s3_access_key = "env(S3_ACCESS_KEY)"
 # Configures AWS_SECRET_ACCESS_KEY for S3 bucket
 s3_secret_key = "env(S3_SECRET_KEY)"
 
+[functions.mikan-respond]
+# DB トリガー (notify_mikan_mention / notify_mikan_listen) から pg_net で
+# 呼ばれる時、`current_setting('supabase.service_role_key', true)` が空を
+# 返してしまうため Authorization ヘッダ無しで届く。JWT 検証を無効にして
+# 関数側でペイロードを検証する。
+verify_jwt = false
+
 # [experimental.pgdelta]
 # When enabled, pg-delta becomes the active engine for supported schema flows.
 # enabled = false
