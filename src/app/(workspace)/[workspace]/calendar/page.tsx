@@ -252,14 +252,53 @@ export default function CalendarPage() {
       .eq("is_hitorigoto", false)
       .order("name");
     if (chs) setChannels(chs);
+    // 個人予定 (デフォルト) のメンバー候補としてワークスペース全員を読み込む
+    const { data: wsMembers } = await supabase
+      .from("workspace_members")
+      .select("user_id, profiles(display_name, avatar_url)")
+      .eq("workspace_id", ws.id);
+    if (wsMembers) {
+      const members = wsMembers.map((m: { user_id: string; profiles: { display_name: string; avatar_url: string | null } | Array<{ display_name: string; avatar_url: string | null }> }) => {
+        const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
+        return { user_id: m.user_id, display_name: p?.display_name || "", avatar_url: p?.avatar_url || null };
+      });
+      setCreateMembers(members);
+    }
     setShowCreate(true);
   };
 
   // チャンネル選択時にメンバー取得
+  // - チャンネルあり: そのチャンネルのメンバー (デフォルト全員選択)
+  // - チャンネルなし (個人予定): ワークスペース全員 (デフォルト未選択 = 任意)
   const onChannelSelect = async (channelId: string) => {
     setCreateChannelId(channelId);
     setCreateAttendeeIds(new Set());
     const supabase = createClient();
+
+    if (!channelId) {
+      // 個人予定: ワークスペース全体のメンバーから選べる
+      const { data: ws } = await supabase
+        .from("workspaces")
+        .select("id")
+        .eq("slug", params.workspace)
+        .maybeSingle();
+      if (!ws) return;
+      const { data } = await supabase
+        .from("workspace_members")
+        .select("user_id, profiles(display_name, avatar_url)")
+        .eq("workspace_id", (ws as { id: string }).id);
+      if (data) {
+        const members = data.map((m: { user_id: string; profiles: { display_name: string; avatar_url: string | null } | Array<{ display_name: string; avatar_url: string | null }> }) => {
+          const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
+          return { user_id: m.user_id, display_name: p?.display_name || "", avatar_url: p?.avatar_url || null };
+        });
+        setCreateMembers(members);
+        // 個人予定は任意なのでデフォルト未選択
+      }
+      return;
+    }
+
+    // チャンネル予定: そのチャンネルのメンバーから
     const { data } = await supabase
       .from("channel_members")
       .select("user_id, profiles(display_name, avatar_url)")
@@ -333,13 +372,28 @@ export default function CalendarPage() {
     setEditStartAt(local);
     setEditLocation(ev.location || "");
     setEditAttendeeIds(new Set(ev.attendee_ids || []));
-    // 個人予定 (channel_id null) の場合はチャンネルメンバー取得不要
+    const supabase = createClient();
     if (!ev.channel_id) {
-      setEditMembers([]);
+      // 個人予定: ワークスペースメンバーから候補
+      const { data: ws } = await supabase
+        .from("workspaces")
+        .select("id")
+        .eq("slug", params.workspace)
+        .maybeSingle();
+      if (!ws) { setEditMembers([]); return; }
+      const { data } = await supabase
+        .from("workspace_members")
+        .select("user_id, profiles(display_name, avatar_url)")
+        .eq("workspace_id", (ws as { id: string }).id);
+      if (data) {
+        setEditMembers(data.map((m: { user_id: string; profiles: { display_name: string; avatar_url: string | null } | Array<{ display_name: string; avatar_url: string | null }> }) => {
+          const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
+          return { user_id: m.user_id, display_name: p?.display_name || "", avatar_url: p?.avatar_url || null };
+        }));
+      }
       return;
     }
-    // チャンネルメンバー取得
-    const supabase = createClient();
+    // チャンネル予定: そのチャンネルのメンバー
     const { data } = await supabase
       .from("channel_members")
       .select("user_id, profiles(display_name, avatar_url)")
@@ -828,7 +882,7 @@ export default function CalendarPage() {
                   className="w-full rounded-lg border border-border bg-input-bg px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none"
                 />
               </div>
-              {editingEvent.channel_id && (
+              {editMembers.length > 0 && (
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-xs text-muted">参加者</label>
