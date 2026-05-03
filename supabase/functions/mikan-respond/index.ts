@@ -1,15 +1,14 @@
 // Supabase Edge Function: みかん（AIファシリテーター）の返信生成
 //
-// トリガ: mentions テーブルへの INSERT (Database Webhook)
-//   - mentioned_user_id がみかん bot の UUID であれば反応
-//   - チャンネルが mikan_enabled = true でなければ無視
-//
-// 処理:
-//   1) メッセージと文脈（直近50件）を取得
-//   2) Anthropic Claude Haiku 4.5 にシステムプロンプト + 文脈 + ツール定義を投げる
-//   3) Claude が `propose_event` ツールを呼んだら → 提案メッセージ投稿 + event_proposals に保存
-//      (リアクションされたら DB トリガーで events に変換)
-//   4) ツール呼び出しが無ければ通常のテキスト返信を投稿
+// 2モード:
+//  Mode A (mention): mentions テーブルへの INSERT が起点
+//    - @みかん で呼ばれた時。会話 + ツール (propose_event) を渡し、
+//      テキスト返信もしくは予定提案を投稿する。
+//  Mode B (listen): messages テーブルへの INSERT が起点
+//    - mikan-enabled チャンネルで誰かが投稿するたび呼ばれる。
+//    - チャンネル内に最近 30 分以内の提案があればクールダウン。
+//    - propose_event ツールのみ提供。テキスト返信は投稿しない (見守るだけ)。
+//    - 直近の文脈で日時が確定したと判断した時のみ提案する。
 //
 // 環境変数 (Supabase Secrets):
 //   ANTHROPIC_API_KEY        : Anthropic Console で発行する API キー
@@ -26,10 +25,15 @@ const MIKAN_USER_ID = "00000000-0000-0000-0000-00000000aaaa";
 const MODEL = "claude-haiku-4-5-20251001";
 const CONTEXT_WINDOW_MESSAGES = 50;
 const MAX_OUTPUT_TOKENS = 400;
+// Listen モードのクールダウン (チャンネルあたり N 分以内に提案があればスキップ)
+const LISTEN_COOLDOWN_MIN = 30;
 
-// みかんの人格・ふるまいを定義するシステムプロンプト
-// 「柔らかい中立者」として、責めず、誰の味方でもなく、場を整える役
-const SYSTEM_PROMPT = `あなたは「みかん」というオンラインチームチャットのファシリテーター AI です。
+// =============================================================================
+// プロンプト
+// =============================================================================
+
+// Mode A: ファシリテーターとしての通常会話 + 予定登録
+const SYSTEM_PROMPT_MENTION = `あなたは「みかん」というオンラインチームチャットのファシリテーター AI です。
 以下の役割と性格を厳守してください。
 
 # 役割
@@ -53,51 +57,73 @@ const SYSTEM_PROMPT = `あなたは「みかん」というオンラインチー
 - 過剰な励まし・お世辞
 - 政治・宗教・センシティブな話題への踏み込み
 
-# カレンダー登録ツール
-ユーザーが具体的な日時を伴って予定/会議/打合せの登録を望んでいると判断した場合、\`propose_event\` ツールを呼んでください。
-- タイトルと開始日時の両方が明確な場合のみ呼ぶ
-- 日時が曖昧 (例: 「来週どこかで」「今度」) はツールを呼ばずに、口頭で日時を確認する質問を返す
+# カレンダー登録ツール (propose_event)
+ユーザーが予定/会議/打合せの登録を望んでいると判断した場合、\`propose_event\` ツールを呼んでください。
+- ユーザーの今回の発言が「明日3時に打合せ」のように具体的でも、「登録お願い」「カレンダーに入れて」のように曖昧でも、**直近の文脈に日時とタイトルが揃っているなら呼ぶ**こと
+- タイトルが曖昧で文脈にも見当たらない、もしくは日時が決まっていない場合は呼ばずに、口頭で確認の質問を返す
 - ツールを呼んだ場合は本文での説明は不要。ツール呼び出しだけで OK
-- start_at_iso はタイムゾーン付きの ISO 8601 (例: "2026-05-04T15:00:00+09:00")。ユーザーが時刻を JST 前提で言っているなら +09:00 を付ける
+- start_at_iso はタイムゾーン付き ISO 8601 (例: "2026-05-04T15:00:00+09:00")。JST 前提なら +09:00 を付ける
 
 # 出力形式
 - 1回の返信は本文のみ。短く。
 - 名前を呼ぶ時は表示名をそのまま使う
 - 返信先のメッセージへの引用は不要（システム側で文脈付与する）`;
 
-// Anthropic tool 定義: 予定登録の提案
-const TOOLS = [
-  {
-    name: "propose_event",
-    description:
-      "ユーザーが予定/会議/打合せの登録を望んでいると判断した場合のみ呼ぶ。" +
-      "タイトルと開始日時が明示されているか合理的に推測できる場合に限る。" +
-      "曖昧な場合は呼ばずにテキストで確認質問を返すこと。",
-    input_schema: {
-      type: "object",
-      properties: {
-        title: {
-          type: "string",
-          description: "予定のタイトル (例: '会議', '○○さんとの打合せ')",
-        },
-        start_at_iso: {
-          type: "string",
-          description:
-            "開始日時 ISO 8601 (タイムゾーン付き、例: '2026-05-04T15:00:00+09:00')。JST なら +09:00 を付ける。",
-        },
-        location: {
-          type: "string",
-          description: "場所 (任意)",
-        },
-      },
-      required: ["title", "start_at_iso"],
-    },
-  },
-];
+// Mode B: 見守りモード。テキスト返信はしない。提案 tool_use のみ
+const SYSTEM_PROMPT_LISTEN = `あなたはオンラインチームチャットを見守る AI 「みかん」です。
+今は「見守りモード」で、ユーザーから直接呼びかけられていません。
 
-interface WebhookPayload {
+# このモードでの厳格なルール
+1. **テキストでの返信は絶対にしない。** 何かを答えたいと思っても、テキスト出力は空にしてください
+2. \`propose_event\` ツールを呼ぶのは、**会話の中で日時とタイトルが揃って合意・決定された直後** のみ
+3. まだ調整中・候補出し中・「来週どこかで」のような曖昧な段階では絶対に呼ばない
+4. 過去にすでに提案・確定済みの予定を再提案しない (文脈中に「📅」のメッセージが既にあれば呼ばない)
+5. 単なる雑談、感想、報告、過去の予定への言及には反応しない
+
+# 判断の基準 (両方 YES のときだけ呼ぶ)
+- 直近のやり取りで「\\<具体的な日時\\> に \\<具体的な内容\\>」が確定している
+- 参加者が反対していない / 同意のリアクション・返答がある (「OK」「了解」「いいよ」など)
+
+# 出力形式
+- ツールを呼ぶ場合: 本文テキストは出力しない (空)
+- 呼ばない場合: 本文テキストも空。ツールも呼ばない。`;
+
+// =============================================================================
+// ツール定義
+// =============================================================================
+
+const PROPOSE_EVENT_TOOL = {
+  name: "propose_event",
+  description:
+    "予定登録の提案メッセージを投稿する。タイトルと開始日時が明確なときのみ呼ぶ。",
+  input_schema: {
+    type: "object",
+    properties: {
+      title: {
+        type: "string",
+        description: "予定のタイトル (例: '会議', '○○さんとの打合せ')",
+      },
+      start_at_iso: {
+        type: "string",
+        description:
+          "開始日時 ISO 8601 (タイムゾーン付き、例: '2026-05-04T15:00:00+09:00')。JST なら +09:00 を付ける。",
+      },
+      location: {
+        type: "string",
+        description: "場所 (任意)",
+      },
+    },
+    required: ["title", "start_at_iso"],
+  },
+};
+
+// =============================================================================
+// 型
+// =============================================================================
+
+interface MentionPayload {
   type: "INSERT";
-  table: string;
+  table: "mentions";
   schema: string;
   record: {
     id: string;
@@ -105,8 +131,22 @@ interface WebhookPayload {
     mentioned_user_id: string;
     mention_type: string;
   };
-  old_record: null;
 }
+
+interface MessagePayload {
+  type: "INSERT";
+  table: "messages";
+  schema: string;
+  record: {
+    id: string;
+    channel_id: string;
+    user_id: string;
+    content: string;
+    created_at: string;
+  };
+}
+
+type WebhookPayload = MentionPayload | MessagePayload;
 
 interface MessageRow {
   id: string;
@@ -114,16 +154,23 @@ interface MessageRow {
   user_id: string;
   content: string;
   created_at: string;
-  parent_id: string | null;
-  deleted_at: string | null;
+  parent_id?: string | null;
+  deleted_at?: string | null;
   profiles: { display_name: string } | null;
 }
 
-// 日時を日本語表記に整形 ("5月4日(土) 15:00")。フロントの formatDateTimeJa と同じ形式。
+type ContentBlock =
+  | { type: "text"; text: string }
+  | { type: "tool_use"; id: string; name: string; input: Record<string, unknown> };
+
+// =============================================================================
+// ユーティリティ
+// =============================================================================
+
+// 日時を日本語表記に整形 ("5月4日(土) 15:00")
 function formatDateTimeJa(iso: string): string {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return iso;
-  // JST に変換 (UTC + 9h)
   const jst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
   const month = jst.getUTCMonth() + 1;
   const day = jst.getUTCDate();
@@ -133,50 +180,72 @@ function formatDateTimeJa(iso: string): string {
   return `${month}月${day}日(${dow}) ${h}:${m}`;
 }
 
-// 現在の JST を文字列で
 function nowJstString(): string {
   return formatDateTimeJa(new Date().toISOString());
 }
 
+// =============================================================================
+// メイン
+// =============================================================================
+
 Deno.serve(async (req) => {
   try {
     const payload = (await req.json()) as WebhookPayload;
-
-    if (payload.type !== "INSERT" || payload.table !== "mentions") {
+    if (payload.type !== "INSERT") {
       return new Response("ignored", { status: 200 });
-    }
-    if (payload.record.mentioned_user_id !== MIKAN_USER_ID) {
-      return new Response("not mikan", { status: 200 });
     }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       auth: { persistSession: false },
     });
 
+    // モード判定 + 元メッセージ ID 抽出
+    let messageId: string;
+    let mode: "mention" | "listen";
+    if (payload.table === "mentions") {
+      if (payload.record.mentioned_user_id !== MIKAN_USER_ID) {
+        return new Response("not mikan", { status: 200 });
+      }
+      messageId = payload.record.message_id;
+      mode = "mention";
+    } else if (payload.table === "messages") {
+      messageId = payload.record.id;
+      mode = "listen";
+    } else {
+      return new Response("ignored", { status: 200 });
+    }
+
     // メッセージ本体取得
     const { data: msg, error: msgErr } = await supabase
       .from("messages")
       .select("id, channel_id, user_id, content, created_at, parent_id, deleted_at, profiles(display_name)")
-      .eq("id", payload.record.message_id)
+      .eq("id", messageId)
       .maybeSingle();
 
-    if (msgErr || !msg) {
-      console.error("[mikan] message fetch failed:", msgErr);
-      return new Response("message not found", { status: 200 });
-    }
+    if (msgErr || !msg) return new Response("message not found", { status: 200 });
     if (msg.deleted_at) return new Response("message deleted", { status: 200 });
-    // bot 自身の投稿には反応しない
     if (msg.user_id === MIKAN_USER_ID) return new Response("self message", { status: 200 });
 
-    // チャンネル情報 (workspace_id も取得)
+    // チャンネル情報
     const { data: ch } = await supabase
       .from("channels")
       .select("id, name, mikan_enabled, workspace_id")
       .eq("id", msg.channel_id)
       .maybeSingle();
 
-    if (!ch || !ch.mikan_enabled) {
-      return new Response("channel not enabled", { status: 200 });
+    if (!ch || !ch.mikan_enabled) return new Response("channel not enabled", { status: 200 });
+
+    // Listen モードのクールダウン: 直近 N 分以内に同チャンネルで提案があればスキップ
+    if (mode === "listen") {
+      const since = new Date(Date.now() - LISTEN_COOLDOWN_MIN * 60 * 1000).toISOString();
+      const { count } = await supabase
+        .from("event_proposals")
+        .select("id", { count: "exact", head: true })
+        .eq("channel_id", msg.channel_id)
+        .gte("created_at", since);
+      if ((count ?? 0) > 0) {
+        return new Response("cooldown", { status: 200 });
+      }
     }
 
     // 直近の文脈
@@ -204,7 +273,10 @@ Deno.serve(async (req) => {
 
     const lastUserName = msg.profiles?.display_name ?? "誰か";
 
-    // Claude API 呼び出し (tools 付き)
+    // モードに応じてシステムプロンプトとツール選択を切り替え
+    const systemPrompt =
+      mode === "mention" ? SYSTEM_PROMPT_MENTION : SYSTEM_PROMPT_LISTEN;
+
     const aiRes = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -215,14 +287,14 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         model: MODEL,
         max_tokens: MAX_OUTPUT_TOKENS,
-        tools: TOOLS,
+        tools: [PROPOSE_EVENT_TOOL],
         system: [
           {
             type: "text",
-            text: SYSTEM_PROMPT,
+            text: systemPrompt,
             cache_control: { type: "ephemeral" },
           },
-          // 現在日時はキャッシュ外。Claude が「明日3時」を絶対日時に解決するため
+          // 現在日時はキャッシュ外
           {
             type: "text",
             text: `現在日時 (JST): ${nowJstString()}`,
@@ -240,10 +312,6 @@ Deno.serve(async (req) => {
       return new Response(`ai failed: ${aiRes.status} ${errText}`, { status: 200 });
     }
 
-    type ContentBlock =
-      | { type: "text"; text: string }
-      | { type: "tool_use"; id: string; name: string; input: Record<string, unknown> };
-
     const aiJson = await aiRes.json() as { content: ContentBlock[] };
 
     // tool_use 優先で処理
@@ -260,16 +328,13 @@ Deno.serve(async (req) => {
       const startAt = new Date(startIso);
 
       if (!title || isNaN(startAt.getTime())) {
-        // ツール入力が壊れていたらフォールバック
         console.warn("[mikan] propose_event invalid input:", input);
       } else {
-        // 提案メッセージを組み立て
         const jaDate = formatDateTimeJa(startAt.toISOString());
         const locLine = location ? `\n📍 ${location}` : "";
         const proposalContent =
           `📅 予定の登録を提案します\n\n「${title}」\n${jaDate}${locLine}\n\nこのメッセージにリアクションすると登録します ✅`;
 
-        // みかんの提案メッセージを投稿
         const { data: msgData, error: insertErr } = await supabase
           .from("messages")
           .insert({
@@ -285,7 +350,6 @@ Deno.serve(async (req) => {
           return new Response("insert failed", { status: 500 });
         }
 
-        // event_proposals に保存
         const { error: propErr } = await supabase.from("event_proposals").insert({
           workspace_id: ch.workspace_id,
           channel_id: msg.channel_id,
@@ -299,14 +363,18 @@ Deno.serve(async (req) => {
 
         if (propErr) {
           console.error("[mikan] event_proposals insert failed:", propErr);
-          // 提案メッセージはすでに投下されているので、エラーでも 200 を返してリトライさせない
         }
 
         return new Response("proposal posted", { status: 200 });
       }
     }
 
-    // 通常のテキスト返信
+    // Listen モードではテキスト返信は投稿しない
+    if (mode === "listen") {
+      return new Response("listen no-op", { status: 200 });
+    }
+
+    // Mention モード: 通常テキスト返信
     const replyText = aiJson.content
       .filter((c): c is Extract<ContentBlock, { type: "text" }> => c.type === "text")
       .map((c) => c.text)
