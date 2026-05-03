@@ -91,10 +91,10 @@ export async function WorkspaceShell({ workspaceSlug, children }: WorkspaceShell
   // ワークスペースのカテゴリ一覧を取得
   const { data: categoriesData } = await supabase
     .from("workspace_categories")
-    .select("slug, label, sort_order")
+    .select("slug, label, sort_order, color")
     .eq("workspace_id", result.workspace.id)
     .order("sort_order", { ascending: true });
-  const categories = (categoriesData || []) as Array<{ slug: string; label: string; sort_order: number }>;
+  const categories = (categoriesData || []) as Array<{ slug: string; label: string; sort_order: number; color: string | null }>;
 
   return (
     <>

@@ -6,12 +6,14 @@ import { ThemeSelector } from "@/components/theme-selector";
 import { signOut } from "@/lib/actions";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
 import { createClient } from "@/lib/supabase/client";
+import { CATEGORY_COLORS } from "@/lib/channel-categories";
 
 type CategoryRow = {
   id: string;
   slug: string;
   label: string;
   sort_order: number;
+  color: string | null;
 };
 
 export default function SettingsPage() {
@@ -22,6 +24,7 @@ export default function SettingsPage() {
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [newLabel, setNewLabel] = useState("");
+  const [newColor, setNewColor] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [catError, setCatError] = useState("");
 
@@ -42,7 +45,7 @@ export default function SettingsPage() {
     if (!workspaceId) return;
     const { data } = await supabase
       .from("workspace_categories")
-      .select("id, slug, label, sort_order")
+      .select("id, slug, label, sort_order, color")
       .eq("workspace_id", workspaceId)
       .order("sort_order", { ascending: true });
     setCategories((data || []) as CategoryRow[]);
@@ -60,14 +63,35 @@ export default function SettingsPage() {
     const { error } = await supabase.rpc("add_workspace_category", {
       p_workspace_id: workspaceId,
       p_label: newLabel.trim(),
+      p_color: newColor,
     });
     if (error) {
       setCatError(error.message);
     } else {
       setNewLabel("");
+      setNewColor(null);
       await fetchCategories();
     }
     setAdding(false);
+  }
+
+  // カテゴリの色変更 (null = 無色)
+  async function handleColorChange(slug: string, color: string | null) {
+    if (!workspaceId) return;
+    setCatError("");
+    // 楽観的更新
+    setCategories((prev) =>
+      prev.map((c) => (c.slug === slug ? { ...c, color } : c))
+    );
+    const { error } = await supabase.rpc("update_workspace_category_color", {
+      p_workspace_id: workspaceId,
+      p_slug: slug,
+      p_color: color,
+    });
+    if (error) {
+      setCatError(error.message);
+      await fetchCategories();
+    }
   }
 
   // カテゴリ削除
@@ -130,13 +154,49 @@ export default function SettingsPage() {
                 key={cat.id}
                 className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.03] border border-border/50"
               >
-                <span className="text-sm text-foreground flex-1 truncate">
+                <span
+                  className="text-sm flex-1 truncate font-medium"
+                  style={{ color: cat.color || undefined }}
+                >
                   {cat.label}
                 </span>
+                {/* カラーピッカー: 無色 + 7色のドット */}
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => handleColorChange(cat.slug, null)}
+                    className={`w-5 h-5 rounded-full border-2 transition-all ${
+                      !cat.color
+                        ? "border-foreground/60 ring-2 ring-foreground/30"
+                        : "border-border hover:border-foreground/40"
+                    }`}
+                    title="無色"
+                    aria-label="無色"
+                  >
+                    <svg className="w-full h-full text-muted" viewBox="0 0 20 20" fill="currentColor">
+                      <line x1="3" y1="17" x2="17" y2="3" stroke="currentColor" strokeWidth="2" />
+                    </svg>
+                  </button>
+                  {CATEGORY_COLORS.map((c) => (
+                    <button
+                      key={c.value}
+                      type="button"
+                      onClick={() => handleColorChange(cat.slug, c.value)}
+                      style={{ backgroundColor: c.value }}
+                      className={`w-5 h-5 rounded-full border-2 transition-all ${
+                        cat.color === c.value
+                          ? "border-foreground/60 ring-2 ring-foreground/30 scale-110"
+                          : "border-transparent hover:scale-110"
+                      }`}
+                      title={c.label}
+                      aria-label={c.label}
+                    />
+                  ))}
+                </div>
                 <button
                   type="button"
                   onClick={() => handleDelete(cat.slug, cat.label)}
-                  className="shrink-0 p-1 text-muted hover:text-red-400 rounded hover:bg-red-500/10 transition-colors"
+                  className="shrink-0 ml-1 p-1 text-muted hover:text-red-400 rounded hover:bg-red-500/10 transition-colors"
                   title="削除"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -151,28 +211,65 @@ export default function SettingsPage() {
           </div>
 
           {/* カテゴリ追加フォーム */}
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={newLabel}
-              onChange={(e) => setNewLabel(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-                  e.preventDefault();
-                  handleAdd();
-                }
-              }}
-              placeholder="新しいカテゴリ名"
-              className="flex-1 rounded-lg border border-border bg-input-bg px-3 py-2 text-sm text-foreground placeholder-muted focus:border-accent focus:outline-none"
-            />
-            <button
-              type="button"
-              onClick={handleAdd}
-              disabled={!newLabel.trim() || adding}
-              className="shrink-0 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50 transition-colors"
-            >
-              {adding ? "追加中..." : "追加"}
-            </button>
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newLabel}
+                onChange={(e) => setNewLabel(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                    e.preventDefault();
+                    handleAdd();
+                  }
+                }}
+                placeholder="新しいカテゴリ名"
+                style={{ color: newColor || undefined }}
+                className="flex-1 rounded-lg border border-border bg-input-bg px-3 py-2 text-sm text-foreground placeholder-muted focus:border-accent focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={handleAdd}
+                disabled={!newLabel.trim() || adding}
+                className="shrink-0 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50 transition-colors"
+              >
+                {adding ? "追加中..." : "追加"}
+              </button>
+            </div>
+            {/* 新規カテゴリの色 */}
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-muted mr-1">色</span>
+              <button
+                type="button"
+                onClick={() => setNewColor(null)}
+                className={`w-5 h-5 rounded-full border-2 transition-all ${
+                  !newColor
+                    ? "border-foreground/60 ring-2 ring-foreground/30"
+                    : "border-border hover:border-foreground/40"
+                }`}
+                title="無色"
+                aria-label="無色"
+              >
+                <svg className="w-full h-full text-muted" viewBox="0 0 20 20" fill="currentColor">
+                  <line x1="3" y1="17" x2="17" y2="3" stroke="currentColor" strokeWidth="2" />
+                </svg>
+              </button>
+              {CATEGORY_COLORS.map((c) => (
+                <button
+                  key={c.value}
+                  type="button"
+                  onClick={() => setNewColor(c.value)}
+                  style={{ backgroundColor: c.value }}
+                  className={`w-5 h-5 rounded-full border-2 transition-all ${
+                    newColor === c.value
+                      ? "border-foreground/60 ring-2 ring-foreground/30 scale-110"
+                      : "border-transparent hover:scale-110"
+                  }`}
+                  title={c.label}
+                  aria-label={c.label}
+                />
+              ))}
+            </div>
           </div>
         </section>
 

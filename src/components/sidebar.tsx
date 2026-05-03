@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { Workspace, Channel } from "@/lib/supabase/types";
 import type { WorkspaceCategory } from "@/lib/channel-categories";
-import { UNCATEGORIZED_LABEL } from "@/lib/channel-categories";
+import { UNCATEGORIZED_LABEL, CATEGORY_COLORS } from "@/lib/channel-categories";
 import { CreateChannelModal } from "@/components/create-channel-modal";
 import { CreateDmModal } from "@/components/create-dm-modal";
 import { InviteModal } from "@/components/invite-modal";
@@ -97,8 +97,9 @@ export function Sidebar({
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showWsSwitcher, setShowWsSwitcher] = useState(false);
   const [showCategoryManager, setShowCategoryManager] = useState(false);
-  const [catList, setCatList] = useState(categories);
+  const [catList, setCatList] = useState<WorkspaceCategory[]>(categories);
   const [newCatLabel, setNewCatLabel] = useState("");
+  const [newCatColor, setNewCatColor] = useState<string | null>(null);
   const [catAdding, setCatAdding] = useState(false);
   const [catError, setCatError] = useState("");
   // 各チャンネルの所属ユーザーID (チャンネル行に参加者アバターを表示するため)
@@ -117,15 +118,34 @@ export function Sidebar({
     const { data, error } = await supabase.rpc("add_workspace_category", {
       p_workspace_id: workspace.id,
       p_label: newCatLabel.trim(),
+      p_color: newCatColor,
     });
     if (error) {
       setCatError(error.message);
     } else if (data) {
-      const row = data as unknown as { slug: string; label: string; sort_order: number };
+      const row = data as unknown as { slug: string; label: string; sort_order: number; color: string | null };
       setCatList((prev) => [...prev, row]);
       setNewCatLabel("");
+      setNewCatColor(null);
     }
     setCatAdding(false);
+  }
+
+  // 既存カテゴリの色変更（楽観的更新 + 失敗時ロールバック）
+  async function handleChangeCategoryColor(slug: string, color: string | null) {
+    setCatError("");
+    const prev = catList;
+    setCatList((list) => list.map((c) => (c.slug === slug ? { ...c, color } : c)));
+    const supabase = sidebarSupabaseRef.current;
+    const { error } = await supabase.rpc("update_workspace_category_color", {
+      p_workspace_id: workspace.id,
+      p_slug: slug,
+      p_color: color,
+    });
+    if (error) {
+      setCatError(error.message);
+      setCatList(prev);
+    }
   }
   const wsSwitcherRef = useRef<HTMLDivElement>(null);
   // zustand セレクタ形式で購読範囲を限定（不要な再レンダーを防ぐ）
@@ -1328,8 +1348,9 @@ export function Sidebar({
               {catList.map((cat, idx) => (
                 <div
                   key={cat.slug}
-                  className="flex items-center gap-1 px-3 py-2 rounded-lg bg-white/[0.03] border border-border/50"
+                  className="flex flex-col gap-1.5 px-3 py-2 rounded-lg bg-white/[0.03] border border-border/50"
                 >
+                  <div className="flex items-center gap-1">
                   {/* 上下ボタン */}
                   <div className="flex flex-col shrink-0">
                     <button
@@ -1386,7 +1407,10 @@ export function Sidebar({
                     </button>
                   </div>
                   {/* カテゴリ名 */}
-                  <span className="text-sm text-foreground flex-1 truncate">{cat.label}</span>
+                  <span
+                    className="text-sm flex-1 truncate font-medium"
+                    style={{ color: cat.color || undefined }}
+                  >{cat.label}</span>
                   {/* 編集ボタン */}
                   <button
                     type="button"
@@ -1436,6 +1460,40 @@ export function Sidebar({
                       <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
+                  </div>
+                  {/* カラーピッカー: 無色 + 7色のドット */}
+                  <div className="flex items-center gap-1 pl-7">
+                    <button
+                      type="button"
+                      onClick={() => handleChangeCategoryColor(cat.slug, null)}
+                      className={`w-4 h-4 rounded-full border-2 transition-all ${
+                        !cat.color
+                          ? "border-foreground/60 ring-2 ring-foreground/30"
+                          : "border-border hover:border-foreground/40"
+                      }`}
+                      title="無色"
+                      aria-label="無色"
+                    >
+                      <svg className="w-full h-full text-muted" viewBox="0 0 20 20" fill="currentColor">
+                        <line x1="3" y1="17" x2="17" y2="3" stroke="currentColor" strokeWidth="2" />
+                      </svg>
+                    </button>
+                    {CATEGORY_COLORS.map((c) => (
+                      <button
+                        key={c.value}
+                        type="button"
+                        onClick={() => handleChangeCategoryColor(cat.slug, c.value)}
+                        style={{ backgroundColor: c.value }}
+                        className={`w-4 h-4 rounded-full border-2 transition-all ${
+                          cat.color === c.value
+                            ? "border-foreground/60 ring-2 ring-foreground/30 scale-110"
+                            : "border-transparent hover:scale-110"
+                        }`}
+                        title={c.label}
+                        aria-label={c.label}
+                      />
+                    ))}
+                  </div>
                 </div>
               ))}
               {catList.length === 0 && (
@@ -1443,28 +1501,65 @@ export function Sidebar({
               )}
             </div>
 
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={newCatLabel}
-                onChange={(e) => setNewCatLabel(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-                    e.preventDefault();
-                    handleAddCategory();
-                  }
-                }}
-                placeholder="新しいカテゴリ名"
-                className="flex-1 rounded-lg border border-border bg-input-bg px-3 py-2 text-sm text-foreground placeholder-muted focus:border-accent focus:outline-none"
-              />
-              <button
-                type="button"
-                onClick={handleAddCategory}
-                disabled={!newCatLabel.trim() || catAdding}
-                className="shrink-0 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50 transition-colors"
-              >
-                {catAdding ? "..." : "追加"}
-              </button>
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newCatLabel}
+                  onChange={(e) => setNewCatLabel(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                      e.preventDefault();
+                      handleAddCategory();
+                    }
+                  }}
+                  placeholder="新しいカテゴリ名"
+                  style={{ color: newCatColor || undefined }}
+                  className="flex-1 rounded-lg border border-border bg-input-bg px-3 py-2 text-sm text-foreground placeholder-muted focus:border-accent focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddCategory}
+                  disabled={!newCatLabel.trim() || catAdding}
+                  className="shrink-0 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50 transition-colors"
+                >
+                  {catAdding ? "..." : "追加"}
+                </button>
+              </div>
+              {/* 新規カテゴリの色 */}
+              <div className="flex items-center gap-1">
+                <span className="text-[11px] text-muted mr-1">色</span>
+                <button
+                  type="button"
+                  onClick={() => setNewCatColor(null)}
+                  className={`w-4 h-4 rounded-full border-2 transition-all ${
+                    !newCatColor
+                      ? "border-foreground/60 ring-2 ring-foreground/30"
+                      : "border-border hover:border-foreground/40"
+                  }`}
+                  title="無色"
+                  aria-label="無色"
+                >
+                  <svg className="w-full h-full text-muted" viewBox="0 0 20 20" fill="currentColor">
+                    <line x1="3" y1="17" x2="17" y2="3" stroke="currentColor" strokeWidth="2" />
+                  </svg>
+                </button>
+                {CATEGORY_COLORS.map((c) => (
+                  <button
+                    key={c.value}
+                    type="button"
+                    onClick={() => setNewCatColor(c.value)}
+                    style={{ backgroundColor: c.value }}
+                    className={`w-4 h-4 rounded-full border-2 transition-all ${
+                      newCatColor === c.value
+                        ? "border-foreground/60 ring-2 ring-foreground/30 scale-110"
+                        : "border-transparent hover:scale-110"
+                    }`}
+                    title={c.label}
+                    aria-label={c.label}
+                  />
+                ))}
+              </div>
             </div>
 
             {/* 決定ボタン */}
@@ -1742,13 +1837,13 @@ function ChannelCategoryList({
   }, [categories]);
 
   const sections = useMemo(() => [
-    ...categories.map((c) => ({ key: c.slug, label: c.label })),
-    { key: "__uncategorized__", label: UNCATEGORIZED_LABEL },
+    ...categories.map((c) => ({ key: c.slug, label: c.label, color: c.color ?? null })),
+    { key: "__uncategorized__", label: UNCATEGORIZED_LABEL, color: null as string | null },
   ], [categories]);
 
   return (
     <div className="space-y-3">
-      {sections.map(({ key, label }) => {
+      {sections.map(({ key, label, color }) => {
         const list = grouped.get(key) || [];
         if (list.length === 0) return null;
         const isCollapsed = collapsed.has(key);
@@ -1776,7 +1871,10 @@ function ChannelCategoryList({
                 >
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                 </svg>
-                <span className="truncate text-left">■ {label}</span>
+                <span
+                  className="truncate text-left"
+                  style={{ color: color || undefined }}
+                >■ {label}</span>
                 {isCollapsed && unreadTotal > 0 && (
                   <span className="ml-auto bg-accent text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
                     {unreadTotal > 99 ? "99+" : unreadTotal}
@@ -1812,12 +1910,16 @@ function ChannelCategoryList({
                           ? "text-accent"
                           : "text-muted hover:text-foreground"
                       }`}
+                      style={!isActive && color ? { color } : undefined}
                     >
-                      <span className="mr-2 shrink-0 text-accent/50">#</span>
+                      <span
+                        className={`mr-2 shrink-0 ${!isActive && color ? "" : "text-accent/50"}`}
+                        style={!isActive && color ? { color, opacity: 0.7 } : undefined}
+                      >#</span>
                       <span
                         className={`truncate min-w-0 flex-1 ${
-                          showUnreadStyle ? "font-semibold text-foreground" : ""
-                        }`}
+                          showUnreadStyle ? "font-semibold" : ""
+                        } ${showUnreadStyle && !color ? "text-foreground" : ""}`}
                       >
                         {channel.name}
                       </span>
