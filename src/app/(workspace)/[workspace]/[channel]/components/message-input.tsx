@@ -278,29 +278,15 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showMentionPicker]);
 
-  // テキスト変更時のメンション検出
-  const handleContentChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const value = e.target.value;
-    setContent(value);
-
-    // IME入力中でも @ の検出は行う。
-    // 日本語IMEで変換中の中間文字はメンショントリガーにならないが、
-    // `@` 自体はIME外で確定入力されるため、isComposing に関係なく検出すべき。
-    // （以前は isComposing で全体を early return していたが、モバイルの日本語キーボードで
-    //  @を入力してもサジェストが出ない問題を引き起こしていた）
-
-    const cursorPos = e.target.selectionStart ?? value.length;
+  // 入力された値からメンションサジェストの表示/非表示を判定する共通ロジック
+  // 半角@ と 全角＠ の両方をトリガとして扱う
+  const detectMentionTrigger = useCallback((value: string, cursorPos: number) => {
     const textBeforeCursor = value.slice(0, cursorPos);
-    // カーソル位置から逆方向に @ または全角＠ を探す
-    // 半角@ と 全角＠ の両方をトリガとして扱う (日本語キーボードの IME 経由でも反応)
     const halfAt = textBeforeCursor.lastIndexOf("@");
     const fullAt = textBeforeCursor.lastIndexOf("＠");
     const atIndex = Math.max(halfAt, fullAt);
-
     if (atIndex >= 0) {
       const query = textBeforeCursor.slice(atIndex + 1);
-      // クエリにスペース/改行が含まれていない場合のみサジェスト表示
-      // (前の文字種は問わない: 日本語の途中、行頭、行末どこでも @ 打った瞬間に出る)
       if (!query.includes(" ") && !query.includes("\n")) {
         setShowMention(true);
         setMentionQuery(query);
@@ -311,6 +297,25 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
     }
     setShowMention(false);
   }, []);
+
+  // onChange (確定済み入力)
+  const handleContentChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setContent(value);
+    detectMentionTrigger(value, e.target.selectionStart ?? value.length);
+  }, [detectMentionTrigger]);
+
+  // IME composition 中でも textarea.value から中間文字を読み取って検出
+  // 日本語キーボードで「＠」を入力した場合、onChange が確定まで発火しない環境がある。
+  // 検出だけ走らせて setContent はしない (composition 中の state 更新は IME を壊す)。
+  // requestAnimationFrame で次フレームに遅延させ、value が更新された後に読む。
+  const handleInputEvent = useCallback(() => {
+    requestAnimationFrame(() => {
+      const ta = textareaRef.current;
+      if (!ta) return;
+      detectMentionTrigger(ta.value, ta.selectionStart ?? ta.value.length);
+    });
+  }, [detectMentionTrigger]);
 
   // メンション選択時の挿入
   // 表示名に含まれる半角スペースは NBSP (U+00A0) に置換して 1 トークン扱いにする。
@@ -991,6 +996,7 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
             onInput={handleInput}
             onPaste={handlePaste}
             onCompositionStart={() => setIsComposing(true)}
+            onCompositionUpdate={handleInputEvent}
             onCompositionEnd={() => setIsComposing(false)}
             placeholder={placeholder || (channelName ? `#${channelName} にメッセージを送信` : "メッセージを入力")}
             rows={1}
