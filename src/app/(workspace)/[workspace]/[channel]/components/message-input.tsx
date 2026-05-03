@@ -100,6 +100,21 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
   const [mentionStartPos, setMentionStartPos] = useState(0);
   const [isComposing, setIsComposing] = useState(false);
 
+  // サジェストリストの最大高さ
+  // キーボード表示中の visualViewport の 35% (上限 320px / 下限 140px)
+  // → 画面上端に被らず、メンバーが多くても内部スクロールで対応
+  const [suggestMaxHeight, setSuggestMaxHeight] = useState(192);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    function update() {
+      const h = window.visualViewport?.height ?? window.innerHeight;
+      setSuggestMaxHeight(Math.max(140, Math.min(h * 0.35, 320)));
+    }
+    update();
+    window.visualViewport?.addEventListener("resize", update);
+    return () => window.visualViewport?.removeEventListener("resize", update);
+  }, []);
+
   // 「@」ボタンから開く宛先ピッカー (本文中の @ サジェストとは別経路)
   // 選択するとカーソル位置に @<name> テキストが挿入される (Chatwork 方式)
   const [showMentionPicker, setShowMentionPicker] = useState(false);
@@ -798,7 +813,10 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
       >
         {/* メンションサジェストリスト (form の上端基準で配置 = 入力 box の真上に固定) */}
         {showMention && filteredMentionMembers.length > 0 && (
-          <div className="absolute bottom-full left-0 mb-1 w-64 max-h-48 overflow-y-auto rounded-xl bg-sidebar border border-border shadow-xl z-50">
+          <div
+            style={{ maxHeight: `${suggestMaxHeight}px` }}
+            className="absolute bottom-full left-0 mb-1 w-64 overflow-y-auto rounded-xl bg-sidebar border border-border shadow-xl z-50"
+          >
             {filteredMentionMembers.map((member, index) => (
               <button
                 key={member.user_id}
