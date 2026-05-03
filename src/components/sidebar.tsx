@@ -1791,24 +1791,19 @@ function ChannelCategoryList({
 
   // アコーディオン方式: 1つ開くと他は全部閉じる
   function toggleCollapsed(key: string) {
+    // 各カテゴリの開閉は独立。タップしたカテゴリだけを開閉し、
+    // 他のカテゴリの開閉状態には触らない。
     setCollapsed((prev) => {
-      const wasOpen = !prev.has(key);
-      let next: Set<string>;
-      if (wasOpen) {
-        // 既に開いていた → 閉じる
-        next = new Set(prev);
-        next.add(key);
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key); // 閉じていた → 開く
       } else {
-        // 閉じていた → 開く（他は全部閉じる）
-        const allKeys = categories.map((c) => c.slug);
-        allKeys.push("__uncategorized__");
-        next = new Set(allKeys);
-        next.delete(key);
+        next.add(key);    // 開いていた → 閉じる
       }
       try {
         localStorage.setItem(COLLAPSED_KEY, JSON.stringify(Array.from(next)));
       } catch {
-        // localStorage使えない環境は無視
+        // localStorage 使えない環境は無視
       }
       return next;
     });
