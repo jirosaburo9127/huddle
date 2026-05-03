@@ -100,13 +100,8 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
   const [mentionStartPos, setMentionStartPos] = useState(0);
   const [isComposing, setIsComposing] = useState(false);
 
-  // 常時表示の「@」ピル方式メンション
-  // チャットワークの To のような使い方: 入力前に宛先を選んでおくと
-  // 本文送信時に自動で先頭に @name が付く。IME 確定なしで使える。
-  type PillMention =
-    | { kind: "user"; id: string; label: string }
-    | { kind: "broadcast"; type: "here" | "channel" };
-  const [pillMentions, setPillMentions] = useState<PillMention[]>([]);
+  // 「@」ボタンから開く宛先ピッカー (本文中の @ サジェストとは別経路)
+  // 選択するとカーソル位置に @<name> テキストが挿入される (Chatwork 方式)
   const [showMentionPicker, setShowMentionPicker] = useState(false);
   const [pickerQuery, setPickerQuery] = useState("");
   const mentionPickerRef = useRef<HTMLDivElement>(null);
@@ -220,38 +215,52 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
     );
   }, [members, mentionQuery]);
 
-  // ピル方式の候補リスト（ピッカー内の検索）
+  // 宛先ピッカーの候補リスト
   const pickerCandidates = useMemo(() => {
     const q = pickerQuery.toLowerCase().trim();
-    const list = members.filter((m) => {
+    return members.filter((m) => {
       if (!m.profiles?.display_name) return false;
-      if (pillMentions.some((p) => p.kind === "user" && p.id === m.user_id)) return false;
       if (!q) return true;
       return m.profiles.display_name.toLowerCase().includes(q);
     });
-    return list;
-  }, [members, pillMentions, pickerQuery]);
+  }, [members, pickerQuery]);
 
-  const hasBroadcastChannel = pillMentions.some((p) => p.kind === "broadcast" && p.type === "channel");
-
-  function addUserPill(member: MentionMember) {
-    setPillMentions((prev) => {
-      if (prev.some((p) => p.kind === "user" && p.id === member.user_id)) return prev;
-      return [...prev, { kind: "user", id: member.user_id, label: member.profiles.display_name }];
+  // 現在のカーソル位置にテキストを挿入する共通関数
+  const insertAtCursor = useCallback((text: string) => {
+    const ta = textareaRef.current;
+    setContent((prev) => {
+      const start = ta?.selectionStart ?? prev.length;
+      const end = ta?.selectionEnd ?? prev.length;
+      const next = prev.slice(0, start) + text + prev.slice(end);
+      requestAnimationFrame(() => {
+        if (ta) {
+          const pos = start + text.length;
+          ta.focus();
+          ta.selectionStart = pos;
+          ta.selectionEnd = pos;
+          ta.style.height = "auto";
+          ta.style.height = `${Math.min(ta.scrollHeight, 200)}px`;
+        }
+      });
+      return next;
     });
+  }, []);
+
+  // 宛先ピッカーで個人メンバーを選択 → カーソル位置に @<name> を挿入
+  function selectMemberFromPicker(member: MentionMember) {
+    // 表示名内の半角スペースは NBSP に置換して 1 トークン扱いにする
+    const name = member.profiles.display_name.replace(/ /g, " ");
+    insertAtCursor(`@${name} `);
+    setShowMentionPicker(false);
     setPickerQuery("");
   }
 
-  function addBroadcastPill(type: "here" | "channel") {
-    setPillMentions((prev) => {
-      if (prev.some((p) => p.kind === "broadcast" && p.type === type)) return prev;
-      return [...prev, { kind: "broadcast", type }];
-    });
+  // 宛先ピッカーでブロードキャスト (@here / @All) を選択 → カーソル位置に挿入
+  function selectBroadcastFromPicker(type: "here" | "channel") {
+    const text = type === "here" ? "@here " : "@All ";
+    insertAtCursor(text);
     setShowMentionPicker(false);
-  }
-
-  function removePill(idx: number) {
-    setPillMentions((prev) => prev.filter((_, i) => i !== idx));
+    setPickerQuery("");
   }
 
   // ピッカー外クリックで閉じる
@@ -362,22 +371,11 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
     e.preventDefault();
     const rawTrimmed = content.trim();
     // 添付がある場合はテキスト空でも送信を許可する
-    if (!rawTrimmed && pillMentions.length === 0 && pendingAttachments.length === 0) return;
+    if (!rawTrimmed && pendingAttachments.length === 0) return;
     if (sending) return;
 
-    // ピル方式で選ばれたメンションを本文先頭に差し込む
-    // 表示名に含まれる半角スペースは NBSP に置換して 1 トークン扱い
-    const pillPrefix = pillMentions
-      .map((p) => {
-        if (p.kind === "user") return `@${p.label.replace(/ /g, "\u00A0")}`;
-        return p.type === "here" ? "@here" : "@All";
-      })
-      .join(" ");
-    const combined = pillPrefix
-      ? pillPrefix + (rawTrimmed ? " " + rawTrimmed : "")
-      : rawTrimmed;
-    const trimmed = combined.trim();
-    // 添付のみで本文空の場合は trimmed が空でも送信可能にする
+    // 本文中の @<name> はそのまま送信される (extractMentions が後で解析)
+    const trimmed = rawTrimmed;
     if (!trimmed && pendingAttachments.length === 0) return;
 
     // DLP: 機密情報検知 → 警告して確認を取る（強制ブロックはしない）
@@ -399,7 +397,6 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
     const attachmentsSnapshot = pendingAttachments;
     setContent("");
     setSendAsDecision(false);
-    setPillMentions([]);
     setPendingAttachments([]);
 
     // テキストエリアの高さをリセット
@@ -769,11 +766,11 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
             </div>
             <div className="flex-1 overflow-y-auto py-1">
               {/* @All 特殊メンション */}
-              {!pickerQuery && !hasBroadcastChannel && (
+              {!pickerQuery && (
                 <>
                   <button
                     type="button"
-                    onClick={() => addBroadcastPill("channel")}
+                    onClick={() => selectBroadcastFromPicker("channel")}
                     className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-white/[0.04] transition-colors"
                   >
                     <span className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center shrink-0 text-accent text-[10px] font-bold">All</span>
@@ -797,7 +794,7 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
                   <button
                     key={member.user_id}
                     type="button"
-                    onClick={() => addUserPill(member)}
+                    onClick={() => selectMemberFromPicker(member)}
                     className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-white/[0.04] transition-colors"
                   >
                     {member.profiles.avatar_url ? (
@@ -970,35 +967,6 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
                   </svg>
                 </button>
               </div>
-            ))}
-          </div>
-        )}
-
-        {/* 選択済みの宛先ピル行 */}
-        {pillMentions.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5 px-3 py-1.5 border-b border-border/50">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted shrink-0">
-              To
-            </span>
-            {pillMentions.map((p, idx) => (
-              <span
-                key={p.kind === "user" ? `u-${p.id}` : `b-${p.type}`}
-                className="inline-flex items-center gap-1 rounded-full bg-accent/10 border border-accent/30 px-2 py-0.5 text-xs text-accent"
-              >
-                <span className="font-semibold">
-                  @{p.kind === "user" ? p.label : p.type === "here" ? "here" : "All"}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => removePill(idx)}
-                  className="text-accent/70 hover:text-accent"
-                  aria-label="削除"
-                >
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </span>
             ))}
           </div>
         )}
