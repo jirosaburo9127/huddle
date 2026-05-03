@@ -5,6 +5,12 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
 import { createClient } from "@/lib/supabase/client";
+import {
+  SortableChannelTabs,
+  loadChannelOrder,
+  saveChannelOrder,
+  applyChannelOrder,
+} from "@/components/sortable-channel-tabs";
 
 type InProgressItem = {
   id: string;
@@ -31,6 +37,15 @@ export default function InProgressPage() {
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
   // モバイルのフィルタボトムシート開閉
   const [showFilter, setShowFilter] = useState(false);
+  // ユーザー定義の並び順 (localStorage 保存)
+  const orderScope = `in-progress:${params.workspace}`;
+  const [channelOrder, setChannelOrder] = useState<string[]>(() =>
+    loadChannelOrder(orderScope)
+  );
+  function handleReorder(newOrder: string[]) {
+    setChannelOrder(newOrder);
+    saveChannelOrder(orderScope, newOrder);
+  }
 
   useEffect(() => {
     (async () => {
@@ -78,6 +93,7 @@ export default function InProgressPage() {
   }, [params.workspace]);
 
   // チャンネル別に集計（タブ表示用）
+  // デフォルトは件数の多い順、ユーザーがドラッグで並び替えるとそれが優先される
   const channelFacets = useMemo(() => {
     const map = new Map<string, { id: string; name: string; count: number }>();
     for (const it of items) {
@@ -86,8 +102,9 @@ export default function InProgressPage() {
       if (existing) existing.count += 1;
       else map.set(it.channel_id, { id: it.channel_id, name: it.channel_name, count: 1 });
     }
-    return Array.from(map.values()).sort((a, b) => b.count - a.count);
-  }, [items]);
+    const byCount = Array.from(map.values()).sort((a, b) => b.count - a.count);
+    return applyChannelOrder(byCount, channelOrder);
+  }, [items, channelOrder]);
 
   const filteredItems = useMemo(() => {
     if (!selectedChannelId) return items;
@@ -116,41 +133,14 @@ export default function InProgressPage() {
       <div className="flex-1 flex min-h-0 overflow-hidden">
         {/* 左サイド: 縦型チャンネルタブ (lg 以上) */}
         {!loading && channelFacets.length > 0 && (
-          <aside className="hidden lg:flex flex-col w-56 shrink-0 border-r border-border overflow-y-auto hide-scrollbar p-2 space-y-1">
-            <button
-              type="button"
-              onClick={() => setSelectedChannelId(null)}
-              className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors flex items-center justify-between gap-2 ${
-                selectedChannelId === null
-                  ? "bg-accent text-white"
-                  : "text-muted hover:text-foreground hover:bg-white/[0.04]"
-              }`}
-            >
-              <span className="truncate">全て</span>
-              <span className={`shrink-0 text-[11px] tabular-nums ${selectedChannelId === null ? "text-white/80" : "text-muted"}`}>
-                {items.length}
-              </span>
-            </button>
-            {channelFacets.map((ch) => {
-              const active = selectedChannelId === ch.id;
-              return (
-                <button
-                  key={ch.id}
-                  type="button"
-                  onClick={() => setSelectedChannelId(ch.id)}
-                  className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors flex items-center justify-between gap-2 ${
-                    active
-                      ? "bg-accent text-white"
-                      : "text-muted hover:text-foreground hover:bg-white/[0.04]"
-                  }`}
-                >
-                  <span className="truncate">#{ch.name}</span>
-                  <span className={`shrink-0 text-[11px] tabular-nums ${active ? "text-white/80" : "text-muted"}`}>
-                    {ch.count}
-                  </span>
-                </button>
-              );
-            })}
+          <aside className="hidden lg:flex flex-col w-56 shrink-0 border-r border-border overflow-y-auto hide-scrollbar p-2">
+            <SortableChannelTabs
+              items={channelFacets}
+              selectedId={selectedChannelId}
+              totalCount={items.length}
+              onSelect={setSelectedChannelId}
+              onReorder={handleReorder}
+            />
           </aside>
         )}
 
@@ -243,7 +233,10 @@ export default function InProgressPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
-              <h3 className="text-sm font-semibold text-foreground">チャンネルで絞り込み</h3>
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">チャンネルで絞り込み</h3>
+                <p className="text-[11px] text-muted mt-0.5">左の点々を長押しで並び替え</p>
+              </div>
               <button
                 type="button"
                 onClick={() => setShowFilter(false)}
@@ -255,47 +248,17 @@ export default function InProgressPage() {
                 </svg>
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-2 space-y-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedChannelId(null);
+            <div className="flex-1 overflow-y-auto p-2">
+              <SortableChannelTabs
+                items={channelFacets}
+                selectedId={selectedChannelId}
+                totalCount={items.length}
+                onSelect={(id) => {
+                  setSelectedChannelId(id);
                   setShowFilter(false);
                 }}
-                className={`w-full text-left px-3 py-2.5 text-sm rounded-lg transition-colors flex items-center justify-between gap-2 ${
-                  selectedChannelId === null
-                    ? "bg-accent text-white"
-                    : "text-foreground hover:bg-white/[0.04]"
-                }`}
-              >
-                <span className="truncate">全て</span>
-                <span className={`shrink-0 text-xs tabular-nums ${selectedChannelId === null ? "text-white/80" : "text-muted"}`}>
-                  {items.length}
-                </span>
-              </button>
-              {channelFacets.map((ch) => {
-                const active = selectedChannelId === ch.id;
-                return (
-                  <button
-                    key={ch.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedChannelId(ch.id);
-                      setShowFilter(false);
-                    }}
-                    className={`w-full text-left px-3 py-2.5 text-sm rounded-lg transition-colors flex items-center justify-between gap-2 ${
-                      active
-                        ? "bg-accent text-white"
-                        : "text-foreground hover:bg-white/[0.04]"
-                    }`}
-                  >
-                    <span className="truncate">#{ch.name}</span>
-                    <span className={`shrink-0 text-xs tabular-nums ${active ? "text-white/80" : "text-muted"}`}>
-                      {ch.count}
-                    </span>
-                  </button>
-                );
-              })}
+                onReorder={handleReorder}
+              />
             </div>
           </div>
         </div>

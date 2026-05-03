@@ -9,6 +9,12 @@ import {
   revokeShareToken,
 } from "@/lib/actions/share-tokens";
 import { generateDecisionsPdf, savePdf } from "@/lib/pdf-export";
+import {
+  SortableChannelTabs,
+  loadChannelOrder,
+  saveChannelOrder,
+  applyChannelOrder,
+} from "@/components/sortable-channel-tabs";
 
 // メッセージ本文が画像URLかを判定（Supabase Storage公開URLは拡張子で判別）
 const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|bmp|avif)(\?.*)?$/i;
@@ -94,8 +100,18 @@ export function DashboardView({
   const [dateRange, setDateRange] = useState<DateRange>(null);
   // モバイルのフィルタボトムシート開閉
   const [showFilter, setShowFilter] = useState(false);
+  // ユーザー定義の並び順 (localStorage 保存)
+  const orderScope = `decisions:${workspaceSlug}`;
+  const [channelOrder, setChannelOrder] = useState<string[]>(() =>
+    loadChannelOrder(orderScope)
+  );
+  function handleReorder(newOrder: string[]) {
+    setChannelOrder(newOrder);
+    saveChannelOrder(orderScope, newOrder);
+  }
 
   // 決定事項に登場するチャンネルをユニーク抽出（件数も集計）
+  // デフォルトは件数の多い順、ユーザーがドラッグで並び替えるとそれが優先される
   const channelFacets = useMemo(() => {
     const map = new Map<string, { id: string; name: string; count: number }>();
     for (const d of decisions) {
@@ -110,8 +126,9 @@ export function DashboardView({
         });
       }
     }
-    return Array.from(map.values()).sort((a, b) => b.count - a.count);
-  }, [decisions]);
+    const byCount = Array.from(map.values()).sort((a, b) => b.count - a.count);
+    return applyChannelOrder(byCount, channelOrder);
+  }, [decisions, channelOrder]);
 
   const filteredDecisions = useMemo(() => {
     let list = decisions;
@@ -229,41 +246,14 @@ export function DashboardView({
       <div className="flex-1 flex min-h-0 overflow-hidden">
         {/* 左サイド: 縦型チャンネルタブ (lg 以上、印刷時は非表示) */}
         {channelFacets.length > 0 && (
-          <aside className="print:hidden hidden lg:flex flex-col w-56 shrink-0 border-r border-border overflow-y-auto hide-scrollbar p-2 space-y-1">
-            <button
-              type="button"
-              onClick={() => setSelectedChannelId(null)}
-              className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors flex items-center justify-between gap-2 ${
-                selectedChannelId === null
-                  ? "bg-accent text-white"
-                  : "text-muted hover:text-foreground hover:bg-white/[0.04]"
-              }`}
-            >
-              <span className="truncate">全て</span>
-              <span className={`shrink-0 text-[11px] tabular-nums ${selectedChannelId === null ? "text-white/80" : "text-muted"}`}>
-                {decisions.length}
-              </span>
-            </button>
-            {channelFacets.map((ch) => {
-              const active = selectedChannelId === ch.id;
-              return (
-                <button
-                  key={ch.id}
-                  type="button"
-                  onClick={() => setSelectedChannelId(ch.id)}
-                  className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors flex items-center justify-between gap-2 ${
-                    active
-                      ? "bg-accent text-white"
-                      : "text-muted hover:text-foreground hover:bg-white/[0.04]"
-                  }`}
-                >
-                  <span className="truncate">#{ch.name}</span>
-                  <span className={`shrink-0 text-[11px] tabular-nums ${active ? "text-white/80" : "text-muted"}`}>
-                    {ch.count}
-                  </span>
-                </button>
-              );
-            })}
+          <aside className="print:hidden hidden lg:flex flex-col w-56 shrink-0 border-r border-border overflow-y-auto hide-scrollbar p-2">
+            <SortableChannelTabs
+              items={channelFacets}
+              selectedId={selectedChannelId}
+              totalCount={decisions.length}
+              onSelect={setSelectedChannelId}
+              onReorder={handleReorder}
+            />
           </aside>
         )}
 
@@ -601,7 +591,10 @@ export function DashboardView({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
-              <h3 className="text-sm font-semibold text-foreground">チャンネルで絞り込み</h3>
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">チャンネルで絞り込み</h3>
+                <p className="text-[11px] text-muted mt-0.5">左の点々を長押しで並び替え</p>
+              </div>
               <button
                 type="button"
                 onClick={() => setShowFilter(false)}
@@ -613,47 +606,17 @@ export function DashboardView({
                 </svg>
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-2 space-y-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedChannelId(null);
+            <div className="flex-1 overflow-y-auto p-2">
+              <SortableChannelTabs
+                items={channelFacets}
+                selectedId={selectedChannelId}
+                totalCount={decisions.length}
+                onSelect={(id) => {
+                  setSelectedChannelId(id);
                   setShowFilter(false);
                 }}
-                className={`w-full text-left px-3 py-2.5 text-sm rounded-lg transition-colors flex items-center justify-between gap-2 ${
-                  selectedChannelId === null
-                    ? "bg-accent text-white"
-                    : "text-foreground hover:bg-white/[0.04]"
-                }`}
-              >
-                <span className="truncate">全て</span>
-                <span className={`shrink-0 text-xs tabular-nums ${selectedChannelId === null ? "text-white/80" : "text-muted"}`}>
-                  {decisions.length}
-                </span>
-              </button>
-              {channelFacets.map((ch) => {
-                const active = selectedChannelId === ch.id;
-                return (
-                  <button
-                    key={ch.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedChannelId(ch.id);
-                      setShowFilter(false);
-                    }}
-                    className={`w-full text-left px-3 py-2.5 text-sm rounded-lg transition-colors flex items-center justify-between gap-2 ${
-                      active
-                        ? "bg-accent text-white"
-                        : "text-foreground hover:bg-white/[0.04]"
-                    }`}
-                  >
-                    <span className="truncate">#{ch.name}</span>
-                    <span className={`shrink-0 text-xs tabular-nums ${active ? "text-white/80" : "text-muted"}`}>
-                      {ch.count}
-                    </span>
-                  </button>
-                );
-              })}
+                onReorder={handleReorder}
+              />
             </div>
           </div>
         </div>
