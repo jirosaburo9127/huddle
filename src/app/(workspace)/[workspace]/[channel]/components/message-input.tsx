@@ -302,6 +302,10 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
   const handleContentChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
     setContent(value);
+    // textarea の高さを内容に合わせて即時調整 (空なら最小、長文なら最大 200px)
+    // これを忘れると過去の入力で広がった高さが残ってサジェストの位置が下へ追いやられる
+    e.target.style.height = "auto";
+    e.target.style.height = `${Math.min(e.target.scrollHeight, 200)}px`;
     detectMentionTrigger(value, e.target.selectionStart ?? value.length);
   }, [detectMentionTrigger]);
 
