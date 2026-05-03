@@ -717,43 +717,6 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
         </div>
       )}
 
-      {/* メンションサジェストリスト */}
-      {showMention && filteredMentionMembers.length > 0 && (
-        <div className="absolute bottom-full left-0 mb-1 w-64 max-h-48 overflow-y-auto rounded-xl bg-sidebar border border-border shadow-xl z-50">
-          {filteredMentionMembers.map((member, index) => (
-            <button
-              key={member.user_id}
-              type="button"
-              onMouseDown={(e) => {
-                // blurを防止してからメンション挿入
-                e.preventDefault();
-                insertMention(member);
-              }}
-              className={`flex items-center gap-2 px-3 py-2 text-sm w-full text-left cursor-pointer transition-colors ${
-                index === mentionIndex
-                  ? "bg-accent/10"
-                  : "hover:bg-white/[0.04]"
-              }`}
-            >
-              {member.profiles.avatar_url ? (
-                <img
-                  src={member.profiles.avatar_url}
-                  alt={member.profiles.display_name}
-                  className="w-6 h-6 rounded-full object-cover shrink-0"
-                />
-              ) : (
-                <div className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center shrink-0">
-                  <span className="text-[10px] font-medium text-accent">
-                    {member.profiles.display_name.charAt(0).toUpperCase()}
-                  </span>
-                </div>
-              )}
-              <span className="truncate text-foreground">{member.profiles.display_name}</span>
-            </button>
-          ))}
-        </div>
-      )}
-
       {/* ピッカーは form の外側で absolute 配置 */}
       <div className="relative" ref={mentionPickerRef}>
         {/* ピッカー */}
@@ -827,8 +790,46 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
 
       <form
         onSubmit={handleSubmit}
-        className="flex flex-col rounded-xl border border-border bg-input-bg overflow-hidden"
+        className="relative flex flex-col rounded-xl border border-border bg-input-bg overflow-visible"
       >
+        {/* メンションサジェストリスト (form の上端基準で配置 = 入力 box の真上に固定) */}
+        {showMention && filteredMentionMembers.length > 0 && (
+          <div className="absolute bottom-full left-0 mb-1 w-64 max-h-48 overflow-y-auto rounded-xl bg-sidebar border border-border shadow-xl z-50">
+            {filteredMentionMembers.map((member, index) => (
+              <button
+                key={member.user_id}
+                type="button"
+                onMouseDown={(e) => {
+                  // blurを防止してからメンション挿入
+                  e.preventDefault();
+                  insertMention(member);
+                }}
+                className={`flex items-center gap-2 px-3 py-2 text-sm w-full text-left cursor-pointer transition-colors ${
+                  index === mentionIndex
+                    ? "bg-accent/10"
+                    : "hover:bg-white/[0.04]"
+                }`}
+              >
+                {member.profiles.avatar_url ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={member.profiles.avatar_url}
+                    alt={member.profiles.display_name}
+                    className="w-6 h-6 rounded-full object-cover shrink-0"
+                  />
+                ) : (
+                  <div className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center shrink-0">
+                    <span className="text-[10px] font-medium text-accent">
+                      {member.profiles.display_name.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                )}
+                <span className="truncate text-foreground">{member.profiles.display_name}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* ツールバー行 — 添付 / 宛先追加 アイコンを textarea の上に配置 */}
         <div className="flex items-center gap-1 px-2 py-1.5">
           {/* ファイル添付ボタン */}
