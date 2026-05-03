@@ -157,7 +157,7 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
       setContent((prev) => prev.replace(/\u200B/g, ""));
       if (textareaRef.current) {
         textareaRef.current.style.height = "auto";
-        textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
+        textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
       }
     };
 
@@ -239,7 +239,7 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
           ta.selectionStart = pos;
           ta.selectionEnd = pos;
           ta.style.height = "auto";
-          ta.style.height = `${Math.min(ta.scrollHeight, 200)}px`;
+          ta.style.height = `${Math.min(ta.scrollHeight, 120)}px`;
         }
       });
       return next;
@@ -302,10 +302,10 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
   const handleContentChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
     setContent(value);
-    // textarea の高さを内容に合わせて即時調整 (空なら最小、長文なら最大 200px)
+    // textarea の高さを内容に合わせて即時調整 (空なら最小、長文なら最大 120px)
     // これを忘れると過去の入力で広がった高さが残ってサジェストの位置が下へ追いやられる
     e.target.style.height = "auto";
-    e.target.style.height = `${Math.min(e.target.scrollHeight, 200)}px`;
+    e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
     detectMentionTrigger(value, e.target.selectionStart ?? value.length);
   }, [detectMentionTrigger]);
 
@@ -481,7 +481,7 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
     const textarea = textareaRef.current;
     if (textarea) {
       textarea.style.height = "auto";
-      textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`;
     }
   }
 
@@ -1006,7 +1006,7 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
             placeholder={placeholder || (channelName ? `#${channelName} にメッセージを送信` : "メッセージを入力")}
             rows={1}
             maxLength={4000}
-            className="flex-1 resize-none overflow-y-auto bg-transparent text-base text-foreground placeholder-muted focus:outline-none max-h-[200px]"
+            className="flex-1 resize-none overflow-y-auto bg-transparent text-base text-foreground placeholder-muted focus:outline-none max-h-[120px]"
           />
           {/* 送信ボタン */}
           <button
