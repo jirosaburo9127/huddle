@@ -83,8 +83,33 @@ type Props = {
   onCancelReply?: () => void;
 };
 
+// 下書きをチャンネルごとに localStorage に保存する。LINE と同様、入力途中で
+// 別チャンネルに移動しても戻ったら同じ文字が残る。
+const DRAFT_KEY_PREFIX = "huddle:draft:";
+function readDraft(channelId: string | undefined): string {
+  if (typeof window === "undefined" || !channelId) return "";
+  try {
+    return window.localStorage.getItem(DRAFT_KEY_PREFIX + channelId) || "";
+  } catch {
+    return "";
+  }
+}
+function writeDraft(channelId: string | undefined, value: string) {
+  if (typeof window === "undefined" || !channelId) return;
+  try {
+    if (value) {
+      window.localStorage.setItem(DRAFT_KEY_PREFIX + channelId, value);
+    } else {
+      window.localStorage.removeItem(DRAFT_KEY_PREFIX + channelId);
+    }
+  } catch {
+    // ストレージ未対応 / 容量超過は無視
+  }
+}
+
 export function MessageInput({ channelName, onSend, placeholder, channelId, workspaceId, onCreatePoll, onCreateEvent, replyTo, onCancelReply }: Props) {
-  const [content, setContent] = useState("");
+  // 初期値はマウント時に下書きから復元 (チャンネル切替で remount されるたびに走る)
+  const [content, setContent] = useState<string>(() => readDraft(channelId));
   const [sending, setSending] = useState(false);
   const [sendAsDecision, setSendAsDecision] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -132,6 +157,22 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
       setIsNativeApp(Capacitor.isNativePlatform());
     }).catch(() => {});
   }, []);
+
+  // チャンネル切替で同一インスタンスが再利用される稀なケース向けに、
+  // channelId が変わったタイミングでも下書きを再ロードする。
+  // 通常はチャンネル遷移で MessageInput 自体が remount されるので useState
+  // の lazy initializer 側で復元される。
+  useEffect(() => {
+    setContent(readDraft(channelId));
+    // channelId 切替時のみ走る (content を依存に含めると無限ループ)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channelId]);
+
+  // content が変わるたびに下書きを保存。空文字なら削除。
+  // 送信成功後の setContent("") も自動的にこのエフェクトで掃除される。
+  useEffect(() => {
+    writeDraft(channelId, content);
+  }, [channelId, content]);
 
   function toggleVoiceInput() {
     if (isListening) {
