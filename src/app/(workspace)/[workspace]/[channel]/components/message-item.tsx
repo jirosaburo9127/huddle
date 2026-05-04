@@ -109,11 +109,16 @@ function parseMarkdown(text: string): string {
     }
   );
 
-  // @メンション: 前後がスペース/行頭行末で囲まれた短い名前のみハイライト。
-  // メンション挿入時に「@name 」(末尾スペース付き) で保存されるため、
-  // 文中の普通の @ (例: test@example.com, @以降の長文) は反応しない。
+  // @メンション: 文中でも検出されるよう boundary を緩める。
+  // ・直前が英数字 / _ / @ ならスキップ (email "test@example.com" や @@ 等を除外)
+  // ・name に含めるのは英数字・アンダースコア・ドット・ハイフン・(全/半角)カッコ・NBSP・
+  //   ひらがな (3040-309F)・カタカナ (30A0-30FF)・CJK 漢字 (4E00-9FFF)・CJK 互換 (F900-FAFF)・
+  //   半角/全角形式 (FF00-FFEF) のみ。「、。「」」 などの句読点は含めないので
+  //   それらが現れた地点で名前が終わる
+  // ・末尾スペースを要求しないので「@おくずみさん」「@おくずみ。」も検出される
+  //   (敬称や助詞まで span に含まれてしまうが、視認性 > 厳密マッチで OK)
   html = html.replace(
-    /(^|[\s>])@([\w.\-\u3000-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF\u00A0()（）]{1,30})(?=[\s<]|$)/g,
+    /(^|[^a-zA-Z0-9_@])@([\w.\-()（）\u00A0\u3040-\u30FF\u4E00-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]{1,30})/g,
     (_m, before: string, name: string) => {
       // 旧来の @channel 表記は表示だけ @All に置き換える (DB互換のため)
       const displayName = name === "channel" ? "All" : name.replace(/\u00A0/g, " ");
