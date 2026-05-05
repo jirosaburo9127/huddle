@@ -34,6 +34,9 @@ type Props = {
   hasEvent?: boolean;
   readCount?: number; // -1: 非表示（他人の投稿）、0以上: 既読数
   memberCount?: number; // 自分以外のメンバー数
+  // メンションハイライト用: workspace 全メンバーの display_name 配列
+  // 渡せば本文中の @<name> を厳密マッチで span 化する
+  memberNames?: string[];
 };
 
 // Supabase Storage URLかどうか判定
@@ -66,8 +69,13 @@ function escapeHtml(text: string): string {
     .replace(/"/g, "&quot;");
 }
 
+// 正規表現メタ文字をエスケープ
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 // MarkdownをパースしてHTML文字列に変換（最小対応）
-function parseMarkdown(text: string): string {
+function parseMarkdown(text: string, memberNames: string[] = []): string {
   // まずHTMLタグをエスケープ
   let html = escapeHtml(text);
 
@@ -109,22 +117,36 @@ function parseMarkdown(text: string): string {
     }
   );
 
-  // @メンション: 文中でも検出されるよう boundary を緩める。
-  // ・直前が英数字 / _ / @ ならスキップ (email "test@example.com" や @@ 等を除外)
-  // ・name に含めるのは英数字・アンダースコア・ドット・ハイフン・(全/半角)カッコ・NBSP・
-  //   ひらがな (3040-309F)・カタカナ (30A0-30FF)・CJK 漢字 (4E00-9FFF)・CJK 互換 (F900-FAFF)・
-  //   半角/全角形式 (FF00-FFEF) のみ。「、。「」」 などの句読点は含めないので
-  //   それらが現れた地点で名前が終わる
-  // ・末尾スペースを要求しないので「@おくずみさん」「@おくずみ。」も検出される
-  //   (敬称や助詞まで span に含まれてしまうが、視認性 > 厳密マッチで OK)
-  html = html.replace(
-    /(^|[^a-zA-Z0-9_@])@([\w.\-()（）\u00A0\u3040-\u30FF\u4E00-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]{1,30})/g,
-    (_m, before: string, name: string) => {
-      // 旧来の @channel 表記は表示だけ @All に置き換える (DB互換のため)
+  // @メンション: workspace メンバー display_name + 特殊トークンに厳密マッチ。
+  // ・name に「さん」「ですが」のような敬称/助詞が span に入らないよう、
+  //   member 名の完全一致だけハイライトする (末尾 lookahead は付けない →
+  //   member 名にプレフィックス一致したらそこで切る)
+  // ・長い名前優先で照合 (おくずみ太郎 と おくずみ が両方メンバーなら長い方を先に)
+  // ・直前が英数字 / _ / @ ならスキップ (email や @@ を除外)
+  // ・@here / @channel / @All は固定で対応
+  const specialNames = ["here", "channel", "All"];
+  const allNames = [
+    ...specialNames,
+    ...memberNames.filter((n) => !!n && !specialNames.includes(n)),
+  ];
+  // 表示名に半角スペースが含まれる場合、insertMention で NBSP に置換されているので
+  // 照合用も NBSP 化する
+  const variants = allNames
+    .map((n) => n.replace(/ /g, "\u00A0"))
+    .filter((n) => !!n);
+  // 長い順に sort し、alternation で leftmost match を狙う (JS regex は順番優先)
+  variants.sort((a, b) => b.length - a.length);
+
+  if (variants.length > 0) {
+    const alternation = variants.map(escapeRegex).join("|");
+    // lookbehind で「直前が英数字 / _ / @ ではないこと」を確認 (前の char を消費しない)
+    // → 連続メンション「@a@b」も両方 match できる
+    const re = new RegExp(`(?<=^|[^a-zA-Z0-9_@])@(${alternation})`, "g");
+    html = html.replace(re, (_m, name: string) => {
       const displayName = name === "channel" ? "All" : name.replace(/\u00A0/g, " ");
-      return `${before}<span class="text-accent font-semibold">@${displayName}</span>`;
-    }
-  );
+      return `<span class="text-accent font-semibold">@${displayName}</span>`;
+    });
+  }
 
   return html;
 }
@@ -150,12 +172,15 @@ function MessageContent({
   imageError,
   onImageError,
   onImageClick,
+  memberNames,
 }: {
   content: string;
   imageError: boolean;
   onImageError: () => void;
   // クリックされた画像と、そのメッセージ内の全画像URL配列を渡す（連続閲覧用）
   onImageClick?: (allImageUrls: string[], clickedIndex: number) => void;
+  // メンションハイライト用 (workspace の display_name 配列)
+  memberNames?: string[];
 }) {
   const { textLines, fileUrls } = splitContentAndFiles(content);
   const textContent = textLines.join("\n").trim();
@@ -168,7 +193,7 @@ function MessageContent({
       {textContent && (
         <div
           className="text-base leading-[1.65] text-foreground whitespace-pre-wrap break-words [&_pre]:whitespace-pre [&_pre]:my-2"
-          dangerouslySetInnerHTML={{ __html: parseMarkdown(textContent) }}
+          dangerouslySetInnerHTML={{ __html: parseMarkdown(textContent, memberNames) }}
         />
       )}
       {/* 画像: 1枚なら単独表示、2枚以上は X 風の横スライドカルーセル */}
@@ -506,6 +531,7 @@ export const MessageItem = memo(function MessageItem({
   hasEvent,
   readCount = -1,
   memberCount = 0,
+  memberNames,
 }: Props) {
   const profile = message.profiles;
   const isOwn = message.user_id === currentUserId;
@@ -839,6 +865,7 @@ export const MessageItem = memo(function MessageItem({
                 imageError={imageError}
                 onImageError={() => setImageError(true)}
                 onImageClick={(urls, index) => setLightboxState({ urls, index })}
+                memberNames={memberNames}
               />
               {/* 投票 (message に紐づく polls 行がある時だけ) */}
               {hasPoll && (

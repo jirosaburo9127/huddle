@@ -124,6 +124,9 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
   // 既読状態: チャンネルメンバーの last_read_at を取得して既読数を計算
   const [memberReadTimes, setMemberReadTimes] = useState<Array<{ user_id: string; last_read_at: string | null }>>([]);
   const memberCountForRead = memberReadTimes.filter((m) => m.user_id !== currentUserId).length;
+  // メンション表示用の workspace メンバー名リスト (display_name 配列)
+  // メッセージ本文の @<name> を厳密にマッチさせるために使う
+  const [workspaceMemberNames, setWorkspaceMemberNames] = useState<string[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -139,6 +142,26 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
     const interval = setInterval(fetchReadTimes, 10000);
     return () => { cancelled = true; clearInterval(interval); };
   }, [channel.id, supabase]);
+
+  // workspace 全メンバーの display_name を取得 (メンションハイライト用)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("workspace_members")
+        .select("profiles!inner(display_name)")
+        .eq("workspace_id", channel.workspace_id);
+      if (cancelled || !data) return;
+      const names: string[] = [];
+      for (const row of data) {
+        const p = (row as { profiles: { display_name: string } | { display_name: string }[] }).profiles;
+        const name = Array.isArray(p) ? p[0]?.display_name : p?.display_name;
+        if (name) names.push(name);
+      }
+      setWorkspaceMemberNames(names);
+    })();
+    return () => { cancelled = true; };
+  }, [channel.workspace_id, supabase]);
 
   // メッセージの既読数を計算（自分の投稿のみ対象）
   const getReadCount = useCallback((message: MessageWithProfile) => {
@@ -1506,6 +1529,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                         hasEvent={eventMessageIds.has(message.id)}
                         readCount={getReadCount(message)}
                         memberCount={memberCountForRead}
+                        memberNames={workspaceMemberNames}
                       />
                     </div>
                   );
