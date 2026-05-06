@@ -411,11 +411,78 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel.id]);
 
-  // スクロールコンテナを最下部に強制移動
+  // 「最新の投稿を画面に出す」関数。
+  // 通常チャンネルは ASC 表示なので最下部 = 最新、独り言は X / Threads 風に
+  // DESC 表示しているため最上部 = 最新となる。
   const scrollToBottom = useCallback(() => {
     const el = scrollContainerRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, []);
+    if (!el) return;
+    if (channel.is_hitorigoto) {
+      el.scrollTop = 0;
+    } else {
+      el.scrollTop = el.scrollHeight;
+    }
+  }, [channel.is_hitorigoto]);
+
+  // 「もっと前を読み込む」処理。通常はボタンが最上部、独り言は最下部に出る。
+  // prepend 後のスクロール位置補正は通常チャンネルだけ必要 (独り言は逆順表示で
+  // prepend が画面下に追加されるので位置はそのままでよい)。
+  const handleLoadOlder = useCallback(async () => {
+    if (loadingOlder) return;
+    const oldest = messagesRef.current[0];
+    if (!oldest) return;
+    setLoadingOlder(true);
+    const container = scrollContainerRef.current;
+    const prevScrollHeight = container?.scrollHeight ?? 0;
+    const prevScrollTop = container?.scrollTop ?? 0;
+    try {
+      const { data } = await supabase
+        .from("messages")
+        .select("*, profiles(*), reactions(*)")
+        .eq("channel_id", channel.id)
+        .lt("created_at", oldest.created_at)
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (!data || data.length === 0) {
+        setHasMoreOlder(false);
+      } else {
+        const additions = (data as MessageWithProfile[]).slice().reverse();
+        setMessages((prev) => {
+          const existingIds = new Set(prev.map((m) => m.id));
+          const fresh = additions.filter((m) => !existingIds.has(m.id));
+          return [...fresh, ...prev];
+        });
+        if (data.length < 50) setHasMoreOlder(false);
+        if (!channel.is_hitorigoto) {
+          requestAnimationFrame(() => {
+            if (!container) return;
+            const newScrollHeight = container.scrollHeight;
+            container.scrollTop = newScrollHeight - prevScrollHeight + prevScrollTop;
+          });
+        }
+      }
+    } finally {
+      setLoadingOlder(false);
+    }
+  }, [channel.id, channel.is_hitorigoto, loadingOlder, supabase]);
+
+  const loadMoreOlderButton = (
+    <div className="flex justify-center my-4">
+      <button
+        type="button"
+        onClick={handleLoadOlder}
+        disabled={loadingOlder}
+        className="px-4 py-2 text-xs rounded-full border border-border bg-sidebar hover:bg-sidebar-hover transition-colors text-muted disabled:opacity-50"
+      >
+        {loadingOlder
+          ? "読み込み中…"
+          : channel.is_hitorigoto
+            ? "もっと前のつぶやきを読む"
+            : "もっと前のメッセージを読み込む"}
+      </button>
+    </div>
+  );
 
   // ヘッダタップで最上部までスムーススクロール (iOS のステータスバータップ挙動の代替)
   // ボタン (戻る・メニュー等) を押したときは bubbling 経由で来るのでスキップする
@@ -1370,60 +1437,9 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
 
         {/* メッセージ一覧 */}
         <div ref={scrollContainerRef} className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-4">
-          {/* もっと前のメッセージを読み込むボタン（最上部） */}
-          {messages.length > 0 && hasMoreOlder && (
-            <div className="flex justify-center mb-4">
-              <button
-                type="button"
-                onClick={async () => {
-                  if (loadingOlder) return;
-                  const oldest = messages[0];
-                  if (!oldest) return;
-                  setLoadingOlder(true);
-                  // スクロール位置を維持するため、現在のスクロール高さを保存
-                  const container = scrollContainerRef.current;
-                  const prevScrollHeight = container?.scrollHeight ?? 0;
-                  const prevScrollTop = container?.scrollTop ?? 0;
-                  try {
-                    const { data } = await supabase
-                      .from("messages")
-                      .select("*, profiles(*), reactions(*)")
-                      .eq("channel_id", channel.id)
-                      .lt("created_at", oldest.created_at)
-                      .is("deleted_at", null)
-                      .order("created_at", { ascending: false })
-                      .limit(50);
-                    if (!data || data.length === 0) {
-                      setHasMoreOlder(false);
-                    } else {
-                      const additions = (data as MessageWithProfile[])
-                        .slice()
-                        .reverse();
-                      setMessages((prev) => {
-                        const existingIds = new Set(prev.map((m) => m.id));
-                        const fresh = additions.filter((m) => !existingIds.has(m.id));
-                        return [...fresh, ...prev];
-                      });
-                      if (data.length < 50) setHasMoreOlder(false);
-                      // 新しい古いメッセージが上に追加されたぶんだけスクロール位置を補正して
-                      // 見た目の表示位置をキープする
-                      requestAnimationFrame(() => {
-                        if (!container) return;
-                        const newScrollHeight = container.scrollHeight;
-                        container.scrollTop = newScrollHeight - prevScrollHeight + prevScrollTop;
-                      });
-                    }
-                  } finally {
-                    setLoadingOlder(false);
-                  }
-                }}
-                disabled={loadingOlder}
-                className="px-4 py-2 text-xs rounded-full border border-border bg-sidebar hover:bg-sidebar-hover transition-colors text-muted disabled:opacity-50"
-              >
-                {loadingOlder ? "読み込み中…" : "もっと前のメッセージを読み込む"}
-              </button>
-            </div>
-          )}
+          {/* 通常チャンネルは最上部 (上に行くほど過去)、独り言は最下部 (下に行くほど過去)
+              に「もっと前を読み込む」ボタンを置く。下の独り言ブロック末尾でも同じボタンを使う */}
+          {messages.length > 0 && hasMoreOlder && !channel.is_hitorigoto && loadMoreOlderButton}
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-muted">
               {channel.is_hitorigoto ? (
@@ -1442,16 +1458,19 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
               )}
             </div>
           ) : channel.is_hitorigoto ? (
-            /* 独り言: Twitter/Threads風カード表示（トップレベルのみ） */
+            /* 独り言: X / Threads 風 (最新が上) のカード表示 */
             <div>
               {(() => {
-                const topLevel = messages.filter((m) => !m.deleted_at && !m.parent_id);
+                // 配列上は ASC のまま保ち、表示時だけ reverse して最新を上にする
+                const topLevel = messages
+                  .filter((m) => !m.deleted_at && !m.parent_id)
+                  .slice()
+                  .reverse();
                 return topLevel.map((message, index, arr) => {
                   const prev = index > 0 ? arr[index - 1] : null;
                   const currentDate = new Date(message.created_at).toDateString();
                   const prevDate = prev ? new Date(prev.created_at).toDateString() : null;
                   const showDateSeparator = !prev || currentDate !== prevDate;
-                  const replyCount = messages.filter((m) => m.parent_id === message.id && !m.deleted_at).length;
 
                   return (
                     <div key={message.id} className="group">
@@ -1468,6 +1487,8 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                   );
                 });
               })()}
+              {/* 独り言は最新が上なので、もっと前のつぶやきは下にスクロールして読む */}
+              {hasMoreOlder && loadMoreOlderButton}
             </div>
           ) : (
             <div>
