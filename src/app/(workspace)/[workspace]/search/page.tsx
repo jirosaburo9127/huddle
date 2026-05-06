@@ -117,7 +117,7 @@ export default function SearchPage() {
             {results.map((r) => (
               <Link
                 key={r.id}
-                href={`/${params.workspace}/${r.channel_slug}`}
+                href={`/${params.workspace}/${r.channel_slug}?m=${r.id}`}
                 className="block px-4 py-3 border-b border-border/30 hover:bg-white/[0.02] transition-colors"
               >
                 <div className="flex items-center gap-2 mb-1">
