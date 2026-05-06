@@ -1458,36 +1458,26 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
               )}
             </div>
           ) : channel.is_hitorigoto ? (
-            /* 独り言: X / Threads 風 (最新が上) のカード表示 */
+            /* 独り言: X / Threads 風 (最新が上) のカード表示。
+               日付セパレータは出さず、各カード内の相対時間 (3分前 / 2時間前 / 5月4日 等)
+               だけで時系列を示す */
             <div>
               {(() => {
-                // 配列上は ASC のまま保ち、表示時だけ reverse して最新を上にする
                 const topLevel = messages
                   .filter((m) => !m.deleted_at && !m.parent_id)
                   .slice()
                   .reverse();
-                return topLevel.map((message, index, arr) => {
-                  const prev = index > 0 ? arr[index - 1] : null;
-                  const currentDate = new Date(message.created_at).toDateString();
-                  const prevDate = prev ? new Date(prev.created_at).toDateString() : null;
-                  const showDateSeparator = !prev || currentDate !== prevDate;
-
-                  return (
-                    <div key={message.id} className="group">
-                      {showDateSeparator && (
-                        <DateSeparator date={message.created_at} />
-                      )}
-                      <HitorigotoPostCard
-                        message={message}
-                        currentUserId={currentUserId}
-                        onDelete={handleDelete}
-                        hasPoll={pollMessageIds.has(message.id)}
-                      />
-                    </div>
-                  );
-                });
+                return topLevel.map((message) => (
+                  <div key={message.id} className="group">
+                    <HitorigotoPostCard
+                      message={message}
+                      currentUserId={currentUserId}
+                      onDelete={handleDelete}
+                      hasPoll={pollMessageIds.has(message.id)}
+                    />
+                  </div>
+                ));
               })()}
-              {/* 独り言は最新が上なので、もっと前のつぶやきは下にスクロールして読む */}
               {hasMoreOlder && loadMoreOlderButton}
             </div>
           ) : (
