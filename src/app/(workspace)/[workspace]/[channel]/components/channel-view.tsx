@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { RealtimePostgresInsertPayload, RealtimePostgresUpdatePayload } from "@supabase/supabase-js";
 import type { Channel, Message, MessageWithProfile, Reaction } from "@/lib/supabase/types";
@@ -67,6 +67,11 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
   const [mikanEnabled, setMikanEnabled] = useState<boolean>(!!channel.mikan_enabled);
   const overflowMenuRef = useRef<HTMLDivElement>(null);
   const prevMessageCountRef = useRef(initialMessages.length);
+  // 末尾メッセージ id を覚えておき、変化したときだけ「append された」と判定する。
+  // prepend (もっと前を読み込む) では末尾 id は変わらないので最下部スクロールを抑制できる。
+  const prevLastMessageIdRef = useRef<string | null>(
+    initialMessages.length > 0 ? initialMessages[initialMessages.length - 1].id : null
+  );
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const syncMissedRef = useRef<(() => void) | null>(null);
   const supabaseRef = useRef(createClient());
@@ -412,6 +417,14 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
     if (el) el.scrollTop = el.scrollHeight;
   }, []);
 
+  // ヘッダタップで最上部までスムーススクロール (iOS のステータスバータップ挙動の代替)
+  // ボタン (戻る・メニュー等) を押したときは bubbling 経由で来るのでスキップする
+  const handleHeaderTap = useCallback((e: ReactMouseEvent<HTMLElement>) => {
+    if ((e.target as HTMLElement).closest("button, a, [role=menu], input")) return;
+    const el = scrollContainerRef.current;
+    if (el) el.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
+
   // 未読区切り線または最下部にスクロール
   const scrollToUnreadOrBottom = useCallback(() => {
     const unreadEl = unreadLineRef.current;
@@ -491,15 +504,19 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
     return () => { armed = false; clearTimeout(waitAndScroll); clearTimeout(timer); observer.disconnect(); };
   }, [channel.id, channel.is_hitorigoto, initialMessages.length, scrollToBottom]);
 
-  // メッセージ増加時: DOM 更新後に即座に最下部へ
+  // メッセージ追加時: DOM 更新後に即座に最下部へ
+  // ただし「もっと前を読み込む」での prepend は末尾 id が変わらないので除外する。
+  // (これを区別しないと、古いメッセージを追加した直後に画面が最下部へ飛ばされる)
   useEffect(() => {
-    if (messages.length > prevMessageCountRef.current) {
-      if (!jumpActiveRef.current) {
-        requestAnimationFrame(scrollToBottom);
-      }
+    const lastId = messages.length > 0 ? messages[messages.length - 1].id : null;
+    const grew = messages.length > prevMessageCountRef.current;
+    const lastChanged = lastId !== prevLastMessageIdRef.current;
+    if (grew && lastChanged && !jumpActiveRef.current) {
+      requestAnimationFrame(scrollToBottom);
     }
     prevMessageCountRef.current = messages.length;
-  }, [messages.length, scrollToBottom]);
+    prevLastMessageIdRef.current = lastId;
+  }, [messages, scrollToBottom]);
 
   // Realtime購読
   useEffect(() => {
@@ -1061,7 +1078,10 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
       {/* チャンネルエリア */}
       <div className="flex flex-col h-full flex-1 min-w-0">
         {/* チャンネルヘッダー */}
-        <header className="flex items-center gap-2 px-3 sm:px-4 py-3 lg:py-0 lg:h-14 border-b border-border bg-header shrink-0">
+        <header
+          onClick={handleHeaderTap}
+          className="flex items-center gap-2 px-3 sm:px-4 py-3 lg:py-0 lg:h-14 border-b border-border bg-header shrink-0 cursor-pointer"
+        >
           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
             {/* モバイル戻るボタン */}
             <button
