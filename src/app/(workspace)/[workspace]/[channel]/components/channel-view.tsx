@@ -555,6 +555,11 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
     const container = scrollContainerRef.current;
     if (!container) return () => clearTimeout(waitAndScroll);
     let armed = true;
+    const disarm = () => {
+      if (!armed) return;
+      armed = false;
+      observer.disconnect();
+    };
     const observer = new ResizeObserver(() => {
       if (armed && !jumpActiveRef.current) {
         const unreadEl = unreadLineRef.current;
@@ -567,9 +572,21 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
     });
     const inner = container.firstElementChild;
     if (inner) observer.observe(inner);
-    const timer = setTimeout(() => { armed = false; observer.disconnect(); }, armedDurationMs);
-    return () => { armed = false; clearTimeout(waitAndScroll); clearTimeout(timer); observer.disconnect(); };
-  }, [channel.id, channel.is_hitorigoto, initialMessages.length, scrollToBottom]);
+    // ユーザが手で操作した瞬間に自動スクロール追従を止める
+    // (画像ロード後のレイアウトシフトで勝手にトップ/最下部に戻されないように)
+    container.addEventListener("wheel", disarm, { passive: true });
+    container.addEventListener("touchmove", disarm, { passive: true });
+    container.addEventListener("keydown", disarm);
+    const timer = setTimeout(disarm, armedDurationMs);
+    return () => {
+      clearTimeout(waitAndScroll);
+      clearTimeout(timer);
+      container.removeEventListener("wheel", disarm);
+      container.removeEventListener("touchmove", disarm);
+      container.removeEventListener("keydown", disarm);
+      disarm();
+    };
+  }, [channel.id, channel.is_hitorigoto, initialMessages.length, scrollToBottom, scrollToUnreadOrBottom]);
 
   // メッセージ追加時: DOM 更新後に即座に最下部へ
   // ただし「もっと前を読み込む」での prepend は末尾 id が変わらないので除外する。
