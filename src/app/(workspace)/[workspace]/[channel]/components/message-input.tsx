@@ -12,17 +12,68 @@ const MAX_FILE_SIZE = 50 * 1024 * 1024;
 // 許可するMIMEタイプ
 // SVG はスクリプト埋め込み可能で XSS ベクトルなので除外する
 const ALLOWED_MIME_TYPES = [
+  // 画像
   "image/jpeg", "image/png", "image/gif", "image/webp",
+  "image/heic", "image/heif", "image/bmp", "image/tiff",
+  // 動画
   "video/mp4", "video/quicktime", "video/webm", "video/x-m4v",
+  // 音声
+  "audio/mpeg", "audio/wav", "audio/x-wav", "audio/mp4", "audio/x-m4a", "audio/aac", "audio/ogg",
+  // PDF / Office
   "application/pdf",
   "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "application/vnd.ms-powerpoint", "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  "text/plain", "text/csv",
+  // Apple iWork
+  "application/vnd.apple.pages", "application/vnd.apple.numbers", "application/vnd.apple.keynote",
+  // テキスト系 (HTML は XSS リスクのため意図的に除外)
+  "text/plain", "text/csv", "text/markdown", "application/x-yaml", "text/yaml",
+  // 圧縮
   "application/zip", "application/x-zip-compressed",
+  "application/vnd.rar", "application/x-rar-compressed",
+  "application/x-7z-compressed",
+  "application/x-tar",
+  "application/gzip",
+  // データ
   "application/json", "application/xml", "text/xml",
+  // カレンダー
   "text/calendar",
+  // 電子書籍
+  "application/epub+zip", "application/x-mobipocket-ebook",
+  // 地図
+  "application/vnd.google-earth.kml+xml", "application/gpx+xml",
 ];
+
+// 拡張子から MIME type を補完するマップ。
+// iOS Safari / Android Chrome 等で MIME type が空 / octet-stream で来るブラウザに備える。
+const EXTENSION_TO_MIME: Record<string, string> = {
+  ".ics": "text/calendar",
+  ".heic": "image/heic",
+  ".heif": "image/heif",
+  ".bmp": "image/bmp",
+  ".tif": "image/tiff",
+  ".tiff": "image/tiff",
+  ".mp3": "audio/mpeg",
+  ".wav": "audio/wav",
+  ".m4a": "audio/mp4",
+  ".aac": "audio/aac",
+  ".ogg": "audio/ogg",
+  ".pages": "application/vnd.apple.pages",
+  ".numbers": "application/vnd.apple.numbers",
+  ".key": "application/vnd.apple.keynote",
+  ".md": "text/markdown",
+  ".markdown": "text/markdown",
+  ".yaml": "application/x-yaml",
+  ".yml": "application/x-yaml",
+  ".rar": "application/vnd.rar",
+  ".7z": "application/x-7z-compressed",
+  ".tar": "application/x-tar",
+  ".gz": "application/gzip",
+  ".epub": "application/epub+zip",
+  ".mobi": "application/x-mobipocket-ebook",
+  ".kml": "application/vnd.google-earth.kml+xml",
+  ".gpx": "application/gpx+xml",
+};
 
 // ブロックする危険な拡張子
 const BLOCKED_EXTENSIONS = [
@@ -599,13 +650,16 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
   }
 
   async function uploadFile(file: File) {
-    // iOS Safari や一部のブラウザで .ics の MIME type が空 or octet-stream になる
-    // ことがあるので、拡張子から text/calendar に正規化する
-    if (
-      (file.type === "" || file.type === "application/octet-stream") &&
-      file.name.toLowerCase().endsWith(".ics")
-    ) {
-      file = new File([file], file.name, { type: "text/calendar" });
+    // ブラウザによって MIME type が空 / octet-stream で来ることがあるので
+    // 拡張子から推測した MIME type に差し替える
+    if (file.type === "" || file.type === "application/octet-stream") {
+      const lower = file.name.toLowerCase();
+      for (const [ext, mime] of Object.entries(EXTENSION_TO_MIME)) {
+        if (lower.endsWith(ext)) {
+          file = new File([file], file.name, { type: mime });
+          break;
+        }
+      }
     }
 
     // ファイルサイズチェック
@@ -1057,7 +1111,7 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
           multiple
           className="hidden"
           onChange={handleFileSelect}
-          accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip,.json,.xml,.ics,text/calendar"
+          accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.md,.markdown,.yaml,.yml,.zip,.rar,.7z,.tar,.gz,.json,.xml,.ics,.heic,.heif,.bmp,.tif,.tiff,.pages,.numbers,.key,.epub,.mobi,.kml,.gpx,text/calendar,text/markdown,application/x-yaml"
         />
 
         {/* 入力欄行 */}

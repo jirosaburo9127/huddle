@@ -34,16 +34,54 @@ const SIGNATURES: MagicSignature[] = [
   { mime: "application/vnd.ms-powerpoint", signature: [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1] },
 ];
 
-// プレーンテキスト系（text/*, application/json, application/xml, text/xml, text/csv）は
-// マジックバイトが存在しないので内容検証を免除する。代わりに拡張子・MIME ホワイトリスト
-// と実行ファイル拡張子ブロックに頼る。
+// マジックバイト検証を免除する MIME 集合。
+//
+// 含まれるもの:
+//  1. プレーンテキスト系 (text/* / json / xml / yaml / markdown / kml / gpx 等)
+//     → そもそもマジックバイトが存在しない
+//  2. 音声系 / iWork / 圧縮 (RAR/7z/tar/gz) / 電子書籍 / HEIC/BMP/TIFF など
+//     → SIGNATURES に登録しても良いが、Office (ZIP) と被ったり offset 計算が
+//       入ったり整備コストが見合わないため検証免除。代わりに ALLOWED_MIME_TYPES
+//       と BLOCKED_EXTENSIONS (.exe/.sh/.bat 等) で実害を防ぐ。
 const TEXT_LIKE_MIMES = new Set([
+  // プレーンテキスト
   "text/plain",
   "text/csv",
+  "text/markdown",
   "application/json",
   "application/xml",
   "text/xml",
+  "application/x-yaml",
+  "text/yaml",
   "text/calendar",
+  "application/vnd.google-earth.kml+xml",
+  "application/gpx+xml",
+  // 音声 (バリエーション豊富で SIGNATURES での厳格検証コストが見合わない)
+  "audio/mpeg",
+  "audio/wav",
+  "audio/x-wav",
+  "audio/mp4",
+  "audio/x-m4a",
+  "audio/aac",
+  "audio/ogg",
+  // 画像系の追加分
+  "image/heic",
+  "image/heif",
+  "image/bmp",
+  "image/tiff",
+  // Apple iWork (中身は ZIP だが既存 ZIP magic と完全に被るので個別検証しない)
+  "application/vnd.apple.pages",
+  "application/vnd.apple.numbers",
+  "application/vnd.apple.keynote",
+  // 圧縮の追加分
+  "application/vnd.rar",
+  "application/x-rar-compressed",
+  "application/x-7z-compressed",
+  "application/x-tar",
+  "application/gzip",
+  // 電子書籍
+  "application/epub+zip",
+  "application/x-mobipocket-ebook",
 ]);
 
 function matchesSignature(bytes: Uint8Array, sig: MagicSignature): boolean {
