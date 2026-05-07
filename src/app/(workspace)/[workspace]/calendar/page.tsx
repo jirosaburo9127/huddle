@@ -127,7 +127,7 @@ export default function CalendarPage() {
   const [editDeleting, setEditDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  // 外部カレンダー購読モーダル
+  // 外部カレンダー連携モーダル
   const [showSubscribeModal, setShowSubscribeModal] = useState(false);
   const [subscribeToken, setSubscribeToken] = useState<string | null>(null);
   const [subscribeLoading, setSubscribeLoading] = useState(false);
@@ -155,7 +155,7 @@ export default function CalendarPage() {
   }, [showSubscribeModal, subscribeToken]);
 
   async function rotateToken() {
-    if (!confirm("購読 URL を再発行すると、現在外部カレンダーに登録されている URL は無効になります。続行しますか？")) return;
+    if (!confirm("連携 URL を再発行すると、現在外部カレンダーに登録されている URL は無効になります。続行しますか？")) return;
     setSubscribeLoading(true);
     const supabase = createClient();
     const { data, error } = await supabase.rpc("rotate_user_calendar_token");
@@ -169,7 +169,7 @@ export default function CalendarPage() {
   const webcalUrl = origin && subscribeToken
     ? `webcal://${origin.replace(/^https?:\/\//, "")}/api/calendar/${subscribeToken}.ics`
     : "";
-  // Google カレンダーは cid= パラメータでの URL 購読に対応していないため、
+  // Google カレンダーは cid= パラメータでの URL 連携に対応していないため、
   // 「他のカレンダーを追加 > URL で追加」設定ページに直接遷移して
   // URL は事前にクリップボードへコピーしておく方式にする。
   const googleAddByUrl = "https://calendar.google.com/calendar/u/0/r/settings/addbyurl";
@@ -578,8 +578,8 @@ export default function CalendarPage() {
         <button
           onClick={() => setShowSubscribeModal(true)}
           className="p-2 text-muted hover:text-accent rounded-lg hover:bg-white/[0.04] transition-colors"
-          title="外部カレンダーで購読"
-          aria-label="外部カレンダーで購読"
+          title="外部カレンダーと連携"
+          aria-label="外部カレンダーと連携"
         >
           {/* external-link アイコン: 外部 (Apple/Google) カレンダーで開く意 */}
           <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -1170,7 +1170,7 @@ export default function CalendarPage() {
         </div>
       )}
 
-      {/* 外部カレンダー購読モーダル */}
+      {/* 外部カレンダー連携モーダル */}
       {showSubscribeModal && (
         <div
           className="fixed inset-0 z-[60] flex items-end lg:items-center justify-center"
@@ -1182,7 +1182,7 @@ export default function CalendarPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between">
-              <h3 className="font-bold text-lg">外部カレンダーで購読</h3>
+              <h3 className="font-bold text-lg">外部カレンダーと連携</h3>
               <button
                 onClick={() => setShowSubscribeModal(false)}
                 className="p-1 text-muted hover:text-foreground rounded transition-colors"
@@ -1204,7 +1204,7 @@ export default function CalendarPage() {
             ) : subscribeUrl ? (
               <>
                 <div className="space-y-2">
-                  <label className="text-xs text-muted block">購読 URL</label>
+                  <label className="text-xs text-muted block">連携 URL</label>
                   <div className="flex gap-2">
                     <input
                       readOnly
