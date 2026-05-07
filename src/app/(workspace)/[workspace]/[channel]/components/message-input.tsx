@@ -21,6 +21,7 @@ const ALLOWED_MIME_TYPES = [
   "text/plain", "text/csv",
   "application/zip", "application/x-zip-compressed",
   "application/json", "application/xml", "text/xml",
+  "text/calendar",
 ];
 
 // ブロックする危険な拡張子
@@ -598,6 +599,15 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
   }
 
   async function uploadFile(file: File) {
+    // iOS Safari や一部のブラウザで .ics の MIME type が空 or octet-stream になる
+    // ことがあるので、拡張子から text/calendar に正規化する
+    if (
+      (file.type === "" || file.type === "application/octet-stream") &&
+      file.name.toLowerCase().endsWith(".ics")
+    ) {
+      file = new File([file], file.name, { type: "text/calendar" });
+    }
+
     // ファイルサイズチェック
     if (file.size > MAX_FILE_SIZE) {
       setUploadError("ファイルサイズは10MB以下にしてください");
@@ -1047,7 +1057,7 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
           multiple
           className="hidden"
           onChange={handleFileSelect}
-          accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip,.json,.xml"
+          accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip,.json,.xml,.ics,text/calendar"
         />
 
         {/* 入力欄行 */}

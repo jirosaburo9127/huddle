@@ -43,6 +43,7 @@ const TEXT_LIKE_MIMES = new Set([
   "application/json",
   "application/xml",
   "text/xml",
+  "text/calendar",
 ]);
 
 function matchesSignature(bytes: Uint8Array, sig: MagicSignature): boolean {
