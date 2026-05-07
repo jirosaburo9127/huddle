@@ -169,27 +169,38 @@ export default function CalendarPage() {
   const webcalUrl = origin && subscribeToken
     ? `webcal://${origin.replace(/^https?:\/\//, "")}/api/calendar/${subscribeToken}.ics`
     : "";
-  const googleAddUrl = subscribeUrl
-    ? `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(subscribeUrl)}`
-    : "";
+  // Google カレンダーは cid= パラメータでの URL 購読に対応していないため、
+  // 「他のカレンダーを追加 > URL で追加」設定ページに直接遷移して
+  // URL は事前にクリップボードへコピーしておく方式にする。
+  const googleAddByUrl = "https://calendar.google.com/calendar/u/0/r/settings/addbyurl";
 
-  async function copySubscribeUrl() {
-    if (!subscribeUrl) return;
+  async function copyToClipboardWithFallback(text: string) {
     try {
-      await navigator.clipboard.writeText(subscribeUrl);
-      setSubscribeCopied(true);
-      setTimeout(() => setSubscribeCopied(false), 1500);
+      await navigator.clipboard.writeText(text);
     } catch {
-      // フォールバック: 旧い iOS / Safari など
       const ta = document.createElement("textarea");
-      ta.value = subscribeUrl;
+      ta.value = text;
       document.body.appendChild(ta);
       ta.select();
       document.execCommand("copy");
       document.body.removeChild(ta);
-      setSubscribeCopied(true);
-      setTimeout(() => setSubscribeCopied(false), 1500);
     }
+  }
+
+  async function copySubscribeUrl() {
+    if (!subscribeUrl) return;
+    await copyToClipboardWithFallback(subscribeUrl);
+    setSubscribeCopied(true);
+    setTimeout(() => setSubscribeCopied(false), 1500);
+  }
+
+  async function openGoogleAddByUrl() {
+    if (!subscribeUrl) return;
+    // 設定ページの URL 入力欄に貼り付けやすいよう、先に URL をコピーしておく
+    await copyToClipboardWithFallback(subscribeUrl);
+    setSubscribeCopied(true);
+    setTimeout(() => setSubscribeCopied(false), 1500);
+    window.open(googleAddByUrl, "_blank", "noopener,noreferrer");
   }
 
   // チャンネル選択ドロップダウン外クリックで閉じる (新規作成モーダル用)
@@ -1217,14 +1228,17 @@ export default function CalendarPage() {
                   >
                     📅 Apple カレンダーで開く
                   </a>
-                  <a
-                    href={googleAddUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button
+                    type="button"
+                    onClick={openGoogleAddByUrl}
                     className="block w-full text-center px-4 py-2.5 text-sm font-medium rounded-lg border border-border hover:bg-white/[0.04] transition-colors"
                   >
                     📅 Google カレンダーに追加
-                  </a>
+                  </button>
+                  <p className="text-xs text-muted leading-relaxed pl-1">
+                    Google を選ぶと URL がコピーされ、設定ページが開きます。
+                    開いたページの「URL」欄に貼り付けて追加してください。
+                  </p>
                 </div>
 
                 <div className="rounded-lg bg-accent/5 border border-accent/20 px-3 py-2 text-xs text-muted leading-relaxed">
