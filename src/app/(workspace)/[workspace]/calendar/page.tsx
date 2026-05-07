@@ -127,6 +127,71 @@ export default function CalendarPage() {
   const [editDeleting, setEditDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
+  // 外部カレンダー購読モーダル
+  const [showSubscribeModal, setShowSubscribeModal] = useState(false);
+  const [subscribeToken, setSubscribeToken] = useState<string | null>(null);
+  const [subscribeLoading, setSubscribeLoading] = useState(false);
+  const [subscribeCopied, setSubscribeCopied] = useState(false);
+  const [origin, setOrigin] = useState<string>("");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") setOrigin(window.location.origin);
+  }, []);
+
+  // モーダルを開いた時に token を取得 (なければ自動発行)
+  useEffect(() => {
+    if (!showSubscribeModal || subscribeToken) return;
+    let cancelled = false;
+    (async () => {
+      setSubscribeLoading(true);
+      const supabase = createClient();
+      const { data, error } = await supabase.rpc("ensure_user_calendar_token");
+      if (!cancelled) {
+        if (!error && typeof data === "string") setSubscribeToken(data);
+        setSubscribeLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [showSubscribeModal, subscribeToken]);
+
+  async function rotateToken() {
+    if (!confirm("購読 URL を再発行すると、現在外部カレンダーに登録されている URL は無効になります。続行しますか？")) return;
+    setSubscribeLoading(true);
+    const supabase = createClient();
+    const { data, error } = await supabase.rpc("rotate_user_calendar_token");
+    if (!error && typeof data === "string") setSubscribeToken(data);
+    setSubscribeLoading(false);
+  }
+
+  const subscribeUrl = origin && subscribeToken
+    ? `${origin}/api/calendar/${subscribeToken}.ics`
+    : "";
+  const webcalUrl = origin && subscribeToken
+    ? `webcal://${origin.replace(/^https?:\/\//, "")}/api/calendar/${subscribeToken}.ics`
+    : "";
+  const googleAddUrl = subscribeUrl
+    ? `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(subscribeUrl)}`
+    : "";
+
+  async function copySubscribeUrl() {
+    if (!subscribeUrl) return;
+    try {
+      await navigator.clipboard.writeText(subscribeUrl);
+      setSubscribeCopied(true);
+      setTimeout(() => setSubscribeCopied(false), 1500);
+    } catch {
+      // フォールバック: 旧い iOS / Safari など
+      const ta = document.createElement("textarea");
+      ta.value = subscribeUrl;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      setSubscribeCopied(true);
+      setTimeout(() => setSubscribeCopied(false), 1500);
+    }
+  }
+
   // チャンネル選択ドロップダウン外クリックで閉じる (新規作成モーダル用)
   useEffect(() => {
     if (!showChannelList) return;
@@ -499,6 +564,17 @@ export default function CalendarPage() {
         </button>
         <span className="mr-2 text-lg">📅</span>
         <h1 className="font-bold text-lg flex-1">カレンダー</h1>
+        <button
+          onClick={() => setShowSubscribeModal(true)}
+          className="p-2 text-muted hover:text-accent rounded-lg hover:bg-white/[0.04] transition-colors"
+          title="外部カレンダーで購読"
+          aria-label="外部カレンダーで購読"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 016.364 0M1.5 9.136a8.5 8.5 0 0112.728 0M5.5 13.5a.5.5 0 11-1 0 .5.5 0 011 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 14l4-4 4 4M7 18v-8" />
+          </svg>
+        </button>
         <button
           onClick={openCreate}
           className="p-2 text-muted hover:text-accent rounded-lg hover:bg-white/[0.04] transition-colors"
@@ -1079,6 +1155,98 @@ export default function CalendarPage() {
                 {editSaving ? "保存中..." : "保存"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 外部カレンダー購読モーダル */}
+      {showSubscribeModal && (
+        <div
+          className="fixed inset-0 z-[60] flex items-end lg:items-center justify-center"
+          onClick={() => setShowSubscribeModal(false)}
+        >
+          <div className="absolute inset-0 bg-black/50" />
+          <div
+            className="relative w-full lg:max-w-md rounded-t-2xl lg:rounded-2xl bg-sidebar border border-border p-5 space-y-4 max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-lg">外部カレンダーで購読</h3>
+              <button
+                onClick={() => setShowSubscribeModal(false)}
+                className="p-1 text-muted hover:text-foreground rounded transition-colors"
+                aria-label="閉じる"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <p className="text-sm text-muted leading-relaxed">
+              Apple カレンダー / Google カレンダー / Outlook で URL を登録すると、
+              Huddle の自分の予定 (作成 or 参加) が自動で同期されます。
+            </p>
+
+            {subscribeLoading && !subscribeToken ? (
+              <div className="text-center py-6 text-muted text-sm">読み込み中...</div>
+            ) : subscribeUrl ? (
+              <>
+                <div className="space-y-2">
+                  <label className="text-xs text-muted block">購読 URL</label>
+                  <div className="flex gap-2">
+                    <input
+                      readOnly
+                      value={subscribeUrl}
+                      onClick={(e) => (e.target as HTMLInputElement).select()}
+                      className="flex-1 min-w-0 px-3 py-2 text-xs rounded-lg border border-border bg-input-bg text-foreground font-mono"
+                    />
+                    <button
+                      onClick={copySubscribeUrl}
+                      className="shrink-0 px-3 py-2 text-xs font-medium rounded-lg bg-accent text-white hover:bg-accent-hover transition-colors"
+                    >
+                      {subscribeCopied ? "コピー済み ✓" : "コピー"}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <a
+                    href={webcalUrl}
+                    className="block w-full text-center px-4 py-2.5 text-sm font-medium rounded-lg border border-border hover:bg-white/[0.04] transition-colors"
+                  >
+                    📅 Apple カレンダーで開く
+                  </a>
+                  <a
+                    href={googleAddUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block w-full text-center px-4 py-2.5 text-sm font-medium rounded-lg border border-border hover:bg-white/[0.04] transition-colors"
+                  >
+                    📅 Google カレンダーに追加
+                  </a>
+                </div>
+
+                <div className="rounded-lg bg-accent/5 border border-accent/20 px-3 py-2 text-xs text-muted leading-relaxed">
+                  ※ Apple / Google カレンダーは数時間〜1日に1回しか同期しません (各社の仕様)。
+                  即時反映ではない点をご了承ください。
+                </div>
+
+                <div className="border-t border-border/50 pt-3">
+                  <button
+                    onClick={rotateToken}
+                    disabled={subscribeLoading}
+                    className="text-xs text-red-400 hover:text-red-300 hover:underline disabled:opacity-50 transition-colors"
+                  >
+                    URL を再発行する (古い URL を無効化)
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="text-center py-6 text-muted text-sm">
+                URL の取得に失敗しました
+              </div>
+            )}
           </div>
         </div>
       )}
