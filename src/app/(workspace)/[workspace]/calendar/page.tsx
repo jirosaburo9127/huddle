@@ -1195,8 +1195,8 @@ export default function CalendarPage() {
             </div>
 
             <p className="text-sm text-muted leading-relaxed">
-              Apple / Google カレンダーにこの URL を追加すると、Huddle の予定
-              (作成 or 参加) が外部カレンダー上にも表示されます。
+              Apple / Google / Outlook カレンダーなどにこの URL を追加すると、
+              Huddle の予定 (作成 or 参加) が外部カレンダー上にも表示されます。
             </p>
 
             {subscribeLoading && !subscribeToken ? (
