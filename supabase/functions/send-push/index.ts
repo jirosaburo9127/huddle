@@ -24,7 +24,10 @@ const APNS_HOST_SANDBOX = "api.sandbox.push.apple.com";
 const APNS_HOST_PRIMARY = APNS_ENV === "production" ? APNS_HOST_PRODUCTION : APNS_HOST_SANDBOX;
 const APNS_HOST_FALLBACK = APNS_ENV === "production" ? APNS_HOST_SANDBOX : APNS_HOST_PRODUCTION;
 
-// JWT は最大1時間有効。再生成コストを抑えるため50分キャッシュ
+// JWT は最大1時間有効。同一インスタンス内のメモリキャッシュ (50分)。
+// ただし Edge Function は cold start で頻繁に新インスタンス化されるため、
+// メモリキャッシュだけでは APNs の「20分以内の新規 JWT 発行は 429」を
+// すり抜けられない。なのでもう一段、apns_jwt_cache テーブルでも共有する。
 let cachedJwt: { token: string; expiresAt: number } | null = null;
 
 function base64UrlEncode(input: ArrayBuffer | string): string {
@@ -40,13 +43,15 @@ function base64UrlEncode(input: ArrayBuffer | string): string {
   return str.replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
 }
 
-async function getApnsJwt(): Promise<string> {
-  const now = Math.floor(Date.now() / 1000);
-  if (cachedJwt && cachedJwt.expiresAt > now + 60) {
-    return cachedJwt.token;
-  }
+// Supabase クライアント (JWT キャッシュテーブル参照用)。
+// 個別の Deno.serve ハンドラ内で createClient しているが、それより前に
+// グローバルで 1 回作って良い (キャッシュテーブルアクセス専用)。
+const apnsCacheClient = createClient(
+  Deno.env.get("SUPABASE_URL")!,
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+);
 
-  // .p8 (PKCS#8 PEM) を CryptoKey に変換
+async function generateNewJwt(now: number): Promise<string> {
   const pemContents = APNS_PRIVATE_KEY
     .replace(/-----BEGIN PRIVATE KEY-----/g, "")
     .replace(/-----END PRIVATE KEY-----/g, "")
@@ -59,7 +64,7 @@ async function getApnsJwt(): Promise<string> {
     binaryDer,
     { name: "ECDSA", namedCurve: "P-256" },
     false,
-    ["sign"]
+    ["sign"],
   );
 
   const header = { alg: "ES256", kid: APNS_KEY_ID };
@@ -72,12 +77,63 @@ async function getApnsJwt(): Promise<string> {
   const signature = await crypto.subtle.sign(
     { name: "ECDSA", hash: "SHA-256" },
     key,
-    new TextEncoder().encode(signingInput)
+    new TextEncoder().encode(signingInput),
   );
 
   const sigB64 = base64UrlEncode(signature);
-  const jwt = `${signingInput}.${sigB64}`;
-  cachedJwt = { token: jwt, expiresAt: now + 50 * 60 };
+  return `${signingInput}.${sigB64}`;
+}
+
+async function getApnsJwt(): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+
+  // L1: メモリキャッシュ (同一インスタンス内 warm 時)
+  if (cachedJwt && cachedJwt.expiresAt > now + 60) {
+    return cachedJwt.token;
+  }
+
+  // L2: DB キャッシュ (全 Edge Function インスタンス共有)
+  // APNs は同一プロバイダから 20 分以内に新規 JWT 発行すると 429 を返すため、
+  // cold start で毎回新規発行しないようにここで再利用する。
+  try {
+    const { data: cached } = await apnsCacheClient
+      .from("apns_jwt_cache")
+      .select("token, expires_at")
+      .eq("id", 1)
+      .maybeSingle();
+    if (cached?.token && cached.expires_at) {
+      const expiresAt = Math.floor(new Date(cached.expires_at).getTime() / 1000);
+      if (expiresAt > now + 60) {
+        cachedJwt = { token: cached.token, expiresAt };
+        return cached.token;
+      }
+    }
+  } catch (err) {
+    // DB 読み取りエラーでも JWT 生成にはフォールバックできる
+    // eslint-disable-next-line no-console
+    console.error("apns_jwt_cache read failed, falling back to fresh JWT:", err);
+  }
+
+  // 新規 JWT を発行して DB に保存
+  const jwt = await generateNewJwt(now);
+  const expiresAt = now + 50 * 60;
+  cachedJwt = { token: jwt, expiresAt };
+
+  try {
+    await apnsCacheClient
+      .from("apns_jwt_cache")
+      .upsert({
+        id: 1,
+        token: jwt,
+        expires_at: new Date(expiresAt * 1000).toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+  } catch (err) {
+    // DB 書き込みに失敗してもメモリキャッシュは残るので送信は続行する
+    // eslint-disable-next-line no-console
+    console.error("apns_jwt_cache write failed:", err);
+  }
+
   return jwt;
 }
 
