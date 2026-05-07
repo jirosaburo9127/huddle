@@ -13,6 +13,8 @@ export async function updateSession(request: NextRequest) {
   const isSharePage = request.nextUrl.pathname.startsWith("/share/");
   // LP / マーケティングページ
   const isMarketingPage = request.nextUrl.pathname === "/about";
+  // iCal 購読エンドポイント (Apple/Google/Outlook が token 付き URL で fetch する)
+  const isCalendarFeed = request.nextUrl.pathname.startsWith("/api/calendar/");
   const isStaticAsset =
     request.nextUrl.pathname.startsWith("/_next") ||
     request.nextUrl.pathname.startsWith("/favicon") ||
@@ -23,7 +25,7 @@ export async function updateSession(request: NextRequest) {
   if (isStaticAsset) return supabaseResponse;
 
   // 認証不要ページではSupabaseクライアント生成もスキップして即座にレスポンス
-  if (isAuthPage || isInvitePage || isSharePage || isMarketingPage) {
+  if (isAuthPage || isInvitePage || isSharePage || isMarketingPage || isCalendarFeed) {
     return supabaseResponse;
   }
 
