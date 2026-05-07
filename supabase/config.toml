@@ -401,6 +401,12 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 # 関数側でペイロードを検証する。
 verify_jwt = false
 
+[functions.archive-link]
+# Database Webhook (messages INSERT) から呼ばれる。webhook の auth
+# ヘッダ取り扱いは pg_net 同様に不安定なので verify_jwt 無効化して
+# 関数側でペイロード検証する。
+verify_jwt = false
+
 # [experimental.pgdelta]
 # When enabled, pg-delta becomes the active engine for supported schema flows.
 # enabled = false
