@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 type Props = {
   onSelect: (emoji: string) => void;
@@ -41,7 +41,8 @@ export function EmojiPicker({ onSelect, onClose, position = "below" }: Props) {
   }, [onClose]);
 
   // マウント直後に画面内に収まるよう水平位置を補正（左右どちらにはみ出しても対応）
-  useEffect(() => {
+  // DOM 測定後の補正なので useLayoutEffect でペイント前に反映し、ちらつきを防ぐ。
+  useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
@@ -50,6 +51,8 @@ export function EmojiPicker({ onSelect, onClose, position = "below" }: Props) {
     if (rect.left < margin) dx = margin - rect.left;
     else if (rect.right > window.innerWidth - margin)
       dx = window.innerWidth - margin - rect.right;
+    // setState in effect は意図的（DOM 測定→state→再レンダーが目的）
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (dx !== 0) setXOffset(dx);
   }, []);
 

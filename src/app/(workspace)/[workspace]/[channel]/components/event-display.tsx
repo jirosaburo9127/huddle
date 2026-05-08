@@ -51,6 +51,14 @@ export function EventDisplay({ messageId, currentUserId }: Props) {
   const [attendees, setAttendees] = useState<AttendeeProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  // Date.now() は impure なので lazy initializer 経由で初期化し、
+  // 1分ごとに更新して isPast の表示を切り替える
+  const [nowTick, setNowTick] = useState(() => Date.now());
+
+  useEffect(() => {
+    const interval = setInterval(() => setNowTick(Date.now()), 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -114,7 +122,7 @@ export function EventDisplay({ messageId, currentUserId }: Props) {
   if (!event) return null;
 
   const isAttending = event.attendee_ids.includes(currentUserId);
-  const isPast = new Date(event.start_at).getTime() < Date.now();
+  const isPast = new Date(event.start_at).getTime() < nowTick;
   const overflowCount = attendees.length - MAX_AVATARS;
 
   return (

@@ -21,10 +21,12 @@ type Props = {
 export function VideoThumbnail({ url, className, captureAt = 0.1 }: Props) {
   const ref = useRef<HTMLVideoElement | null>(null);
   // SSR/hydration では false（PC のフォールバック挙動）にしておき、
-  // mount 後に Capacitor 判定でネイティブのみ非表示化
+  // mount 後に Capacitor 判定でネイティブのみ非表示化。
+  // hydration mismatch を避けるため lazy initializer ではなく effect で読む
   const [hideForNative, setHideForNative] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (Capacitor.isNativePlatform()) setHideForNative(true);
   }, []);
 

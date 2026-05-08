@@ -1208,7 +1208,7 @@ export function Sidebar({
               );
             })()}
             {/* LP プレビュー（アプリ内から /about に直接ジャンプ） */}
-            <a
+            <Link
               href="/about"
               className="text-muted hover:text-foreground transition-colors p-1.5 rounded-lg hover:bg-white/[0.04] shrink-0"
               title="LPプレビュー"
@@ -1218,7 +1218,7 @@ export function Sidebar({
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3.6 9h16.8M3.6 15h16.8M11.25 3a17 17 0 000 18M12.75 3a17 17 0 010 18" />
               </svg>
-            </a>
+            </Link>
             <button
               onClick={() => setShowSettings(true)}
               className="text-muted hover:text-foreground transition-colors p-1.5 rounded-lg hover:bg-white/[0.04] shrink-0"
@@ -1777,11 +1777,14 @@ function ChannelCategoryList({
     all.add("__uncategorized__");
     return all;
   });
+  // localStorage は SSR で読めないため effect で読み込む。
+  // 初期値（全カテゴリ折りたたみ）から保存値へ同期する正当な外部システム読み取り
   useEffect(() => {
     try {
       const raw = localStorage.getItem(COLLAPSED_KEY);
       if (raw) {
         const arr = JSON.parse(raw);
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         if (Array.isArray(arr)) setCollapsed(new Set(arr));
       }
     } catch {

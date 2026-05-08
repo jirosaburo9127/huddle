@@ -76,6 +76,8 @@ export function ChannelMembersModal({
   }, [supabase, channelId, workspaceId]);
 
   useEffect(() => {
+    // Supabase からの非同期フェッチで setState する正当なケース
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchData();
   }, [fetchData]);
 

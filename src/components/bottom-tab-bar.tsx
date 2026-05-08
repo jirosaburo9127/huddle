@@ -29,11 +29,14 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
   // ただし初回マウント時は skip: ワークスペーストップ /ws-xxx でサイドバーを
   // 自動表示する WorkspaceLobby の setSidebarOpen(true) を打ち消してしまうため
   const initialMountRef = useRef(true);
+  // pathname 変化（外部のナビゲーション state）に同期して UI を閉じる。
+  // 派生 state では計算できないため effect 内で setState する正当なケース
   useEffect(() => {
     if (initialMountRef.current) {
       initialMountRef.current = false;
       return;
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setShowMore(false);
     setSidebarOpen(false);
   }, [pathname, setSidebarOpen]);

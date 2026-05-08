@@ -9,12 +9,15 @@ export function BackToAppBar() {
   //   (ブックマークやSNSリンクからの初回着地では「戻る」に意味がないので非表示)
   const [show, setShow] = useState(false);
 
+  // Capacitor 判定と history.length は SSR 不可なので effect で読む。
+  // hydration ミスマッチを避けるため初期値は false にし、mount 後に同期する
   useEffect(() => {
     if (typeof window === "undefined") return;
     // Capacitor 判定: WebView 環境では window.Capacitor が注入される
     const isCapacitor =
       typeof (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor !== "undefined";
     if (isCapacitor) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setShow(true);
       return;
     }

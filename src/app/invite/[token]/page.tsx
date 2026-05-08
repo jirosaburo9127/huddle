@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -119,12 +120,12 @@ export default function InvitePage() {
           <div className="rounded-lg bg-red-500/10 p-4 text-sm text-red-400">
             {error}
           </div>
-          <a
+          <Link
             href="/login"
             className="inline-block text-sm text-accent hover:underline"
           >
             ログインページへ
-          </a>
+          </Link>
         </div>
       </div>
     );

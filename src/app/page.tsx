@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { createWorkspace } from "@/lib/actions";
 
 export default async function HomePage({
@@ -79,12 +80,12 @@ export default async function HomePage({
         {/* 既存WSがある場合は戻るリンクを表示 */}
         {create === "true" && memberships && memberships.length > 0 && (
           <div className="text-center">
-            <a
+            <Link
               href="/"
               className="text-sm text-muted hover:text-accent transition-colors"
             >
               ← ワークスペースに戻る
-            </a>
+            </Link>
           </div>
         )}
       </div>

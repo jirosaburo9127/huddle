@@ -43,7 +43,9 @@ export function PollDisplay({ messageId, currentUserId, onMarkDecision }: Props)
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [voting, setVoting] = useState(false);
-  const [nowTick, setNowTick] = useState(Date.now());
+  // Date.now() は impure なので lazy initializer 経由で初期化する
+  // (render 中の直接呼び出しは react-hooks/purity 違反)
+  const [nowTick, setNowTick] = useState(() => Date.now());
 
   // 1分ごとに再描画して締切表示を更新
   useEffect(() => {
@@ -176,11 +178,10 @@ export function PollDisplay({ messageId, currentUserId, onMarkDecision }: Props)
     };
   }, [messageId]);
 
-  // 締切過ぎているか
-  const isPastDeadline = useMemo(() => {
-    if (!poll?.closes_at) return false;
-    return new Date(poll.closes_at).getTime() <= nowTick;
-  }, [poll?.closes_at, nowTick]);
+  // 締切過ぎているか（React Compiler が自動で memoize するため useMemo 不要）
+  const isPastDeadline = poll?.closes_at
+    ? new Date(poll.closes_at).getTime() <= nowTick
+    : false;
 
   const isActive = poll && !poll.is_closed && !isPastDeadline;
 
