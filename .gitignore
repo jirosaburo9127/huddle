@@ -37,6 +37,9 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# claude code app dev pack (contains test credentials)
+.claude-app-config.md
+
 # vercel
 .vercel
 
