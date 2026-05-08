@@ -6,8 +6,8 @@ import { verifyFileMagicBytes } from "@/lib/file-validation";
 import { scanForSensitiveData } from "@/lib/dlp-scan";
 import type { MessageWithProfile } from "@/lib/supabase/types";
 
-// ファイルサイズ上限: 50MB（動画対応）
-const MAX_FILE_SIZE = 50 * 1024 * 1024;
+// ファイルサイズ上限: 1GB（画面収録・長尺動画対応）
+const MAX_FILE_SIZE = 1024 * 1024 * 1024;
 
 // 許可するMIMEタイプ
 // SVG はスクリプト埋め込み可能で XSS ベクトルなので除外する
@@ -664,7 +664,7 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
 
     // ファイルサイズチェック
     if (file.size > MAX_FILE_SIZE) {
-      setUploadError("ファイルサイズは10MB以下にしてください");
+      setUploadError("ファイルサイズは1GB以下にしてください");
       return;
     }
 
