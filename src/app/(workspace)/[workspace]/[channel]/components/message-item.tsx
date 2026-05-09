@@ -687,7 +687,7 @@ export const MessageItem = memo(function MessageItem({
           message.status === "in_progress"
             ? "bg-blue-400/[0.06] hover:bg-blue-400/[0.1]"
             : isBot
-            ? "bg-[#fffbf2] hover:bg-[#fff5e2] border border-[#ffe7c4]"
+            ? "bg-[#fffefa] hover:bg-[#fff9ed] border border-[#ffe7c4]"
             : "hover:bg-white/[0.02]"
         }`}
         onClick={(e) => {
