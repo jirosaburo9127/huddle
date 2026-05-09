@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
@@ -45,10 +45,8 @@ export default function InProgressPage() {
   const [items, setItems] = useState<InProgressItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [completingId, setCompletingId] = useState<string | null>(null);
-  // 「完了にする」を 2 タップ確認方式にするための一時状態。
-  // 1 タップ目で confirmingId にセット → 3 秒で自動解除。2 タップ目で実行。
-  const [confirmingId, setConfirmingId] = useState<string | null>(null);
-  const confirmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 「完了にする」ボタン押下時の確認モーダル対象 item id
+  const [confirmTargetId, setConfirmTargetId] = useState<string | null>(null);
   // 失敗時の通知用。alert() はモバイル UX が悪いので画面内バナーで表示する。
   const [completionError, setCompletionError] = useState<string | null>(null);
   // チャンネルフィルタ: null = 全て
@@ -148,26 +146,10 @@ export default function InProgressPage() {
     return oldest.id;
   }, [filteredItems]);
 
-  async function handleComplete(itemId: string) {
-    if (completingId) return;
-
-    // 1 タップ目: 確認状態にして 3 秒で自動解除する。誤タップ事故を防ぐ。
-    if (confirmingId !== itemId) {
-      if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current);
-      setConfirmingId(itemId);
-      confirmTimerRef.current = setTimeout(() => {
-        setConfirmingId(null);
-        confirmTimerRef.current = null;
-      }, 3000);
-      return;
-    }
-
-    // 2 タップ目: 実行
-    if (confirmTimerRef.current) {
-      clearTimeout(confirmTimerRef.current);
-      confirmTimerRef.current = null;
-    }
-    setConfirmingId(null);
+  // 「完了にする」確認モーダルを実行する
+  async function executeComplete() {
+    const itemId = confirmTargetId;
+    if (!itemId || completingId) return;
     setCompletingId(itemId);
     setCompletionError(null);
 
@@ -177,6 +159,7 @@ export default function InProgressPage() {
       p_status: "done",
     });
     setCompletingId(null);
+    setConfirmTargetId(null);
     if (error) {
       setCompletionError("完了にできませんでした。もう一度お試しください。");
       // 4 秒で自動的に消す
@@ -185,13 +168,6 @@ export default function InProgressPage() {
     }
     setItems((prev) => prev.filter((item) => item.id !== itemId));
   }
-
-  // unmount 時にタイマーを片付ける
-  useEffect(() => {
-    return () => {
-      if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current);
-    };
-  }, []);
 
   return (
     <div className="flex flex-col h-full">
@@ -343,19 +319,11 @@ export default function InProgressPage() {
                   </span>
                   <button
                     type="button"
-                    onClick={() => handleComplete(item.id)}
+                    onClick={() => setConfirmTargetId(item.id)}
                     disabled={!!completingId}
-                    className={`rounded-lg border px-2.5 py-1 text-[12px] font-medium transition-colors disabled:opacity-50 ${
-                      confirmingId === item.id
-                        ? "border-blue-400 bg-blue-400/15 text-blue-200"
-                        : "border-blue-400/30 text-blue-300 hover:bg-blue-400/10"
-                    }`}
+                    className="rounded-lg border border-blue-400/30 px-2.5 py-1 text-[12px] font-medium text-blue-300 hover:bg-blue-400/10 disabled:opacity-50 transition-colors"
                   >
-                    {completingId === item.id
-                      ? "更新中..."
-                      : confirmingId === item.id
-                        ? "もう一度押すと完了"
-                        : "完了にする"}
+                    {completingId === item.id ? "更新中..." : "完了にする"}
                   </button>
                 </div>
               </div>
@@ -403,6 +371,47 @@ export default function InProgressPage() {
                 }}
                 onReorder={handleReorder}
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 完了確認モーダル */}
+      {confirmTargetId && (
+        <div
+          className="fixed inset-0 z-[60] flex items-end lg:items-center justify-center"
+          onClick={() => {
+            if (!completingId) setConfirmTargetId(null);
+          }}
+        >
+          <div className="absolute inset-0 bg-black/50" />
+          <div
+            className="relative w-full lg:max-w-sm rounded-t-2xl lg:rounded-2xl bg-sidebar border border-border p-5 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div>
+              <h3 className="font-bold text-base">この投稿を完了にしますか？</h3>
+              <p className="mt-1 text-sm text-muted leading-relaxed">
+                完了にすると、進行中の一覧からは消えます (完了済みからは確認できます)。
+              </p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmTargetId(null)}
+                disabled={!!completingId}
+                className="px-4 py-2 text-sm text-muted hover:text-foreground rounded-lg transition-colors disabled:opacity-50"
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                onClick={executeComplete}
+                disabled={!!completingId}
+                className="px-4 py-2 text-sm font-medium rounded-lg bg-accent text-white hover:bg-accent-hover transition-colors disabled:opacity-50"
+              >
+                {completingId ? "更新中..." : "完了にする"}
+              </button>
             </div>
           </div>
         </div>
