@@ -279,12 +279,14 @@ export function ActivityModal({ workspaceSlug, workspaceId, onClose }: Props) {
                     <Link
                       href={`/${workspaceSlug}/${a.channel_slug}?m=${a.message_id}`}
                       onClick={onClose}
-                      className={`flex items-start gap-3 px-4 py-3 transition-colors ${
-                        a.is_new
-                          ? "bg-[#fffbeb] hover:bg-[#fef3c7]"
-                          : "hover:bg-white/[0.04]"
-                      }`}
+                      className="relative flex items-start gap-3 px-4 py-3 hover:bg-white/[0.04] transition-colors"
                     >
+                      {a.is_new && (
+                        <span
+                          aria-label="新着"
+                          className="absolute top-3 right-3 w-2 h-2 rounded-full bg-red-500"
+                        />
+                      )}
                       <Avatar url={a.reactor_avatar} name={a.reactor_name} />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -323,12 +325,14 @@ export function ActivityModal({ workspaceSlug, workspaceId, onClose }: Props) {
                     <Link
                       href={`/${workspaceSlug}/${a.channel_slug}?m=${a.message_id}`}
                       onClick={onClose}
-                      className={`flex items-start gap-3 px-4 py-3 transition-colors ${
-                        a.is_new
-                          ? "bg-[#fffbeb] hover:bg-[#fef3c7]"
-                          : "hover:bg-white/[0.04]"
-                      }`}
+                      className="relative flex items-start gap-3 px-4 py-3 hover:bg-white/[0.04] transition-colors"
                     >
+                      {a.is_new && (
+                        <span
+                          aria-label="新着"
+                          className="absolute top-3 right-3 w-2 h-2 rounded-full bg-red-500"
+                        />
+                      )}
                       <Avatar url={a.author_avatar} name={a.author_name} />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -359,12 +363,14 @@ export function ActivityModal({ workspaceSlug, workspaceId, onClose }: Props) {
                   <Link
                     href={`/${workspaceSlug}/${a.channel_slug}?m=${a.parent_message_id}`}
                     onClick={onClose}
-                    className={`flex items-start gap-3 px-4 py-3 transition-colors ${
-                      a.is_new
-                        ? "bg-[#fffbeb] hover:bg-[#fef3c7]"
-                        : "hover:bg-white/[0.04]"
-                    }`}
+                    className="relative flex items-start gap-3 px-4 py-3 hover:bg-white/[0.04] transition-colors"
                   >
+                    {a.is_new && (
+                      <span
+                        aria-label="新着"
+                        className="absolute top-3 right-3 w-2 h-2 rounded-full bg-red-500"
+                      />
+                    )}
                     <Avatar url={a.replier_avatar} name={a.replier_name} />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
