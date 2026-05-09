@@ -139,15 +139,20 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // チャンネル情報 (DM / 独り言 除外、workspace 一致チェック)
+    // チャンネル情報 (DM / 独り言 / プライベート 除外、workspace 一致チェック)
     const { data: channel } = await supabase
       .from("channels")
-      .select("id, name, slug, is_dm, is_hitorigoto, workspace_id")
+      .select("id, name, slug, is_dm, is_hitorigoto, is_private, workspace_id")
       .eq("id", msg.channel_id)
       .maybeSingle();
     if (!channel) return new Response("channel not found", { status: 200 });
     if (channel.is_dm || channel.is_hitorigoto) {
       return new Response("dm or hitorigoto", { status: 200 });
+    }
+    // プライベートチャンネルは「招待されたメンバーだけが見られる」前提なので、
+    // その内容を全員が見える #みんなでお勉強 に転記すると情報漏洩になる
+    if (channel.is_private) {
+      return new Response("private channel", { status: 200 });
     }
 
     const { data: learningCh } = await supabase
@@ -157,6 +162,27 @@ Deno.serve(async (req) => {
       .maybeSingle();
     if (!learningCh || learningCh.workspace_id !== channel.workspace_id) {
       return new Response("different workspace", { status: 200 });
+    }
+
+    // 「#みんなでお勉強 の全メンバーが元チャンネルにも参加している」場合のみ転記。
+    // これが成り立っていないと、元チャンネルに参加していない人が #みんなでお勉強
+    // で投稿を見られてしまい、参加していないチャンネルの内容が漏れる。
+    const { data: learningMembers } = await supabase
+      .from("channel_members")
+      .select("user_id")
+      .eq("channel_id", LEARNING_CHANNEL_ID);
+    const { data: sourceMembers } = await supabase
+      .from("channel_members")
+      .select("user_id")
+      .eq("channel_id", msg.channel_id);
+    const sourceMemberIds = new Set(
+      (sourceMembers ?? []).map((r) => r.user_id as string),
+    );
+    const allLearningMembersInSource = (learningMembers ?? []).every((lm) =>
+      sourceMemberIds.has(lm.user_id as string),
+    );
+    if (!allLearningMembersInSource) {
+      return new Response("learning members not subset of source", { status: 200 });
     }
 
     const { data: profile } = await supabase
