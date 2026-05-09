@@ -1,10 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
 import { createClient } from "@/lib/supabase/client";
+import {
+  SortableChannelTabs,
+  loadChannelOrder,
+  saveChannelOrder,
+  applyChannelOrder,
+} from "@/components/sortable-channel-tabs";
 
 type StatusFilter = "in_progress" | "done" | "all";
 
@@ -53,6 +59,19 @@ export default function InProgressPage() {
   const [confirmTargetId, setConfirmTargetId] = useState<string | null>(null);
   // 失敗時の通知用。alert() はモバイル UX が悪いので画面内バナーで表示する。
   const [completionError, setCompletionError] = useState<string | null>(null);
+  // チャンネル別フィルタ: null = 全チャンネル
+  const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
+  // モバイルのフィルタボトムシート開閉
+  const [showFilter, setShowFilter] = useState(false);
+  // ユーザー定義のチャンネル並び順 (localStorage 保存)
+  const orderScope = `in-progress:${params.workspace}`;
+  const [channelOrder, setChannelOrder] = useState<string[]>(() =>
+    loadChannelOrder(orderScope),
+  );
+  function handleReorder(newOrder: string[]) {
+    setChannelOrder(newOrder);
+    saveChannelOrder(orderScope, newOrder);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -114,6 +133,25 @@ export default function InProgressPage() {
     })();
     return () => { cancelled = true; };
   }, [params.workspace, statusFilter]);
+
+  // チャンネル別の集計 (左サイドのタブ用)。デフォルトは件数順、
+  // ユーザのドラッグ並び替え結果を localStorage から適用する。
+  const channelFacets = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; count: number }>();
+    for (const it of items) {
+      if (!it.channel_id) continue;
+      const existing = map.get(it.channel_id);
+      if (existing) existing.count += 1;
+      else map.set(it.channel_id, { id: it.channel_id, name: it.channel_name, count: 1 });
+    }
+    const byCount = Array.from(map.values()).sort((a, b) => b.count - a.count);
+    return applyChannelOrder(byCount, channelOrder);
+  }, [items, channelOrder]);
+
+  const filteredItems = useMemo(() => {
+    if (!selectedChannelId) return items;
+    return items.filter((it) => it.channel_id === selectedChannelId);
+  }, [items, selectedChannelId]);
 
   // 「完了にする」確認モーダルを実行する
   async function executeComplete() {
@@ -188,11 +226,54 @@ export default function InProgressPage() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 sm:px-6 pt-4 pb-6 hide-scrollbar">
+      <div className="flex-1 flex min-h-0 overflow-hidden">
+        {/* 左サイド: 縦型チャンネルタブ (lg 以上) */}
+        {!loading && channelFacets.length > 0 && (
+          <aside className="hidden lg:flex flex-col w-56 shrink-0 border-r border-border overflow-y-auto hide-scrollbar p-2">
+            <SortableChannelTabs
+              items={channelFacets}
+              selectedId={selectedChannelId}
+              totalCount={items.length}
+              onSelect={setSelectedChannelId}
+              onReorder={handleReorder}
+            />
+          </aside>
+        )}
+
+        {/* 右側: 本文 */}
+        <div className="flex-1 min-w-0 overflow-y-auto px-4 sm:px-6 pt-4 pb-6 hide-scrollbar">
         <div className="max-w-3xl mx-auto">
           {completionError && (
             <div className="mb-3 rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2 text-sm text-red-300" role="alert">
               {completionError}
+            </div>
+          )}
+
+          {/* モバイル用フィルタチップ (lg 未満で表示) */}
+          {!loading && channelFacets.length > 0 && (
+            <div className="lg:hidden mb-3">
+              <button
+                type="button"
+                onClick={() => setShowFilter(true)}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.05] border border-border text-sm text-foreground hover:bg-white/[0.08] transition-colors max-w-full"
+              >
+                <svg className="w-3.5 h-3.5 text-muted shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                </svg>
+                <span className="truncate">
+                  {selectedChannelId
+                    ? `#${channelFacets.find((c) => c.id === selectedChannelId)?.name ?? ""}`
+                    : "全て"}
+                </span>
+                <span className="text-muted text-xs tabular-nums shrink-0">
+                  {selectedChannelId
+                    ? channelFacets.find((c) => c.id === selectedChannelId)?.count ?? 0
+                    : items.length}
+                </span>
+                <svg className="w-3 h-3 text-muted shrink-0" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
             </div>
           )}
 
@@ -212,8 +293,12 @@ export default function InProgressPage() {
                       : "進行中・完了済みの項目はありません"}
                 </p>
               </div>
+            ) : filteredItems.length === 0 ? (
+              <div className="text-center py-16 text-muted">
+                <p className="text-sm">このチャンネルの該当項目はありません</p>
+              </div>
             ) : (
-              items.map((item) => {
+              filteredItems.map((item) => {
                 const isDone = item.status === "done";
                 const cardClasses = isDone
                   ? "rounded-xl bg-white/[0.02] border border-border hover:bg-white/[0.04] transition-colors"
@@ -286,7 +371,50 @@ export default function InProgressPage() {
             )}
           </div>
         </div>
+        </div>
       </div>
+
+      {/* モバイル用フィルタボトムシート (lg 未満) */}
+      {showFilter && (
+        <div
+          className="lg:hidden fixed inset-0 z-50 bg-black/40 flex items-end animate-fade-in"
+          onClick={() => setShowFilter(false)}
+        >
+          <div
+            className="w-full bg-sidebar rounded-t-2xl max-h-[70vh] flex flex-col animate-slide-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">チャンネルで絞り込み</h3>
+                <p className="text-[11px] text-muted mt-0.5">行を長押しで並び替え</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowFilter(false)}
+                className="text-muted hover:text-foreground transition-colors"
+                aria-label="閉じる"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-2">
+              <SortableChannelTabs
+                items={channelFacets}
+                selectedId={selectedChannelId}
+                totalCount={items.length}
+                onSelect={(id) => {
+                  setSelectedChannelId(id);
+                  setShowFilter(false);
+                }}
+                onReorder={handleReorder}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 完了確認モーダル */}
       {confirmTargetId && (
