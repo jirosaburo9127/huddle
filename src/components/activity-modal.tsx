@@ -16,6 +16,7 @@ type ReactionActivity = {
   channel_id: string;
   channel_name: string;
   channel_slug: string;
+  is_new: boolean;
 };
 
 type MentionActivity = {
@@ -29,6 +30,7 @@ type MentionActivity = {
   channel_id: string;
   channel_name: string;
   channel_slug: string;
+  is_new: boolean;
 };
 
 type ReplyActivity = {
@@ -43,6 +45,7 @@ type ReplyActivity = {
   channel_id: string;
   channel_name: string;
   channel_slug: string;
+  is_new: boolean;
 };
 
 type Tab = "reactions" | "mentions" | "replies";
@@ -276,7 +279,11 @@ export function ActivityModal({ workspaceSlug, workspaceId, onClose }: Props) {
                     <Link
                       href={`/${workspaceSlug}/${a.channel_slug}?m=${a.message_id}`}
                       onClick={onClose}
-                      className="flex items-start gap-3 px-4 py-3 hover:bg-white/[0.04] transition-colors"
+                      className={`flex items-start gap-3 px-4 py-3 transition-colors ${
+                        a.is_new
+                          ? "bg-[#fffbeb] hover:bg-[#fef3c7]"
+                          : "hover:bg-white/[0.04]"
+                      }`}
                     >
                       <Avatar url={a.reactor_avatar} name={a.reactor_name} />
                       <div className="min-w-0 flex-1">
@@ -316,7 +323,11 @@ export function ActivityModal({ workspaceSlug, workspaceId, onClose }: Props) {
                     <Link
                       href={`/${workspaceSlug}/${a.channel_slug}?m=${a.message_id}`}
                       onClick={onClose}
-                      className="flex items-start gap-3 px-4 py-3 hover:bg-white/[0.04] transition-colors"
+                      className={`flex items-start gap-3 px-4 py-3 transition-colors ${
+                        a.is_new
+                          ? "bg-[#fffbeb] hover:bg-[#fef3c7]"
+                          : "hover:bg-white/[0.04]"
+                      }`}
                     >
                       <Avatar url={a.author_avatar} name={a.author_name} />
                       <div className="min-w-0 flex-1">
@@ -348,7 +359,11 @@ export function ActivityModal({ workspaceSlug, workspaceId, onClose }: Props) {
                   <Link
                     href={`/${workspaceSlug}/${a.channel_slug}?m=${a.parent_message_id}`}
                     onClick={onClose}
-                    className="flex items-start gap-3 px-4 py-3 hover:bg-white/[0.04] transition-colors"
+                    className={`flex items-start gap-3 px-4 py-3 transition-colors ${
+                      a.is_new
+                        ? "bg-[#fffbeb] hover:bg-[#fef3c7]"
+                        : "hover:bg-white/[0.04]"
+                    }`}
                   >
                     <Avatar url={a.replier_avatar} name={a.replier_name} />
                     <div className="min-w-0 flex-1">
