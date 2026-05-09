@@ -77,7 +77,7 @@ export default function AboutPage() {
               <br className="hidden sm:block" />
               ― 毎週のミーティングで飛び交うその一言を、アプリが終わらせます。
               <br className="hidden sm:block" />
-              チームの "ちゃんと" を、Huddleが代わりに覚えています。
+              チームの「ちゃんと」を、Huddleが代わりに覚えています。
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start items-center lp-fade-up lp-delay-300">
               <Link
@@ -373,7 +373,7 @@ export default function AboutPage() {
             <p className="mt-6 text-[#55555c] text-sm sm:text-base leading-relaxed max-w-2xl mx-auto">
               決定事項を安心して残せるように、
               <br className="hidden sm:block" />
-              "あって当たり前" のセキュリティ機能を最初から全部入れてあります。
+              「あって当たり前」のセキュリティ機能を最初から全部入れてあります。
             </p>
           </div>
 

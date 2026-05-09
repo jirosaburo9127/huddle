@@ -55,16 +55,22 @@ export default function SearchPage() {
     debounceRef.current = setTimeout(() => doSearch(value), 500);
   }
 
-  // コンテンツのハイライト表示
-  function highlightContent(content: string, q: string) {
+  // コンテンツのハイライト表示。
+  // 旧実装では文字列連結 + dangerouslySetInnerHTML を使っていたため、
+  // 本文に <script> 等の HTML 断片が含まれていると XSS になりえた。
+  // React 要素として返すことで、各 part は React が自動でエスケープし、
+  // <mark> だけが意図したタグとして残る安全な実装にする。
+  function renderHighlighted(content: string, q: string): React.ReactNode {
     if (!q.trim()) return content;
     const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const parts = content.split(new RegExp(`(${escaped})`, "gi"));
     return parts.map((part, i) =>
-      part.toLowerCase() === q.toLowerCase()
-        ? `<mark class="bg-accent/30 text-foreground rounded px-0.5">${part}</mark>`
-        : part
-    ).join("");
+      part.toLowerCase() === q.toLowerCase() ? (
+        <mark key={i} className="bg-accent/30 text-foreground rounded px-0.5">{part}</mark>
+      ) : (
+        <span key={i}>{part}</span>
+      )
+    );
   }
 
   return (
@@ -134,10 +140,9 @@ export default function SearchPage() {
                   </span>
                   <span className="text-xs text-accent ml-auto shrink-0">#{r.channel_name.length > 10 ? r.channel_name.slice(0, 10) + "…" : r.channel_name}</span>
                 </div>
-                <div
-                  className="text-sm text-foreground/80 line-clamp-2 break-words"
-                  dangerouslySetInnerHTML={{ __html: highlightContent(r.content.replace(/\n/g, " ").slice(0, 150), query) }}
-                />
+                <div className="text-sm text-foreground/80 line-clamp-2 break-words">
+                  {renderHighlighted(r.content.replace(/\n/g, " ").slice(0, 150), query)}
+                </div>
               </Link>
             ))}
           </div>
