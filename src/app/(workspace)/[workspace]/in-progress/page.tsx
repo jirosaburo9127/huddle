@@ -1,21 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
 import { createClient } from "@/lib/supabase/client";
-import {
-  SortableChannelTabs,
-  loadChannelOrder,
-  saveChannelOrder,
-  applyChannelOrder,
-} from "@/components/sortable-channel-tabs";
 
-type InProgressItem = {
+type StatusFilter = "in_progress" | "done" | "all";
+
+type StatusItem = {
   id: string;
   content: string;
   created_at: string;
+  status: "in_progress" | "done" | null;
   channel_id: string;
   channel_name: string;
   channel_slug: string;
@@ -39,112 +36,84 @@ function getAgeLabel(iso: string): string {
   return `${days}日経過`;
 }
 
+const FILTER_OPTIONS: { value: StatusFilter; label: string }[] = [
+  { value: "in_progress", label: "進行中" },
+  { value: "done", label: "完了済み" },
+  { value: "all", label: "全て" },
+];
+
 export default function InProgressPage() {
   const setSidebarOpen = useMobileNavStore((s) => s.setSidebarOpen);
   const params = useParams<{ workspace: string }>();
-  const [items, setItems] = useState<InProgressItem[]>([]);
+  const [items, setItems] = useState<StatusItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("in_progress");
   const [completingId, setCompletingId] = useState<string | null>(null);
   // 「完了にする」ボタン押下時の確認モーダル対象 item id
   const [confirmTargetId, setConfirmTargetId] = useState<string | null>(null);
   // 失敗時の通知用。alert() はモバイル UX が悪いので画面内バナーで表示する。
   const [completionError, setCompletionError] = useState<string | null>(null);
-  // チャンネルフィルタ: null = 全て
-  const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
-  // モバイルのフィルタボトムシート開閉
-  const [showFilter, setShowFilter] = useState(false);
-  // ユーザー定義の並び順 (localStorage 保存)
-  const orderScope = `in-progress:${params.workspace}`;
-  const [channelOrder, setChannelOrder] = useState<string[]>(() =>
-    loadChannelOrder(orderScope)
-  );
-  function handleReorder(newOrder: string[]) {
-    setChannelOrder(newOrder);
-    saveChannelOrder(orderScope, newOrder);
-  }
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
+      setLoading(true);
       const supabase = createClient();
-      // ワークスペースID取得
       const { data: ws } = await supabase
         .from("workspaces")
         .select("id")
         .eq("slug", params.workspace)
         .maybeSingle();
-      if (!ws) { setLoading(false); return; }
+      if (!ws) {
+        if (!cancelled) setLoading(false);
+        return;
+      }
 
-      const { data } = await supabase
+      let q = supabase
         .from("messages")
         .select(
-          "id, content, created_at, channels!inner(id, name, slug, workspace_id, is_dm), profiles!inner(display_name, avatar_url)"
+          "id, content, created_at, status, channels!inner(id, name, slug, workspace_id, is_dm), profiles!inner(display_name, avatar_url)",
         )
-        .eq("status", "in_progress")
         .is("deleted_at", null)
         .eq("channels.workspace_id", ws.id)
         .eq("channels.is_dm", false)
         .order("created_at", { ascending: false })
         .limit(100);
 
+      if (statusFilter === "all") {
+        q = q.in("status", ["in_progress", "done"]);
+      } else {
+        q = q.eq("status", statusFilter);
+      }
+
+      const { data } = await q;
+
+      if (cancelled) return;
       if (data) {
         setItems(
-          data.map((row: { id: string; content: string; created_at: string; channels: unknown; profiles: unknown }) => {
+          data.map((row: { id: string; content: string; created_at: string; status: "in_progress" | "done" | null; channels: unknown; profiles: unknown }) => {
             const ch = Array.isArray(row.channels) ? row.channels[0] : (row.channels as { id: string; name: string; slug: string });
             const p = Array.isArray(row.profiles) ? row.profiles[0] : (row.profiles as { display_name: string; avatar_url: string | null });
             return {
               id: row.id,
               content: row.content,
               created_at: row.created_at,
+              status: row.status,
               channel_id: ch?.id || "",
               channel_name: ch?.name || "",
               channel_slug: ch?.slug || "",
               sender_name: p?.display_name || "メンバー",
               sender_avatar: p?.avatar_url || null,
             };
-          })
+          }),
         );
+      } else {
+        setItems([]);
       }
       setLoading(false);
     })();
-  }, [params.workspace]);
-
-  // チャンネル別に集計（タブ表示用）
-  // デフォルトは件数の多い順、ユーザーがドラッグで並び替えるとそれが優先される
-  const channelFacets = useMemo(() => {
-    const map = new Map<string, { id: string; name: string; count: number }>();
-    for (const it of items) {
-      if (!it.channel_id) continue;
-      const existing = map.get(it.channel_id);
-      if (existing) existing.count += 1;
-      else map.set(it.channel_id, { id: it.channel_id, name: it.channel_name, count: 1 });
-    }
-    const byCount = Array.from(map.values()).sort((a, b) => b.count - a.count);
-    return applyChannelOrder(byCount, channelOrder);
-  }, [items, channelOrder]);
-
-  const filteredItems = useMemo(() => {
-    if (!selectedChannelId) return items;
-    return items.filter((it) => it.channel_id === selectedChannelId);
-  }, [items, selectedChannelId]);
-
-  const progressStats = useMemo(() => {
-    const oldestDays = items.reduce((max, item) => Math.max(max, getAgeDays(item.created_at)), 0);
-    const staleCount = items.filter((item) => getAgeDays(item.created_at) >= 7).length;
-    return { oldestDays, staleCount };
-  }, [items]);
-
-  // 表示順の中で「最も古い 1 件」だけを最古マーカー対象にする。
-  // 同日経過のカードが複数あったときに全部が「最古」表示になるのを防ぐ。
-  const oldestItemId = useMemo(() => {
-    if (filteredItems.length === 0) return null;
-    let oldest = filteredItems[0];
-    for (const item of filteredItems) {
-      if (new Date(item.created_at).getTime() < new Date(oldest.created_at).getTime()) {
-        oldest = item;
-      }
-    }
-    return oldest.id;
-  }, [filteredItems]);
+    return () => { cancelled = true; };
+  }, [params.workspace, statusFilter]);
 
   // 「完了にする」確認モーダルを実行する
   async function executeComplete() {
@@ -162,11 +131,19 @@ export default function InProgressPage() {
     setConfirmTargetId(null);
     if (error) {
       setCompletionError("完了にできませんでした。もう一度お試しください。");
-      // 4 秒で自動的に消す
       setTimeout(() => setCompletionError(null), 4000);
       return;
     }
-    setItems((prev) => prev.filter((item) => item.id !== itemId));
+    // 進行中タブ表示中は一覧から消す。完了済み / 全てタブ中はそのまま残し
+    // status を更新するだけにする (再表示時に正しい順序で並び替えされる)
+    setItems((prev) => {
+      if (statusFilter === "in_progress") {
+        return prev.filter((item) => item.id !== itemId);
+      }
+      return prev.map((item) =>
+        item.id === itemId ? { ...item, status: "done" as const } : item,
+      );
+    });
   }
 
   return (
@@ -191,190 +168,125 @@ export default function InProgressPage() {
         )}
       </header>
 
-      <div className="flex-1 flex min-h-0 overflow-hidden">
-        {/* 左サイド: 縦型チャンネルタブ (lg 以上) */}
-        {!loading && channelFacets.length > 0 && (
-          <aside className="hidden lg:flex flex-col w-56 shrink-0 border-r border-border overflow-y-auto hide-scrollbar p-2">
-            <SortableChannelTabs
-              items={channelFacets}
-              selectedId={selectedChannelId}
-              totalCount={items.length}
-              onSelect={setSelectedChannelId}
-              onReorder={handleReorder}
-            />
-          </aside>
-        )}
-
-        {/* 右側: 本文 */}
-        <div className="flex-1 min-w-0 overflow-y-auto px-4 sm:px-6 pt-4 pb-6 hide-scrollbar">
-          <div className="max-w-3xl mx-auto">
-            {completionError && (
-              <div className="mb-3 rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2 text-sm text-red-300" role="alert">
-                {completionError}
-              </div>
-            )}
-
-            {!loading && items.length > 0 && (
-              <div className="grid grid-cols-3 gap-2 mb-4">
-                <div className="rounded-xl border border-border bg-surface px-3 py-2">
-                  <div className="text-[11px] text-muted">進行中</div>
-                  <div className="mt-0.5 text-lg font-bold text-foreground tabular-nums">
-                    {items.length}
-                  </div>
-                </div>
-                <div className="rounded-xl border border-border bg-surface px-3 py-2">
-                  <div className="text-[11px] text-muted">チャンネル</div>
-                  <div className="mt-0.5 text-lg font-bold text-foreground tabular-nums">
-                    {channelFacets.length}
-                  </div>
-                </div>
-                <div className="rounded-xl border border-border bg-surface px-3 py-2">
-                  <div className="text-[11px] text-muted">7日以上</div>
-                  <div className={`mt-0.5 text-lg font-bold tabular-nums ${
-                    progressStats.staleCount > 0 ? "text-blue-400" : "text-foreground"
-                  }`}>
-                    {progressStats.staleCount}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* モバイル用フィルタチップ (lg 未満で表示) */}
-            {!loading && channelFacets.length > 0 && (
-              <div className="lg:hidden mb-3">
-                <button
-                  type="button"
-                  onClick={() => setShowFilter(true)}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.05] border border-border text-sm text-foreground hover:bg-white/[0.08] transition-colors max-w-full"
-                >
-                  <svg className="w-3.5 h-3.5 text-muted shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                  </svg>
-                  <span className="truncate">
-                    {selectedChannelId
-                      ? `#${channelFacets.find((c) => c.id === selectedChannelId)?.name ?? ""}`
-                      : "全て"}
-                  </span>
-                  <span className="text-muted text-xs tabular-nums shrink-0">
-                    {selectedChannelId
-                      ? channelFacets.find((c) => c.id === selectedChannelId)?.count ?? 0
-                      : items.length}
-                  </span>
-                  <svg className="w-3 h-3 text-muted shrink-0" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-              </div>
-            )}
-            <div className="space-y-3">
-          {loading ? (
-            <div className="text-center py-16 text-muted">読み込み中...</div>
-          ) : items.length === 0 ? (
-            <div className="text-center py-16 text-muted">
-              <svg className="w-12 h-12 mx-auto mb-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-              <p>進行中の項目はありません</p>
-            </div>
-          ) : filteredItems.length === 0 ? (
-            <div className="text-center py-16 text-muted">
-              <p className="text-sm">このチャンネルの進行中項目はありません</p>
-            </div>
-          ) : (
-            filteredItems.map((item) => (
-              <div
-                key={item.id}
-                className="rounded-xl bg-blue-400/[0.06] border border-blue-400/20 hover:bg-blue-400/[0.1] transition-colors"
-              >
-                <Link
-                  href={`/${params.workspace}/${item.channel_slug}?m=${item.id}`}
-                  className="block px-4 pt-3 pb-2"
-                >
-                  <div className="flex items-start gap-3">
-                    {item.sender_avatar ? (
-                      <img src={item.sender_avatar} alt="" className="w-8 h-8 rounded-full object-cover shrink-0 mt-0.5" />
-                    ) : (
-                      <div className="w-8 h-8 rounded-full bg-blue-400/20 flex items-center justify-center shrink-0 mt-0.5">
-                        <span className="text-xs font-bold text-blue-400">{item.sender_name[0]?.toUpperCase()}</span>
-                      </div>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm font-semibold text-foreground truncate max-w-[10em]">{item.sender_name.length > 10 ? item.sender_name.slice(0, 10) + "…" : item.sender_name}</span>
-                        <span className="text-xs text-muted shrink-0">{formatDate(item.created_at)}</span>
-                        <span className="text-xs text-muted truncate max-w-[10em]">#{item.channel_name.length > 10 ? item.channel_name.slice(0, 10) + "…" : item.channel_name}</span>
-                      </div>
-                      <div className="text-sm text-foreground whitespace-pre-wrap break-words line-clamp-3">
-                        {item.content}
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-                <div className="flex items-center justify-between gap-2 border-t border-blue-400/15 px-4 py-2">
-                  <span className={`text-[11px] font-medium ${
-                    getAgeDays(item.created_at) >= 7 ? "text-blue-300" : "text-muted"
-                  }`}>
-                    {getAgeLabel(item.created_at)}
-                    {item.id === oldestItemId && progressStats.oldestDays > 0 ? " ・最古" : ""}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setConfirmTargetId(item.id)}
-                    disabled={!!completingId}
-                    className="rounded-lg border border-blue-400/30 px-2.5 py-1 text-[12px] font-medium text-blue-300 hover:bg-blue-400/10 disabled:opacity-50 transition-colors"
-                  >
-                    {completingId === item.id ? "更新中..." : "完了にする"}
-                  </button>
-                </div>
-              </div>
-            ))
-          )}
-            </div>
-          </div>
+      {/* ステータス絞り込みタブ */}
+      <div className="border-b border-border bg-background shrink-0">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 flex gap-1">
+          {FILTER_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setStatusFilter(opt.value)}
+              className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
+                statusFilter === opt.value
+                  ? "border-blue-400 text-foreground"
+                  : "border-transparent text-muted hover:text-foreground"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* モバイル用フィルタボトムシート */}
-      {showFilter && (
-        <div
-          className="lg:hidden fixed inset-0 z-50 bg-black/40 flex items-end animate-fade-in"
-          onClick={() => setShowFilter(false)}
-        >
-          <div
-            className="w-full bg-sidebar rounded-t-2xl max-h-[70vh] flex flex-col animate-slide-up"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
-              <div>
-                <h3 className="text-sm font-semibold text-foreground">チャンネルで絞り込み</h3>
-                <p className="text-[11px] text-muted mt-0.5">行を長押しで並び替え</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowFilter(false)}
-                className="text-muted hover:text-foreground transition-colors"
-                aria-label="閉じる"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+      <div className="flex-1 overflow-y-auto px-4 sm:px-6 pt-4 pb-6 hide-scrollbar">
+        <div className="max-w-3xl mx-auto">
+          {completionError && (
+            <div className="mb-3 rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2 text-sm text-red-300" role="alert">
+              {completionError}
+            </div>
+          )}
+
+          <div className="space-y-3">
+            {loading ? (
+              <div className="text-center py-16 text-muted">読み込み中...</div>
+            ) : items.length === 0 ? (
+              <div className="text-center py-16 text-muted">
+                <svg className="w-12 h-12 mx-auto mb-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-2">
-              <SortableChannelTabs
-                items={channelFacets}
-                selectedId={selectedChannelId}
-                totalCount={items.length}
-                onSelect={(id) => {
-                  setSelectedChannelId(id);
-                  setShowFilter(false);
-                }}
-                onReorder={handleReorder}
-              />
-            </div>
+                <p>
+                  {statusFilter === "in_progress"
+                    ? "進行中の項目はありません"
+                    : statusFilter === "done"
+                      ? "完了済みの項目はありません"
+                      : "進行中・完了済みの項目はありません"}
+                </p>
+              </div>
+            ) : (
+              items.map((item) => {
+                const isDone = item.status === "done";
+                const cardClasses = isDone
+                  ? "rounded-xl bg-white/[0.02] border border-border hover:bg-white/[0.04] transition-colors"
+                  : "rounded-xl bg-blue-400/[0.06] border border-blue-400/20 hover:bg-blue-400/[0.1] transition-colors";
+                const footerBorder = isDone
+                  ? "border-t border-border/50"
+                  : "border-t border-blue-400/15";
+                const ageColor = isDone
+                  ? "text-muted"
+                  : getAgeDays(item.created_at) >= 7
+                    ? "text-blue-300"
+                    : "text-muted";
+                return (
+                  <div key={item.id} className={cardClasses}>
+                    <Link
+                      href={`/${params.workspace}/${item.channel_slug}?m=${item.id}`}
+                      className="block px-4 pt-3 pb-2"
+                    >
+                      <div className="flex items-start gap-3">
+                        {item.sender_avatar ? (
+                          <img src={item.sender_avatar} alt="" className="w-8 h-8 rounded-full object-cover shrink-0 mt-0.5" />
+                        ) : (
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
+                            isDone ? "bg-white/[0.06]" : "bg-blue-400/20"
+                          }`}>
+                            <span className={`text-xs font-bold ${isDone ? "text-muted" : "text-blue-400"}`}>
+                              {item.sender_name[0]?.toUpperCase()}
+                            </span>
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-sm font-semibold text-foreground truncate max-w-[10em]">{item.sender_name.length > 10 ? item.sender_name.slice(0, 10) + "…" : item.sender_name}</span>
+                            <span className="text-xs text-muted shrink-0">{formatDate(item.created_at)}</span>
+                            <span className="text-xs text-muted truncate max-w-[10em]">#{item.channel_name.length > 10 ? item.channel_name.slice(0, 10) + "…" : item.channel_name}</span>
+                          </div>
+                          <div className={`text-sm whitespace-pre-wrap break-words line-clamp-3 ${
+                            isDone ? "text-foreground/70" : "text-foreground"
+                          }`}>
+                            {item.content}
+                          </div>
+                        </div>
+                      </div>
+                    </Link>
+                    <div className={`flex items-center justify-between gap-2 px-4 py-2 ${footerBorder}`}>
+                      <span className={`text-[11px] font-medium ${ageColor}`}>
+                        {getAgeLabel(item.created_at)}
+                      </span>
+                      {isDone ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] text-muted">
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                          完了済み
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setConfirmTargetId(item.id)}
+                          disabled={!!completingId}
+                          className="rounded-lg border border-blue-400/30 px-2.5 py-1 text-[12px] font-medium text-blue-300 hover:bg-blue-400/10 disabled:opacity-50 transition-colors"
+                        >
+                          {completingId === item.id ? "更新中..." : "完了にする"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
-      )}
+      </div>
 
       {/* 完了確認モーダル */}
       {confirmTargetId && (
@@ -392,7 +304,7 @@ export default function InProgressPage() {
             <div>
               <h3 className="font-bold text-base">この投稿を完了にしますか？</h3>
               <p className="mt-1 text-sm text-muted leading-relaxed">
-                完了にすると、進行中の一覧からは消えます (完了済みからは確認できます)。
+                完了にすると進行中の一覧からは消え、「完了済み」タブから確認できます。
               </p>
             </div>
             <div className="flex justify-end gap-2">
