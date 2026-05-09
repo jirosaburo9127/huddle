@@ -681,14 +681,14 @@ export const MessageItem = memo(function MessageItem({
     <>
       <div
         id={`msg-${message.id}`}
-        className={`group relative flex gap-3 px-2 rounded-lg transition-colors ${
+        className={`group relative flex gap-3 px-2 transition-colors ${
           isConsecutive ? "py-1" : "pt-3 pb-1"
         } ${
           message.status === "in_progress"
-            ? "bg-blue-400/[0.06] hover:bg-blue-400/[0.1]"
+            ? "rounded-lg bg-blue-400/[0.06] hover:bg-blue-400/[0.1]"
             : isBot
-            ? "bg-[#fffefa] hover:bg-[#fff9ed] border border-[#ffe7c4]"
-            : "hover:bg-white/[0.02]"
+            ? "bg-[#fffefa] hover:bg-[#fff9ed]"
+            : "rounded-lg hover:bg-white/[0.02]"
         }`}
         onClick={(e) => {
           // テキストをドラッグ選択した直後の click は無視する
