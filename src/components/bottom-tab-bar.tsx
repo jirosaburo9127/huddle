@@ -18,6 +18,7 @@ type Props = {
 export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, members }: Props) {
   const pathname = usePathname();
   const setSidebarOpen = useMobileNavStore((s) => s.setSidebarOpen);
+  const messageInputFocused = useMobileNavStore((s) => s.messageInputFocused);
   const dmUnreadCount = useUnreadStore((s) => s.dmUnreadCount);
   const [showMore, setShowMore] = useState(false);
   const [showBookmark, setShowBookmark] = useState(false);
@@ -63,7 +64,12 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
 
   return (
     <>
-      <nav className="fixed bottom-0 left-0 right-0 z-[55] bg-sidebar border-t border-border lg:hidden safe-area-bottom">
+      <nav
+        className={`fixed bottom-0 left-0 right-0 z-[55] bg-sidebar border-t border-border lg:hidden safe-area-bottom transition-transform duration-150 ${
+          messageInputFocused ? "translate-y-full pointer-events-none" : "translate-y-0"
+        }`}
+        aria-hidden={messageInputFocused}
+      >
         <div className="flex items-center justify-around py-1 px-2">
           {/* ホーム */}
           <button

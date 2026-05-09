@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { verifyFileMagicBytes } from "@/lib/file-validation";
 import { scanForSensitiveData } from "@/lib/dlp-scan";
 import type { MessageWithProfile } from "@/lib/supabase/types";
+import { useMobileNavStore } from "@/stores/mobile-nav-store";
 
 // ファイルサイズ上限: 50MB（Supabase Free プランの Global file size limit が 50MB 固定のため）
 // Pro プラン移行時は Dashboard の「Global file size limit」を上げた後、こことバケット側 file_size_limit も再設定する
@@ -179,6 +180,8 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
   const [isComposing, setIsComposing] = useState(false);
   // 入力欄がアクティブな時だけツールバーを表示する Slack ライク UI
   const [isInputActive, setIsInputActive] = useState(false);
+  // ボトムタブバーをキーボードと一緒に持ち上げないために共有する
+  const setMessageInputFocused = useMobileNavStore((s) => s.setMessageInputFocused);
 
   // サジェストリストの最大高さ
   // キーボード表示中の visualViewport の 35% (上限 320px / 下限 140px)
@@ -1133,13 +1136,17 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
             onCompositionStart={() => setIsComposing(true)}
             onCompositionUpdate={handleInputEvent}
             onCompositionEnd={() => setIsComposing(false)}
-            onFocus={() => setIsInputActive(true)}
+            onFocus={() => {
+              setIsInputActive(true);
+              setMessageInputFocused(true);
+            }}
             onBlur={(e) => {
               // ツールバー内のボタンへフォーカスが移った場合は非表示にしない
               const form = e.currentTarget.closest("form");
               setTimeout(() => {
                 if (form && form.contains(document.activeElement)) return;
                 setIsInputActive(false);
+                setMessageInputFocused(false);
               }, 0);
             }}
             placeholder={placeholder || (channelName ? `#${channelName} にメッセージを送信` : "メッセージを入力")}
