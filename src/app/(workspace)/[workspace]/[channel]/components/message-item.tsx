@@ -545,6 +545,8 @@ export const MessageItem = memo(function MessageItem({
     timeZone: "Asia/Tokyo",
   });
   const initial = (profile?.display_name || "?")[0].toUpperCase();
+  // bot 投稿（みかん等）はメッセージ全体を薄いオレンジで区別する
+  const isBot = !!profile?.is_bot;
   // オンライン判定: last_seen_atが5分以内
   const isOnline = profile?.last_seen_at
     ? Date.now() - new Date(profile.last_seen_at).getTime() < 5 * 60 * 1000
@@ -684,6 +686,8 @@ export const MessageItem = memo(function MessageItem({
         } ${
           message.status === "in_progress"
             ? "bg-blue-400/[0.06] hover:bg-blue-400/[0.1]"
+            : isBot
+            ? "bg-[#fff7ed] hover:bg-[#ffedd5]"
             : "hover:bg-white/[0.02]"
         }`}
         onClick={(e) => {
@@ -710,8 +714,12 @@ export const MessageItem = memo(function MessageItem({
             </span>
           </div>
         ) : (
-          <div className="relative shrink-0 w-9 h-9 rounded-full bg-accent/20 flex items-center justify-center text-accent text-[13px] font-bold mt-0.5">
-            {profile?.avatar_url ? (
+          <div className={`relative shrink-0 w-9 h-9 rounded-full flex items-center justify-center mt-0.5 ${
+            isBot ? "bg-[#ffedd5] text-base" : "bg-accent/20 text-accent text-[13px] font-bold"
+          }`}>
+            {isBot ? (
+              <span className="leading-none" aria-label={profile?.display_name}>🍊</span>
+            ) : profile?.avatar_url ? (
               <img
                 src={profile.avatar_url}
                 alt={profile.display_name}
@@ -720,8 +728,8 @@ export const MessageItem = memo(function MessageItem({
             ) : (
               initial
             )}
-            {/* オンラインドット */}
-            {isOnline && (
+            {/* オンラインドット (bot は表示しない) */}
+            {!isBot && isOnline && (
               <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-online border-2 border-background" />
             )}
           </div>
@@ -821,7 +829,11 @@ export const MessageItem = memo(function MessageItem({
                             d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
                           />
                         </svg>
-                        {parentMessage.profiles?.avatar_url ? (
+                        {parentMessage.profiles?.is_bot ? (
+                          <span className="shrink-0 w-5 h-5 rounded-full bg-[#ffedd5] flex items-center justify-center text-[11px] leading-none">
+                            🍊
+                          </span>
+                        ) : parentMessage.profiles?.avatar_url ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
                             src={parentMessage.profiles.avatar_url}

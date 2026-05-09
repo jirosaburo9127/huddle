@@ -8,6 +8,7 @@ export type Profile = {
   avatar_url: string | null;
   status: string | null;
   last_seen_at: string | null;
+  is_bot?: boolean;
 };
 
 export type Workspace = {
