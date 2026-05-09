@@ -92,49 +92,51 @@ async function getApnsJwt(): Promise<string> {
     return cachedJwt.token;
   }
 
-  // L2: DB キャッシュ (全 Edge Function インスタンス共有)
-  // APNs は同一プロバイダから 20 分以内に新規 JWT 発行すると 429 を返すため、
-  // cold start で毎回新規発行しないようにここで再利用する。
+  // L2: get_or_set_apns_jwt RPC で advisory lock 越しに DB キャッシュを参照。
+  // 並列インスタンスが同時に cache miss した時に APNs へ複数 JWT を投げると
+  // 429 TooManyProviderTokenUpdates を喰らうため、生成と書き込みは直列化する。
   try {
-    const { data: cached } = await apnsCacheClient
-      .from("apns_jwt_cache")
-      .select("token, expires_at")
-      .eq("id", 1)
-      .maybeSingle();
-    if (cached?.token && cached.expires_at) {
-      const expiresAt = Math.floor(new Date(cached.expires_at).getTime() / 1000);
-      if (expiresAt > now + 60) {
-        cachedJwt = { token: cached.token, expiresAt };
-        return cached.token;
-      }
+    const { data: existing } = await apnsCacheClient.rpc("get_or_set_apns_jwt", {
+      p_candidate_token: null,
+      p_candidate_expires: null,
+    });
+    const row = Array.isArray(existing) ? existing[0] : existing;
+    if (row?.token) {
+      const expiresAt = Math.floor(new Date(row.expires_at).getTime() / 1000);
+      cachedJwt = { token: row.token, expiresAt };
+      return row.token;
     }
   } catch (err) {
-    // DB 読み取りエラーでも JWT 生成にはフォールバックできる
+    // RPC 失敗でも生成にフォールバック (push 配信は最優先)
     // eslint-disable-next-line no-console
-    console.error("apns_jwt_cache read failed, falling back to fresh JWT:", err);
+    console.error("get_or_set_apns_jwt read failed, falling back to fresh JWT:", err);
   }
 
-  // 新規 JWT を発行して DB に保存
+  // 新規 JWT を生成。直後に再度 RPC を叩いて lock 越しに保存。
+  // 並列インスタンスが先に書き込んでいた場合は先行 JWT を返してくるので、
+  // こちらが生成した JWT は捨てて先行を採用する (= APNs へは1本だけ送られる)。
   const jwt = await generateNewJwt(now);
   const expiresAt = now + 50 * 60;
-  cachedJwt = { token: jwt, expiresAt };
-
+  let chosenToken = jwt;
+  let chosenExpires = expiresAt;
   try {
-    await apnsCacheClient
-      .from("apns_jwt_cache")
-      .upsert({
-        id: 1,
-        token: jwt,
-        expires_at: new Date(expiresAt * 1000).toISOString(),
-        updated_at: new Date().toISOString(),
-      });
+    const { data: saved } = await apnsCacheClient.rpc("get_or_set_apns_jwt", {
+      p_candidate_token: jwt,
+      p_candidate_expires: new Date(expiresAt * 1000).toISOString(),
+    });
+    const row = Array.isArray(saved) ? saved[0] : saved;
+    if (row?.token) {
+      chosenToken = row.token;
+      chosenExpires = Math.floor(new Date(row.expires_at).getTime() / 1000);
+    }
   } catch (err) {
-    // DB 書き込みに失敗してもメモリキャッシュは残るので送信は続行する
+    // RPC 失敗時は自前で生成した JWT を使う (既存ロジック踏襲)
     // eslint-disable-next-line no-console
-    console.error("apns_jwt_cache write failed:", err);
+    console.error("get_or_set_apns_jwt write failed, using locally-generated JWT:", err);
   }
 
-  return jwt;
+  cachedJwt = { token: chosenToken, expiresAt: chosenExpires };
+  return chosenToken;
 }
 
 async function sendPushToHost(
@@ -208,9 +210,13 @@ async function sendPushOnce(
   let result = await sendPushToHost(host, deviceToken, title, body, badge, url, showBanner, isMention);
   for (const delay of DELAYS) {
     if (result.ok) return result;
+    // 429 (TooManyProviderTokenUpdates) も再送対象。同一 JWT の再送は
+    // 「新規 token update」とカウントされないので、APNs 側のスロット待ちのために
+    // 短いバックオフを入れて同じ JWT で再投する。
     const retriable =
       result.status === 0 ||
       result.status === 408 ||
+      result.status === 429 ||
       (result.status >= 500 && result.status < 600);
     if (!retriable) return result;
     await new Promise((r) => setTimeout(r, delay));
