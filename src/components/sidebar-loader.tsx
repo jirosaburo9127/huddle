@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/sidebar";
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
 import { BottomTabBar } from "@/components/bottom-tab-bar";
+import { MainPane } from "@/components/main-pane";
 
 type WorkspaceShellProps = {
   workspaceSlug: string;
@@ -111,9 +112,7 @@ export async function WorkspaceShell({ workspaceSlug, children }: WorkspaceShell
         hitorigotoChannel={result.hitorigoto_channel ?? null}
       />
       <KeyboardShortcuts workspaceId={result.workspace.id} workspaceSlug={workspaceSlug}>
-        <main className="flex-1 flex flex-col min-w-0 pb-14 lg:pb-0">
-          {children}
-        </main>
+        <MainPane>{children}</MainPane>
       </KeyboardShortcuts>
       <BottomTabBar workspaceSlug={workspaceSlug} workspaceId={result.workspace.id} currentUserId={user.id} members={result.members || []} />
     </>
