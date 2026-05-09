@@ -54,6 +54,11 @@ export default function InProgressPage() {
   const [items, setItems] = useState<StatusItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("in_progress");
+  // タブに併記する全体件数 (フィルタ適用前の生カウント)
+  const [statusCounts, setStatusCounts] = useState<{ in_progress: number; done: number }>({
+    in_progress: 0,
+    done: 0,
+  });
   const [completingId, setCompletingId] = useState<string | null>(null);
   // 「完了にする」ボタン押下時の確認モーダル対象 item id
   const [confirmTargetId, setConfirmTargetId] = useState<string | null>(null);
@@ -134,6 +139,37 @@ export default function InProgressPage() {
     return () => { cancelled = true; };
   }, [params.workspace, statusFilter]);
 
+  // タブ表示用の各ステータス件数 (statusFilter とは独立)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const supabase = createClient();
+      const { data: ws } = await supabase
+        .from("workspaces")
+        .select("id")
+        .eq("slug", params.workspace)
+        .maybeSingle();
+      if (!ws) return;
+
+      const baseQuery = (status: "in_progress" | "done") =>
+        supabase
+          .from("messages")
+          .select("id, channels!inner(workspace_id, is_dm)", { count: "exact", head: true })
+          .eq("status", status)
+          .is("deleted_at", null)
+          .eq("channels.workspace_id", ws.id)
+          .eq("channels.is_dm", false);
+
+      const [ip, dn] = await Promise.all([baseQuery("in_progress"), baseQuery("done")]);
+      if (cancelled) return;
+      setStatusCounts({
+        in_progress: ip.count ?? 0,
+        done: dn.count ?? 0,
+      });
+    })();
+    return () => { cancelled = true; };
+  }, [params.workspace, statusFilter]);
+
   // チャンネル別の集計 (左サイドのタブ用)。デフォルトは件数順、
   // ユーザのドラッグ並び替え結果を localStorage から適用する。
   const channelFacets = useMemo(() => {
@@ -182,6 +218,11 @@ export default function InProgressPage() {
         item.id === itemId ? { ...item, status: "done" as const } : item,
       );
     });
+    // タブの件数も同期
+    setStatusCounts((prev) => ({
+      in_progress: Math.max(0, prev.in_progress - 1),
+      done: prev.done + 1,
+    }));
   }
 
   return (
@@ -206,23 +247,35 @@ export default function InProgressPage() {
         )}
       </header>
 
-      {/* ステータス絞り込みタブ */}
+      {/* ステータス絞り込みタブ (カプセル形式 + 件数併記) */}
       <div className="border-b border-border bg-background shrink-0">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 flex gap-1">
-          {FILTER_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => setStatusFilter(opt.value)}
-              className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
-                statusFilter === opt.value
-                  ? "border-blue-400 text-foreground"
-                  : "border-transparent text-muted hover:text-foreground"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-2 flex gap-1.5">
+          {FILTER_OPTIONS.map((opt) => {
+            const count =
+              opt.value === "in_progress"
+                ? statusCounts.in_progress
+                : opt.value === "done"
+                  ? statusCounts.done
+                  : statusCounts.in_progress + statusCounts.done;
+            const active = statusFilter === opt.value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setStatusFilter(opt.value)}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-full transition-colors ${
+                  active
+                    ? "bg-foreground/10 text-foreground"
+                    : "text-muted hover:bg-white/[0.04] hover:text-foreground"
+                }`}
+              >
+                <span>{opt.label}</span>
+                <span className={`tabular-nums text-xs ${active ? "text-foreground/70" : "text-muted/70"}`}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
