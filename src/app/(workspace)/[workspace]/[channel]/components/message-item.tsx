@@ -682,7 +682,9 @@ export const MessageItem = memo(function MessageItem({
       <div
         id={`msg-${message.id}`}
         className={`group relative flex gap-3 px-2 transition-colors ${
-          isConsecutive ? "py-1" : "pt-3 pb-1"
+          isBot
+            ? (isConsecutive ? "py-3" : "pt-4 pb-3")
+            : (isConsecutive ? "py-1" : "pt-3 pb-1")
         } ${
           message.status === "in_progress"
             ? "rounded-lg bg-blue-400/[0.06] hover:bg-blue-400/[0.1]"
