@@ -177,6 +177,8 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
   const [mentionIndex, setMentionIndex] = useState(0);
   const [mentionStartPos, setMentionStartPos] = useState(0);
   const [isComposing, setIsComposing] = useState(false);
+  // 入力欄がアクティブな時だけツールバーを表示する Slack ライク UI
+  const [isInputActive, setIsInputActive] = useState(false);
 
   // サジェストリストの最大高さ
   // キーボード表示中の visualViewport の 35% (上限 320px / 下限 140px)
@@ -958,7 +960,9 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
           </div>
         )}
 
-        {/* ツールバー行 — 添付 / 宛先追加 アイコンを textarea の上に配置 */}
+        {/* ツールバー行 — フォーカス中・添付保留中・メンションピッカー表示中・返信中のいずれかの時だけ表示 */}
+        {(isInputActive || pendingAttachments.length > 0 || showMentionPicker || !!replyTo || content.length > 0) && (
+        <>
         <div className="flex items-center gap-1 px-2 py-1.5">
           {/* ファイル添付ボタン */}
           <button
@@ -1058,6 +1062,8 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
 
         {/* ツールバーと入力欄の区切り線 */}
         <div className="border-t border-border/50" />
+        </>
+        )}
 
         {/* 保留中の添付ファイル（送信ボタンで実送信される） */}
         {pendingAttachments.length > 0 && (
@@ -1127,6 +1133,15 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
             onCompositionStart={() => setIsComposing(true)}
             onCompositionUpdate={handleInputEvent}
             onCompositionEnd={() => setIsComposing(false)}
+            onFocus={() => setIsInputActive(true)}
+            onBlur={(e) => {
+              // ツールバー内のボタンへフォーカスが移った場合は非表示にしない
+              const form = e.currentTarget.closest("form");
+              setTimeout(() => {
+                if (form && form.contains(document.activeElement)) return;
+                setIsInputActive(false);
+              }, 0);
+            }}
             placeholder={placeholder || (channelName ? `#${channelName} にメッセージを送信` : "メッセージを入力")}
             rows={1}
             maxLength={4000}
