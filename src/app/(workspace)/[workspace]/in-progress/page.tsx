@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
@@ -28,11 +28,29 @@ function formatDate(iso: string): string {
   return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
+function getAgeDays(iso: string): number {
+  return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / (24 * 60 * 60 * 1000)));
+}
+
+function getAgeLabel(iso: string): string {
+  const days = getAgeDays(iso);
+  if (days === 0) return "今日";
+  if (days === 1) return "1日経過";
+  return `${days}日経過`;
+}
+
 export default function InProgressPage() {
   const setSidebarOpen = useMobileNavStore((s) => s.setSidebarOpen);
   const params = useParams<{ workspace: string }>();
   const [items, setItems] = useState<InProgressItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [completingId, setCompletingId] = useState<string | null>(null);
+  // 「完了にする」を 2 タップ確認方式にするための一時状態。
+  // 1 タップ目で confirmingId にセット → 3 秒で自動解除。2 タップ目で実行。
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const confirmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 失敗時の通知用。alert() はモバイル UX が悪いので画面内バナーで表示する。
+  const [completionError, setCompletionError] = useState<string | null>(null);
   // チャンネルフィルタ: null = 全て
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
   // モバイルのフィルタボトムシート開閉
@@ -111,6 +129,70 @@ export default function InProgressPage() {
     return items.filter((it) => it.channel_id === selectedChannelId);
   }, [items, selectedChannelId]);
 
+  const progressStats = useMemo(() => {
+    const oldestDays = items.reduce((max, item) => Math.max(max, getAgeDays(item.created_at)), 0);
+    const staleCount = items.filter((item) => getAgeDays(item.created_at) >= 7).length;
+    return { oldestDays, staleCount };
+  }, [items]);
+
+  // 表示順の中で「最も古い 1 件」だけを最古マーカー対象にする。
+  // 同日経過のカードが複数あったときに全部が「最古」表示になるのを防ぐ。
+  const oldestItemId = useMemo(() => {
+    if (filteredItems.length === 0) return null;
+    let oldest = filteredItems[0];
+    for (const item of filteredItems) {
+      if (new Date(item.created_at).getTime() < new Date(oldest.created_at).getTime()) {
+        oldest = item;
+      }
+    }
+    return oldest.id;
+  }, [filteredItems]);
+
+  async function handleComplete(itemId: string) {
+    if (completingId) return;
+
+    // 1 タップ目: 確認状態にして 3 秒で自動解除する。誤タップ事故を防ぐ。
+    if (confirmingId !== itemId) {
+      if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current);
+      setConfirmingId(itemId);
+      confirmTimerRef.current = setTimeout(() => {
+        setConfirmingId(null);
+        confirmTimerRef.current = null;
+      }, 3000);
+      return;
+    }
+
+    // 2 タップ目: 実行
+    if (confirmTimerRef.current) {
+      clearTimeout(confirmTimerRef.current);
+      confirmTimerRef.current = null;
+    }
+    setConfirmingId(null);
+    setCompletingId(itemId);
+    setCompletionError(null);
+
+    const supabase = createClient();
+    const { error } = await supabase.rpc("toggle_message_status", {
+      p_message_id: itemId,
+      p_status: "done",
+    });
+    setCompletingId(null);
+    if (error) {
+      setCompletionError("完了にできませんでした。もう一度お試しください。");
+      // 4 秒で自動的に消す
+      setTimeout(() => setCompletionError(null), 4000);
+      return;
+    }
+    setItems((prev) => prev.filter((item) => item.id !== itemId));
+  }
+
+  // unmount 時にタイマーを片付ける
+  useEffect(() => {
+    return () => {
+      if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current);
+    };
+  }, []);
+
   return (
     <div className="flex flex-col h-full">
       <header className="flex items-center px-6 py-3 border-b border-border bg-header shrink-0">
@@ -128,6 +210,9 @@ export default function InProgressPage() {
           <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
         </svg>
         <h1 className="font-bold text-lg">進行中</h1>
+        {!loading && (
+          <span className="ml-2 text-sm text-muted">{items.length}件</span>
+        )}
       </header>
 
       <div className="flex-1 flex min-h-0 overflow-hidden">
@@ -147,6 +232,37 @@ export default function InProgressPage() {
         {/* 右側: 本文 */}
         <div className="flex-1 min-w-0 overflow-y-auto px-4 sm:px-6 pt-4 pb-6 hide-scrollbar">
           <div className="max-w-3xl mx-auto">
+            {completionError && (
+              <div className="mb-3 rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2 text-sm text-red-300" role="alert">
+                {completionError}
+              </div>
+            )}
+
+            {!loading && items.length > 0 && (
+              <div className="grid grid-cols-3 gap-2 mb-4">
+                <div className="rounded-xl border border-border bg-surface px-3 py-2">
+                  <div className="text-[11px] text-muted">進行中</div>
+                  <div className="mt-0.5 text-lg font-bold text-foreground tabular-nums">
+                    {items.length}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-border bg-surface px-3 py-2">
+                  <div className="text-[11px] text-muted">チャンネル</div>
+                  <div className="mt-0.5 text-lg font-bold text-foreground tabular-nums">
+                    {channelFacets.length}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-border bg-surface px-3 py-2">
+                  <div className="text-[11px] text-muted">7日以上</div>
+                  <div className={`mt-0.5 text-lg font-bold tabular-nums ${
+                    progressStats.staleCount > 0 ? "text-blue-400" : "text-foreground"
+                  }`}>
+                    {progressStats.staleCount}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* モバイル用フィルタチップ (lg 未満で表示) */}
             {!loading && channelFacets.length > 0 && (
               <div className="lg:hidden mb-3">
@@ -190,31 +306,59 @@ export default function InProgressPage() {
             </div>
           ) : (
             filteredItems.map((item) => (
-              <Link
+              <div
                 key={item.id}
-                href={`/${params.workspace}/${item.channel_slug}?m=${item.id}`}
-                className="block px-4 py-3 rounded-xl bg-blue-400/[0.06] border border-blue-400/20 hover:bg-blue-400/[0.1] transition-colors"
+                className="rounded-xl bg-blue-400/[0.06] border border-blue-400/20 hover:bg-blue-400/[0.1] transition-colors"
               >
-                <div className="flex items-start gap-3">
-                  {item.sender_avatar ? (
-                    <img src={item.sender_avatar} alt="" className="w-8 h-8 rounded-full object-cover shrink-0 mt-0.5" />
-                  ) : (
-                    <div className="w-8 h-8 rounded-full bg-blue-400/20 flex items-center justify-center shrink-0 mt-0.5">
-                      <span className="text-xs font-bold text-blue-400">{item.sender_name[0]?.toUpperCase()}</span>
-                    </div>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-semibold text-foreground truncate max-w-[10em]">{item.sender_name.length > 10 ? item.sender_name.slice(0, 10) + "…" : item.sender_name}</span>
-                      <span className="text-xs text-muted shrink-0">{formatDate(item.created_at)}</span>
-                      <span className="text-xs text-muted truncate max-w-[10em]">#{item.channel_name.length > 10 ? item.channel_name.slice(0, 10) + "…" : item.channel_name}</span>
-                    </div>
-                    <div className="text-sm text-foreground whitespace-pre-wrap break-words line-clamp-3">
-                      {item.content}
+                <Link
+                  href={`/${params.workspace}/${item.channel_slug}?m=${item.id}`}
+                  className="block px-4 pt-3 pb-2"
+                >
+                  <div className="flex items-start gap-3">
+                    {item.sender_avatar ? (
+                      <img src={item.sender_avatar} alt="" className="w-8 h-8 rounded-full object-cover shrink-0 mt-0.5" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-blue-400/20 flex items-center justify-center shrink-0 mt-0.5">
+                        <span className="text-xs font-bold text-blue-400">{item.sender_name[0]?.toUpperCase()}</span>
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm font-semibold text-foreground truncate max-w-[10em]">{item.sender_name.length > 10 ? item.sender_name.slice(0, 10) + "…" : item.sender_name}</span>
+                        <span className="text-xs text-muted shrink-0">{formatDate(item.created_at)}</span>
+                        <span className="text-xs text-muted truncate max-w-[10em]">#{item.channel_name.length > 10 ? item.channel_name.slice(0, 10) + "…" : item.channel_name}</span>
+                      </div>
+                      <div className="text-sm text-foreground whitespace-pre-wrap break-words line-clamp-3">
+                        {item.content}
+                      </div>
                     </div>
                   </div>
+                </Link>
+                <div className="flex items-center justify-between gap-2 border-t border-blue-400/15 px-4 py-2">
+                  <span className={`text-[11px] font-medium ${
+                    getAgeDays(item.created_at) >= 7 ? "text-blue-300" : "text-muted"
+                  }`}>
+                    {getAgeLabel(item.created_at)}
+                    {item.id === oldestItemId && progressStats.oldestDays > 0 ? " ・最古" : ""}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleComplete(item.id)}
+                    disabled={!!completingId}
+                    className={`rounded-lg border px-2.5 py-1 text-[12px] font-medium transition-colors disabled:opacity-50 ${
+                      confirmingId === item.id
+                        ? "border-blue-400 bg-blue-400/15 text-blue-200"
+                        : "border-blue-400/30 text-blue-300 hover:bg-blue-400/10"
+                    }`}
+                  >
+                    {completingId === item.id
+                      ? "更新中..."
+                      : confirmingId === item.id
+                        ? "もう一度押すと完了"
+                        : "完了にする"}
+                  </button>
                 </div>
-              </Link>
+              </div>
             ))
           )}
             </div>

@@ -66,6 +66,13 @@ function formatDateOnly(iso: string): string {
   return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
 }
 
+function getAgeLabel(iso: string): string {
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / (24 * 60 * 60 * 1000));
+  if (days <= 0) return "今日";
+  if (days === 1) return "1日前";
+  return `${days}日前`;
+}
+
 export function DashboardView({
   workspace,
   workspaceSlug,
@@ -147,6 +154,15 @@ export function DashboardView({
     }
     return list;
   }, [decisions, selectedChannelId, dateRange]);
+
+  const decisionStats = useMemo(() => {
+    const withWhy = filteredDecisions.filter((d) => !!d.decision_why?.trim()).length;
+    const withDue = filteredDecisions.filter((d) => !!d.decision_due?.trim()).length;
+    const needsContext = filteredDecisions.filter(
+      (d) => !d.decision_why?.trim() && !d.decision_due?.trim()
+    ).length;
+    return { withWhy, withDue, needsContext };
+  }, [filteredDecisions]);
 
   const selectedChannelName = selectedChannelId
     ? channelFacets.find((c) => c.id === selectedChannelId)?.name || ""
@@ -369,6 +385,29 @@ export function DashboardView({
             })}
           </div>
 
+          {filteredDecisions.length > 0 && (
+            <div className="print:hidden grid grid-cols-3 gap-2 mb-4">
+              <div className="rounded-xl border border-border bg-surface px-3 py-2">
+                <div className="text-[11px] text-muted">表示中</div>
+                <div className="mt-0.5 text-lg font-bold text-foreground tabular-nums">
+                  {filteredDecisions.length}
+                </div>
+              </div>
+              <div className="rounded-xl border border-border bg-surface px-3 py-2">
+                <div className="text-[11px] text-muted">理由あり</div>
+                <div className="mt-0.5 text-lg font-bold text-foreground tabular-nums">
+                  {decisionStats.withWhy}
+                </div>
+              </div>
+              <div className="rounded-xl border border-border bg-surface px-3 py-2">
+                <div className="text-[11px] text-muted">期限あり</div>
+                <div className="mt-0.5 text-lg font-bold text-foreground tabular-nums">
+                  {decisionStats.withDue}
+                </div>
+              </div>
+            </div>
+          )}
+
           {filteredDecisions.length === 0 ? (
             <div className="rounded-2xl border border-border bg-white/[0.02] p-8 text-center text-sm text-muted">
               {decisions.length === 0
@@ -385,11 +424,18 @@ export function DashboardView({
                 >
                   {/* 上部メタ: チャンネルバッジ + 日付 */}
                   <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-1.5">
-                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-accent bg-accent/10 rounded-full px-2 py-0.5 truncate max-w-[12em]">
-                      #{d.channel_name.length > 10 ? d.channel_name.slice(0, 10) + "…" : d.channel_name}
-                    </span>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-accent bg-accent/10 rounded-full px-2 py-0.5 truncate max-w-[12em]">
+                        #{d.channel_name.length > 10 ? d.channel_name.slice(0, 10) + "…" : d.channel_name}
+                      </span>
+                      {!d.decision_why?.trim() && !d.decision_due?.trim() && (
+                        <span className="hidden sm:inline-flex text-[11px] text-muted border border-border rounded-full px-2 py-0.5">
+                          補足待ち
+                        </span>
+                      )}
+                    </div>
                     <span className="text-[11px] text-muted shrink-0">
-                      {formatDate(d.created_at)}
+                      {getAgeLabel(d.created_at)} ・ {formatDate(d.created_at)}
                     </span>
                   </div>
 
@@ -410,7 +456,7 @@ export function DashboardView({
                   </div>
 
                   {/* Why / Due */}
-                  {(d.decision_why || d.decision_due) && (
+                  {(d.decision_why || d.decision_due) ? (
                     <div className="mx-4 mb-3 rounded-lg bg-background/40 border border-border/60 px-3 py-2 space-y-1.5 text-[13px]">
                       {d.decision_why && (
                         <div className="flex gap-2">
@@ -427,12 +473,18 @@ export function DashboardView({
                           <span className="shrink-0 text-[10px] font-bold text-muted uppercase tracking-wider pt-0.5 w-8">
                             Due
                           </span>
-                          <span className="flex-1 text-foreground/90 whitespace-pre-wrap break-words">
+                          <span className="flex-1 text-foreground/90 whitespace-pre-wrap break-words font-medium">
                             {d.decision_due}
                           </span>
                         </div>
                       )}
                     </div>
+                  ) : (
+                    decisionStats.needsContext > 0 && (
+                      <div className="mx-4 mb-3 rounded-lg bg-background/30 border border-border/50 px-3 py-2 text-[12px] text-muted">
+                        理由・期限はまだ補足されていません
+                      </div>
+                    )
                   )}
 
                   {/* フッター: 送信者 */}
