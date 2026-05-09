@@ -14,7 +14,7 @@ import { CreatePollModal } from "./create-poll-modal";
 import { CreateEventModal } from "./create-event-modal";
 import { EventDisplay } from "./event-display";
 import { DateSeparator } from "./date-separator";
-import { ChannelWiki } from "./channel-wiki";
+import { ChannelNote } from "./channel-note";
 import { ChannelMembersModal } from "@/components/channel-members-modal";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
 import { showMessageNotification } from "@/lib/notification";
@@ -54,8 +54,8 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
   const [showDeleteChannel, setShowDeleteChannel] = useState(false);
   const [deletingChannel, setDeletingChannel] = useState(false);
   const [showDecisionsOnly, setShowDecisionsOnly] = useState(false);
-  const [showWiki, setShowWiki] = useState(false);
-  const [hasWiki, setHasWiki] = useState(false);
+  const [showNote, setShowNote] = useState(false);
+  const [hasNote, setHasNote] = useState(false);
   const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showOverflowMenu, setShowOverflowMenu] = useState(false);
@@ -324,18 +324,18 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUserId]);
 
-  // Wikiの存在チェック
+  // 固定メモの存在チェック
   useEffect(() => {
-    async function checkWiki() {
+    async function checkNote() {
       // .single() は0件で406を返すので .maybeSingle() を使う
       const { data } = await supabase
         .from("channel_notes")
-        .select("id")
+        .select("content")
         .eq("channel_id", channel.id)
         .maybeSingle();
-      setHasWiki(!!data);
+      setHasNote(!!data?.content?.trim());
     }
-    checkWiki();
+    checkNote();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel.id]);
 
@@ -1301,22 +1301,22 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                     {isMuted ? "ミュート解除" : "ミュート"}
                   </button>
 
-                  {/* Wiki（DMでは非表示） */}
+                  {/* 固定メモ（DMでは非表示） */}
                   {!channel.is_dm && (
                     <button
                       role="menuitem"
                       onClick={() => {
                         setShowOverflowMenu(false);
-                        setShowWiki((v) => !v);
+                        setShowNote((v) => !v);
                       }}
                       className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-white/[0.04] transition-colors ${
-                        showWiki ? "text-accent" : "text-foreground"
+                        showNote ? "text-accent" : "text-foreground"
                       }`}
                     >
                       <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                       </svg>
-                      {showWiki ? "Wikiを閉じる" : "Wiki"}
+                      {showNote ? "固定メモを閉じる" : "固定メモ"}
                     </button>
                   )}
 
@@ -1436,18 +1436,20 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
           </div>
         </header>
 
-        {/* Wikiバナー */}
-        {hasWiki && !showWiki && (
+        {/* 固定メモバナー */}
+        {hasNote && !showNote && (
           <div className="px-4 py-2 border-b border-border/50 bg-accent/5 flex items-center justify-between">
             <div className="flex items-center gap-2 text-sm text-foreground">
-              <span>📋</span>
-              <span>このチャンネルの使い方が書かれています</span>
+              <svg className="w-4 h-4 text-accent shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h8M8 11h8m-8 4h5M5 4h14v16H5z" />
+              </svg>
+              <span>固定メモがあります</span>
             </div>
             <button
-              onClick={() => setShowWiki(true)}
+              onClick={() => setShowNote(true)}
               className="text-sm text-accent hover:underline font-medium shrink-0"
             >
-              読む
+              開く
             </button>
           </div>
         )}
@@ -1620,11 +1622,16 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
         />
       )}
 
-      {/* Wikiパネル */}
-      {showWiki && (
-        <ChannelWiki
+      {/* 固定メモパネル */}
+      {showNote && (
+        <ChannelNote
           channelId={channel.id}
-          onClose={() => { setShowWiki(false); setHasWiki(true); }}
+          onClose={(noteHasContent) => {
+            setShowNote(false);
+            if (typeof noteHasContent === "boolean") {
+              setHasNote(noteHasContent);
+            }
+          }}
         />
       )}
 

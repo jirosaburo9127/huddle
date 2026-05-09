@@ -5,15 +5,16 @@ import { createClient } from "@/lib/supabase/client";
 
 type Props = {
   channelId: string;
-  onClose: () => void;
+  onClose: (hasContent?: boolean) => void;
 };
 
-// Markdownプレビュー用の簡易パーサー
+// 固定メモ用の最小Markdownプレビュー。
 function renderMarkdownPreview(text: string): string {
   let html = text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 
   // コードブロック
   html = html.replace(/```([\s\S]*?)```/g, (_m, code: string) => {
@@ -26,7 +27,11 @@ function renderMarkdownPreview(text: string): string {
   // URL
   html = html.replace(
     /(?<!["=])(https?:\/\/[^\s<]+)/g,
-    '<a href="$1" target="_blank" rel="noopener noreferrer" class="text-accent hover:underline">$1</a>'
+    (_match, raw: string) => {
+      const trimmed = raw.replace(/[。、．，）\])\}>"'`,.!?;:]+$/u, "");
+      const dropped = raw.slice(trimmed.length);
+      return `<a href="${trimmed}" target="_blank" rel="noopener noreferrer" class="text-accent hover:underline break-all">${trimmed}</a>${dropped}`;
+    }
   );
   // 改行
   html = html.replace(/\n/g, "<br />");
@@ -34,7 +39,7 @@ function renderMarkdownPreview(text: string): string {
   return html;
 }
 
-export function ChannelWiki({ channelId, onClose }: Props) {
+export function ChannelNote({ channelId, onClose }: Props) {
   const [content, setContent] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState("");
@@ -42,7 +47,7 @@ export function ChannelWiki({ channelId, onClose }: Props) {
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
-  // Wikiデータの取得
+  // 固定メモの取得
   useEffect(() => {
     async function fetchNote() {
       const { data } = await supabase
@@ -68,6 +73,8 @@ export function ChannelWiki({ channelId, onClose }: Props) {
       return;
     }
 
+    const nextContent = editContent.trim();
+
     // upsert: channel_idが既存ならupdate、なければinsert
     const { data: existing } = await supabase
       .from("channel_notes")
@@ -79,7 +86,7 @@ export function ChannelWiki({ channelId, onClose }: Props) {
       await supabase
         .from("channel_notes")
         .update({
-          content: editContent,
+          content: nextContent,
           updated_by: user.id,
           updated_at: new Date().toISOString(),
         })
@@ -89,12 +96,13 @@ export function ChannelWiki({ channelId, onClose }: Props) {
         .from("channel_notes")
         .insert({
           channel_id: channelId,
-          content: editContent,
+          content: nextContent,
           updated_by: user.id,
         });
     }
 
-    setContent(editContent);
+    setContent(nextContent);
+    setEditContent(nextContent);
     setIsEditing(false);
     setIsSaving(false);
   }, [supabase, channelId, editContent]);
@@ -107,10 +115,10 @@ export function ChannelWiki({ channelId, onClose }: Props) {
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
           </svg>
-          Wiki
+          固定メモ
         </h2>
         <button
-          onClick={onClose}
+          onClick={() => onClose(!!content.trim())}
           className="p-1 text-muted hover:text-foreground rounded transition-colors"
           title="閉じる"
         >
@@ -129,9 +137,13 @@ export function ChannelWiki({ channelId, onClose }: Props) {
             <textarea
               value={editContent}
               onChange={(e) => setEditContent(e.target.value)}
-              className="w-full h-64 resize-none rounded-lg border border-border bg-input-bg px-3 py-2 text-sm leading-relaxed text-foreground focus:border-accent focus:outline-none font-mono"
-              placeholder="Markdownで記述できます（**太字**, `コード`, ```コードブロック```）"
+              className="w-full h-40 resize-none rounded-lg border border-border bg-input-bg px-3 py-2 text-sm leading-relaxed text-foreground focus:border-accent focus:outline-none"
+              maxLength={800}
+              placeholder="このチャンネルの目的、よく使うリンク、約束ごとなど"
             />
+            <div className="text-right text-[11px] text-muted">
+              {editContent.trim().length}/800
+            </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={handleSave}
@@ -157,8 +169,8 @@ export function ChannelWiki({ channelId, onClose }: Props) {
               />
             ) : (
               <div className="text-muted text-sm text-center py-8">
-                <p>まだWikiが作成されていません</p>
-                <p className="text-xs mt-1">チャンネルの共有メモを作成しましょう</p>
+                <p>固定メモはまだありません</p>
+                <p className="text-xs mt-1">チャンネルの目的やリンクを短く残せます</p>
               </div>
             )}
             <button
@@ -168,7 +180,7 @@ export function ChannelWiki({ channelId, onClose }: Props) {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
               </svg>
-              編集する
+              メモを編集
             </button>
           </div>
         )}
