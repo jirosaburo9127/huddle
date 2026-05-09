@@ -286,41 +286,6 @@ export function DashboardView({
             <hr />
           </div>
 
-          <div className="print:hidden flex items-baseline justify-between mb-3 gap-3">
-            <h2 className="text-sm font-semibold text-foreground">
-              決定事項（最新100件）
-            </h2>
-            <div className="flex items-center gap-3">
-              <span className="text-xs text-muted">
-                {filteredDecisions.length}件
-              </span>
-              <button
-                type="button"
-                onClick={handleExportPdf}
-                disabled={filteredDecisions.length === 0 || exporting}
-                className="text-xs px-3 py-1.5 rounded-lg border border-border text-muted hover:text-foreground hover:bg-white/[0.04] disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
-                title={exporting ? "生成中..." : "現在の絞り込みで決定事項をPDFとして保存"}
-              >
-                {exporting ? (
-                  <svg className="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                ) : (
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
-                  </svg>
-                )}
-                {exporting ? "生成中…" : "PDFエクスポート"}
-              </button>
-            </div>
-          </div>
-
-          {exportError && (
-            <div className="print:hidden mb-3 text-xs text-mention bg-mention/10 border border-mention/30 rounded-lg px-3 py-2">
-              PDF生成エラー: {exportError}
-            </div>
-          )}
-
           {/* モバイル用フィルタチップ (lg 未満で表示) */}
           {channelFacets.length > 0 && (
             <div className="print:hidden lg:hidden mb-3">
@@ -348,33 +313,6 @@ export function DashboardView({
               </button>
             </div>
           )}
-
-          {/* 期間フィルタ */}
-          <div className="print:hidden flex gap-2 mb-3 text-xs">
-            {(
-              [
-                { key: null, label: "全期間" },
-                { key: "week" as const, label: "今週" },
-                { key: "month" as const, label: "今月" },
-              ] as Array<{ key: DateRange; label: string }>
-            ).map((opt) => {
-              const active = dateRange === opt.key;
-              return (
-                <button
-                  key={opt.label}
-                  type="button"
-                  onClick={() => setDateRange(opt.key)}
-                  className={`px-3 py-1 rounded-lg border transition-colors ${
-                    active
-                      ? "bg-accent text-white border-accent"
-                      : "border-border text-muted hover:text-foreground hover:bg-white/[0.04]"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              );
-            })}
-          </div>
 
           {filteredDecisions.length === 0 ? (
             <div className="rounded-2xl border border-border bg-white/[0.02] p-8 text-center text-sm text-muted">
