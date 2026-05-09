@@ -227,29 +227,23 @@ export default function InProgressPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <header className="flex items-center px-6 py-3 border-b border-border bg-header shrink-0">
+      <header className="flex items-center gap-2 px-4 sm:px-6 py-2 border-b border-border bg-header shrink-0">
         <button
           type="button"
           onClick={() => setSidebarOpen(true)}
-          className="lg:hidden mr-2 p-1 text-muted hover:text-foreground rounded transition-colors"
+          className="lg:hidden p-1 text-muted hover:text-foreground rounded transition-colors"
           aria-label="戻る"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
-        <svg className="w-5 h-5 text-blue-400 mr-2" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+        <svg className="w-5 h-5 text-blue-400 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
         </svg>
-        <h1 className="font-bold text-lg">進行中</h1>
-        {!loading && (
-          <span className="ml-2 text-sm text-muted">{items.length}件</span>
-        )}
-      </header>
-
-      {/* ステータス絞り込みタブ (カプセル形式 + 件数併記) */}
-      <div className="border-b border-border bg-background shrink-0">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-2 flex gap-1.5">
+        <h1 className="font-bold text-lg shrink-0">進行中</h1>
+        {/* ステータス絞り込みタブ (カプセル形式 + 件数併記) */}
+        <div className="ml-auto flex gap-1 sm:gap-1.5 overflow-x-auto hide-scrollbar">
           {FILTER_OPTIONS.map((opt) => {
             const count =
               opt.value === "in_progress"
@@ -263,7 +257,7 @@ export default function InProgressPage() {
                 key={opt.value}
                 type="button"
                 onClick={() => setStatusFilter(opt.value)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-full transition-colors ${
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-full transition-colors shrink-0 ${
                   active
                     ? "bg-foreground/10 text-foreground"
                     : "text-muted hover:bg-white/[0.04] hover:text-foreground"
@@ -277,7 +271,7 @@ export default function InProgressPage() {
             );
           })}
         </div>
-      </div>
+      </header>
 
       <div className="flex-1 flex min-h-0 overflow-hidden">
         {/* 左サイド: 縦型チャンネルタブ (lg 以上) */}
