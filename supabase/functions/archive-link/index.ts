@@ -30,6 +30,75 @@ const MIKAN_USER_ID = "00000000-0000-0000-0000-00000000aaaa";
 const LEARNING_CHANNEL_ID = "1d3cb7bc-ea93-4b55-9f39-edac9c64be62";
 const MODEL = "claude-haiku-4-5-20251001";
 
+// 学習用転記の対象外にする (ドキュメント共有 / 社内コラボツール) ドメイン。
+// 「あくまでも一般 Web サイトのリンクだけ転記」という運用方針。
+// マッチ判定はホスト名ベース (URL.hostname と完全一致 or サブドメインで終わるか)。
+const BLOCKED_ARCHIVE_DOMAINS: string[] = [
+  // Google Workspace
+  "docs.google.com",
+  "sheets.google.com",
+  "slides.google.com",
+  "drive.google.com",
+  "forms.google.com",
+  "calendar.google.com",
+  "mail.google.com",
+  "meet.google.com",
+  "keep.google.com",
+  // Microsoft 365 / Office
+  "sharepoint.com",
+  "onedrive.com",
+  "onedrive.live.com",
+  "office.com",
+  "office.live.com",
+  "outlook.com",
+  "outlook.live.com",
+  "teams.microsoft.com",
+  "1drv.ms",
+  // Notion
+  "notion.so",
+  "notion.site",
+  // Apple iCloud
+  "icloud.com",
+  // クラウドストレージ
+  "dropbox.com",
+  "box.com",
+  // ホワイトボード / デザイン
+  "figma.com",
+  "miro.com",
+  "lucidchart.com",
+  "lucid.app",
+  "whimsical.com",
+  // ドキュメントツール
+  "coda.io",
+  "quip.com",
+  "evernote.com",
+  // タスク管理
+  "asana.com",
+  "trello.com",
+  "linear.app",
+  "atlassian.net",
+  "atlassian.com",
+  "monday.com",
+  "clickup.com",
+  // チャット系
+  "slack.com",
+  "discord.com",
+  "discord.gg",
+  "chatwork.com",
+];
+
+function isBlockedArchiveDomain(url: string): boolean {
+  let hostname: string;
+  try {
+    hostname = new URL(url).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  return BLOCKED_ARCHIVE_DOMAINS.some(
+    (d) => hostname === d || hostname.endsWith("." + d),
+  );
+}
+
 interface MessagePayload {
   type: "INSERT";
   table: "messages";
@@ -97,15 +166,22 @@ Deno.serve(async (req) => {
       .maybeSingle();
     const userName = profile?.display_name ?? "メンバー";
 
-    // URL 抽出 (Supabase Storage の chat-files URL は除外)
+    // URL 抽出 (Supabase Storage の chat-files URL は除外。さらにドキュメント
+    // 共有系 / 社内コラボツール系も「学習用転記」の趣旨と合わないため除外)
     const urlRegex = /https?:\/\/[^\s<>"]+/g;
     const matches = msg.content.match(urlRegex) ?? [];
-    const urls = matches.filter((u) => !u.includes("supabase.co/storage/"));
+    const urls = matches
+      .map(cleanTrailingPunctuation)
+      .filter(
+        (u) =>
+          !u.includes("supabase.co/storage/") &&
+          !isBlockedArchiveDomain(u),
+      );
 
     if (urls.length > 0) {
       for (const url of urls) {
         await processUrl(supabase, {
-          url: cleanTrailingPunctuation(url),
+          url,
           sourceMessage: msg,
           channelName: channel.name,
           userName,
