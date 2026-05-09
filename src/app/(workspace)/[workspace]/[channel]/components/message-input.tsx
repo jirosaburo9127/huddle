@@ -162,8 +162,9 @@ function writeDraft(channelId: string | undefined, value: string) {
 }
 
 export function MessageInput({ channelName, onSend, placeholder, channelId, workspaceId, onCreatePoll, onCreateEvent, replyTo, onCancelReply }: Props) {
-  // 初期値はマウント時に下書きから復元 (チャンネル切替で remount されるたびに走る)
-  const [content, setContent] = useState<string>(() => readDraft(channelId));
+  // 初期値は SSR/CSR で一致させるため空文字。マウント後に useEffect で
+  // localStorage から下書きを復元する (channel 切替で remount された時も同様)
+  const [content, setContent] = useState<string>("");
   const [sending, setSending] = useState(false);
   const [sendAsDecision, setSendAsDecision] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -216,10 +217,9 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
     }).catch(() => {});
   }, []);
 
-  // チャンネル切替で同一インスタンスが再利用される稀なケース向けに、
-  // channelId が変わったタイミングでも下書きを再ロードする。
-  // 通常はチャンネル遷移で MessageInput 自体が remount されるので useState
-  // の lazy initializer 側で復元される。
+  // マウント時およびチャンネル切替時に下書きを localStorage から復元する。
+  // SSR と CSR で初期値を一致させて hydration mismatch を防ぐため、
+  // useState の lazy initializer ではなくこの effect で読む。
   useEffect(() => {
     setContent(readDraft(channelId));
     // channelId 切替時のみ走る (content を依存に含めると無限ループ)
