@@ -1512,9 +1512,11 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                 </div>
               )}
               {(() => {
-                // 削除済み・スレッド返信は表示対象外。MessageItem 側でも null を返すが
+                // 削除済みメッセージは表示対象外。MessageItem 側でも null を返すが
                 // ここで弾いておかないと日付セパレータの計算で空の日付ヘッダが残る。
-                const visible = messages.filter((m) => !m.deleted_at && !m.parent_id);
+                // ※ parent_id 付き (スレッド返信) はメインフィードに残す:
+                //    Huddle は Chatwork 風インライン返信仕様で、返信もメイン上に並べる。
+                const visible = messages.filter((m) => !m.deleted_at);
                 const displayed = showDecisionsOnly
                   ? visible.filter((m) => m.is_decision)
                   : visible;
