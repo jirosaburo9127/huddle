@@ -1512,9 +1512,12 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                 </div>
               )}
               {(() => {
+                // 削除済み・スレッド返信は表示対象外。MessageItem 側でも null を返すが
+                // ここで弾いておかないと日付セパレータの計算で空の日付ヘッダが残る。
+                const visible = messages.filter((m) => !m.deleted_at && !m.parent_id);
                 const displayed = showDecisionsOnly
-                  ? messages.filter((m) => m.is_decision)
-                  : messages;
+                  ? visible.filter((m) => m.is_decision)
+                  : visible;
                 // 引用ブロック表示用の参照マップ (O(1) 親解決)
                 const byId = new Map<string, MessageWithProfile>();
                 for (const m of messages) byId.set(m.id, m);
