@@ -155,31 +155,32 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
   }, [channel.id, supabase]);
 
   // 既読化: チャンネルをマウントしたら
-  //   1. サーバから FRESH な pre-mark last_read_at を取得 (Router Cache 対策)
-  //   2. mark_channel_read で last_read_at を NOW() に更新
-  //   3. 未読ライン位置の基準 (myLastReadAt) を fresh pre 値に揃える
-  //      → 再訪問時に Router Cache の古い initialLastReadAt が混入しても
-  //        サーバ真実の前回既読時刻でラインが計算され、二度出ない
+  //   1. サーバから FRESH な last_read_at + joined_at を取得 (Router Cache 対策)
+  //   2. 未読ラインの baseline を last_read_at ?? joined_at に揃える
+  //      → 未読カウント RPC (server) と同じ基準。
+  //        初回参加チャンネル (last_read_at = NULL) でもラインを正しく出せる
+  //   3. mark_channel_read で last_read_at を NOW() に更新 (DB)
   //   4. huddle:channelRead イベントを発火して Sidebar のバッジを消す
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      // (1) FRESH pre-mark last_read_at を直接 channel_members から取得
+      // (1) FRESH な last_read_at + joined_at を直接 channel_members から取得
       const { data: pre } = await supabase
         .from("channel_members")
-        .select("last_read_at")
+        .select("last_read_at, joined_at")
         .eq("channel_id", channel.id)
         .eq("user_id", currentUserId)
         .maybeSingle();
       if (cancelled) return;
-      const preLastReadAt = (pre as { last_read_at: string | null } | null)?.last_read_at ?? null;
-      // initialLastReadAt が Router Cache で古い場合に備え、サーバ最新値で上書き
-      if (preLastReadAt && preLastReadAt !== myLastReadAtRef.current) {
-        setMyLastReadAt(preLastReadAt);
-        myLastReadAtRef.current = preLastReadAt;
+      const row = pre as { last_read_at: string | null; joined_at: string | null } | null;
+      // (2) baseline = last_read_at ?? joined_at (未読カウント RPC と一致させる)
+      const baseline = row?.last_read_at ?? row?.joined_at ?? null;
+      if (baseline && baseline !== myLastReadAtRef.current) {
+        setMyLastReadAt(baseline);
+        myLastReadAtRef.current = baseline;
       }
 
-      // (2) mark_channel_read で既読確定
+      // (3) mark_channel_read で既読確定
       const { data: marked, error } = await supabase.rpc("mark_channel_read", {
         p_channel_id: channel.id,
       });
@@ -188,7 +189,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
       // 「到着時の既読時刻」として保持。以降の Realtime 新着では更新しない。
       setFirstMarkedReadAt(newLastReadAt);
 
-      // (3) Sidebar / 他リスナーに通知
+      // (4) Sidebar / 他リスナーに通知
       window.dispatchEvent(
         new CustomEvent("huddle:channelRead", {
           detail: { channelId: channel.id, lastReadAt: newLastReadAt },
@@ -227,22 +228,17 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
     ).length;
   }, [memberReadTimes, currentUserId]);
 
-  // ミュート状態 + 自分の最終既読時刻を取得
+  // ミュート状態のみ取得 (myLastReadAt の設定は上の既読化 effect に一元化)
   useEffect(() => {
     (async () => {
       const { data } = await supabase
         .from("channel_members")
-        .select("muted, last_read_at")
+        .select("muted")
         .eq("channel_id", channel.id)
         .eq("user_id", currentUserId)
         .maybeSingle();
       if (data) {
         setIsMuted(!!data.muted);
-        // 初回のみセット（チャンネル表示中に更新しない）
-        if (!myLastReadAtRef.current) {
-          myLastReadAtRef.current = data.last_read_at;
-          setMyLastReadAt(data.last_read_at);
-        }
       }
     })();
   }, [channel.id, currentUserId, supabase]);
