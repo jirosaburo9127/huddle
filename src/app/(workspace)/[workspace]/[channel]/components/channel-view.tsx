@@ -123,11 +123,11 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
   // SSR で先取りした値を初期値に使う（RPC が last_read_at を NOW に更新する前の値）
   const [myLastReadAt, setMyLastReadAt] = useState<string | null>(initialLastReadAt);
   const myLastReadAtRef = useRef<string | null>(initialLastReadAt);
-  // サーバが確定した最新の last_read_at (mark_channel_read の戻り値で更新)。
-  // これより新しい未読メッセージが無くなったら未読ラインを完全に隠す。
-  // Router Cache で古い initialLastReadAt が再注入されてもラインが復活しないよう、
-  // 「現在の既読状態」を独立して持つ。
-  const [serverLastReadAt, setServerLastReadAt] = useState<string | null>(initialLastReadAt);
+  // 「このチャンネルに到着した瞬間」の既読タイムスタンプ。
+  // マウント時の mark_channel_read で一度だけ確定し、Realtime 新着では更新しない。
+  // 未読ラインの「上限」として使う: これ以降に来たメッセージは "表示中の新着" なので
+  // ラインの対象外にする (= 開いたままで他人が投稿してもラインが追加で出ない)。
+  const [firstMarkedReadAt, setFirstMarkedReadAt] = useState<string | null>(null);
   const unreadLineRef = useRef<HTMLDivElement>(null);
   // 未読区切り線の表示ステート: 画面に入って3秒 → fading → 0.5秒後にhiddenで完全に消す
   const [unreadLineState, setUnreadLineState] = useState<"visible" | "fading" | "hidden">("visible");
@@ -185,7 +185,8 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
       });
       if (cancelled || error || !marked) return;
       const newLastReadAt = marked as unknown as string;
-      setServerLastReadAt(newLastReadAt);
+      // 「到着時の既読時刻」として保持。以降の Realtime 新着では更新しない。
+      setFirstMarkedReadAt(newLastReadAt);
 
       // (3) Sidebar / 他リスナーに通知
       window.dispatchEvent(
@@ -692,9 +693,9 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
             return [...prev, newMessage];
           });
 
-          // 表示中チャンネルへの他人の新着 → 自動既読化 + Sidebar に通知。
-          // これで「チャンネルを開いたまま新着が来た時に、次回再訪問でラインが再発する」
-          // 問題が解消する (mark_channel_read 一元化)。
+          // 表示中チャンネルへの他人の新着 → DB 上は自動既読化 + Sidebar に通知。
+          // 注意: firstMarkedReadAt は更新しない (それは「到着時」の不変スナップショット)。
+          //       表示中の新着は未読ライン対象外として扱われる。
           if (newMessage.user_id !== currentUserId) {
             (async () => {
               const { data: marked, error } = await supabase.rpc("mark_channel_read", {
@@ -702,7 +703,6 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
               });
               if (error || !marked) return;
               const newLastReadAt = marked as unknown as string;
-              setServerLastReadAt(newLastReadAt);
               window.dispatchEvent(
                 new CustomEvent("huddle:channelRead", {
                   detail: { channelId: channel.id, lastReadAt: newLastReadAt },
@@ -1605,16 +1605,22 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                   // 自分自身の投稿は「未読」にはしない（知っている内容なので）が、
                   // 未読判定の「前メッセージが既読か」チェックでは、自分の投稿は "読んだもの扱い" にする。
                   //
-                  // myLastReadAt はマウント時に channel_members から FRESH 値を取得して上書き済み
-                  // (Router Cache の古い initialLastReadAt は使わない)。よってここでは
-                  // 「msg > myLastReadAt」だけで判定して OK。
-                  // 3秒で hide する unreadLineState のタイマーで自動消滅する。
+                  // 表示対象を「到着時に存在していた未読」だけに閉じる:
+                  //   lastReadTime  < msgTime <= firstMarkedTime
+                  // つまり「前回既読より新しい」かつ「到着時マークより古い (= 表示中の新着ではない)」。
+                  // myLastReadAt はマウント時に channel_members から FRESH 値を取得済み (Router Cache 対策)。
+                  // firstMarkedReadAt はマウント時の mark_channel_read 戻り値で一度だけ確定 (不変)。
                   const lastReadTime = myLastReadAt ? new Date(myLastReadAt).getTime() : 0;
+                  // firstMarkedReadAt が未確定 (マウント直後) は Infinity = 上限なし扱い
+                  const firstMarkedTime = firstMarkedReadAt
+                    ? new Date(firstMarkedReadAt).getTime()
+                    : Number.POSITIVE_INFINITY;
                   const msgTime = new Date(message.created_at).getTime();
                   const isNewForMe =
                     !!myLastReadAt &&
                     message.user_id !== currentUserId &&
-                    msgTime > lastReadTime;
+                    msgTime > lastReadTime &&
+                    msgTime <= firstMarkedTime;
                   const prevTreatedAsSeen =
                     prev === null ||
                     prev.user_id === currentUserId ||
