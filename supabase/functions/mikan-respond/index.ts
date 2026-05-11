@@ -295,14 +295,14 @@ function escapeLikePattern(raw: string): string {
 
 Deno.serve(async (req) => {
   try {
-    // 認証: Supabase Database Webhook (migration 063/065) は service_role key を
-    // Bearer で渡してくる。それ以外 (anon key・無認証・改ざんトークン) は弾く。
-    // Edge Function 自体は verify_jwt がデフォルト ON だが、ここで二重に確認する。
-    const authHeader = req.headers.get("Authorization") ?? "";
-    if (authHeader !== `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`) {
-      return new Response("unauthorized", { status: 401 });
-    }
-
+    // 認証は Supabase Edge Function 標準の verify_jwt (config.toml で ON) に
+    // 委ねる。アプリ側で `Authorization === Bearer ${SERVICE_ROLE_KEY}` を
+    // 厳格に突き合わせるアプローチは過去 (2026-05-11) に試したが、
+    // migration 063/065 の notify_mikan_mention() が使う
+    // `current_setting('supabase.service_role_key', true)` が Supabase Cloud
+    // では未設定で空文字列を返し、本物の正規呼び出しまで 401 で弾けてしまった。
+    // GUC を設定するか、verify_jwt が認可してくれる JWT (anon/service_role) を
+    // 確実に送る形に DB トリガー側を直してから、再導入する。
     const payload = (await req.json()) as WebhookPayload;
     if (payload.type !== "INSERT") {
       return new Response("ignored", { status: 200 });
