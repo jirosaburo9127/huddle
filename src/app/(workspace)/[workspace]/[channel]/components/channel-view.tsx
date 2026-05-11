@@ -139,6 +139,34 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
   // メッセージ本文の @<name> を厳密にマッチさせるために使う
   const [workspaceMemberNames, setWorkspaceMemberNames] = useState<string[]>([]);
 
+  // DM 相手の表示名 (channel_members 由来)。
+  // 既存ヘッダは messages から相手を探していたが、新規 DM (メッセージ 0 件) では
+  // 取れずに channel.name (= "dm") が出てしまうため、ここで別途取得する。
+  const [dmOtherName, setDmOtherName] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!channel.is_dm) {
+      setDmOtherName(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("channel_members")
+        .select("user_id, profiles(display_name)")
+        .eq("channel_id", channel.id);
+      if (cancelled || !data) return;
+      const other = (data as Array<{
+        user_id: string;
+        profiles: { display_name: string } | Array<{ display_name: string }> | null;
+      }>).find((m) => m.user_id !== currentUserId);
+      const p = other?.profiles;
+      const profile = Array.isArray(p) ? p[0] : p;
+      if (profile?.display_name) setDmOtherName(profile.display_name);
+    })();
+    return () => { cancelled = true; };
+  }, [channel.id, channel.is_dm, currentUserId, supabase]);
+
   useEffect(() => {
     let cancelled = false;
     async function fetchReadTimes() {
@@ -1243,8 +1271,9 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
             </button>
             {channel.is_dm ? (
               <h1 className="font-bold text-base sm:text-lg truncate min-w-0">
-                {/* DMの相手の名前を表示 */}
-                {(() => {
+                {/* DMの相手の名前を表示。channel_members 由来を優先し、
+                    取得前/失敗時は messages から救出、それも無ければ channel.name */}
+                {dmOtherName ?? (() => {
                   const other = messages.find((m) => m.user_id !== currentUserId);
                   return other?.profiles?.display_name || channel.name;
                 })()}
@@ -1532,6 +1561,12 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                   </svg>
                   <p className="text-base font-medium">独り言タイムライン</p>
                   <p className="text-sm mt-1">思ったことを気軽につぶやこう</p>
+                </>
+              ) : channel.is_dm ? (
+                <>
+                  <p className="text-base font-medium">
+                    {dmOtherName ?? "相手"} さんへ DM を送りましょう
+                  </p>
                 </>
               ) : (
                 <>
