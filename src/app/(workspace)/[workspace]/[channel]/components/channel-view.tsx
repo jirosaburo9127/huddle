@@ -118,10 +118,16 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
     })();
   }, [currentUserId, supabase]);
 
-  // 自分の最終既読時刻（チャンネル初回表示時点の値を保持。未読区切り線の位置に使用）
+  // 自分の最終既読時刻（チャンネル初回表示時点の "スナップショット"）。
+  // 未読区切り線の **位置** を決める基準なので、表示中は更新しない。
   // SSR で先取りした値を初期値に使う（RPC が last_read_at を NOW に更新する前の値）
   const [myLastReadAt, setMyLastReadAt] = useState<string | null>(initialLastReadAt);
   const myLastReadAtRef = useRef<string | null>(initialLastReadAt);
+  // サーバが確定した最新の last_read_at (mark_channel_read の戻り値で更新)。
+  // これより新しい未読メッセージが無くなったら未読ラインを完全に隠す。
+  // Router Cache で古い initialLastReadAt が再注入されてもラインが復活しないよう、
+  // 「現在の既読状態」を独立して持つ。
+  const [serverLastReadAt, setServerLastReadAt] = useState<string | null>(initialLastReadAt);
   const unreadLineRef = useRef<HTMLDivElement>(null);
   // 未読区切り線の表示ステート: 画面に入って3秒 → fading → 0.5秒後にhiddenで完全に消す
   const [unreadLineState, setUnreadLineState] = useState<"visible" | "fading" | "hidden">("visible");
@@ -146,6 +152,29 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
     // 10秒ごとに既読状態を更新
     const interval = setInterval(fetchReadTimes, 10000);
     return () => { cancelled = true; clearInterval(interval); };
+  }, [channel.id, supabase]);
+
+  // 既読化: チャンネルをマウントしたら mark_channel_read を呼んでサーバ確定値を取得
+  // 戻り値 (新 last_read_at) を huddle:channelRead イベントで Sidebar に通知する。
+  // これまで Sidebar 側の URL 推測で実行していた既読化を ChannelView 主導に統一。
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase.rpc("mark_channel_read", {
+        p_channel_id: channel.id,
+      });
+      if (cancelled) return;
+      if (error || !data) return; // 失敗時は Sidebar のフォールバックには触らない
+      const newLastReadAt = data as unknown as string;
+      setServerLastReadAt(newLastReadAt);
+      // Sidebar (および他のリスナー) に通知。lastOptimisticReadRef にも記録される。
+      window.dispatchEvent(
+        new CustomEvent("huddle:channelRead", {
+          detail: { channelId: channel.id, lastReadAt: newLastReadAt },
+        })
+      );
+    })();
+    return () => { cancelled = true; };
   }, [channel.id, supabase]);
 
   // workspace 全メンバーの display_name を取得 (メンションハイライト用)
@@ -1536,12 +1565,22 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                   // 未読区切り線: 自分以外のユーザーからの最初の未読メッセージの前に表示する。
                   // 自分自身の投稿は「未読」にはしない（知っている内容なので）が、
                   // 未読判定の「前メッセージが既読か」チェックでは、自分の投稿は "読んだもの扱い" にする。
+                  //
+                  // 二段判定:
+                  //   - lastReadTime (snapshot, 不変): ラインの「位置」を決める基準
+                  //   - serverLastReadTime (現在, mark_channel_read 後に更新):
+                  //     これより新しい未読が無ければラインを出さない (Router Cache で
+                  //     古い initialLastReadAt が再注入されてもラインが復活しない)
                   const lastReadTime = myLastReadAt ? new Date(myLastReadAt).getTime() : 0;
+                  const serverLastReadTime = serverLastReadAt
+                    ? new Date(serverLastReadAt).getTime()
+                    : lastReadTime;
                   const msgTime = new Date(message.created_at).getTime();
                   const isNewForMe =
                     !!myLastReadAt &&
                     message.user_id !== currentUserId &&
-                    msgTime > lastReadTime;
+                    msgTime > lastReadTime &&
+                    msgTime > serverLastReadTime;
                   const prevTreatedAsSeen =
                     prev === null ||
                     prev.user_id === currentUserId ||

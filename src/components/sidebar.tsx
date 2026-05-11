@@ -271,30 +271,31 @@ export function Sidebar({
   const lastOptimisticReadRef = useRef<Map<string, number>>(new Map());
   const READ_GUARD_MS = 2000;
 
-  // 表示中のチャンネルが切り替わったら:
-  // 1. 楽観的にバッジを即消す
-  // 2. 楽観的削除の時刻を記録（ポーリングのガード用）
-  // 3. DB の last_read_at を更新
+  // 既読化の責務は ChannelView に移管したので、Sidebar から mark_channel_read は呼ばない。
+  // (URL 推測でチャンネル ID を起点に既読化していたが、ChannelView マウントで一元化)
+  //
+  // ChannelView がマウント時に mark_channel_read を実行 → 戻り値の last_read_at を
+  // huddle:channelRead イベントで通知。Sidebar はその event を受けてバッジを消す。
   useEffect(() => {
-    if (!currentChannelId) return;
-
-    setUnreadState((prev) => {
-      if (!prev[currentChannelId]) return prev;
-      const next = { ...prev };
-      delete next[currentChannelId];
-      return next;
-    });
-    lastOptimisticReadRef.current.set(currentChannelId, Date.now());
-
-    const supabase = sidebarSupabaseRef.current;
-    supabase
-      .rpc("mark_channel_read", { p_channel_id: currentChannelId })
-      .then(() => {
-        // iOS アプリアイコンのバッジを即時にサーバ真実と同期
-        // （ポーリングを待たずに一瞬で減るようにする）
-        syncAppBadgeFromServer(currentUserId);
+    function onChannelRead(e: Event) {
+      const detail = (e as CustomEvent).detail as { channelId?: string } | undefined;
+      const channelId = detail?.channelId;
+      if (!channelId) return;
+      // 1. バッジ即時削除
+      setUnreadState((prev) => {
+        if (!prev[channelId]) return prev;
+        const next = { ...prev };
+        delete next[channelId];
+        return next;
       });
-  }, [currentChannelId, currentUserId]);
+      // 2. ポーリングが古いサーバ値で復活させないようガード時刻を記録
+      lastOptimisticReadRef.current.set(channelId, Date.now());
+      // 3. iOS アプリアイコンのバッジを即時にサーバ真実と同期
+      syncAppBadgeFromServer(currentUserId);
+    }
+    window.addEventListener("huddle:channelRead", onChannelRead);
+    return () => window.removeEventListener("huddle:channelRead", onChannelRead);
+  }, [currentUserId]);
 
   // 各チャンネルの所属ユーザーIDを取得（チャンネル行のメンバーアバター表示用）
   useEffect(() => {
@@ -383,23 +384,18 @@ export function Sidebar({
         setDecisionUnreadCount(decisionRes.data);
       }
 
-      if (channelRes.data && Array.isArray(channelRes.data)) {
+      // 通信エラー時のみ local を維持する (サーバから「空配列」を信頼する設計に変更)。
+      // 以前は serverCounts.length === 0 && prev > 0 のとき local を維持していたが、
+      // これが「既読化したのにバッジが復活する」事故の主因だったので撤去。
+      // 真実の源はサーバ。READ_GUARD_MS の時間ベースガードだけで吸収する。
+      if (channelRes.error) {
+        // ネットワークエラー等。前回値を保持して次回ポーリングを待つ。
+        // do nothing.
+      } else if (Array.isArray(channelRes.data)) {
         const serverCounts = channelRes.data as Array<{ channel_id: string; unread_count: number }>;
         const currentId = currentChannelIdRef.current;
         const now = Date.now();
-        // サーバを真実とみなして state を置換する。
-        // 例外:
-        //   - 表示中のチャンネル (currentId): 開いた瞬間に既読扱いするので除外
-        //   - 直近 READ_GUARD_MS 以内に楽観的削除したチャンネル: mark_channel_read の
-        //     DB 反映待ちで一時的にサーバが古い未読を返すケースを無視する
-        //   - サーバが空配列を返したのに local に未読がある場合: サーバ側の一時的な
-        //     不具合と判断して local を維持する（"他チャンネルを既読にしたら別チャンネルの
-        //     バッジも消える" 再発防止）
-        setUnreadState((prev) => {
-          if (serverCounts.length === 0 && Object.keys(prev).length > 0) {
-            return prev;
-          }
-
+        setUnreadState(() => {
           const next: Record<string, number> = {};
           for (const row of serverCounts) {
             if (row.channel_id === currentId) continue;
