@@ -412,6 +412,9 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
             clearInterval(retryInterval);
             retryInterval = null;
           }
+          // ジャンプ成功 → URLから ?m= を消す（同じ項目の再タップで再発火できるようにする）
+          jumpHandledIdRef.current = null;
+          router.replace(pathname, { scroll: false });
           // ResizeObserver の最大 3s より後に解除し、自動スクロールに負けないようにする
           releaseTimer = setTimeout(() => { jumpActiveRef.current = false; }, 3500);
         } else if (attempts >= maxAttempts) {

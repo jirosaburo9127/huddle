@@ -357,7 +357,7 @@ export function ActivityModal({ workspaceSlug, workspaceId, onClose }: Props) {
               {replies.map((a) => (
                 <li key={a.reply_id}>
                   <Link
-                    href={`/${workspaceSlug}/${a.channel_slug}?m=${a.parent_message_id}`}
+                    href={`/${workspaceSlug}/${a.channel_slug}?m=${a.reply_id}`}
                     onClick={onClose}
                     className={`flex items-start gap-3 px-4 py-3 transition-colors ${
                       a.is_new
