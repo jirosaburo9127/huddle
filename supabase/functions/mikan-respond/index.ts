@@ -1,13 +1,21 @@
 // Supabase Edge Function: みかん（AIファシリテーター）の返信生成
 //
-// 単一モード (mention): mentions テーブルへの INSERT が起点
-//   - @みかん で呼ばれた時。会話 + ツール (propose_event 等) を渡し、
-//     テキスト返信もしくは予定提案を投稿する。
-//   - 予定登録の判断は LLM のプロンプト側で完結させる
-//     (場所未確認・過去日・日時不明なら確認質問を返す)。
+// 動作モード: mention のみ (ユーザー起点)
+//   - mentions テーブルへの INSERT が起点。@みかん で呼ばれた時に
+//     会話 + 4 つのツール (propose_event / set_event_reminder / web_search /
+//     web_fetch) を渡し、テキスト返信もしくは予定提案を投稿する。
+//   - 予定登録の一次判断 (場所未確認・過去日・日時不明なら確認質問を返す)
+//     は LLM のシステムプロンプトで誘導する想定。コード側にも保険フィルタは
+//     置かない。LLM が誤判定したらユーザーがその場で訂正できる前提。
+//   - したがって「期待した振る舞い」であり、強い実装保証ではない点に注意。
 //
-// なお messages テーブルへの INSERT (旧 listen モード = 自動見守り提案)
-// は廃止した。ユーザー起点 (Mode A) のみで運用する。
+// 旧 messages テーブル INSERT 起点 (自動見守り = 旧 Mode B) は廃止済み。
+//   - 理由: 自動モードは「保険フィルタ禁止」方針と相性が悪く、重複防止や
+//     場所未確認 skip などのコード側バリデーションを後付けで積む方向に
+//     走ってしまうため。ユーザー起点の Mode A 1 本に絞った。
+//   - DB 側のトリガー (messages_mikan_listen_trigger / notify_mikan_listen)
+//     は migration 117 で DROP 済み。Edge Function 側でも messages payload は
+//     早期 return で受け付けない (Webhook が残っていても no-op)。
 //
 // 環境変数 (Supabase Secrets):
 //   ANTHROPIC_API_KEY        : Anthropic Console で発行する API キー
@@ -32,7 +40,7 @@ const WEB_SEARCH_MAX_USES = 5;
 // プロンプト
 // =============================================================================
 
-// Mode A: ファシリテーターとしての通常会話 + 予定登録
+// ファシリテーターとしての通常会話 + 予定登録 (mention 起点)
 const SYSTEM_PROMPT_MENTION = `あなたは「みかん」というオンラインチームチャットのファシリテーター AI です。
 以下の役割と性格を厳守してください。
 
@@ -289,9 +297,9 @@ Deno.serve(async (req) => {
       auth: { persistSession: false },
     });
 
-    // Mode A (mention) のみ受け付ける。messages テーブル INSERT (旧 listen) は捨てる
+    // mention 起点のみ受け付ける。messages テーブル INSERT (旧 Mode B) は捨てる
     if (payload.table !== "mentions") {
-      return new Response("ignored (listen mode removed)", { status: 200 });
+      return new Response("ignored (mode B removed)", { status: 200 });
     }
     const mentionPayload = payload as MentionPayload;
     if (mentionPayload.record.mentioned_user_id !== MIKAN_USER_ID) {
