@@ -246,7 +246,8 @@ export function Sidebar({
 
   // 現在開いているチャンネルのID（pathname → slug → channel）
   // 独り言チャンネルは別フィールド (hitorigotoChannel) に入っているので、
-  // ここで明示的に含めないと mark_channel_read が呼ばれず既読バッジが消えない
+  // ここで明示的に含めないとポーリングのスキップ判定や Realtime 即時バッジ消しが
+  // できない（既読化自体は ChannelView の責務）
   const currentChannelId = useMemo(() => {
     const slug = pathname.split("/")[2]; // /[workspace]/[channel]
     if (!slug) return null;
@@ -554,14 +555,10 @@ export function Sidebar({
             return;
           }
 
-          // 表示中チャンネル → 自動既読 + バッジも消す
+          // 表示中チャンネル → ChannelView 側の Realtime ハンドラが mark_channel_read を実行し
+          // huddle:channelRead イベントで通知してくる。Sidebar はバッジを即時に消すだけ。
+          // (RPC を二重に呼ばないことで責務分離を維持し、ChannelView を唯一の既読源にする)
           if (msg.channel_id === currentChannelId) {
-            supabase
-              .rpc("mark_channel_read", { p_channel_id: msg.channel_id })
-              .then(() => {
-                syncAppBadgeFromServer(currentUserId);
-              });
-            // バッジが残らないよう明示的に消す + ポーリングガードに登録
             setUnreadState((prev) => {
               if (!prev[msg.channel_id]) return prev;
               const next = { ...prev };

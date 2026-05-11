@@ -154,20 +154,40 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
     return () => { cancelled = true; clearInterval(interval); };
   }, [channel.id, supabase]);
 
-  // 既読化: チャンネルをマウントしたら mark_channel_read を呼んでサーバ確定値を取得
-  // 戻り値 (新 last_read_at) を huddle:channelRead イベントで Sidebar に通知する。
-  // これまで Sidebar 側の URL 推測で実行していた既読化を ChannelView 主導に統一。
+  // 既読化: チャンネルをマウントしたら
+  //   1. サーバから FRESH な pre-mark last_read_at を取得 (Router Cache 対策)
+  //   2. mark_channel_read で last_read_at を NOW() に更新
+  //   3. 未読ライン位置の基準 (myLastReadAt) を fresh pre 値に揃える
+  //      → 再訪問時に Router Cache の古い initialLastReadAt が混入しても
+  //        サーバ真実の前回既読時刻でラインが計算され、二度出ない
+  //   4. huddle:channelRead イベントを発火して Sidebar のバッジを消す
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const { data, error } = await supabase.rpc("mark_channel_read", {
+      // (1) FRESH pre-mark last_read_at を直接 channel_members から取得
+      const { data: pre } = await supabase
+        .from("channel_members")
+        .select("last_read_at")
+        .eq("channel_id", channel.id)
+        .eq("user_id", currentUserId)
+        .maybeSingle();
+      if (cancelled) return;
+      const preLastReadAt = (pre as { last_read_at: string | null } | null)?.last_read_at ?? null;
+      // initialLastReadAt が Router Cache で古い場合に備え、サーバ最新値で上書き
+      if (preLastReadAt && preLastReadAt !== myLastReadAtRef.current) {
+        setMyLastReadAt(preLastReadAt);
+        myLastReadAtRef.current = preLastReadAt;
+      }
+
+      // (2) mark_channel_read で既読確定
+      const { data: marked, error } = await supabase.rpc("mark_channel_read", {
         p_channel_id: channel.id,
       });
-      if (cancelled) return;
-      if (error || !data) return; // 失敗時は Sidebar のフォールバックには触らない
-      const newLastReadAt = data as unknown as string;
+      if (cancelled || error || !marked) return;
+      const newLastReadAt = marked as unknown as string;
       setServerLastReadAt(newLastReadAt);
-      // Sidebar (および他のリスナー) に通知。lastOptimisticReadRef にも記録される。
+
+      // (3) Sidebar / 他リスナーに通知
       window.dispatchEvent(
         new CustomEvent("huddle:channelRead", {
           detail: { channelId: channel.id, lastReadAt: newLastReadAt },
@@ -175,7 +195,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
       );
     })();
     return () => { cancelled = true; };
-  }, [channel.id, supabase]);
+  }, [channel.id, currentUserId, supabase]);
 
   // workspace 全メンバーの display_name を取得 (メンションハイライト用)
   useEffect(() => {
@@ -671,6 +691,25 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
             if (prev.some((m) => m.id === newMessage.id)) return prev;
             return [...prev, newMessage];
           });
+
+          // 表示中チャンネルへの他人の新着 → 自動既読化 + Sidebar に通知。
+          // これで「チャンネルを開いたまま新着が来た時に、次回再訪問でラインが再発する」
+          // 問題が解消する (mark_channel_read 一元化)。
+          if (newMessage.user_id !== currentUserId) {
+            (async () => {
+              const { data: marked, error } = await supabase.rpc("mark_channel_read", {
+                p_channel_id: channel.id,
+              });
+              if (error || !marked) return;
+              const newLastReadAt = marked as unknown as string;
+              setServerLastReadAt(newLastReadAt);
+              window.dispatchEvent(
+                new CustomEvent("huddle:channelRead", {
+                  detail: { channelId: channel.id, lastReadAt: newLastReadAt },
+                })
+              );
+            })();
+          }
 
           // 通知表示
           showMessageNotification({
@@ -1566,21 +1605,16 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                   // 自分自身の投稿は「未読」にはしない（知っている内容なので）が、
                   // 未読判定の「前メッセージが既読か」チェックでは、自分の投稿は "読んだもの扱い" にする。
                   //
-                  // 二段判定:
-                  //   - lastReadTime (snapshot, 不変): ラインの「位置」を決める基準
-                  //   - serverLastReadTime (現在, mark_channel_read 後に更新):
-                  //     これより新しい未読が無ければラインを出さない (Router Cache で
-                  //     古い initialLastReadAt が再注入されてもラインが復活しない)
+                  // myLastReadAt はマウント時に channel_members から FRESH 値を取得して上書き済み
+                  // (Router Cache の古い initialLastReadAt は使わない)。よってここでは
+                  // 「msg > myLastReadAt」だけで判定して OK。
+                  // 3秒で hide する unreadLineState のタイマーで自動消滅する。
                   const lastReadTime = myLastReadAt ? new Date(myLastReadAt).getTime() : 0;
-                  const serverLastReadTime = serverLastReadAt
-                    ? new Date(serverLastReadAt).getTime()
-                    : lastReadTime;
                   const msgTime = new Date(message.created_at).getTime();
                   const isNewForMe =
                     !!myLastReadAt &&
                     message.user_id !== currentUserId &&
-                    msgTime > lastReadTime &&
-                    msgTime > serverLastReadTime;
+                    msgTime > lastReadTime;
                   const prevTreatedAsSeen =
                     prev === null ||
                     prev.user_id === currentUserId ||
