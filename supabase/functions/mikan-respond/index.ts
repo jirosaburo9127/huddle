@@ -27,6 +27,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+// notify_mikan_mention() trigger (migration 118) が X-Mikan-Secret ヘッダで送る
+// 共有 secret。Supabase Vault に同じ値を保管している。
+const MIKAN_WEBHOOK_SECRET = Deno.env.get("MIKAN_WEBHOOK_SECRET") ?? "";
 
 const MIKAN_USER_ID = "00000000-0000-0000-0000-00000000aaaa";
 const MODEL = "claude-haiku-4-5-20251001";
@@ -295,14 +298,24 @@ function escapeLikePattern(raw: string): string {
 
 Deno.serve(async (req) => {
   try {
-    // 認証は Supabase Edge Function 標準の verify_jwt (config.toml で ON) に
-    // 委ねる。アプリ側で `Authorization === Bearer ${SERVICE_ROLE_KEY}` を
-    // 厳格に突き合わせるアプローチは過去 (2026-05-11) に試したが、
-    // migration 063/065 の notify_mikan_mention() が使う
-    // `current_setting('supabase.service_role_key', true)` が Supabase Cloud
-    // では未設定で空文字列を返し、本物の正規呼び出しまで 401 で弾けてしまった。
-    // GUC を設定するか、verify_jwt が認可してくれる JWT (anon/service_role) を
-    // 確実に送る形に DB トリガー側を直してから、再導入する。
+    // 認証: notify_mikan_mention() トリガー (migration 118) が
+    // Vault の `mikan_webhook_secret` を取り出して X-Mikan-Secret ヘッダで
+    // 送ってくる。Edge Function 側はそれと MIKAN_WEBHOOK_SECRET (Supabase
+    // Secrets) を突合して、不一致は 401。これで anon JWT を持っただけの
+    // 外部リクエストからの濫用 (Anthropic API 料金浪費) を防ぐ。
+    //
+    // 旧 Authorization Bearer 厳密一致アプローチは Supabase Cloud で
+    // `current_setting('supabase.service_role_key', true)` が空文字を返す問題
+    // で 401 全弾きになるため不採用。huddle-supabase-gotchas 項目 9 参照。
+    if (!MIKAN_WEBHOOK_SECRET) {
+      console.error("[mikan] MIKAN_WEBHOOK_SECRET env not set");
+      return new Response("server misconfigured", { status: 500 });
+    }
+    const providedSecret = req.headers.get("X-Mikan-Secret") ?? "";
+    if (providedSecret !== MIKAN_WEBHOOK_SECRET) {
+      return new Response("unauthorized", { status: 401 });
+    }
+
     const payload = (await req.json()) as WebhookPayload;
     if (payload.type !== "INSERT") {
       return new Response("ignored", { status: 200 });
