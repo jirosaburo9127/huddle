@@ -282,12 +282,27 @@ function nowJstString(): string {
   return formatDateTimeJa(new Date().toISOString());
 }
 
+// ILIKE のワイルドカード (%, _) と区切り文字 (\) を全て \-エスケープする。
+// LLM が title_hint に「%会議%」「会_議」を返した時に、PostgreSQL の LIKE が
+// ワイルドカード解釈してしまうのを防ぐ。
+function escapeLikePattern(raw: string): string {
+  return raw.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
+}
+
 // =============================================================================
 // メイン
 // =============================================================================
 
 Deno.serve(async (req) => {
   try {
+    // 認証: Supabase Database Webhook (migration 063/065) は service_role key を
+    // Bearer で渡してくる。それ以外 (anon key・無認証・改ざんトークン) は弾く。
+    // Edge Function 自体は verify_jwt がデフォルト ON だが、ここで二重に確認する。
+    const authHeader = req.headers.get("Authorization") ?? "";
+    if (authHeader !== `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`) {
+      return new Response("unauthorized", { status: 401 });
+    }
+
     const payload = (await req.json()) as WebhookPayload;
     if (payload.type !== "INSERT") {
       return new Response("ignored", { status: 200 });
@@ -426,7 +441,7 @@ Deno.serve(async (req) => {
         .order("start_at", { ascending: true })
         .limit(1);
       if (titleHint) {
-        q = q.ilike("title", `%${titleHint}%`);
+        q = q.ilike("title", `%${escapeLikePattern(titleHint)}%`);
       }
       const { data: events, error: evErr } = await q;
 
@@ -448,16 +463,30 @@ Deno.serve(async (req) => {
 
       const targetEvent = events[0] as { id: string; title: string; start_at: string };
 
-      // reminder_offsets を更新
+      // reminder_offsets を更新 (失敗したらユーザーに失敗を返す)
       const newOffsets = offsetMin === 0 ? [] : [offsetMin];
-      await supabase.from("events")
+      const { error: updateErr } = await supabase.from("events")
         .update({ reminder_offsets: newOffsets })
         .eq("id", targetEvent.id);
+      if (updateErr) {
+        console.error("[mikan] events update failed:", updateErr);
+        await supabase.from("messages").insert({
+          channel_id: msg.channel_id,
+          user_id: MIKAN_USER_ID,
+          content: "リマインドの設定変更に失敗しました 🙏",
+        });
+        return new Response("update failed", { status: 500 });
+      }
 
-      // 既発火履歴を該当 event について全部削除 (新オフセットで再発火できるように)
-      await supabase.from("event_reminder_fires")
+      // 既発火履歴を該当 event について全部削除 (新オフセットで再発火できるように)。
+      // 失敗しても致命的ではない (新オフセットが過去側だと再発火されないだけ) ので
+      // 警告ログだけ残して処理は続行する。
+      const { error: deleteErr } = await supabase.from("event_reminder_fires")
         .delete()
         .eq("event_id", targetEvent.id);
+      if (deleteErr) {
+        console.warn("[mikan] event_reminder_fires delete failed (non-fatal):", deleteErr);
+      }
 
       // ラベル整形
       let label: string;
@@ -531,8 +560,19 @@ Deno.serve(async (req) => {
           location: location || null,
         });
 
+        // event_proposals INSERT に失敗したら、孤児メッセージ (リアクションしても
+        // 登録できない 📅 メッセージ) が残らないように、先に投稿した messages を
+        // 削除してロールバックする。
         if (propErr) {
-          console.error("[mikan] event_proposals insert failed:", propErr);
+          console.error("[mikan] event_proposals insert failed, rolling back message:", propErr);
+          const { error: rollbackErr } = await supabase
+            .from("messages")
+            .delete()
+            .eq("id", msgData.id);
+          if (rollbackErr) {
+            console.error("[mikan] rollback delete also failed:", rollbackErr);
+          }
+          return new Response("event_proposals insert failed", { status: 500 });
         }
 
         return new Response("proposal posted", { status: 200 });
