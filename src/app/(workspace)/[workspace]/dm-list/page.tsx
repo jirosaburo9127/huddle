@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
 import { createClient } from "@/lib/supabase/client";
+import { CreateDmModal } from "@/components/create-dm-modal";
 
 type DmItem = {
   slug: string;
@@ -15,17 +16,33 @@ type DmItem = {
   lastAt: string | null;
 };
 
+type WsMember = {
+  user_id: string;
+  profiles: {
+    id: string;
+    display_name: string;
+    avatar_url: string | null;
+    status: string | null;
+  };
+};
+
 export default function DmListPage() {
   const setSidebarOpen = useMobileNavStore((s) => s.setSidebarOpen);
   const params = useParams<{ workspace: string }>();
   const [items, setItems] = useState<DmItem[]>([]);
   const [loading, setLoading] = useState(true);
+  // 新規DM作成モーダル用
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [members, setMembers] = useState<WsMember[]>([]);
+  const [showCreateDm, setShowCreateDm] = useState(false);
 
   useEffect(() => {
     (async () => {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setLoading(false); return; }
+      setCurrentUserId(user.id);
 
       const { data: ws } = await supabase
         .from("workspaces")
@@ -33,6 +50,30 @@ export default function DmListPage() {
         .eq("slug", params.workspace)
         .maybeSingle();
       if (!ws) { setLoading(false); return; }
+      setWorkspaceId(ws.id);
+
+      // 新規DM 作成モーダル用のワークスペースメンバー一覧
+      const { data: wsMembers } = await supabase
+        .from("workspace_members")
+        .select("user_id, profiles(id, display_name, avatar_url, status)")
+        .eq("workspace_id", ws.id);
+      if (wsMembers) {
+        // profiles は relation で 1:1 だが、Supabase の型が単数/配列ゆらぐので吸収
+        const normalized: WsMember[] = (wsMembers as Array<{
+          user_id: string;
+          profiles:
+            | { id: string; display_name: string; avatar_url: string | null; status: string | null }
+            | Array<{ id: string; display_name: string; avatar_url: string | null; status: string | null }>
+            | null;
+        }>)
+          .filter((m) => m.profiles !== null)
+          .map((m) => ({
+            user_id: m.user_id,
+            profiles: Array.isArray(m.profiles) ? m.profiles[0] : m.profiles!,
+          }))
+          .filter((m) => m.profiles);
+        setMembers(normalized);
+      }
 
       // DM チャンネル取得
       const { data: dms } = await supabase
@@ -101,7 +142,20 @@ export default function DmListPage() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
-        <h1 className="font-bold text-lg">ダイレクトメッセージ</h1>
+        <h1 className="font-bold text-lg flex-1">ダイレクトメッセージ</h1>
+        {/* 新しい DM 開始ボタン (PC版 sidebar と同じ + アイコン) */}
+        <button
+          type="button"
+          onClick={() => setShowCreateDm(true)}
+          disabled={!workspaceId || !currentUserId}
+          className="ml-2 p-2 text-muted hover:text-accent rounded-lg hover:bg-white/[0.04] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          aria-label="新しいメッセージ"
+          title="新しいメッセージ"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+        </button>
       </header>
 
       <div className="flex-1 overflow-y-auto">
@@ -145,6 +199,17 @@ export default function DmListPage() {
           </div>
         )}
       </div>
+
+      {/* 新規 DM 作成モーダル */}
+      {showCreateDm && workspaceId && currentUserId && (
+        <CreateDmModal
+          workspaceId={workspaceId}
+          workspaceSlug={params.workspace}
+          currentUserId={currentUserId}
+          members={members}
+          onClose={() => setShowCreateDm(false)}
+        />
+      )}
     </div>
   );
 }
