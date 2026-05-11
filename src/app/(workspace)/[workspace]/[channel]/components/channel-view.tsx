@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { RealtimePostgresInsertPayload, RealtimePostgresUpdatePayload } from "@supabase/supabase-js";
 import type { Channel, Message, MessageWithProfile, Reaction } from "@/lib/supabase/types";
 import Link from "next/link";
-import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { useRouter, useSearchParams, usePathname, useParams } from "next/navigation";
 import type { WorkspaceCategory } from "@/lib/channel-categories";
 import { MessageItem } from "./message-item";
 import { HitorigotoPostCard } from "./hitorigoto-post-card";
@@ -36,6 +36,9 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
+  // route segment から workspace slug を取得 (pathname 分割は basePath / locale で壊れる)
+  const routeParams = useParams<{ workspace?: string }>();
+  const workspaceSlug = typeof routeParams?.workspace === "string" ? routeParams.workspace : "";
   // 進行中まとめなど、外部からの投稿ジャンプ指定（?m=<messageId>）
   // 同じIDで二重実行されないよう処理済みIDを保持
   const jumpHandledIdRef = useRef<string | null>(null);
@@ -311,13 +314,14 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
     setReplyTo(msg);
   }, []);
 
-  // 引用元メッセージへジャンプしてハイライト
-  const handleJumpToMessage = useCallback((messageId: string) => {
+  // 引用元メッセージへジャンプしてハイライト（成功したら true を返す）
+  const handleJumpToMessage = useCallback((messageId: string): boolean => {
     const el = document.getElementById(`msg-${messageId}`);
-    if (!el) return;
+    if (!el) return false;
     el.scrollIntoView({ behavior: "smooth", block: "center" });
     el.classList.add("reply-jump-highlight");
     setTimeout(() => el.classList.remove("reply-jump-highlight"), 1600);
+    return true;
   }, []);
 
   // URL ?m=<messageId> で指定された投稿へジャンプ（進行中まとめ等からの遷移用）
@@ -327,14 +331,19 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
     if (!target) return;
     if (jumpHandledIdRef.current === target) return;
 
-    // ジャンプ進行中フラグを立てる（既存の自動スクロールを抑止）
-    jumpActiveRef.current = true;
+    // 処理開始マーク: 同じ effect が再発火しても並列リトライを起こさない
+    // （失敗時のみ null に戻して次回タップでの再試行を許可する）
     jumpHandledIdRef.current = target;
 
-    // ジャンプ実行後に時間差でスクロールをやり直す（ResizeObserver対策）
-    function runJump() {
-      handleJumpToMessage(target!);
-    }
+    // ジャンプ進行中フラグを立てる（既存の自動スクロールを抑止）
+    jumpActiveRef.current = true;
+
+    // 決定事項フィルタが有効だとターゲットがDOMに出ない可能性がある → 解除
+    setShowDecisionsOnly(false);
+
+    let retryInterval: ReturnType<typeof setInterval> | null = null;
+    let releaseTimer: ReturnType<typeof setTimeout> | null = null;
+    let cancelled = false;
 
     async function run() {
       const msgInState = messagesRef.current.find((m) => m.id === target);
@@ -348,8 +357,11 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
           .eq("channel_id", channel.id)
           .maybeSingle();
 
+        if (cancelled) return;
+
         if (!targetRow) {
           // 該当投稿が見つからない（削除済み or チャンネル違い）
+          jumpHandledIdRef.current = null;
           jumpActiveRef.current = false;
           return;
         }
@@ -361,6 +373,8 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
           .gte("created_at", targetRow.created_at)
           .order("created_at", { ascending: true })
           .limit(500);
+
+        if (cancelled) return;
 
         if (range && range.length > 0) {
           setMessages((prev) => {
@@ -376,17 +390,60 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
         }
       }
 
-      // 既存の初期スクロール(300ms)・ResizeObserver(最大3s)より後に複数回ジャンプし直して勝たせる
-      // 0ms, 400ms, 1000ms, 2000ms, 3100ms の5回
-      const delays = [0, 400, 1000, 2000, 3100];
-      for (const d of delays) {
-        setTimeout(runJump, d);
-      }
-      // 抑止フラグは 3.5 秒後に解除（以降は通常の自動スクロールへ戻す）
-      setTimeout(() => { jumpActiveRef.current = false; }, 3500);
+      if (cancelled) return;
+
+      // DOM出現を待ってスクロール（最大5秒、200msごとにリトライ）
+      // React描画完了を待つ必要があるため、即座に見つからない場合がある
+      let attempts = 0;
+      const maxAttempts = 25; // 200ms × 25 = 5秒
+      retryInterval = setInterval(() => {
+        // 別IDのジャンプが始まった or アンマウント済みなら即停止
+        if (cancelled || jumpHandledIdRef.current !== target) {
+          if (retryInterval) {
+            clearInterval(retryInterval);
+            retryInterval = null;
+          }
+          return;
+        }
+        attempts++;
+        const ok = handleJumpToMessage(target!);
+        if (ok) {
+          if (retryInterval) {
+            clearInterval(retryInterval);
+            retryInterval = null;
+          }
+          // ResizeObserver の最大 3s より後に解除し、自動スクロールに負けないようにする
+          releaseTimer = setTimeout(() => { jumpActiveRef.current = false; }, 3500);
+        } else if (attempts >= maxAttempts) {
+          if (retryInterval) {
+            clearInterval(retryInterval);
+            retryInterval = null;
+          }
+          // 5秒待ってもDOMが出なかった → 諦める（次回タップで再試行可能にする）
+          jumpHandledIdRef.current = null;
+          jumpActiveRef.current = false;
+        }
+      }, 200);
     }
 
     run();
+
+    return () => {
+      cancelled = true;
+      if (retryInterval) {
+        clearInterval(retryInterval);
+        retryInterval = null;
+      }
+      if (releaseTimer) {
+        clearTimeout(releaseTimer);
+        releaseTimer = null;
+      }
+      // releaseTimer 未発火のまま unmount / URL 変更 / channel 切替で cleanup だけ走ると
+      // jumpActiveRef = true が残り、以降の自動スクロールが全て抑止されてしまう
+      if (jumpHandledIdRef.current === target) {
+        jumpActiveRef.current = false;
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, channel.id]);
 
@@ -1270,9 +1327,9 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
             <button
               onClick={() => {
                 if (channel.is_dm) {
-                  // pathname は /<workspace-slug>/<channel-slug>
-                  const workspaceSlug = pathname.split("/")[1] ?? "";
-                  router.push(`/${workspaceSlug}/dm-list`);
+                  // workspaceSlug が空のときに `//dm-list` へ飛ばないようガード
+                  if (!workspaceSlug) return;
+                  router.push(`/${encodeURIComponent(workspaceSlug)}/dm-list`);
                 } else {
                   setSidebarOpen(true);
                 }
