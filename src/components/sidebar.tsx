@@ -58,6 +58,7 @@ type SidebarProps = {
   allWorkspaces: Array<{ id: string; name: string; slug: string }>;
   categories?: WorkspaceCategory[];
   hitorigotoChannel?: { id: string; slug: string; name: string } | null;
+  isMaster?: boolean;
 };
 
 export function Sidebar({
@@ -71,6 +72,7 @@ export function Sidebar({
   allWorkspaces,
   categories = [],
   hitorigotoChannel,
+  isMaster = false,
 }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -1207,6 +1209,17 @@ export function Sidebar({
                 </>
               );
             })()}
+            {/* マスター画面 (is_master 限定で表示) */}
+            {isMaster && (
+              <Link
+                href="/master"
+                className="text-muted hover:text-foreground transition-colors p-1.5 rounded-lg hover:bg-white/[0.04] shrink-0"
+                title="マスター画面（全WS閲覧）"
+                aria-label="マスター画面を開く"
+              >
+                <span className="text-base leading-none">🔑</span>
+              </Link>
+            )}
             {/* LP プレビュー（アプリ内から /about に直接ジャンプ） */}
             <Link
               href="/about"

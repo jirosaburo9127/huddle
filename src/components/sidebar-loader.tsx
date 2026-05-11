@@ -97,6 +97,14 @@ export async function WorkspaceShell({ workspaceSlug, children }: WorkspaceShell
     .order("sort_order", { ascending: true });
   const categories = (categoriesData || []) as Array<{ slug: string; label: string; sort_order: number; color: string | null }>;
 
+  // is_master 判定 (/master リンクの表示制御に使う)
+  const { data: ownProfile } = await supabase
+    .from("profiles")
+    .select("is_master")
+    .eq("id", user.id)
+    .maybeSingle();
+  const isMaster = !!ownProfile?.is_master;
+
   return (
     <>
       <Sidebar
@@ -110,6 +118,7 @@ export async function WorkspaceShell({ workspaceSlug, children }: WorkspaceShell
         allWorkspaces={result.all_workspaces || []}
         categories={categories}
         hitorigotoChannel={result.hitorigoto_channel ?? null}
+        isMaster={isMaster}
       />
       <KeyboardShortcuts workspaceId={result.workspace.id} workspaceSlug={workspaceSlug}>
         <MainPane>{children}</MainPane>
