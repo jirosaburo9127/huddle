@@ -328,7 +328,11 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
   // 初期ロードは直近50件のみのため、古い投稿はDBから追加取得してからスクロールする
   useEffect(() => {
     const target = searchParams?.get("m");
-    if (!target) return;
+    if (!target) {
+      // URL から ?m= が消えた → 次回タップで再ジャンプできるようリセット
+      jumpHandledIdRef.current = null;
+      return;
+    }
     if (jumpHandledIdRef.current === target) return;
 
     // 処理開始マーク: 同じ effect が再発火しても並列リトライを起こさない
@@ -412,11 +416,21 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
             clearInterval(retryInterval);
             retryInterval = null;
           }
-          // ジャンプ成功 → URLから ?m= を消す（同じ項目の再タップで再発火できるようにする）
-          jumpHandledIdRef.current = null;
-          router.replace(pathname, { scroll: false });
-          // ResizeObserver の最大 3s より後に解除し、自動スクロールに負けないようにする
-          releaseTimer = setTimeout(() => { jumpActiveRef.current = false; }, 3500);
+          // ResizeObserver の最大 3s より後に解除し、自動スクロールに負けないようにする。
+          // ?m= の除去は releaseTimer より後に行う。先に router.replace すると
+          // effect cleanup が走り releaseTimer がキャンセルされて jumpActiveRef の
+          // 保護が早期解除される問題を防ぐ。
+          releaseTimer = setTimeout(() => {
+            jumpActiveRef.current = false;
+            // URLから ?m= だけ消す（他クエリは保持。ref リセットは
+            // URL 更新後に effect が再実行され `!target` ブランチで自動的に行われる）
+            if (searchParams?.has("m")) {
+              const params = new URLSearchParams(searchParams.toString());
+              params.delete("m");
+              const qs = params.toString();
+              router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+            }
+          }, 3500);
         } else if (attempts >= maxAttempts) {
           if (retryInterval) {
             clearInterval(retryInterval);
