@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
+import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 type ReactionActivity = {
@@ -53,6 +53,7 @@ type Tab = "reactions" | "mentions" | "replies";
 type Props = {
   workspaceSlug: string;
   workspaceId: string;
+  currentChannelSlug: string | null;
   onClose: () => void;
 };
 
@@ -92,7 +93,20 @@ function Avatar({ url, name }: { url: string | null; name: string }) {
   );
 }
 
-export function ActivityModal({ workspaceSlug, workspaceId, onClose }: Props) {
+export function ActivityModal({ workspaceSlug, workspaceId, currentChannelSlug, onClose }: Props) {
+  const router = useRouter();
+
+  // 同一チャンネル: CustomEvent で直接ジャンプ、別チャンネル: router.push で ?m= ナビゲーション
+  const handleJump = useCallback((channelSlug: string, messageId: string) => {
+    if (channelSlug === currentChannelSlug) {
+      window.dispatchEvent(
+        new CustomEvent("huddle:jumpToMessage", { detail: { messageId } })
+      );
+    } else {
+      router.push(`/${workspaceSlug}/${channelSlug}?m=${messageId}`);
+    }
+    onClose();
+  }, [currentChannelSlug, workspaceSlug, router, onClose]);
   const [tab, setTab] = useState<Tab>("mentions");
   const [reactions, setReactions] = useState<ReactionActivity[]>([]);
   const [mentions, setMentions] = useState<MentionActivity[]>([]);
@@ -116,8 +130,12 @@ export function ActivityModal({ workspaceSlug, workspaceId, onClose }: Props) {
     let cancelled = false;
     (async () => {
       const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (cancelled || !user) return;
       const { data } = await supabase.rpc("get_activity_unread_breakdown", {
-        p_user_id: (await supabase.auth.getUser()).data.user?.id,
+        p_user_id: user.id,
         p_workspace_id: workspaceId,
       });
       if (cancelled) return;
@@ -154,10 +172,12 @@ export function ActivityModal({ workspaceSlug, workspaceId, onClose }: Props) {
         if (cancelled) return;
         if (data && Array.isArray(data)) setReactions(data as ReactionActivity[]);
         await supabase.rpc("mark_activity_seen");
+        if (cancelled) return;
         setLoaded((s) => ({ ...s, reactions: true }));
       } else if (tab === "reactions") {
         // すでに読み込み済みでも、タブを再度開いたら既読更新
         await supabase.rpc("mark_activity_seen");
+        if (cancelled) return;
       }
 
       if (tab === "mentions" && !loaded.mentions) {
@@ -169,9 +189,11 @@ export function ActivityModal({ workspaceSlug, workspaceId, onClose }: Props) {
         if (cancelled) return;
         if (data && Array.isArray(data)) setMentions(data as MentionActivity[]);
         await supabase.rpc("mark_mention_seen");
+        if (cancelled) return;
         setLoaded((s) => ({ ...s, mentions: true }));
       } else if (tab === "mentions") {
         await supabase.rpc("mark_mention_seen");
+        if (cancelled) return;
       }
 
       if (tab === "replies" && !loaded.replies) {
@@ -183,9 +205,11 @@ export function ActivityModal({ workspaceSlug, workspaceId, onClose }: Props) {
         if (cancelled) return;
         if (data && Array.isArray(data)) setReplies(data as ReplyActivity[]);
         await supabase.rpc("mark_reply_seen");
+        if (cancelled) return;
         setLoaded((s) => ({ ...s, replies: true }));
       } else if (tab === "replies") {
         await supabase.rpc("mark_reply_seen");
+        if (cancelled) return;
       }
 
       // 開いたタブのドットだけ即座に消す
@@ -276,10 +300,9 @@ export function ActivityModal({ workspaceSlug, workspaceId, onClose }: Props) {
               <ul className="divide-y divide-border/50">
                 {reactions.map((a) => (
                   <li key={a.reaction_id}>
-                    <Link
-                      href={`/${workspaceSlug}/${a.channel_slug}?m=${a.message_id}`}
-                      onClick={onClose}
-                      className={`flex items-start gap-3 px-4 py-3 transition-colors ${
+                    <button
+                      onClick={() => handleJump(a.channel_slug, a.message_id)}
+                      className={`w-full text-left flex items-start gap-3 px-4 py-3 transition-colors ${
                         a.is_new
                           ? "bg-[#eff6ff] hover:bg-[#dbeafe]"
                           : "hover:bg-white/[0.04]"
@@ -308,7 +331,7 @@ export function ActivityModal({ workspaceSlug, workspaceId, onClose }: Props) {
                           {previewContent(a.message_content)}
                         </div>
                       </div>
-                    </Link>
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -320,10 +343,9 @@ export function ActivityModal({ workspaceSlug, workspaceId, onClose }: Props) {
               <ul className="divide-y divide-border/50">
                 {mentions.map((a) => (
                   <li key={a.mention_id}>
-                    <Link
-                      href={`/${workspaceSlug}/${a.channel_slug}?m=${a.message_id}`}
-                      onClick={onClose}
-                      className={`flex items-start gap-3 px-4 py-3 transition-colors ${
+                    <button
+                      onClick={() => handleJump(a.channel_slug, a.message_id)}
+                      className={`w-full text-left flex items-start gap-3 px-4 py-3 transition-colors ${
                         a.is_new
                           ? "bg-[#eff6ff] hover:bg-[#dbeafe]"
                           : "hover:bg-white/[0.04]"
@@ -345,7 +367,7 @@ export function ActivityModal({ workspaceSlug, workspaceId, onClose }: Props) {
                           {previewContent(a.message_content)}
                         </div>
                       </div>
-                    </Link>
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -356,10 +378,9 @@ export function ActivityModal({ workspaceSlug, workspaceId, onClose }: Props) {
             <ul className="divide-y divide-border/50">
               {replies.map((a) => (
                 <li key={a.reply_id}>
-                  <Link
-                    href={`/${workspaceSlug}/${a.channel_slug}?m=${a.reply_id}`}
-                    onClick={onClose}
-                    className={`flex items-start gap-3 px-4 py-3 transition-colors ${
+                  <button
+                    onClick={() => handleJump(a.channel_slug, a.reply_id)}
+                    className={`w-full text-left flex items-start gap-3 px-4 py-3 transition-colors ${
                       a.is_new
                         ? "bg-[#eff6ff] hover:bg-[#dbeafe]"
                         : "hover:bg-white/[0.04]"
@@ -381,7 +402,7 @@ export function ActivityModal({ workspaceSlug, workspaceId, onClose }: Props) {
                         ↳ {previewContent(a.parent_content)}
                       </div>
                     </div>
-                  </Link>
+                  </button>
                 </li>
               ))}
             </ul>

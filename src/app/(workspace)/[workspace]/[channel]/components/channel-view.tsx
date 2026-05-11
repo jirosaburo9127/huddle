@@ -324,21 +324,9 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
     return true;
   }, []);
 
-  // URL ?m=<messageId> で指定された投稿へジャンプ（進行中まとめ等からの遷移用）
-  // 初期ロードは直近50件のみのため、古い投稿はDBから追加取得してからスクロールする
-  useEffect(() => {
-    const target = searchParams?.get("m");
-    if (!target) {
-      // URL から ?m= が消えた → 次回タップで再ジャンプできるようリセット
-      jumpHandledIdRef.current = null;
-      return;
-    }
-    if (jumpHandledIdRef.current === target) return;
-
-    // 処理開始マーク: 同じ effect が再発火しても並列リトライを起こさない
-    // （失敗時のみ null に戻して次回タップでの再試行を許可する）
-    jumpHandledIdRef.current = target;
-
+  // メッセージジャンプの共通ロジック（DB追加取得 + DOM待ちリトライ + ハイライト）
+  // 同一チャンネル内のCustomEvent駆動と、別チャンネルからの ?m= URL駆動の両方で使う
+  const executeJump = useCallback((targetId: string, opts?: { cleanupUrl?: boolean }) => {
     // ジャンプ進行中フラグを立てる（既存の自動スクロールを抑止）
     jumpActiveRef.current = true;
 
@@ -347,25 +335,23 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
 
     let retryInterval: ReturnType<typeof setInterval> | null = null;
     let releaseTimer: ReturnType<typeof setTimeout> | null = null;
-    let cancelled = false;
+    let aborted = false;
 
     async function run() {
-      const msgInState = messagesRef.current.find((m) => m.id === target);
+      const msgInState = messagesRef.current.find((m) => m.id === targetId);
 
       if (!msgInState) {
         // 未読込: 対象投稿の created_at を取得し、それ以降をまとめて取得してマージ
         const { data: targetRow } = await supabase
           .from("messages")
           .select("created_at")
-          .eq("id", target!)
+          .eq("id", targetId)
           .eq("channel_id", channel.id)
           .maybeSingle();
 
-        if (cancelled) return;
+        if (aborted) return;
 
         if (!targetRow) {
-          // 該当投稿が見つからない（削除済み or チャンネル違い）
-          jumpHandledIdRef.current = null;
           jumpActiveRef.current = false;
           return;
         }
@@ -378,7 +364,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
           .order("created_at", { ascending: true })
           .limit(500);
 
-        if (cancelled) return;
+        if (aborted) return;
 
         if (range && range.length > 0) {
           setMessages((prev) => {
@@ -394,37 +380,24 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
         }
       }
 
-      if (cancelled) return;
+      if (aborted) return;
 
       // DOM出現を待ってスクロール（最大5秒、200msごとにリトライ）
-      // React描画完了を待つ必要があるため、即座に見つからない場合がある
       let attempts = 0;
       const maxAttempts = 25; // 200ms × 25 = 5秒
       retryInterval = setInterval(() => {
-        // 別IDのジャンプが始まった or アンマウント済みなら即停止
-        if (cancelled || jumpHandledIdRef.current !== target) {
-          if (retryInterval) {
-            clearInterval(retryInterval);
-            retryInterval = null;
-          }
+        if (aborted) {
+          if (retryInterval) { clearInterval(retryInterval); retryInterval = null; }
           return;
         }
         attempts++;
-        const ok = handleJumpToMessage(target!);
+        const ok = handleJumpToMessage(targetId);
         if (ok) {
-          if (retryInterval) {
-            clearInterval(retryInterval);
-            retryInterval = null;
-          }
-          // ResizeObserver の最大 3s より後に解除し、自動スクロールに負けないようにする。
-          // ?m= の除去は releaseTimer より後に行う。先に router.replace すると
-          // effect cleanup が走り releaseTimer がキャンセルされて jumpActiveRef の
-          // 保護が早期解除される問題を防ぐ。
+          if (retryInterval) { clearInterval(retryInterval); retryInterval = null; }
           releaseTimer = setTimeout(() => {
             jumpActiveRef.current = false;
-            // URLから ?m= だけ消す（他クエリは保持。ref リセットは
-            // URL 更新後に effect が再実行され `!target` ブランチで自動的に行われる）
-            if (searchParams?.has("m")) {
+            // URL経由のジャンプの場合は ?m= を消す
+            if (opts?.cleanupUrl && searchParams?.has("m")) {
               const params = new URLSearchParams(searchParams.toString());
               params.delete("m");
               const qs = params.toString();
@@ -432,12 +405,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
             }
           }, 3500);
         } else if (attempts >= maxAttempts) {
-          if (retryInterval) {
-            clearInterval(retryInterval);
-            retryInterval = null;
-          }
-          // 5秒待ってもDOMが出なかった → 諦める（次回タップで再試行可能にする）
-          jumpHandledIdRef.current = null;
+          if (retryInterval) { clearInterval(retryInterval); retryInterval = null; }
           jumpActiveRef.current = false;
         }
       }, 200);
@@ -445,20 +413,52 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
 
     run();
 
+    // 中断関数を返す
     return () => {
-      cancelled = true;
-      if (retryInterval) {
-        clearInterval(retryInterval);
-        retryInterval = null;
-      }
-      if (releaseTimer) {
-        clearTimeout(releaseTimer);
-        releaseTimer = null;
-      }
-      // releaseTimer 未発火のまま unmount / URL 変更 / channel 切替で cleanup だけ走ると
-      // jumpActiveRef = true が残り、以降の自動スクロールが全て抑止されてしまう
+      aborted = true;
+      if (retryInterval) { clearInterval(retryInterval); retryInterval = null; }
+      if (releaseTimer) { clearTimeout(releaseTimer); releaseTimer = null; }
+      jumpActiveRef.current = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channel.id, handleJumpToMessage]);
+
+  // 同一チャンネル内ジャンプ: CustomEvent "huddle:jumpToMessage" を直接リッスン
+  // URL変更やsearchParamsに依存せず、イベント駆動で即座にジャンプする
+  useEffect(() => {
+    let cleanup: (() => void) | null = null;
+
+    const handler = (e: Event) => {
+      const messageId = (e as CustomEvent<{ messageId: string }>).detail.messageId;
+      if (!messageId) return;
+      // 前回のジャンプが進行中なら中断
+      if (cleanup) cleanup();
+      cleanup = executeJump(messageId);
+    };
+
+    window.addEventListener("huddle:jumpToMessage", handler);
+    return () => {
+      window.removeEventListener("huddle:jumpToMessage", handler);
+      if (cleanup) cleanup();
+    };
+  }, [executeJump]);
+
+  // 別チャンネルからの遷移用: URL ?m=<messageId> で指定された投稿へジャンプ
+  useEffect(() => {
+    const target = searchParams?.get("m");
+    if (!target) {
+      jumpHandledIdRef.current = null;
+      return;
+    }
+    if (jumpHandledIdRef.current === target) return;
+    jumpHandledIdRef.current = target;
+
+    const abort = executeJump(target, { cleanupUrl: true });
+
+    return () => {
+      abort();
       if (jumpHandledIdRef.current === target) {
-        jumpActiveRef.current = false;
+        jumpHandledIdRef.current = null;
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

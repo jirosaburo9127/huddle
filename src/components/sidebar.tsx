@@ -1320,6 +1320,7 @@ export function Sidebar({
         <ActivityModal
           workspaceSlug={workspaceSlug}
           workspaceId={workspace.id}
+          currentChannelSlug={pathname.split("/")[2] || null}
           onClose={() => setShowActivity(false)}
         />
       )}
