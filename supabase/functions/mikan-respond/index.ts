@@ -29,7 +29,15 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 // notify_mikan_mention() trigger (migration 118) が X-Mikan-Secret ヘッダで送る
 // 共有 secret。Supabase Vault に同じ値を保管している。
-const MIKAN_WEBHOOK_SECRET = Deno.env.get("MIKAN_WEBHOOK_SECRET") ?? "";
+// 起動時に必須化: 未設定なら module init で throw し、インスタンスを上げない。
+// (`?? ""` フォールバックだと、検証側の単純比較で空ヘッダ一致のリスクを論理層に
+//  押し付けることになるため、ここで fail-fast する)
+const MIKAN_WEBHOOK_SECRET = Deno.env.get("MIKAN_WEBHOOK_SECRET");
+if (!MIKAN_WEBHOOK_SECRET) {
+  throw new Error("MIKAN_WEBHOOK_SECRET env is required");
+}
+// ヘッダ名は typo 防止のため定数化 (DB トリガー側 migration 118 と一致させること)
+const MIKAN_SECRET_HEADER = "X-Mikan-Secret";
 
 const MIKAN_USER_ID = "00000000-0000-0000-0000-00000000aaaa";
 const MODEL = "claude-haiku-4-5-20251001";
@@ -307,11 +315,9 @@ Deno.serve(async (req) => {
     // 旧 Authorization Bearer 厳密一致アプローチは Supabase Cloud で
     // `current_setting('supabase.service_role_key', true)` が空文字を返す問題
     // で 401 全弾きになるため不採用。huddle-supabase-gotchas 項目 9 参照。
-    if (!MIKAN_WEBHOOK_SECRET) {
-      console.error("[mikan] MIKAN_WEBHOOK_SECRET env not set");
-      return new Response("server misconfigured", { status: 500 });
-    }
-    const providedSecret = req.headers.get("X-Mikan-Secret") ?? "";
+    //
+    // env 欠落チェックは module init で済ませている (この時点で空文字は来ない)。
+    const providedSecret = req.headers.get(MIKAN_SECRET_HEADER) ?? "";
     if (providedSecret !== MIKAN_WEBHOOK_SECRET) {
       return new Response("unauthorized", { status: 401 });
     }
