@@ -3,7 +3,7 @@
 import { memo, useState, useRef, useEffect, useMemo } from "react";
 import { usePathname } from "next/navigation";
 import type { MessageWithProfile, Reaction } from "@/lib/supabase/types";
-import { EmojiPicker } from "./emoji-picker";
+import { EmojiPicker, EMOJI_LIST } from "./emoji-picker";
 import { PollDisplay } from "./poll-display";
 import { EventDisplay } from "./event-display";
 import { ImageLightbox } from "@/components/image-lightbox";
@@ -322,15 +322,6 @@ function MessageContent({
   );
 }
 
-// モバイル絵文字ピッカー用の定数
-const QUICK_EMOJIS = [
-  { category: "よく使う", emojis: ["👍", "❤️", "😂", "🎉", "🔥", "👀", "💯", "✅"] },
-  { category: "表情", emojis: ["😊", "😄", "🤔", "😮", "😢", "😡", "🥳", "😎"] },
-  { category: "ジェスチャー", emojis: ["👏", "🙌", "🤝", "💪", "✌️", "🫡", "👋", "🙏"] },
-  { category: "記号", emojis: ["⭐", "💡", "📌", "🚀", "⚡", "🎯", "📝", "🔔"] },
-  { category: "テキスト", emojis: ["完了しました！", "了解しました！", "確認中です", "対応いたします", "ありがとうございます！", "お疲れ様です！"] },
-];
-
 // リアクションバッジコンポーネント
 // タップ: 同じ絵文字を追加/解除（Zoom方式）
 // 長押し: 誰がリアクションしたか表示
@@ -423,7 +414,7 @@ function ReactionBadges({
                   <div className="absolute inset-0 bg-black/40" />
                   <div className="relative w-full animate-slide-up" onClick={(e) => e.stopPropagation()}>
                     <div className="w-full rounded-t-2xl bg-sidebar border-t border-border shadow-xl p-4 pb-20">
-                      {QUICK_EMOJIS.map((group) => (
+                      {EMOJI_LIST.map((group) => (
                         <div key={group.category} className="mb-3">
                           <p className="text-[11px] text-muted font-medium mb-1.5">{group.category}</p>
                           {group.category === "テキスト" ? (
@@ -1273,7 +1264,7 @@ export const MessageItem = memo(function MessageItem({
           <div className="absolute inset-0 bg-black/40" />
           <div className="relative w-full animate-slide-up" onClick={(e) => e.stopPropagation()}>
             <div className="w-full rounded-t-2xl bg-sidebar border-t border-border shadow-xl p-4 pb-20">
-              {QUICK_EMOJIS.map((group) => (
+              {EMOJI_LIST.map((group) => (
                 <div key={group.category} className="mb-3">
                   <p className="text-[11px] text-muted font-medium mb-1.5">{group.category}</p>
                   {group.category === "テキスト" ? (
