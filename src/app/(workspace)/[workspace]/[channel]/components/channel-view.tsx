@@ -149,20 +149,26 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
       setDmOtherName(null);
       return;
     }
+    // DM A → DM B 遷移時に前の相手名が残らないよう、fetch 前にクリアする
+    setDmOtherName(null);
     let cancelled = false;
     (async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("channel_members")
         .select("user_id, profiles(display_name)")
         .eq("channel_id", channel.id);
-      if (cancelled || !data) return;
+      if (cancelled) return;
+      if (error || !data) {
+        setDmOtherName(null);
+        return;
+      }
       const other = (data as Array<{
         user_id: string;
         profiles: { display_name: string } | Array<{ display_name: string }> | null;
       }>).find((m) => m.user_id !== currentUserId);
       const p = other?.profiles;
       const profile = Array.isArray(p) ? p[0] : p;
-      if (profile?.display_name) setDmOtherName(profile.display_name);
+      setDmOtherName(profile?.display_name ?? null);
     })();
     return () => { cancelled = true; };
   }, [channel.id, channel.is_dm, currentUserId, supabase]);
@@ -1259,9 +1265,18 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
           className="flex items-center gap-2 px-3 sm:px-4 py-3 lg:py-0 lg:h-14 border-b border-border bg-header shrink-0 cursor-pointer"
         >
           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
-            {/* モバイル戻るボタン */}
+            {/* モバイル戻るボタン。
+                DM の場合は DM 一覧ページに戻す。それ以外はサイドバーを開く既存挙動。 */}
             <button
-              onClick={() => setSidebarOpen(true)}
+              onClick={() => {
+                if (channel.is_dm) {
+                  // pathname は /<workspace-slug>/<channel-slug>
+                  const workspaceSlug = pathname.split("/")[1] ?? "";
+                  router.push(`/${workspaceSlug}/dm-list`);
+                } else {
+                  setSidebarOpen(true);
+                }
+              }}
               className="lg:hidden shrink-0 p-1 text-muted hover:text-foreground rounded transition-colors"
               aria-label="戻る"
             >
