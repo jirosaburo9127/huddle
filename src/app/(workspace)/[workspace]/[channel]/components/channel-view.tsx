@@ -21,6 +21,19 @@ import { showMessageNotification } from "@/lib/notification";
 import { clearPushBadge } from "@/lib/push-notifications";
 import { fetchSincePeriod, mergeById } from "@/lib/sync-fetcher";
 
+// グローバルプロフィールキャッシュ（モジュールレベル）
+// チャンネル跨ぎでも再利用される。Realtime受信時のDB fetchスキップに使う。
+const profileCache = new Map<string, MessageWithProfile["profiles"]>();
+
+/** メッセージ配列からプロフィールをキャッシュに蓄積する */
+function cacheProfiles(messages: MessageWithProfile[]) {
+  for (const m of messages) {
+    if (m.profiles && m.user_id) {
+      profileCache.set(m.user_id, m.profiles);
+    }
+  }
+}
+
 type Props = {
   channel: Channel;
   initialMessages: MessageWithProfile[];
@@ -28,13 +41,16 @@ type Props = {
   // SSR 時点（= RPC による last_read_at 更新より前）の値。
   // 未読区切り線を安定して表示するために必須。
   initialLastReadAt: string | null;
+  // RPC内で last_read_at = NOW() に更新した後の値。
+  // マウント時の別途 mark_channel_read RPC 呼び出しを不要にする。
+  initialMarkedReadAt?: string | null;
 };
 
 // ジャンプ後にスクロール位置を再固定する期間（ms）。
 // この間は画像読み込み等で高さが変わっても対象を中央に保つ。
 const JUMP_STABILIZATION_MS = 5000;
 
-export function ChannelView({ channel, initialMessages, currentUserId, initialLastReadAt }: Props) {
+export function ChannelView({ channel, initialMessages, currentUserId, initialLastReadAt, initialMarkedReadAt }: Props) {
   // zustand セレクタ形式: 購読範囲を setSidebarOpen のみに限定
   const setSidebarOpen = useMobileNavStore((s) => s.setSidebarOpen);
   const router = useRouter();
@@ -54,7 +70,10 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
   const highlightTargetIdRef = useRef<string | null>(null);
   // 進行中の stabilizeJumpPosition cleanup。連続ジャンプ時の取り合いを防ぐため ref で保持
   const stabilizeCleanupRef = useRef<(() => void) | null>(null);
-  const [messages, setMessages] = useState<MessageWithProfile[]>(initialMessages);
+  const [messages, setMessages] = useState<MessageWithProfile[]>(() => {
+    cacheProfiles(initialMessages);
+    return initialMessages;
+  });
   // 過去メッセージの追加読み込み用
   const [loadingOlder, setLoadingOlder] = useState(false);
   // 初期取得で 50 件未満しか返ってこなかったら、それ以前の履歴は無いとみなす
@@ -203,50 +222,20 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
     return () => { cancelled = true; clearInterval(interval); };
   }, [channel.id, supabase]);
 
-  // 既読化: チャンネルをマウントしたら
-  //   1. サーバから FRESH な last_read_at + joined_at を取得 (Router Cache 対策)
-  //   2. 未読ラインの baseline を last_read_at ?? joined_at に揃える
-  //      → 未読カウント RPC (server) と同じ基準。
-  //        初回参加チャンネル (last_read_at = NULL) でもラインを正しく出せる
-  //   3. mark_channel_read で last_read_at を NOW() に更新 (DB)
-  //   4. huddle:channelRead イベントを発火して Sidebar のバッジを消す
+  // 既読化: RPC(get_channel_with_messages)内で last_read_at = NOW() に更新済み。
+  // マウント時は initialMarkedReadAt を使って Sidebar に通知するだけ。
+  // 別途 mark_channel_read RPC を呼ぶ必要はない（1往復削減）。
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      // (1) FRESH な last_read_at + joined_at を直接 channel_members から取得
-      const { data: pre } = await supabase
-        .from("channel_members")
-        .select("last_read_at, joined_at")
-        .eq("channel_id", channel.id)
-        .eq("user_id", currentUserId)
-        .maybeSingle();
-      if (cancelled) return;
-      const row = pre as { last_read_at: string | null; joined_at: string | null } | null;
-      // (2) baseline = last_read_at ?? joined_at (未読カウント RPC と一致させる)
-      const baseline = row?.last_read_at ?? row?.joined_at ?? null;
-      if (baseline && baseline !== myLastReadAtRef.current) {
-        setMyLastReadAt(baseline);
-        myLastReadAtRef.current = baseline;
-      }
-
-      // (3) mark_channel_read で既読確定
-      const { data: marked, error } = await supabase.rpc("mark_channel_read", {
-        p_channel_id: channel.id,
-      });
-      if (cancelled || error || !marked) return;
-      const newLastReadAt = marked as unknown as string;
-      // 「到着時の既読時刻」として保持。以降の Realtime 新着では更新しない。
-      setFirstMarkedReadAt(newLastReadAt);
-
-      // (4) Sidebar / 他リスナーに通知
+    if (initialMarkedReadAt) {
+      setFirstMarkedReadAt(initialMarkedReadAt);
       window.dispatchEvent(
         new CustomEvent("huddle:channelRead", {
-          detail: { channelId: channel.id, lastReadAt: newLastReadAt },
+          detail: { channelId: channel.id, lastReadAt: initialMarkedReadAt },
         })
       );
-    })();
-    return () => { cancelled = true; };
-  }, [channel.id, currentUserId, supabase]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channel.id]);
 
   // workspace 全メンバーの display_name を取得 (メンションハイライト用)
   useEffect(() => {
@@ -446,11 +435,25 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
       });
     }
 
+    // 対象投稿とその前後の兄弟要素だけ監視する（全体を監視すると無関係な高さ変化にも反応するため）
     if (observer) {
-      const inner = container.firstElementChild;
-      if (inner) observer.observe(inner);
       const target = document.getElementById(`msg-${messageId}`);
-      if (target) observer.observe(target);
+      if (target) {
+        // 対象投稿の親 wrapper (group div)
+        const wrapper = target.closest("[class*='group']") || target;
+        observer.observe(wrapper);
+        // 前後3つの兄弟（画像読み込み等がジャンプ位置に影響する範囲）
+        let sibling: Element | null = wrapper;
+        for (let i = 0; i < 3 && sibling; i++) {
+          sibling = sibling.previousElementSibling;
+          if (sibling) observer.observe(sibling);
+        }
+        sibling = wrapper;
+        for (let i = 0; i < 3 && sibling; i++) {
+          sibling = sibling.nextElementSibling;
+          if (sibling) observer.observe(sibling);
+        }
+      }
     }
 
     container.addEventListener("wheel", cleanup, { passive: true });
@@ -973,10 +976,8 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
             return;
           }
 
-          // プロフィールキャッシュ: 既にメッセージ一覧にあるユーザーならDB fetchをスキップ
-          const cachedProfile = messagesRef.current.find(
-            (m) => m.user_id === payload.new.user_id && m.profiles
-          )?.profiles ?? null;
+          // グローバルプロフィールキャッシュから取得（チャンネル跨ぎでも再利用）
+          const cachedProfile = profileCache.get(payload.new.user_id) ?? null;
 
           const quickMessage: MessageWithProfile = {
             ...payload.new,
@@ -1023,6 +1024,10 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
 
             if (fullMessage) {
               const hydrated = fullMessage as unknown as MessageWithProfile;
+              // グローバルキャッシュに蓄積（次回同じユーザーの投稿で再利用）
+              if (hydrated.profiles && hydrated.user_id) {
+                profileCache.set(hydrated.user_id, hydrated.profiles);
+              }
               setMessages((prev) =>
                 prev.map((m) => (m.id === hydrated.id ? hydrated : m))
               );
@@ -1139,14 +1144,14 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
 
       // 「直近1週間を毎回フル取得 → ID で mergeById」が中抜けを起こさない唯一の正解。
       // 詳細と禁止パターン: AGENTS.md / src/lib/sync-fetcher.ts
-      // 直近2日分を再取得（Realtime + 復帰イベントで即時補完が効くため短縮）
-      // 長期間のバックグラウンド放置は稀なケースなので、2日で十分カバーできる
+      // 直近4日分を再取得。金曜夕方→月曜朝の業務パターンをカバーする。
+      // Realtime + 復帰イベントで即時補完も効くが、Realtimeが切れていた場合の保険。
       const fresh = await fetchSincePeriod<MessageWithProfile>({
         supabase,
         table: "messages",
         select: "*, profiles(*), reactions(*)",
         eq: { channel_id: channel.id },
-        sinceDays: 2,
+        sinceDays: 4,
         isCancelled: () => cancelled,
       });
 
@@ -1159,6 +1164,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
         (m) => m.user_id !== currentUserId && !prevIds.has(m.id)
       );
 
+      cacheProfiles(fresh);
       setMessages((prev) => mergeById(prev, fresh));
       if (hasNewOtherUserMessages && !cancelled && document.visibilityState === "visible") {
         const { data: marked, error } = await supabase.rpc("mark_channel_read", {

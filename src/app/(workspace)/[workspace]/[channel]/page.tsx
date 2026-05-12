@@ -33,6 +33,7 @@ export default async function ChannelPage({
     channel: Channel;
     messages: MessageWithProfile[];
     previous_last_read_at: string | null;
+    marked_read_at: string | null;
   };
 
   if (!result.channel) {
@@ -49,6 +50,7 @@ export default async function ChannelPage({
       initialMessages={result.messages || []}
       currentUserId={user.id}
       initialLastReadAt={result.previous_last_read_at}
+      initialMarkedReadAt={result.marked_read_at}
     />
   );
 }
