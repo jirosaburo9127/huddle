@@ -45,6 +45,9 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
   // ジャンプ進行中フラグ: 自動スクロール（未読線/最下部）を一時的に抑止するため
   // ?m 指定がある間は true。ジャンプ完了後 2秒経ってから false に戻す
   const jumpActiveRef = useRef<boolean>(false);
+  // ハイライト解除タイマー: unmount / 次回ジャンプで clear するため id を保持
+  const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const highlightTargetIdRef = useRef<string | null>(null);
   const [messages, setMessages] = useState<MessageWithProfile[]>(initialMessages);
   // 過去メッセージの追加読み込み用
   const [loadingOlder, setLoadingOlder] = useState(false);
@@ -317,15 +320,128 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
     setReplyTo(msg);
   }, []);
 
-  // 引用元メッセージへジャンプしてハイライト（成功したら true を返す）
-  const handleJumpToMessage = useCallback((messageId: string): boolean => {
+  const alignMessageToCenter = useCallback((messageId: string, behavior: ScrollBehavior = "auto"): boolean => {
+    const container = scrollContainerRef.current;
     const el = document.getElementById(`msg-${messageId}`);
-    if (!el) return false;
-    el.scrollIntoView({ behavior: "smooth", block: "center" });
-    el.classList.add("reply-jump-highlight");
-    setTimeout(() => el.classList.remove("reply-jump-highlight"), 1600);
+    if (!container || !el) return false;
+
+    const containerRect = container.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    const offsetTop = elRect.top - containerRect.top;
+    const targetTop =
+      container.scrollTop + offsetTop - (container.clientHeight - elRect.height) / 2;
+
+    container.scrollTo({ top: Math.max(0, targetTop), behavior });
     return true;
   }, []);
+
+  // 引用元メッセージへジャンプしてハイライト（成功したら true を返す）
+  const handleJumpToMessage = useCallback((messageId: string): boolean => {
+    const ok = alignMessageToCenter(messageId, "smooth");
+    if (!ok) return false;
+    // 前回ジャンプのハイライトが残っていれば即解除（タイマーもクリア）
+    if (highlightTimerRef.current) {
+      clearTimeout(highlightTimerRef.current);
+      highlightTimerRef.current = null;
+    }
+    if (highlightTargetIdRef.current && highlightTargetIdRef.current !== messageId) {
+      const prev = document.getElementById(`msg-${highlightTargetIdRef.current}`);
+      prev?.classList.remove("reply-jump-highlight");
+    }
+    const el = document.getElementById(`msg-${messageId}`);
+    el?.classList.add("reply-jump-highlight");
+    highlightTargetIdRef.current = messageId;
+    highlightTimerRef.current = setTimeout(() => {
+      el?.classList.remove("reply-jump-highlight");
+      highlightTimerRef.current = null;
+      if (highlightTargetIdRef.current === messageId) highlightTargetIdRef.current = null;
+    }, 1600);
+    return true;
+  }, [alignMessageToCenter]);
+
+  // unmount 時にハイライトタイマーが残らないようにする
+  useEffect(() => {
+    return () => {
+      if (highlightTimerRef.current) {
+        clearTimeout(highlightTimerRef.current);
+        highlightTimerRef.current = null;
+      }
+      highlightTargetIdRef.current = null;
+    };
+  }, []);
+
+  // ジャンプ直後は画像・添付・未読ラインの消滅などで高さが変わるため、
+  // 短時間だけ対象投稿を中央付近へ再固定する。ユーザー操作が入ったら即解除。
+  const stabilizeJumpPosition = useCallback((messageId: string) => {
+    const container = scrollContainerRef.current;
+    if (!container) return () => {};
+
+    let active = true;
+    let frame: number | null = null;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    // ResizeObserver は jsdom / 古いブラウザで未定義の場合があるためガード
+    const hasRO = typeof ResizeObserver !== "undefined";
+    const observer: ResizeObserver | null = hasRO ? new ResizeObserver(() => scheduleAlign()) : null;
+
+    const cleanup = () => {
+      if (!active) return;
+      active = false;
+      observer?.disconnect();
+      if (frame !== null) cancelAnimationFrame(frame);
+      timers.forEach(clearTimeout);
+      container.removeEventListener("wheel", cleanup);
+      container.removeEventListener("touchmove", cleanup);
+      // keydown は scroll container がフォーカス無いと拾えないので document 側で監視
+      document.removeEventListener("keydown", onKey, true);
+    };
+
+    // PageUp/PageDown/矢印/Home/End などユーザー操作で再固定を止める
+    const onKey = (e: KeyboardEvent) => {
+      const k = e.key;
+      if (
+        k === "PageUp" || k === "PageDown" ||
+        k === "ArrowUp" || k === "ArrowDown" ||
+        k === "Home" || k === "End" ||
+        k === " " || k === "Spacebar"
+      ) {
+        cleanup();
+      }
+    };
+
+    const align = () => {
+      if (!active) return;
+      alignMessageToCenter(messageId, "auto");
+    };
+
+    function scheduleAlign() {
+      if (!active) return;
+      if (frame !== null) cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        frame = requestAnimationFrame(() => {
+          frame = null;
+          align();
+        });
+      });
+    }
+
+    if (observer) {
+      const inner = container.firstElementChild;
+      if (inner) observer.observe(inner);
+      const target = document.getElementById(`msg-${messageId}`);
+      if (target) observer.observe(target);
+    }
+
+    container.addEventListener("wheel", cleanup, { passive: true });
+    container.addEventListener("touchmove", cleanup, { passive: true });
+    document.addEventListener("keydown", onKey, true);
+    [120, 260, 520, 900, 1400, 2200, 3200, 4200].forEach((ms) => {
+      timers.push(setTimeout(scheduleAlign, ms));
+    });
+    timers.push(setTimeout(cleanup, 5000));
+    scheduleAlign();
+
+    return cleanup;
+  }, [alignMessageToCenter]);
 
   // メッセージジャンプの共通ロジック（DB追加取得 + DOM待ちリトライ + ハイライト）
   // 同一チャンネル内のCustomEvent駆動と、別チャンネルからの ?m= URL駆動の両方で使う
@@ -338,6 +454,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
 
     let retryInterval: ReturnType<typeof setInterval> | null = null;
     let releaseTimer: ReturnType<typeof setTimeout> | null = null;
+    let stabilizeCleanup: (() => void) | null = null;
     let aborted = false;
 
     async function run() {
@@ -397,7 +514,12 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
         const ok = handleJumpToMessage(targetId);
         if (ok) {
           if (retryInterval) { clearInterval(retryInterval); retryInterval = null; }
+          stabilizeCleanup = stabilizeJumpPosition(targetId);
           releaseTimer = setTimeout(() => {
+            if (stabilizeCleanup) {
+              stabilizeCleanup();
+              stabilizeCleanup = null;
+            }
             jumpActiveRef.current = false;
             // URL経由のジャンプの場合は ?m= を消す
             if (opts?.cleanupUrl && searchParams?.has("m")) {
@@ -406,7 +528,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
               const qs = params.toString();
               router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
             }
-          }, 3500);
+          }, 5000);
         } else if (attempts >= maxAttempts) {
           if (retryInterval) { clearInterval(retryInterval); retryInterval = null; }
           jumpActiveRef.current = false;
@@ -421,10 +543,11 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
       aborted = true;
       if (retryInterval) { clearInterval(retryInterval); retryInterval = null; }
       if (releaseTimer) { clearTimeout(releaseTimer); releaseTimer = null; }
+      if (stabilizeCleanup) { stabilizeCleanup(); stabilizeCleanup = null; }
       jumpActiveRef.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [channel.id, handleJumpToMessage]);
+  }, [channel.id, handleJumpToMessage, stabilizeJumpPosition]);
 
   // 同一チャンネル内ジャンプ: CustomEvent "huddle:jumpToMessage" を直接リッスン
   // URL変更やsearchParamsに依存せず、イベント駆動で即座にジャンプする
