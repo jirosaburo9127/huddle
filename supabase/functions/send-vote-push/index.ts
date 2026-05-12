@@ -124,8 +124,13 @@ Deno.serve(async (req) => {
       )
         ? (channel as unknown as { workspaces: { slug: string }[] }).workspaces[0]?.slug
         : (channel as unknown as { workspaces: { slug: string } }).workspaces.slug);
-    const channelUrl =
-      workspaceSlug && channel.slug ? `/${workspaceSlug}/${channel.slug}` : "/";
+    const channelUrl = (() => {
+      if (!workspaceSlug || !channel.slug) return "/";
+      const base = `/${encodeURIComponent(workspaceSlug)}/${encodeURIComponent(channel.slug)}`;
+      if (!poll.message_id) return base;
+      const qs = new URLSearchParams({ m: String(poll.message_id) }).toString();
+      return `${base}?${qs}`;
+    })();
 
     // 通知先: 投票作成者
     const recipientId = poll.created_by;

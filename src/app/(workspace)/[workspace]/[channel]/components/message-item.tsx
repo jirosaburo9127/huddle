@@ -417,7 +417,7 @@ function ReactionBadges({
                       {EMOJI_LIST.map((group) => (
                         <div key={group.category} className="mb-3">
                           <p className="text-[11px] text-muted font-medium mb-1.5">{group.category}</p>
-                          {group.category === "テキスト" ? (
+                          {group.kind === "text" ? (
                             <div className="flex flex-wrap gap-1.5">
                               {group.emojis.map((emoji) => (
                                 <button
@@ -1267,7 +1267,7 @@ export const MessageItem = memo(function MessageItem({
               {EMOJI_LIST.map((group) => (
                 <div key={group.category} className="mb-3">
                   <p className="text-[11px] text-muted font-medium mb-1.5">{group.category}</p>
-                  {group.category === "テキスト" ? (
+                  {group.kind === "text" ? (
                     <div className="flex flex-wrap gap-1.5">
                       {group.emojis.map((emoji) => (
                         <button

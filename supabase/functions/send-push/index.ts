@@ -310,7 +310,9 @@ Deno.serve(async (req) => {
         ? (channel as unknown as { workspaces: { slug: string }[] }).workspaces[0]?.slug
         : (channel as unknown as { workspaces: { slug: string } }).workspaces.slug);
     const channelUrl =
-      workspaceSlug && channel.slug ? `/${workspaceSlug}/${channel.slug}` : "/";
+      workspaceSlug && channel.slug
+        ? `/${workspaceSlug}/${channel.slug}?m=${record.id}`
+        : "/";
 
     // 受信者: チャンネルメンバー全員（送信者除外）— LINE方式
     // スレッド返信・通常メッセージ・投票・決定事項すべて同一ロジック

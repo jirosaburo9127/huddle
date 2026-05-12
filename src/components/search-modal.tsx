@@ -103,9 +103,9 @@ export function SearchModal({ workspaceId, workspaceSlug, onClose }: Props) {
     }
   }
 
-  // 結果クリック時の遷移
+  // 結果クリック時の遷移（投稿IDを含めて該当投稿にジャンプ）
   function handleResultClick(result: SearchResult) {
-    router.push(`/${workspaceSlug}/${result.channels.slug}`);
+    router.push(`/${workspaceSlug}/${result.channels.slug}?m=${result.id}`);
     onClose();
   }
 

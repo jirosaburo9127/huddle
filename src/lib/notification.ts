@@ -14,10 +14,12 @@ export function showMessageNotification({
   if (typeof Notification === "undefined") return;
   if (Notification.permission !== "granted") return;
 
-  // 現在見ているチャンネルと同じURLなら、フォーカス中は通知しない
+  // 現在見ているチャンネルと同じなら、フォーカス中は通知しない
   // 別チャンネルのメッセージならフォーカス中でも通知する（LINE方式）
-  const isCurrentPage = window.location.pathname === url;
-  if (isCurrentPage && document.hasFocus()) return;
+  // urlが ?m=xxx 付きでも、pathnameだけで同一チャンネル判定する
+  const targetPath = new URL(url, window.location.origin).pathname;
+  const isCurrentChannel = window.location.pathname === targetPath;
+  if (isCurrentChannel && document.hasFocus()) return;
 
   // メッセージ本文を100文字に切り詰め
   const body = content.length > 100 ? content.slice(0, 100) + "…" : content;
@@ -29,9 +31,24 @@ export function showMessageNotification({
     tag: `huddle-${Date.now()}`,
   });
 
-  // 通知クリックでアプリにフォーカス
+  // 通知クリックで該当投稿に遷移
   notification.onclick = () => {
     window.focus();
+    if (url) {
+      // 同一チャンネル内ならCustomEventでジャンプ、別チャンネルなら通常遷移
+      const targetPath = url.split("?")[0];
+      if (window.location.pathname === targetPath) {
+        const params = new URLSearchParams(url.split("?")[1] || "");
+        const messageId = params.get("m");
+        if (messageId) {
+          window.dispatchEvent(
+            new CustomEvent("huddle:jumpToMessage", { detail: { messageId } })
+          );
+        }
+      } else {
+        window.location.href = url;
+      }
+    }
     notification.close();
   };
 

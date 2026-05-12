@@ -595,7 +595,7 @@ export function Sidebar({
             senderName,
             channelName: channelLabel,
             content: msg.content,
-            url: `/${workspaceSlug}/${ch.slug}`,
+            url: `/${workspaceSlug}/${ch.slug}?m=${msg.id}`,
           });
         }
       )

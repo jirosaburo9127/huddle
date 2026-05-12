@@ -815,12 +815,12 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
             })();
           }
 
-          // 通知表示
+          // 通知表示（投稿IDを含めて、クリックで該当投稿にジャンプ可能にする）
           showMessageNotification({
             senderName: newMessage.profiles?.display_name || "メンバー",
             channelName: channel.name,
             content: payload.new.content,
-            url: window.location.pathname,
+            url: `${window.location.pathname}?m=${newMessage.id}`,
           });
         }
       )

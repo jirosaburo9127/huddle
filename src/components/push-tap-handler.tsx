@@ -42,10 +42,14 @@ export function PushTapHandler() {
             }
 
             // 2) フォールバック: 1.2 秒経っても遷移していなければハードナビ
+            //    pathname だけでなく search (クエリ文字列) も含めて比較する
+            //    （?m=<id> 付き URL で同一チャンネルだと pathname が同じでも遷移が必要）
             setTimeout(() => {
               try {
-                const expected = new URL(url, window.location.origin).pathname;
-                if (window.location.pathname !== expected) {
+                const parsed = new URL(url, window.location.origin);
+                const current = window.location.pathname + window.location.search;
+                const expected = parsed.pathname + parsed.search;
+                if (current !== expected) {
                   window.location.href = url;
                 }
               } catch {

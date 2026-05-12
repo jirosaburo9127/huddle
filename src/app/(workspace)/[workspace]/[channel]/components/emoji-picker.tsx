@@ -10,11 +10,14 @@ type Props = {
 
 // よく使う絵文字カテゴリ（外部ライブラリ不要）
 // 他所から再利用できるよう export しておく
-export const EMOJI_LIST = [
-  { category: "よく使う", emojis: ["👍", "❤️", "😂", "🎉", "🔥", "👀", "💯", "✅", "🚀"] },
-  { category: "表情", emojis: ["😊", "😄", "🤔", "😮", "😢", "😡", "🥳", "😎"] },
-  { category: "ジェスチャー", emojis: ["👏", "🙌", "🤝", "💪", "✌️", "🫡", "👋", "🙏"] },
-  { category: "テキスト", emojis: ["完了しました！", "了解しました！", "確認中です", "対応いたします", "ありがとうございます！", "お疲れ様です！", "禿同", "かしこ", "m9", "それな", "あざます", "orz"] },
+// kind: "text" は短文定型文（ボタン表示）、"emoji" は通常の絵文字グリッド表示
+export type EmojiGroup = { kind: "emoji" | "text"; category: string; emojis: string[] };
+
+export const EMOJI_LIST: EmojiGroup[] = [
+  { kind: "emoji", category: "よく使う", emojis: ["👍", "❤️", "😂", "🎉", "🔥", "👀", "💯", "✅", "🚀"] },
+  { kind: "emoji", category: "表情", emojis: ["😊", "😄", "🤔", "😮", "😢", "😡", "🥳", "😎"] },
+  { kind: "emoji", category: "ジェスチャー", emojis: ["👏", "🙌", "🤝", "💪", "✌️", "🫡", "👋", "🙏"] },
+  { kind: "text", category: "テキスト", emojis: ["完了しました！", "了解しました！", "確認中です", "対応いたします", "ありがとうございます！", "お疲れ様です！", "禿同", "かしこ", "m9", "それな", "あざます", "orz"] },
 ];
 
 export function EmojiPicker({ onSelect, onClose, position = "below" }: Props) {
@@ -70,7 +73,7 @@ export function EmojiPicker({ onSelect, onClose, position = "below" }: Props) {
           >
             {group.category}
           </p>
-          {group.category === "テキスト" ? (
+          {group.kind === "text" ? (
             <div className="flex flex-wrap gap-1">
               {group.emojis.map((emoji) => (
                 <button

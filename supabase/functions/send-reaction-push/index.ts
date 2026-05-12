@@ -125,7 +125,9 @@ Deno.serve(async (req) => {
         ? (channel as unknown as { workspaces: { slug: string }[] }).workspaces[0]?.slug
         : (channel as unknown as { workspaces: { slug: string } }).workspaces.slug);
     const channelUrl =
-      workspaceSlug && channel.slug ? `/${workspaceSlug}/${channel.slug}` : "/";
+      workspaceSlug && channel.slug
+        ? `/${workspaceSlug}/${channel.slug}?m=${record.message_id}`
+        : "/";
 
     // 通知先: メッセージ投稿者のみ
     const recipientId = message.user_id;
