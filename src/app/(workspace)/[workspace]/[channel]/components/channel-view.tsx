@@ -1152,7 +1152,26 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
 
       if (cancelled || fresh.length === 0) return;
 
+      // 自分以外の新着があるかチェック
+      const hasOtherUserMessages = fresh.some((m) => m.user_id !== currentUserId);
+
       setMessages((prev) => mergeById(prev, fresh));
+
+      // 復帰時同期で他ユーザーの新着を取り込んだ場合、既読化する。
+      // これを呼ばないと、画面には表示されているのにDBの last_read_at が古いまま残り、
+      // 別チャンネルへ移動した後にサーバ真実でバッジが復活する。
+      if (hasOtherUserMessages && !cancelled && document.visibilityState === "visible") {
+        const { data: marked, error } = await supabase.rpc("mark_channel_read", {
+          p_channel_id: channel.id,
+        });
+        if (!error && marked) {
+          window.dispatchEvent(
+            new CustomEvent("huddle:channelRead", {
+              detail: { channelId: channel.id, lastReadAt: marked as unknown as string },
+            })
+          );
+        }
+      }
     }
 
     // マウント直後の同期は少し遅延させる（初期描画と遷移の負荷を分離）

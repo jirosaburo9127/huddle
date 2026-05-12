@@ -272,7 +272,7 @@ export function Sidebar({
   // 単一の Map で管理することで、過去にあった「全バッジ消失」「ad-hoc 空配列ガード」
   // 「current チャンネルだけ除外」といった条件分岐の重なりを排除する。
   const lastOptimisticReadRef = useRef<Map<string, number>>(new Map());
-  const READ_GUARD_MS = 2000;
+  const READ_GUARD_MS = 8000;
 
   // 既読化の責務は ChannelView に移管したので、Sidebar から mark_channel_read は呼ばない。
   // (URL 推測でチャンネル ID を起点に既読化していたが、ChannelView マウントで一元化)
@@ -293,6 +293,8 @@ export function Sidebar({
       });
       // 2. ポーリングが古いサーバ値で復活させないようガード時刻を記録
       lastOptimisticReadRef.current.set(channelId, Date.now());
+      // 2.5. 進行中の refetchUnread レスポンスを無効化（既読化より前に発行されたリクエストのため）
+      unreadGenerationRef.current++;
       // 3. iOS アプリアイコンのバッジを即時にサーバ真実と同期
       syncAppBadgeFromServer(currentUserId);
     }
@@ -378,9 +380,13 @@ export function Sidebar({
   // フォアグラウンド復帰時 / マウント時 / ワークスペース切替時に未読カウントを再同期
   // モバイルで画面オフ→復帰した際にRealtime取りこぼしを補完するのと、
   // SSRから渡された unreadCounts がRSCキャッシュで古い場合の補正も兼ねる
+  // refetchUnread の世代番号。古いレスポンスが新しい既読イベント後に state を上書きしないようにする
+  const unreadGenerationRef = useRef(0);
+
   useEffect(() => {
     let cancelled = false;
     async function refetchUnread() {
+      const generation = ++unreadGenerationRef.current;
       const supabase = sidebarSupabaseRef.current;
       // チャンネル単位とワークスペース単位 + 決定事項未読を並列取得
       const [channelRes, wsRes, decisionRes] = await Promise.all([
@@ -391,7 +397,8 @@ export function Sidebar({
           p_user_id: currentUserId,
         }),
       ]);
-      if (cancelled) return;
+      // 古い世代のレスポンスは捨てる（既読化が間に挟まった場合のバッジ復活防止）
+      if (cancelled || generation !== unreadGenerationRef.current) return;
 
       if (typeof decisionRes.data === "number") {
         setDecisionUnreadCount(decisionRes.data);
