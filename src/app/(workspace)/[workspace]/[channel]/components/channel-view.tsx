@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
-import type { RealtimePostgresInsertPayload, RealtimePostgresUpdatePayload } from "@supabase/supabase-js";
+import type { RealtimePostgresInsertPayload, RealtimePostgresUpdatePayload, RealtimePostgresDeletePayload } from "@supabase/supabase-js";
 import type { Channel, Message, MessageWithProfile, Reaction } from "@/lib/supabase/types";
 import Link from "next/link";
 import { useRouter, useSearchParams, usePathname, useParams } from "next/navigation";
@@ -840,6 +840,45 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                 ? { ...m, content: updated.content, edited_at: updated.edited_at, deleted_at: updated.deleted_at, is_decision: updated.is_decision ?? m.is_decision, status: updated.status ?? m.status, reply_count: updated.reply_count }
                 : m
             )
+          );
+        }
+      )
+      // リアクションのリアルタイム反映（他ユーザーの追加/削除を即座に表示）
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "reactions",
+        },
+        (payload: RealtimePostgresInsertPayload<Reaction>) => {
+          const newReaction = payload.new;
+          // 自分の楽観的更新と重複しないようチェック
+          setMessages((prev) =>
+            prev.map((m) => {
+              if (m.id !== newReaction.message_id) return m;
+              const already = (m.reactions || []).some((r) => r.id === newReaction.id);
+              if (already) return m;
+              return { ...m, reactions: [...(m.reactions || []), newReaction] };
+            })
+          );
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "reactions",
+        },
+        (payload: RealtimePostgresDeletePayload<Reaction>) => {
+          const old = payload.old;
+          if (!old.id) return;
+          setMessages((prev) =>
+            prev.map((m) => ({
+              ...m,
+              reactions: (m.reactions || []).filter((r) => r.id !== old.id),
+            }))
           );
         }
       )
