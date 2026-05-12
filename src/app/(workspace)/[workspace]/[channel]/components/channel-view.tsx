@@ -1394,7 +1394,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
 
   return (
     <div
-      className="flex h-full page-enter relative"
+      className="flex h-full relative"
       onDragEnter={(e) => {
         // ファイルドラッグのみ対応
         if (!e.dataTransfer?.types?.includes("Files")) return;

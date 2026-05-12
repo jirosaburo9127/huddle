@@ -35,7 +35,12 @@ export default async function ChannelPage({
     previous_last_read_at: string | null;
   };
 
-  if (!result.channel) redirect(`/${workspaceSlug}/general`);
+  if (!result.channel) {
+    // general 自体が無い/権限が無い場合のループ回避と、slug 不正による redirect 経路汚染の防止
+    const isValidSlug = /^[a-z0-9][a-z0-9_-]*$/i.test(workspaceSlug);
+    if (channelSlug === "general" || !isValidSlug) redirect("/");
+    redirect(`/${encodeURIComponent(workspaceSlug)}/general`);
+  }
 
   return (
     <ChannelView

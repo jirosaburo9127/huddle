@@ -3,9 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   serverExternalPackages: ["@supabase/supabase-js", "@supabase/ssr"],
-  // チャンネル切替時に前のチャンネルが表示される問題を防ぐため、
-  // 動的ページのキャッシュを無効にして loading.tsx スケルトンを即座に表示する。
-  // データ鮮度は syncMissedMessages が補正する。
+  // staleTimes.dynamic = 0 により、動的ページのクライアントサイドキャッシュを持たない。
   experimental: {
     staleTimes: {
       dynamic: 0,
