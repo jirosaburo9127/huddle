@@ -57,6 +57,8 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
   const [showDeleteChannel, setShowDeleteChannel] = useState(false);
   const [deletingChannel, setDeletingChannel] = useState(false);
   const [showDecisionsOnly, setShowDecisionsOnly] = useState(false);
+  // 独り言カードの相対時間を1分ごとに更新するためのtick
+  const [timeTick, setTimeTick] = useState(0);
   const [showNote, setShowNote] = useState(false);
   const [hasNote, setHasNote] = useState(false);
   const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
@@ -463,6 +465,13 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, channel.id]);
+
+  // 独り言チャンネル: 相対時間を1分ごとに更新（「3分前」→「4分前」）
+  useEffect(() => {
+    if (!channel.is_hitorigoto) return;
+    const id = setInterval(() => setTimeTick((t) => t + 1), 60_000);
+    return () => clearInterval(id);
+  }, [channel.is_hitorigoto]);
 
   // オンライン状態の更新（60秒ごと）
   useEffect(() => {
@@ -1720,6 +1729,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                       currentUserId={currentUserId}
                       onDelete={handleDelete}
                       hasPoll={pollMessageIds.has(message.id)}
+                      tick={timeTick}
                     />
                   </div>
                 ));
