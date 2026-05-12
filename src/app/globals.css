@@ -112,6 +112,11 @@ html {
   animation: spin-slow 2s linear infinite;
 }
 
+@keyframes channel-loading {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(320%); }
+}
+
 /* ───── LP 用アニメーション ───── */
 @keyframes lp-fade-up {
   from { opacity: 0; transform: translateY(24px); }

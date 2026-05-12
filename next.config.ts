@@ -4,6 +4,7 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   serverExternalPackages: ["@supabase/supabase-js", "@supabase/ssr"],
   // staleTimes.dynamic = 0 により、動的ページのクライアントサイドキャッシュを持たない。
+  // チャンネル遷移中は軽い loading だけを表示し、前チャンネルの本文を残さない。
   experimental: {
     staleTimes: {
       dynamic: 0,
