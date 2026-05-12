@@ -140,15 +140,59 @@ export async function fetchSincePeriod<T extends Row>(
  * 既存配列に新しい配列を ID 重複排除しながらマージし、created_at 昇順で返す。
  * `fetchSincePeriod` の結果を `setState((prev) => mergeById(prev, fresh))` で
  * 既存 state にマージする時に使う。
+ *
+ * 既存IDのメッセージも content, edited_at, deleted_at, status, is_decision,
+ * reply_count, reactions を最新値で上書きする。これにより Realtime 取りこぼし時の
+ * 編集・削除・リアクション反映漏れを補完同期で回復できる。
  */
 export function mergeById<T extends Row>(prev: T[], incoming: T[]): T[] {
   if (incoming.length === 0) return prev;
-  const existingIds = new Set(prev.map((m) => m.id));
-  const additions = incoming.filter((m) => !existingIds.has(m.id));
-  if (additions.length === 0) return prev;
-  const merged = [...prev, ...additions];
-  merged.sort(
-    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-  );
-  return merged;
+
+  const incomingMap = new Map<string, T>();
+  for (const m of incoming) incomingMap.set(m.id, m);
+
+  let changed = false;
+
+  // 既存メッセージを更新 + 新規メッセージを収集
+  const updated = prev.map((m) => {
+    const fresh = incomingMap.get(m.id);
+    if (!fresh) return m;
+    incomingMap.delete(m.id);
+    // 更新対象フィールドを上書き（型安全のためanyを経由）
+    const prev_ = m as Record<string, unknown>;
+    const fresh_ = fresh as Record<string, unknown>;
+    const updateFields = ["content", "edited_at", "deleted_at", "status", "is_decision", "reply_count", "reactions"];
+    let fieldChanged = false;
+    for (const f of updateFields) {
+      if (f in fresh_ && fresh_[f] !== prev_[f]) {
+        // reactions は配列なので参照比較だと常に変わる → 長さとID集合で比較
+        if (f === "reactions" && Array.isArray(prev_[f]) && Array.isArray(fresh_[f])) {
+          const prevIds = new Set((prev_[f] as Array<{ id: string }>).map((r) => r.id));
+          const freshArr = fresh_[f] as Array<{ id: string }>;
+          if (prevIds.size === freshArr.length && freshArr.every((r) => prevIds.has(r.id))) continue;
+        }
+        fieldChanged = true;
+        break;
+      }
+    }
+    if (!fieldChanged) return m;
+    changed = true;
+    const merged: Record<string, unknown> = { ...prev_ };
+    for (const f of updateFields) {
+      if (f in fresh_) merged[f] = fresh_[f];
+    }
+    return merged as T;
+  });
+
+  // 新規追加分（incomingMapに残っているもの）
+  const additions = [...incomingMap.values()];
+  if (additions.length === 0 && !changed) return prev;
+
+  const result = additions.length > 0 ? [...updated, ...additions] : updated;
+  if (additions.length > 0) {
+    result.sort(
+      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
+  }
+  return result;
 }

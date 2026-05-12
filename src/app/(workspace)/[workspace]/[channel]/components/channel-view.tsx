@@ -807,29 +807,36 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
             return;
           }
 
-          // メッセージとプロフィールを一括取得（個別fetchより確実）
+          // まずpayloadで即表示（プロフィール無しでも先に見せる）
+          const quickMessage: MessageWithProfile = {
+            ...payload.new,
+            profiles: null,
+            reactions: [],
+          } as unknown as MessageWithProfile;
+
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === quickMessage.id)) return prev;
+            return [...prev, quickMessage];
+          });
+
+          // プロフィールとリアクションを後追い取得してhydrate
           const { data: fullMessage } = await supabase
             .from("messages")
             .select("*, profiles(*), reactions(*)")
             .eq("id", payload.new.id)
             .maybeSingle();
 
-          const newMessage = (fullMessage ?? {
-            ...payload.new,
-            profiles: null,
-            reactions: [],
-          }) as unknown as MessageWithProfile;
-
-          setMessages((prev) => {
-            // 重複チェック
-            if (prev.some((m) => m.id === newMessage.id)) return prev;
-            return [...prev, newMessage];
-          });
+          if (fullMessage) {
+            const hydrated = fullMessage as unknown as MessageWithProfile;
+            setMessages((prev) =>
+              prev.map((m) => (m.id === hydrated.id ? hydrated : m))
+            );
+          }
 
           // 表示中チャンネルへの他人の新着 → DB 上は自動既読化 + Sidebar に通知。
           // 注意: firstMarkedReadAt は更新しない (それは「到着時」の不変スナップショット)。
           //       表示中の新着は未読ライン対象外として扱われる。
-          if (newMessage.user_id !== currentUserId) {
+          if (quickMessage.user_id !== currentUserId) {
             (async () => {
               const { data: marked, error } = await supabase.rpc("mark_channel_read", {
                 p_channel_id: channel.id,
@@ -846,10 +853,10 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
 
           // 通知表示（投稿IDを含めて、クリックで該当投稿にジャンプ可能にする）
           showMessageNotification({
-            senderName: newMessage.profiles?.display_name || "メンバー",
+            senderName: "メンバー",
             channelName: channel.name,
             content: payload.new.content,
-            url: `${window.location.pathname}?m=${newMessage.id}`,
+            url: `${window.location.pathname}?m=${quickMessage.id}`,
           });
         }
       )
@@ -1242,9 +1249,6 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
   ) {
     if (content.length > 4000) return;
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
     const isDecision = options?.isDecision ?? false;
     // 独り言X風返信の場合は直接parentIdを使う
     const parentIdSnapshot = options?.parentId
@@ -1256,17 +1260,16 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
 
     // 送信前にクライアント側で UUID を決めてしまうことで、
     // 「optimistic insert → DB insert → realtime 到着」のレース条件を完全に排除する。
-    // (以前は DB からの返り値を待って sentMessageIdsRef に入れていたため、
-    //  その待ち時間の間に realtime が先に届くと同じメッセージが二重/消失する事故があった)
     const newMessageId = crypto.randomUUID();
 
     // まず realtime 用の除外セットに入れてから state へ楽観的に追加
+    // getUser() を待たずに即表示する（currentUserId/myProfile は既にある）
     sentMessageIdsRef.current.add(newMessageId);
 
     const optimisticMsg: MessageWithProfile = {
       id: newMessageId,
       channel_id: channel.id,
-      user_id: user.id,
+      user_id: currentUserId,
       parent_id: parentIdSnapshot,
       content,
       edited_at: null,
@@ -1278,9 +1281,9 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
       reply_count: 0,
       created_at: new Date().toISOString(),
       profiles: {
-        id: user.id,
-        email: user.email || "",
-        display_name: myProfile?.display_name || user.user_metadata?.display_name || user.email?.split("@")[0] || "",
+        id: currentUserId,
+        email: "",
+        display_name: myProfile?.display_name || "",
         avatar_url: myProfile?.avatar_url ?? null,
         status: null,
         last_seen_at: null,
@@ -1291,11 +1294,20 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
     // 送信と同時に返信対象をリセット (ref は handleReply で次の返信がセットされるまで維持)
     if (parentIdSnapshot) setReplyTo(null);
 
+    // DB挿入前に認証確認（楽観的表示は済んでいるので、ここが遅くても画面は即反映）
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      // 未認証 → 楽観的表示を取り消し
+      sentMessageIdsRef.current.delete(newMessageId);
+      setMessages((prev) => prev.filter((m) => m.id !== newMessageId));
+      return;
+    }
+
     // クライアント発行の UUID をそのまま使って DB に挿入
     const { data, error } = await supabase.from("messages").insert({
       id: newMessageId,
       channel_id: channel.id,
-      user_id: user.id,
+      user_id: currentUserId,
       content,
       ...(parentIdSnapshot ? { parent_id: parentIdSnapshot } : {}),
       ...(isDecision ? { is_decision: true } : {}),
