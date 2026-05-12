@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useState } from "react";
+import { memo, useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import type { MessageWithProfile } from "@/lib/supabase/types";
 import { PollDisplay } from "./poll-display";
@@ -97,6 +97,13 @@ function HitorigotoPostCardInner({
   const [lightboxState, setLightboxState] = useState<{ urls: string[]; index: number } | null>(null);
   const pathname = usePathname();
   const channelSlug = pathname?.split("/")[2] ?? null;
+
+  // 相対時間を1分ごとに更新（「3分前」→「4分前」をリロードなしで反映）
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   // 削除済みは非表示
   if (message.deleted_at) return null;
