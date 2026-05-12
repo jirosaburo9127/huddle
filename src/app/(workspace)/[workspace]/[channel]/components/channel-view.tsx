@@ -820,23 +820,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
             return [...prev, quickMessage];
           });
 
-          // プロフィールとリアクションを後追い取得してhydrate
-          const { data: fullMessage } = await supabase
-            .from("messages")
-            .select("*, profiles(*), reactions(*)")
-            .eq("id", payload.new.id)
-            .maybeSingle();
-
-          if (fullMessage) {
-            const hydrated = fullMessage as unknown as MessageWithProfile;
-            setMessages((prev) =>
-              prev.map((m) => (m.id === hydrated.id ? hydrated : m))
-            );
-          }
-
           // 表示中チャンネルへの他人の新着 → DB 上は自動既読化 + Sidebar に通知。
-          // 注意: firstMarkedReadAt は更新しない (それは「到着時」の不変スナップショット)。
-          //       表示中の新着は未読ライン対象外として扱われる。
           if (quickMessage.user_id !== currentUserId) {
             (async () => {
               const { data: marked, error } = await supabase.rpc("mark_channel_read", {
@@ -852,13 +836,34 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
             })();
           }
 
-          // 通知表示（投稿IDを含めて、クリックで該当投稿にジャンプ可能にする）
-          showMessageNotification({
-            senderName: "メンバー",
-            channelName: channel.name,
-            content: payload.new.content,
-            url: `${window.location.pathname}?m=${quickMessage.id}`,
-          });
+          // プロフィールを後追い取得してhydrate + 通知表示
+          // （即表示はpayloadで済んでいるので、ここはバックグラウンド処理）
+          const { data: fullMessage } = await supabase
+            .from("messages")
+            .select("*, profiles(*), reactions(*)")
+            .eq("id", payload.new.id)
+            .maybeSingle();
+
+          if (fullMessage) {
+            const hydrated = fullMessage as unknown as MessageWithProfile;
+            setMessages((prev) =>
+              prev.map((m) => (m.id === hydrated.id ? hydrated : m))
+            );
+            // hydrate後のプロフィール名で通知
+            showMessageNotification({
+              senderName: hydrated.profiles?.display_name || "メンバー",
+              channelName: channel.name,
+              content: payload.new.content,
+              url: `${window.location.pathname}?m=${quickMessage.id}`,
+            });
+          } else {
+            showMessageNotification({
+              senderName: "メンバー",
+              channelName: channel.name,
+              content: payload.new.content,
+              url: `${window.location.pathname}?m=${quickMessage.id}`,
+            });
+          }
         }
       )
       .on(
@@ -895,6 +900,8 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
             sentReactionIdsRef.current.delete(newReaction.id);
             return;
           }
+          // 表示中メッセージに関係ないリアクションは処理しない
+          if (!messagesRef.current.some((m) => m.id === newReaction.message_id)) return;
           setMessages((prev) =>
             prev.map((m) => {
               if (m.id !== newReaction.message_id) return m;
@@ -915,11 +922,16 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
         (payload: RealtimePostgresDeletePayload<Reaction>) => {
           const old = payload.old;
           if (!old.id) return;
+          // 該当リアクションを持つメッセージが無ければスキップ
+          const hasTarget = messagesRef.current.some(
+            (m) => (m.reactions || []).some((r) => r.id === old.id)
+          );
+          if (!hasTarget) return;
           setMessages((prev) =>
-            prev.map((m) => ({
-              ...m,
-              reactions: (m.reactions || []).filter((r) => r.id !== old.id),
-            }))
+            prev.map((m) => {
+              if (!(m.reactions || []).some((r) => r.id === old.id)) return m;
+              return { ...m, reactions: m.reactions!.filter((r) => r.id !== old.id) };
+            })
           );
         }
       )
@@ -950,12 +962,14 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
 
       // 「直近1週間を毎回フル取得 → ID で mergeById」が中抜けを起こさない唯一の正解。
       // 詳細と禁止パターン: AGENTS.md / src/lib/sync-fetcher.ts
+      // 直近2日分を再取得（Realtime + 復帰イベントで即時補完が効くため短縮）
+      // 長期間のバックグラウンド放置は稀なケースなので、2日で十分カバーできる
       const fresh = await fetchSincePeriod<MessageWithProfile>({
         supabase,
         table: "messages",
         select: "*, profiles(*), reactions(*)",
         eq: { channel_id: channel.id },
-        sinceDays: 7,
+        sinceDays: 2,
         isCancelled: () => cancelled,
       });
 
@@ -983,8 +997,10 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
     window.addEventListener("focus", onVisible);
     window.addEventListener("huddle:appResumed", onAppResume);
 
-    // 保険: 10秒ごとにポーリング（Capacitor/WKWebViewでRealtimeが途切れた場合の補完）
-    const poll = setInterval(syncMissedMessages, 10000);
+    // 保険: 30秒ごとにポーリング（Capacitor/WKWebViewでRealtimeが途切れた場合の補完）
+    // Realtime + visibilitychange/focus/appResumed で即時補完が効くため、
+    // ポーリングは最終セーフティネットとして低頻度で十分
+    const poll = setInterval(syncMissedMessages, 30000);
 
     return () => {
       cancelled = true;
