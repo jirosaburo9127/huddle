@@ -161,7 +161,7 @@ export function mergeById<T extends Row>(prev: T[], incoming: T[]): T[] {
     // 更新対象フィールドを上書き（型安全のためanyを経由）
     const prev_ = m as Record<string, unknown>;
     const fresh_ = fresh as Record<string, unknown>;
-    const updateFields = ["content", "edited_at", "deleted_at", "status", "is_decision", "reply_count", "reactions"];
+    const updateFields = ["content", "edited_at", "deleted_at", "status", "is_decision", "reply_count", "reactions", "profiles", "decision_why", "decision_due"];
     let fieldChanged = false;
     for (const f of updateFields) {
       if (f in fresh_ && fresh_[f] !== prev_[f]) {

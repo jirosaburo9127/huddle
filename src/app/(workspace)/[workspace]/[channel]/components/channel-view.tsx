@@ -98,6 +98,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
   // Realtime購読では「同一ユーザーかどうか」ではなく「このタブで送ったか」で判定するのが正しい。
   // （PCとiPhoneで同じユーザーでログインしている場合に、片方の送信がもう片方に届かなくなるため）
   const sentMessageIdsRef = useRef<Set<string>>(new Set());
+  const sentReactionIdsRef = useRef<Set<string>>(new Set());
   // messages の最新参照を ref で保持することで、handleReact 等の useCallback が
   // messages の変更ごとに再生成されるのを回避する（大量メッセージでの性能劣化対策）
   const messagesRef = useRef<MessageWithProfile[]>(initialMessages);
@@ -889,7 +890,11 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
         },
         (payload: RealtimePostgresInsertPayload<Reaction>) => {
           const newReaction = payload.new;
-          // 自分の楽観的更新と重複しないようチェック
+          // このタブで楽観的に追加済みのリアクションはスキップ
+          if (sentReactionIdsRef.current.has(newReaction.id)) {
+            sentReactionIdsRef.current.delete(newReaction.id);
+            return;
+          }
           setMessages((prev) =>
             prev.map((m) => {
               if (m.id !== newReaction.message_id) return m;
@@ -1085,16 +1090,20 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
       }
     } else {
       // 追加
-      // 自分の表示名を取得（楽観的リアクション用）
+      // クライアント発行UUIDでリアクションを追加（メッセージと同じパターン）
+      // Realtime到着時に sentReactionIdsRef で重複スキップ → 二重表示を完全排除
       const myProfile = currentMessages.find((m) => m.user_id === currentUserId)?.profiles;
+      const reactionId = crypto.randomUUID();
       const optimisticReaction: Reaction = {
-        id: crypto.randomUUID(),
+        id: reactionId,
         message_id: messageId,
         user_id: currentUserId,
         emoji,
         created_at: new Date().toISOString(),
         display_name: myProfile?.display_name || "",
       };
+
+      sentReactionIdsRef.current.add(reactionId);
       setMessages((prev) =>
         prev.map((m) =>
           m.id === messageId
@@ -1102,22 +1111,17 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
             : m
         )
       );
-      const { data } = await supabase
+
+      const { error } = await supabase
         .from("reactions")
-        .insert({ message_id: messageId, user_id: currentUserId, emoji })
-        .select()
-        .single();
-      if (data) {
-        // IDをDB側のものに置き換え
+        .insert({ id: reactionId, message_id: messageId, user_id: currentUserId, emoji });
+      if (error) {
+        // 失敗時はロールバック
+        sentReactionIdsRef.current.delete(reactionId);
         setMessages((prev) =>
           prev.map((m) =>
             m.id === messageId
-              ? {
-                  ...m,
-                  reactions: m.reactions?.map((r) =>
-                    r.id === optimisticReaction.id ? { ...r, id: data.id } : r
-                  ),
-                }
+              ? { ...m, reactions: (m.reactions || []).filter((r) => r.id !== reactionId) }
               : m
           )
         );
