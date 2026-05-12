@@ -151,7 +151,7 @@ export function BookmarkModal({ currentUserId, workspaceSlug, onClose }: Props) 
                 >
                   <div className="flex items-start justify-between gap-2">
                     <a
-                      href={`/${workspaceSlug}/${channelSlug}`}
+                      href={`/${workspaceSlug}/${channelSlug}?m=${bookmark.message_id}`}
                       className="flex-1 min-w-0"
                       onClick={onClose}
                     >
