@@ -952,8 +952,8 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
       setMessages((prev) => mergeById(prev, fresh));
     }
 
-    // マウント直後に1回必ず走らせる
-    syncMissedMessages();
+    // マウント直後の同期は少し遅延させる（初期描画と遷移の負荷を分離）
+    const mountTimer = setTimeout(syncMissedMessages, 1500);
 
     function onVisible() {
       if (typeof document === "undefined") return;
@@ -977,6 +977,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
     return () => {
       cancelled = true;
       clearInterval(poll);
+      clearTimeout(mountTimer);
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);
       window.removeEventListener("huddle:appResumed", onAppResume);

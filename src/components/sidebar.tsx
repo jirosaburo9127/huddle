@@ -690,7 +690,6 @@ export function Sidebar({
                     <Link
                       key={ws.id}
                       href={`/${ws.slug}`}
-                      prefetch
                       onClick={() => setShowWsSwitcher(false)}
                       className={`flex items-center justify-between gap-2 px-3 py-2 text-sm truncate transition-colors rounded-lg mx-1 ${
                         ws.id === workspace.id
@@ -917,7 +916,6 @@ export function Sidebar({
           <div className="hidden lg:grid lg:grid-cols-3 gap-y-2 mx-3 mb-3 py-3 rounded-xl bg-white/[0.02] border border-border/30 [&>a]:justify-self-center [&>button]:justify-self-center">
             <Link
               href={`/${workspaceSlug}/dashboard`}
-              prefetch
               onClick={() => setSidebarOpen(false)}
               className="relative flex flex-col items-center gap-1 px-2 py-1 rounded-lg text-muted hover:text-accent transition-colors"
               title="決定事項"
@@ -934,7 +932,6 @@ export function Sidebar({
             </Link>
             <Link
               href={`/${workspaceSlug}/in-progress`}
-              prefetch
               onClick={() => setSidebarOpen(false)}
               className="flex flex-col items-center gap-1 px-2 py-1 rounded-lg text-muted hover:text-blue-400 transition-colors"
               title="進行中"
@@ -946,7 +943,6 @@ export function Sidebar({
             </Link>
             <Link
               href={`/${workspaceSlug}/calendar`}
-              prefetch
               onClick={() => setSidebarOpen(false)}
               className="flex flex-col items-center gap-1 px-2 py-1 rounded-lg text-muted hover:text-accent transition-colors"
               title="カレンダー"
@@ -1108,7 +1104,6 @@ export function Sidebar({
               <Link
                 key={dm.id}
                 href={href}
-                prefetch
                 onClick={() => setSidebarOpen(false)}
                 className={`
                   flex items-center gap-2 px-3 py-2 text-base rounded-xl mx-2 transition-colors
@@ -1908,7 +1903,6 @@ function ChannelCategoryList({
                   >
                     <Link
                       href={href}
-                      prefetch
                       onClick={onNavigate}
                       className={`flex items-center min-w-0 flex-1 px-3 py-2 text-base ${
                         isActive
