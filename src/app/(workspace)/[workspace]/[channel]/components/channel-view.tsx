@@ -1152,18 +1152,15 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
 
       if (cancelled || fresh.length === 0) return;
 
-      // mergeById は変更がなければ prev と同一参照を返す。
-      // 実際に新規追加 or 既存更新があった場合のみ既読化RPCを発行する。
-      let actuallyChanged = false;
-      setMessages((prev) => {
-        const merged = mergeById(prev, fresh);
-        actuallyChanged = merged !== prev;
-        return merged;
-      });
+      // 「本当に新規の他人投稿が入った時だけ」既読化する。
+      // messagesRef は最新 state を参照するので updater 内の副作用に頼らず判定できる。
+      const prevIds = new Set(messagesRef.current.map((m) => m.id));
+      const hasNewOtherUserMessages = fresh.some(
+        (m) => m.user_id !== currentUserId && !prevIds.has(m.id)
+      );
 
-      // 復帰時同期で実際に変更があり、他ユーザーの投稿を含む場合のみ既読化する。
-      const hasOtherUserMessages = actuallyChanged && fresh.some((m) => m.user_id !== currentUserId);
-      if (hasOtherUserMessages && !cancelled && document.visibilityState === "visible") {
+      setMessages((prev) => mergeById(prev, fresh));
+      if (hasNewOtherUserMessages && !cancelled && document.visibilityState === "visible") {
         const { data: marked, error } = await supabase.rpc("mark_channel_read", {
           p_channel_id: channel.id,
         });
