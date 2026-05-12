@@ -52,10 +52,8 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
   // ハイライト解除タイマー: unmount / 次回ジャンプで clear するため id を保持
   const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const highlightTargetIdRef = useRef<string | null>(null);
-  const jumpReturnHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 進行中の stabilizeJumpPosition cleanup。連続ジャンプ時の取り合いを防ぐため ref で保持
   const stabilizeCleanupRef = useRef<(() => void) | null>(null);
-  const [jumpReturnTargetId, setJumpReturnTargetId] = useState<string | null>(null);
   const [messages, setMessages] = useState<MessageWithProfile[]>(initialMessages);
   // 過去メッセージの追加読み込み用
   const [loadingOlder, setLoadingOlder] = useState(false);
@@ -328,18 +326,6 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
     setReplyTo(msg);
   }, []);
 
-  const showJumpReturnButton = useCallback((messageId: string) => {
-    setJumpReturnTargetId(messageId);
-    if (jumpReturnHideTimerRef.current) {
-      clearTimeout(jumpReturnHideTimerRef.current);
-      jumpReturnHideTimerRef.current = null;
-    }
-    jumpReturnHideTimerRef.current = setTimeout(() => {
-      setJumpReturnTargetId((current) => (current === messageId ? null : current));
-      jumpReturnHideTimerRef.current = null;
-    }, 12000);
-  }, []);
-
   const alignMessageToCenter = useCallback((messageId: string, behavior: ScrollBehavior = "auto"): boolean => {
     const container = scrollContainerRef.current;
     const el = document.getElementById(`msg-${messageId}`);
@@ -359,7 +345,6 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
   const handleJumpToMessage = useCallback((messageId: string): boolean => {
     const ok = alignMessageToCenter(messageId, "smooth");
     if (!ok) return false;
-    showJumpReturnButton(messageId);
     // 前回ジャンプのハイライトが残っていれば即解除（タイマーもクリア）
     if (highlightTimerRef.current) {
       clearTimeout(highlightTimerRef.current);
@@ -378,7 +363,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
       if (highlightTargetIdRef.current === messageId) highlightTargetIdRef.current = null;
     }, 1600);
     return true;
-  }, [alignMessageToCenter, showJumpReturnButton]);
+  }, [alignMessageToCenter]);
 
   // unmount 時にハイライトタイマー / 再固定処理が残らないようにする
   useEffect(() => {
@@ -386,10 +371,6 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
       if (highlightTimerRef.current) {
         clearTimeout(highlightTimerRef.current);
         highlightTimerRef.current = null;
-      }
-      if (jumpReturnHideTimerRef.current) {
-        clearTimeout(jumpReturnHideTimerRef.current);
-        jumpReturnHideTimerRef.current = null;
       }
       highlightTargetIdRef.current = null;
       if (stabilizeCleanupRef.current) {
@@ -491,18 +472,6 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
 
     return cleanup;
   }, [alignMessageToCenter]);
-
-  const handleReturnToJumpTarget = useCallback(() => {
-    if (!jumpReturnTargetId) return;
-    const ok = handleJumpToMessage(jumpReturnTargetId);
-    if (!ok) return;
-    if (stabilizeCleanupRef.current) {
-      stabilizeCleanupRef.current();
-      stabilizeCleanupRef.current = null;
-    }
-    const cleanup = stabilizeJumpPosition(jumpReturnTargetId);
-    stabilizeCleanupRef.current = cleanup;
-  }, [handleJumpToMessage, jumpReturnTargetId, stabilizeJumpPosition]);
 
   // メッセージジャンプの共通ロジック（DB追加取得 + DOM待ちリトライ + ハイライト）
   // 同一チャンネル内のCustomEvent駆動と、別チャンネルからの ?m= URL駆動の両方で使う
@@ -2100,18 +2069,6 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
             </div>
           )}
         </div>
-
-        {jumpReturnTargetId && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-24 z-20 flex justify-center px-4">
-            <button
-              type="button"
-              onClick={handleReturnToJumpTarget}
-              className="pointer-events-auto rounded-full border border-border bg-sidebar px-3 py-1.5 text-xs font-medium text-foreground shadow-lg transition-colors hover:bg-sidebar-hover"
-            >
-              対象投稿へ戻る
-            </button>
-          </div>
-        )}
 
         {/* メッセージ入力 */}
         <MessageInput
