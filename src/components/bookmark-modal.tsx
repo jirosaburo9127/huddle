@@ -32,28 +32,41 @@ type Props = {
 export function BookmarkModal({ currentUserId, workspaceSlug, onClose }: Props) {
   const [bookmarks, setBookmarks] = useState<BookmarkEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const supabase = createClient();
 
-  // ブックマーク一覧を取得
+  // ブックマーク一覧を取得（現在のワークスペースに限定）
   useEffect(() => {
+    let cancelled = false;
     async function fetchBookmarks() {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("bookmarks")
         .select(`
           id,
           message_id,
           created_at,
-          messages(
+          messages!inner(
             id,
             content,
             created_at,
             channel_id,
             profiles(display_name),
-            channels(name, slug, workspace_id)
+            channels!inner(name, slug, workspace_id, workspaces!inner(slug))
           )
         `)
         .eq("user_id", currentUserId)
+        .eq("messages.channels.workspaces.slug", workspaceSlug)
         .order("created_at", { ascending: false });
+
+      if (cancelled) return;
+
+      if (error) {
+        // eslint-disable-next-line no-console
+        console.error("[bookmark] fetch failed:", error);
+        setLoadError("ブックマークの取得に失敗しました");
+        setLoading(false);
+        return;
+      }
 
       if (data) {
         // Supabaseのリレーション結果を整形
@@ -76,16 +89,21 @@ export function BookmarkModal({ currentUserId, workspaceSlug, onClose }: Props) 
             };
           });
         setBookmarks(entries);
+        setLoadError(null);
       }
       setLoading(false);
     }
     fetchBookmarks();
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUserId]);
+  }, [currentUserId, workspaceSlug]);
 
-  // ブックマーク解除（楽観的削除 → 失敗時はロールバック）
+  // ブックマーク解除（楽観的削除 → 失敗時は対象 entry だけ差し戻す）
   async function handleRemove(bookmarkId: string) {
-    const prevBookmarks = bookmarks;
+    // 削除対象だけ保持。連続削除でも他の削除に巻き戻りが発生しないように。
+    const removed = bookmarks.find((b) => b.id === bookmarkId);
     setBookmarks((prev) => prev.filter((b) => b.id !== bookmarkId));
     const { error } = await supabase
       .from("bookmarks")
@@ -94,7 +112,14 @@ export function BookmarkModal({ currentUserId, workspaceSlug, onClose }: Props) 
     if (error) {
       // eslint-disable-next-line no-console
       console.error("[bookmark] delete failed:", error);
-      setBookmarks(prevBookmarks);
+      // まだ一覧に存在しない場合だけ差し戻し
+      if (removed) {
+        setBookmarks((prev) =>
+          prev.some((b) => b.id === bookmarkId)
+            ? prev
+            : [...prev, removed].sort((a, b) => b.created_at.localeCompare(a.created_at))
+        );
+      }
     }
   }
 
@@ -123,6 +148,8 @@ export function BookmarkModal({ currentUserId, workspaceSlug, onClose }: Props) 
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
           {loading ? (
             <div className="text-muted text-sm text-center py-8">読み込み中...</div>
+          ) : loadError ? (
+            <div className="text-mention text-sm text-center py-8">{loadError}</div>
           ) : bookmarks.length === 0 ? (
             <div className="text-muted text-sm text-center py-8">
               <p>ブックマークはまだありません</p>

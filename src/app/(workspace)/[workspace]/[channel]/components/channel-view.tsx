@@ -466,11 +466,31 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, channel.id]);
 
-  // 独り言チャンネル: 相対時間を1分ごとに更新（「3分前」→「4分前」）
+  // 独り言チャンネル: 相対時間を1分ごとに更新（「3分前」→「4分前」）。
+  // iOS Safari / Capacitor はバックグラウンド中に interval が止まるため、
+  // 復帰イベントでも即時に再計算させる。
   useEffect(() => {
     if (!channel.is_hitorigoto) return;
-    const id = setInterval(() => setTimeTick((t) => t + 1), 60_000);
-    return () => clearInterval(id);
+
+    const tick = () => setTimeTick((t) => t + 1);
+    const onVisible = () => {
+      if (typeof document === "undefined" || document.visibilityState === "visible") tick();
+    };
+    const onPageShow = () => tick();
+
+    const id = setInterval(tick, 60_000);
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", tick);
+    window.addEventListener("pageshow", onPageShow);
+    window.addEventListener("huddle:appResumed", tick);
+
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", tick);
+      window.removeEventListener("pageshow", onPageShow);
+      window.removeEventListener("huddle:appResumed", tick);
+    };
   }, [channel.is_hitorigoto]);
 
   // オンライン状態の更新（60秒ごと）

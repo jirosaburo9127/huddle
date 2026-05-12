@@ -889,7 +889,7 @@ export function Sidebar({
               {searchResults.map((r) => (
                 <Link
                   key={r.id}
-                  href={`/${workspaceSlug}/${r.channel_slug}?m=${r.id}`}
+                  href={`/${workspaceSlug}/${r.channel_slug}?m=${encodeURIComponent(r.id)}`}
                   onClick={() => { setSearchQuery(""); setSearchResults([]); }}
                   className="block px-3 py-2.5 border-b border-border/30 hover:bg-white/[0.04] transition-colors"
                 >
