@@ -808,10 +808,14 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
             return;
           }
 
-          // まずpayloadで即表示（プロフィール無しでも先に見せる）
+          // プロフィールキャッシュ: 既にメッセージ一覧にあるユーザーならDB fetchをスキップ
+          const cachedProfile = messagesRef.current.find(
+            (m) => m.user_id === payload.new.user_id && m.profiles
+          )?.profiles ?? null;
+
           const quickMessage: MessageWithProfile = {
             ...payload.new,
-            profiles: null,
+            profiles: cachedProfile,
             reactions: [],
           } as unknown as MessageWithProfile;
 
@@ -836,33 +840,41 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
             })();
           }
 
-          // プロフィールを後追い取得してhydrate + 通知表示
-          // （即表示はpayloadで済んでいるので、ここはバックグラウンド処理）
-          const { data: fullMessage } = await supabase
-            .from("messages")
-            .select("*, profiles(*), reactions(*)")
-            .eq("id", payload.new.id)
-            .maybeSingle();
-
-          if (fullMessage) {
-            const hydrated = fullMessage as unknown as MessageWithProfile;
-            setMessages((prev) =>
-              prev.map((m) => (m.id === hydrated.id ? hydrated : m))
-            );
-            // hydrate後のプロフィール名で通知
+          if (cachedProfile) {
+            // キャッシュ済みユーザー: 即通知（display_name が取れる）
             showMessageNotification({
-              senderName: hydrated.profiles?.display_name || "メンバー",
+              senderName: cachedProfile.display_name || "メンバー",
               channelName: channel.name,
               content: payload.new.content,
               url: `${window.location.pathname}?m=${quickMessage.id}`,
             });
           } else {
-            showMessageNotification({
-              senderName: "メンバー",
-              channelName: channel.name,
-              content: payload.new.content,
-              url: `${window.location.pathname}?m=${quickMessage.id}`,
-            });
+            // 初見ユーザー: プロフィールを後追い取得して hydrate + 取得後に通知
+            const { data: fullMessage } = await supabase
+              .from("messages")
+              .select("*, profiles(*), reactions(*)")
+              .eq("id", payload.new.id)
+              .maybeSingle();
+
+            if (fullMessage) {
+              const hydrated = fullMessage as unknown as MessageWithProfile;
+              setMessages((prev) =>
+                prev.map((m) => (m.id === hydrated.id ? hydrated : m))
+              );
+              showMessageNotification({
+                senderName: hydrated.profiles?.display_name || "メンバー",
+                channelName: channel.name,
+                content: payload.new.content,
+                url: `${window.location.pathname}?m=${quickMessage.id}`,
+              });
+            } else {
+              showMessageNotification({
+                senderName: "メンバー",
+                channelName: channel.name,
+                content: payload.new.content,
+                url: `${window.location.pathname}?m=${quickMessage.id}`,
+              });
+            }
           }
         }
       )
@@ -1175,9 +1187,8 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
       return;
     }
 
-    // 進捗ダッシュボードを再検証（次回訪問時に最新データ取得）
-    router.refresh();
-  }, [supabase, router]);
+    // ダッシュボードのキャッシュ無効化は別途サーバアクション化して行う（TODO）
+  }, [supabase]);
 
   // ステータストグル（進行中 / 完了）
   const handleStatus = useCallback(async (messageId: string, status: "in_progress" | "done") => {
@@ -1229,9 +1240,8 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
         alert("理由・期限の保存に失敗しました");
         return;
       }
-      router.refresh();
     },
-    [supabase, router]
+    [supabase]
   );
 
   // ブックマークのトグル
@@ -2024,8 +2034,12 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                     return;
                   }
                   setShowCategoryPicker(false);
-                  // サイドバーに反映するため RSC を再検証
-                  router.refresh();
+                  // サイドバーにカテゴリ変更を通知（RSC再検証の代わり）
+                  window.dispatchEvent(
+                    new CustomEvent("huddle:categoryChanged", {
+                      detail: { channelId: channel.id, category: categoryValue },
+                    })
+                  );
                 }}
                 className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50 transition-colors"
               >

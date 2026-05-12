@@ -82,6 +82,8 @@ export function Sidebar({
   // 毎回新しくなるため、シンクすると無限ループ（React error #185）を起こす。
   // WS切替時は layout が再マウントされるので初期値で十分。
   const [unreadState, setUnreadState] = useState<Record<string, number>>(unreadCounts);
+  // カテゴリ変更をRSC再検証なしで即反映するためのオーバーライド
+  const [categoryOverrides, setCategoryOverrides] = useState<Record<string, string | null>>({});
   // ワークスペース単位の未読カウント（他WSにメッセージが来たことを一目で伝えるため）
   const [unreadByWorkspace, setUnreadByWorkspace] = useState<Record<string, number>>({});
   // 決定事項ボードの未読数 (自分が最後に見た時刻以降に追加された決定の数)
@@ -297,6 +299,16 @@ export function Sidebar({
     window.addEventListener("huddle:channelRead", onChannelRead);
     return () => window.removeEventListener("huddle:channelRead", onChannelRead);
   }, [currentUserId]);
+
+  // カテゴリ変更イベントで即反映（router.refresh()の代替）
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { channelId, category } = (e as CustomEvent<{ channelId: string; category: string | null }>).detail;
+      setCategoryOverrides((prev) => ({ ...prev, [channelId]: category }));
+    };
+    window.addEventListener("huddle:categoryChanged", handler);
+    return () => window.removeEventListener("huddle:categoryChanged", handler);
+  }, []);
 
   // 各チャンネルの所属ユーザーIDを取得（チャンネル行のメンバーアバター表示用）
   useEffect(() => {
@@ -1017,6 +1029,7 @@ export function Sidebar({
             channelMembersMap={channelMembersMap}
             workspaceMembers={members}
             onOpenMembers={(id) => setMembersModalChannelId(id)}
+            categoryOverrides={categoryOverrides}
           />
 
           {/* 独り言チャンネル（カテゴリの下、PCのみ。モバイルはヘッダー横） */}
@@ -1749,6 +1762,8 @@ type ChannelCategoryListProps = {
   workspaceMembers: WorkspaceMember[];
   // アバタータップで所属メンバー一覧モーダルを開く
   onOpenMembers: (channelId: string) => void;
+  // カテゴリ変更のローカルオーバーライド
+  categoryOverrides: Record<string, string | null>;
 };
 
 const COLLAPSED_KEY = "huddle:sidebar:collapsedCategories";
@@ -1763,6 +1778,7 @@ function ChannelCategoryList({
   channelMembersMap,
   workspaceMembers,
   onOpenMembers,
+  categoryOverrides,
 }: ChannelCategoryListProps) {
   // user_id → profile 変換マップ
   const profileById = useMemo(() => {
@@ -1820,13 +1836,15 @@ function ChannelCategoryList({
     for (const cat of categories) map.set(cat.slug, []);
     map.set("__uncategorized__", []);
     for (const ch of channels) {
-      const key = ch.category ?? "__uncategorized__";
+      // カテゴリ変更のローカルオーバーライドを適用
+      const cat = ch.id in categoryOverrides ? categoryOverrides[ch.id] : ch.category;
+      const key = cat ?? "__uncategorized__";
       const list = map.get(key);
       if (list) list.push(ch);
       else map.get("__uncategorized__")!.push(ch);
     }
     return map;
-  }, [channels, categories]);
+  }, [channels, categories, categoryOverrides]);
 
   // カテゴリラベルマップ
   const labelMap = useMemo(() => {

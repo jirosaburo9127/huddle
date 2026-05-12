@@ -5,8 +5,8 @@ import { ChannelView } from "./components/channel-view";
 import type { Channel, MessageWithProfile } from "@/lib/supabase/types";
 
 // チャンネル切替を高速化するため Next.js の Router Cache を活用する。
-// initialMessages が古くなるケースは ChannelView 側の syncMissedMessages (マウント時/復帰時/15秒ポーリング)
-// が最新 50 件をマージして即座に補正するため問題ない。
+// initialMessages が古くなるケースは ChannelView 側の syncMissedMessages (マウント時/復帰時/30秒ポーリング)
+// が最新分をマージして即座に補正するため問題ない。
 
 export default async function ChannelPage({
   params,
@@ -19,21 +19,8 @@ export default async function ChannelPage({
 
   if (!user) redirect("/login");
 
-  // 未読区切り線のために RPC が last_read_at を NOW に更新する前の値を先取りしておく。
-  // （RPC 更新後だと「未読」が常に空になり、区切り線が出ない＋自動スクロールが効かない）
-  // baseline = last_read_at ?? joined_at に揃える (初回参加チャンネルでは last_read_at が
-  // NULL なので、joined_at を fallback として使う。未読カウント RPC と同じ式)
-  const { data: preMembership } = await supabase
-    .from("channel_members")
-    .select("last_read_at, joined_at, channels!inner(slug, workspaces!inner(slug))")
-    .eq("user_id", user.id)
-    .eq("channels.slug", channelSlug)
-    .eq("channels.workspaces.slug", workspaceSlug)
-    .maybeSingle();
-  const preRow = preMembership as { last_read_at: string | null; joined_at: string | null } | null;
-  const previousLastReadAt = preRow?.last_read_at ?? preRow?.joined_at ?? null;
-
-  // RPC1回でチャンネル取得+メッセージ取得+メンバーシップ確認+last_read_at更新を実行
+  // RPC1回でチャンネル取得+メッセージ取得+メンバーシップ確認+previous_last_read_at取得を実行
+  // （以前はpreMembershipクエリで直列2本だったが、RPCに統合して1本化）
   const { data, error } = await supabase.rpc("get_channel_with_messages", {
     p_workspace_slug: workspaceSlug,
     p_channel_slug: channelSlug,
@@ -42,7 +29,11 @@ export default async function ChannelPage({
 
   if (error || !data) redirect(`/`);
 
-  const result = data as { channel: Channel; messages: MessageWithProfile[] };
+  const result = data as {
+    channel: Channel;
+    messages: MessageWithProfile[];
+    previous_last_read_at: string | null;
+  };
 
   if (!result.channel) redirect(`/${workspaceSlug}/general`);
 
@@ -52,7 +43,7 @@ export default async function ChannelPage({
       channel={result.channel}
       initialMessages={result.messages || []}
       currentUserId={user.id}
-      initialLastReadAt={previousLastReadAt}
+      initialLastReadAt={result.previous_last_read_at}
     />
   );
 }
