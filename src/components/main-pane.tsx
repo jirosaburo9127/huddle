@@ -10,10 +10,15 @@ import { useMobileNavStore } from "@/stores/mobile-nav-store";
  */
 export function MainPane({ children }: { children: React.ReactNode }) {
   const messageInputFocused = useMobileNavStore((s) => s.messageInputFocused);
+  const sidebarOpen = useMobileNavStore((s) => s.sidebarOpen);
   return (
     <main
-      className={`flex-1 flex flex-col min-w-0 lg:pb-0 transition-[padding] duration-150 ${
-        messageInputFocused ? "pb-0" : "pb-14"
+      className={`
+        fixed inset-0 z-50 w-full bg-background flex flex-col min-w-0 transform-gpu
+        transition-[transform,padding] duration-200 ease-out
+        lg:static lg:z-auto lg:flex-1 lg:translate-x-0 lg:transform-none lg:pb-0
+        ${sidebarOpen ? "translate-x-full pointer-events-none lg:pointer-events-auto" : "translate-x-0 pointer-events-auto"}
+        ${messageInputFocused ? "pb-0" : "pb-14"}
       }`}
     >
       {children}

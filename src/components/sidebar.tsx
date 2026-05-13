@@ -665,16 +665,14 @@ export function Sidebar({
 
   return (
     <>
-      {/* サイドバー（モバイルではフルスクリーン表示） */}
-      {/* transform ではなく display の切り替えで表示/非表示を制御する。
-          translate-x 系の CSS 変数はブラウザのコンポジターが一瞬動かしてしまい
-          「横スライド」に見える副作用があるので完全に使わない */}
+      {/* サイドバー（モバイルでは一覧画面として常駐。詳細画面が右から重なる） */}
       <aside
         data-sidebar
         className={`
-          fixed top-0 bottom-14 left-0 z-50 w-full sm:w-64 bg-sidebar flex-col border-r border-border
-          lg:bottom-0 lg:relative lg:flex
-          ${sidebarOpen ? "flex" : "hidden"}
+          fixed top-0 bottom-14 left-0 z-40 w-full sm:w-64 bg-sidebar flex flex-col border-r border-border
+          transform-gpu transition-transform duration-200 ease-out
+          lg:bottom-0 lg:relative lg:z-auto lg:translate-x-0 lg:transform-none
+          ${sidebarOpen ? "translate-x-0 pointer-events-auto" : "-translate-x-[24%] pointer-events-none lg:pointer-events-auto"}
         `}
       >
         {/* ヘッダー: ワークスペース名 + 右上にプロフィールアイコン（大） */}
