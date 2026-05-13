@@ -833,7 +833,11 @@ export function Sidebar({
             {hitorigotoChannel && (
               <Link
                 href={`/${workspaceSlug}/${hitorigotoChannel.slug}`}
-                onClick={() => setSidebarOpen(false)}
+                onClick={() => {
+                  if (pathname === `/${workspaceSlug}/${hitorigotoChannel.slug}`) {
+                    setSidebarOpen(false);
+                  }
+                }}
                 className="lg:hidden relative shrink-0 mr-2"
               >
                 {/* 吹き出し本体 — pill 型 + 控えめな影 */}
@@ -1030,7 +1034,9 @@ export function Sidebar({
             workspaceSlug={workspaceSlug}
             pathname={pathname}
             unreadState={unreadState}
-            onNavigate={() => setSidebarOpen(false)}
+            onNavigate={(isActive) => {
+              if (isActive) setSidebarOpen(false);
+            }}
             channelMembersMap={channelMembersMap}
             workspaceMembers={members}
             onOpenMembers={(id) => setMembersModalChannelId(id)}
@@ -1122,7 +1128,9 @@ export function Sidebar({
               <Link
                 key={dm.id}
                 href={href}
-                onClick={() => setSidebarOpen(false)}
+                onClick={() => {
+                  if (isActive) setSidebarOpen(false);
+                }}
                 className={`
                   flex items-center gap-2 px-3 py-2 text-base rounded-xl mx-2 transition-colors
                   ${
@@ -1760,7 +1768,7 @@ type ChannelCategoryListProps = {
   workspaceSlug: string;
   pathname: string;
   unreadState: Record<string, number>;
-  onNavigate: () => void;
+  onNavigate: (isActive: boolean) => void;
   // channel.id → 所属ユーザーID配列
   channelMembersMap: Record<string, string[]>;
   // ユーザーID → プロフィール解決用
@@ -1926,7 +1934,7 @@ function ChannelCategoryList({
                   >
                     <Link
                       href={href}
-                      onClick={onNavigate}
+                      onClick={() => onNavigate(isActive)}
                       className={`flex items-center min-w-0 flex-1 px-3 py-2 text-base ${
                         isActive
                           ? "text-accent"
