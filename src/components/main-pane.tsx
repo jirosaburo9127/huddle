@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
 
 /**
@@ -11,15 +12,38 @@ import { useMobileNavStore } from "@/stores/mobile-nav-store";
 export function MainPane({ children }: { children: React.ReactNode }) {
   const messageInputFocused = useMobileNavStore((s) => s.messageInputFocused);
   const sidebarOpen = useMobileNavStore((s) => s.sidebarOpen);
+  const detailEnterVersion = useMobileNavStore((s) => s.detailEnterVersion);
+  const [playingDetailEnter, setPlayingDetailEnter] = useState(false);
+  const seenEnterVersionRef = useRef(0);
+
+  useEffect(() => {
+    if (detailEnterVersion === 0 || detailEnterVersion === seenEnterVersionRef.current) return;
+    seenEnterVersionRef.current = detailEnterVersion;
+    // animation再生を即開始（rAFを挟まない → 1フレーム目からfrom状態で始まる）
+    setPlayingDetailEnter(true);
+    const timer = setTimeout(() => setPlayingDetailEnter(false), 300);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [detailEnterVersion]);
+
+  // animation再生中はtranslate-x-*とtransitionを無効化して
+  // keyframe animationのtransformに完全に任せる
+  const translateClass = playingDetailEnter
+    ? "pointer-events-auto"
+    : sidebarOpen
+      ? "translate-x-full pointer-events-none lg:pointer-events-auto"
+      : "translate-x-0 pointer-events-auto";
+
   return (
     <main
       className={`
         fixed inset-0 z-50 w-full bg-background flex flex-col min-w-0 transform-gpu
-        transition-[transform,padding] duration-200 ease-out
         lg:static lg:z-auto lg:flex-1 lg:translate-x-0 lg:transform-none lg:pb-0
-        ${sidebarOpen ? "translate-x-full pointer-events-none lg:pointer-events-auto" : "translate-x-0 pointer-events-auto"}
+        ${playingDetailEnter ? "animate-mobile-detail-enter" : "transition-[transform,padding] duration-200 ease-out"}
+        ${translateClass}
         ${messageInputFocused ? "pb-0" : "pb-14"}
-      }`}
+      `}
     >
       {children}
     </main>
