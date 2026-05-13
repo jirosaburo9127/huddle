@@ -51,8 +51,10 @@ type Props = {
 const JUMP_STABILIZATION_MS = 5000;
 
 export function ChannelView({ channel, initialMessages, currentUserId, initialLastReadAt, initialMarkedReadAt }: Props) {
-  // zustand セレクタ形式: 購読範囲を setSidebarOpen のみに限定
+  // zustand セレクタ形式: 購読範囲を必要なナビゲーション状態に限定
   const setSidebarOpen = useMobileNavStore((s) => s.setSidebarOpen);
+  const pendingDetailOpen = useMobileNavStore((s) => s.pendingDetailOpen);
+  const setPendingDetailOpen = useMobileNavStore((s) => s.setPendingDetailOpen);
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
@@ -284,11 +286,30 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
   // モバイル: チャンネルURL直アクセス（プッシュ通知タップや共有リンク）では
   // サイドバーを閉じてチャンネルビューを前面に出す
   useEffect(() => {
+    if (pendingDetailOpen) {
+      // 一覧タップ遷移: まず詳細面を右外に置いた状態を1フレーム確定し、
+      // 次フレームで閉じることで確実に横スライドを発生させる。
+      setSidebarOpen(true);
+      let raf2: number | null = null;
+      const raf1 = requestAnimationFrame(() => {
+        raf2 = requestAnimationFrame(() => {
+          setSidebarOpen(false);
+          setPendingDetailOpen(false);
+        });
+      });
+      // チャンネルを開いた時点でiOSアプリアイコンのバッジと配信済み通知をクリア
+      clearPushBadge(currentUserId);
+      return () => {
+        cancelAnimationFrame(raf1);
+        if (raf2 !== null) cancelAnimationFrame(raf2);
+      };
+    }
+
     setSidebarOpen(false);
     // チャンネルを開いた時点でiOSアプリアイコンのバッジと配信済み通知をクリア
     // userIdを渡すことで、他チャンネルに残っている未読数とバッジを正しく同期する
     clearPushBadge(currentUserId);
-  }, [channel.id, setSidebarOpen, currentUserId]);
+  }, [channel.id, setSidebarOpen, currentUserId, pendingDetailOpen, setPendingDetailOpen]);
 
   // overflow メニュー外クリックで閉じる
   useEffect(() => {

@@ -155,6 +155,7 @@ export function Sidebar({
   // zustand セレクタ形式で購読範囲を限定（不要な再レンダーを防ぐ）
   const sidebarOpen = useMobileNavStore((s) => s.sidebarOpen);
   const setSidebarOpen = useMobileNavStore((s) => s.setSidebarOpen);
+  const setPendingDetailOpen = useMobileNavStore((s) => s.setPendingDetailOpen);
   const [searchQuery, setSearchQuery] = useState("");
 
   // プロフィール編集用のstate
@@ -836,6 +837,8 @@ export function Sidebar({
                 onClick={() => {
                   if (pathname === `/${workspaceSlug}/${hitorigotoChannel.slug}`) {
                     setSidebarOpen(false);
+                  } else {
+                    setPendingDetailOpen(true);
                   }
                 }}
                 className="lg:hidden relative shrink-0 mr-2"
@@ -1036,6 +1039,7 @@ export function Sidebar({
             unreadState={unreadState}
             onNavigate={(isActive) => {
               if (isActive) setSidebarOpen(false);
+              else setPendingDetailOpen(true);
             }}
             channelMembersMap={channelMembersMap}
             workspaceMembers={members}
@@ -1130,6 +1134,7 @@ export function Sidebar({
                 href={href}
                 onClick={() => {
                   if (isActive) setSidebarOpen(false);
+                  else setPendingDetailOpen(true);
                 }}
                 className={`
                   flex items-center gap-2 px-3 py-2 text-base rounded-xl mx-2 transition-colors

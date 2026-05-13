@@ -24,11 +24,12 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
   const [showBookmark, setShowBookmark] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
 
-  // URL が変わったらポップオーバーとサイドバーを閉じる。
-  // （iOS で "タップしても画面変わらない" と見えていたのは、実は navigation は
-  // 成功していて、開きっぱなしのサイドバーが新しいページの上を覆っていただけ）
-  // ただし初回マウント時は skip: ワークスペーストップ /ws-xxx でサイドバーを
-  // 自動表示する WorkspaceLobby の setSidebarOpen(true) を打ち消してしまうため
+  // URL が変わったら「その他」ポップオーバー (showMore) のみ閉じる。
+  // サイドバーはここでは閉じない: チャンネル遷移時は ChannelView マウント時
+  // (channel-view.tsx の useEffect) で閉じる。pathname 変更直後にここで閉じると
+  // loading だけが先に表示されて白く見えるため。
+  // showBookmark / showMembers はモーダルで、開いた状態から直接 URL 遷移する
+  // 導線がないので pathname 同期は不要。
   const initialMountRef = useRef(true);
   // pathname 変化（外部のナビゲーション state）に同期して UI を閉じる。
   // 派生 state では計算できないため effect 内で setState する正当なケース
@@ -39,8 +40,7 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
     }
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setShowMore(false);
-    setSidebarOpen(false);
-  }, [pathname, setSidebarOpen]);
+  }, [pathname]);
 
   // ポップオーバー外タップで閉じる（その他ボタン自身と中身は除外）
   useEffect(() => {
