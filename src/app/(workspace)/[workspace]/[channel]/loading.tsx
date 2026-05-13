@@ -1,4 +1,16 @@
+"use client";
+
+import { useEffect } from "react";
+import { useMobileNavStore } from "@/stores/mobile-nav-store";
+
 export default function ChannelLoading() {
+  const setSidebarOpen = useMobileNavStore((s) => s.setSidebarOpen);
+
+  // loading表示 = チャンネルへの遷移が始まった → サイドバーを閉じて詳細面をスライドイン
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [setSidebarOpen]);
+
   return (
     <div className="flex h-full flex-col bg-background">
       <header className="flex items-center px-3 sm:px-4 py-3 lg:py-0 lg:h-14 border-b border-border bg-header shrink-0">
