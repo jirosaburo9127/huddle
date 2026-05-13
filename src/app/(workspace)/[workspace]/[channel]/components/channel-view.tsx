@@ -55,6 +55,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
   const setSidebarOpen = useMobileNavStore((s) => s.setSidebarOpen);
   const pendingDetailOpen = useMobileNavStore((s) => s.pendingDetailOpen);
   const setPendingDetailOpen = useMobileNavStore((s) => s.setPendingDetailOpen);
+  const triggerDetailEnter = useMobileNavStore((s) => s.triggerDetailEnter);
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
@@ -287,29 +288,21 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
   // サイドバーを閉じてチャンネルビューを前面に出す
   useEffect(() => {
     if (pendingDetailOpen) {
-      // 一覧タップ遷移: まず詳細面を右外に置いた状態を1フレーム確定し、
-      // 次フレームで閉じることで確実に横スライドを発生させる。
-      setSidebarOpen(true);
-      let raf2: number | null = null;
-      const raf1 = requestAnimationFrame(() => {
-        raf2 = requestAnimationFrame(() => {
-          setSidebarOpen(false);
-          setPendingDetailOpen(false);
-        });
-      });
-      // チャンネルを開いた時点でiOSアプリアイコンのバッジと配信済み通知をクリア
+      // 一覧タップ遷移: sidebarOpen=true のまま(=main-paneはtranslate-x-full)で
+      // アニメーションを開始する。アニメーションがtranslateX(100%)→0を担当し、
+      // 完了後にsidebarOpenをfalseにする。
+      // こうしないと、setSidebarOpen(false)で先にtranslate-x-0が適用され白画面が出る。
+      setPendingDetailOpen(false);
+      triggerDetailEnter();
       clearPushBadge(currentUserId);
-      return () => {
-        cancelAnimationFrame(raf1);
-        if (raf2 !== null) cancelAnimationFrame(raf2);
-      };
+      return;
     }
 
     setSidebarOpen(false);
     // チャンネルを開いた時点でiOSアプリアイコンのバッジと配信済み通知をクリア
     // userIdを渡すことで、他チャンネルに残っている未読数とバッジを正しく同期する
     clearPushBadge(currentUserId);
-  }, [channel.id, setSidebarOpen, currentUserId, pendingDetailOpen, setPendingDetailOpen]);
+  }, [channel.id, setSidebarOpen, currentUserId, pendingDetailOpen, setPendingDetailOpen, triggerDetailEnter]);
 
   // overflow メニュー外クリックで閉じる
   useEffect(() => {

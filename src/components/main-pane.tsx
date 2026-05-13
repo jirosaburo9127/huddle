@@ -12,6 +12,7 @@ import { useMobileNavStore } from "@/stores/mobile-nav-store";
 export function MainPane({ children }: { children: React.ReactNode }) {
   const messageInputFocused = useMobileNavStore((s) => s.messageInputFocused);
   const sidebarOpen = useMobileNavStore((s) => s.sidebarOpen);
+  const setSidebarOpen = useMobileNavStore((s) => s.setSidebarOpen);
   const detailEnterVersion = useMobileNavStore((s) => s.detailEnterVersion);
   const [playingDetailEnter, setPlayingDetailEnter] = useState(false);
   const seenEnterVersionRef = useRef(0);
@@ -19,15 +20,18 @@ export function MainPane({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (detailEnterVersion === 0 || detailEnterVersion === seenEnterVersionRef.current) return;
     seenEnterVersionRef.current = detailEnterVersion;
-    // animation再生を即開始（rAFを挟まない → 1フレーム目からfrom状態で始まる）
     setPlayingDetailEnter(true);
-    const timer = setTimeout(() => setPlayingDetailEnter(false), 300);
+    // アニメーション完了後にsidebarを閉じる（translate-x-0に確定）
+    const timer = setTimeout(() => {
+      setPlayingDetailEnter(false);
+      setSidebarOpen(false);
+    }, 250);
     return () => {
       clearTimeout(timer);
     };
-  }, [detailEnterVersion]);
+  }, [detailEnterVersion, setSidebarOpen]);
 
-  // animation再生中はtranslate-x-*とtransitionを無効化して
+  // animation再生中はsidebarOpenのtranslateクラスを無視して
   // keyframe animationのtransformに完全に任せる
   const translateClass = playingDetailEnter
     ? "pointer-events-auto"
