@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useMobileNavStore } from "@/stores/mobile-nav-store";
 
 type ReactionActivity = {
   reaction_id: string;
@@ -96,9 +97,11 @@ function Avatar({ url, name }: { url: string | null; name: string }) {
 
 export function ActivityModal({ workspaceSlug, workspaceId, currentChannelSlug, onClose }: Props) {
   const router = useRouter();
+  const setSidebarOpen = useMobileNavStore((s) => s.setSidebarOpen);
 
   // 同一チャンネル: CustomEvent で直接ジャンプ、別チャンネル: router.push で ?m= ナビゲーション
   const handleJump = useCallback((channelSlug: string, messageId: string) => {
+    setSidebarOpen(false);
     if (channelSlug === currentChannelSlug) {
       window.dispatchEvent(
         new CustomEvent("huddle:jumpToMessage", { detail: { messageId } })
@@ -107,7 +110,7 @@ export function ActivityModal({ workspaceSlug, workspaceId, currentChannelSlug, 
       router.push(`/${workspaceSlug}/${channelSlug}?m=${messageId}`);
     }
     onClose();
-  }, [currentChannelSlug, workspaceSlug, router, onClose]);
+  }, [currentChannelSlug, workspaceSlug, router, onClose, setSidebarOpen]);
   const [tab, setTab] = useState<Tab>("mentions");
   const [reactions, setReactions] = useState<ReactionActivity[]>([]);
   const [mentions, setMentions] = useState<MentionActivity[]>([]);
