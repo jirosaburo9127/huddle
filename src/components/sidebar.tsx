@@ -155,7 +155,9 @@ export function Sidebar({
   // zustand セレクタ形式で購読範囲を限定（不要な再レンダーを防ぐ）
   const sidebarOpen = useMobileNavStore((s) => s.sidebarOpen);
   const setSidebarOpen = useMobileNavStore((s) => s.setSidebarOpen);
-  const setPendingDetailOpen = useMobileNavStore((s) => s.setPendingDetailOpen);
+  const startDetailOpen = useMobileNavStore((s) => s.startDetailOpen);
+  const pendingDetailOpen = useMobileNavStore((s) => s.pendingDetailOpen);
+  const detailTransitionTitle = useMobileNavStore((s) => s.detailTransitionTitle);
   const [searchQuery, setSearchQuery] = useState("");
 
   // プロフィール編集用のstate
@@ -838,7 +840,7 @@ export function Sidebar({
                   if (pathname === `/${workspaceSlug}/${hitorigotoChannel.slug}`) {
                     setSidebarOpen(false);
                   } else {
-                    setPendingDetailOpen(true);
+                    startDetailOpen("独り言");
                   }
                 }}
                 className="lg:hidden relative shrink-0 mr-2"
@@ -1037,9 +1039,9 @@ export function Sidebar({
             workspaceSlug={workspaceSlug}
             pathname={pathname}
             unreadState={unreadState}
-            onNavigate={(isActive) => {
+            onNavigate={(isActive, title) => {
               if (isActive) setSidebarOpen(false);
-              else setPendingDetailOpen(true);
+              else startDetailOpen(title);
             }}
             channelMembersMap={channelMembersMap}
             workspaceMembers={members}
@@ -1134,7 +1136,7 @@ export function Sidebar({
                 href={href}
                 onClick={() => {
                   if (isActive) setSidebarOpen(false);
-                  else setPendingDetailOpen(true);
+                  else startDetailOpen(name);
                 }}
                 className={`
                   flex items-center gap-2 px-3 py-2 text-base rounded-xl mx-2 transition-colors
@@ -1279,6 +1281,17 @@ export function Sidebar({
             </form>
           </div>
         </div>
+        {/* チャンネル読み込み中オーバーレイ（一覧の上に重ねる） */}
+        {pendingDetailOpen && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-sidebar/80 backdrop-blur-sm lg:hidden">
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+              {detailTransitionTitle && (
+                <span className="text-xs text-muted">{detailTransitionTitle}</span>
+              )}
+            </div>
+          </div>
+        )}
       </aside>
 
       {/* チャンネル作成モーダル */}
@@ -1773,7 +1786,7 @@ type ChannelCategoryListProps = {
   workspaceSlug: string;
   pathname: string;
   unreadState: Record<string, number>;
-  onNavigate: (isActive: boolean) => void;
+  onNavigate: (isActive: boolean, title: string) => void;
   // channel.id → 所属ユーザーID配列
   channelMembersMap: Record<string, string[]>;
   // ユーザーID → プロフィール解決用
@@ -1939,7 +1952,7 @@ function ChannelCategoryList({
                   >
                     <Link
                       href={href}
-                      onClick={() => onNavigate(isActive)}
+                      onClick={() => onNavigate(isActive, channel.name)}
                       className={`flex items-center min-w-0 flex-1 px-3 py-2 text-base ${
                         isActive
                           ? "text-accent"
