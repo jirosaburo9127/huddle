@@ -14,7 +14,7 @@ const CATEGORY_COLORS = [
   "bg-rose-200",
 ];
 
-function categoryColor(category: string | null): string {
+export function categoryColor(category: string | null): string {
   if (!category) return "bg-stone-200";
   let hash = 0;
   for (let i = 0; i < category.length; i++) {
@@ -23,58 +23,24 @@ function categoryColor(category: string | null): string {
   return CATEGORY_COLORS[Math.abs(hash) % CATEGORY_COLORS.length];
 }
 
-function relativeTime(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const min = Math.floor(diff / 60000);
-  if (min < 1) return "たった今";
-  if (min < 60) return `${min}分前`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}時間前`;
-  return new Date(dateStr).toLocaleDateString("ja-JP", { month: "short", day: "numeric" });
-}
-
 type Props = {
   note: BoardNoteWithProfile;
 };
 
 export function StickyNote({ note }: Props) {
   const colorClass = categoryColor(note.category);
-  const displayName = note.profiles?.display_name || "メンバー";
-  const avatarUrl = note.profiles?.avatar_url;
+  const displayName = note.profiles?.display_name || "";
 
   return (
-    <div
-      className={`aspect-square w-full p-3 shadow-md transition-all duration-300 flex flex-col ${colorClass}`}
-      style={{ minHeight: 120 }}
-    >
+    <div className={`w-28 h-28 p-2 shadow-md flex flex-col ${colorClass}`}>
       {/* 内容 */}
-      <p className="text-base text-gray-800 whitespace-pre-wrap break-words leading-relaxed flex-1 font-medium">
+      <p className="text-xs text-gray-800 leading-tight flex-1 overflow-hidden line-clamp-5">
         {note.content}
       </p>
-
-      {/* 投稿者 + 時刻 */}
-      <div className="flex items-center gap-1.5 mt-auto pt-2">
-        {avatarUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={avatarUrl} alt="" className="w-4 h-4 rounded-full object-cover" />
-        ) : (
-          <div className="w-4 h-4 rounded-full bg-black/10 flex items-center justify-center">
-            <span className="text-[8px] font-bold text-black/40">
-              {displayName[0]?.toUpperCase()}
-            </span>
-          </div>
-        )}
-        <span className="text-[11px] text-black/40 truncate">{displayName}</span>
-        <span className="text-[10px] text-black/25 ml-auto shrink-0">{relativeTime(note.created_at)}</span>
+      {/* 投稿者 */}
+      <div className="mt-auto pt-1">
+        <span className="text-[9px] text-black/35 truncate block">{displayName}</span>
       </div>
-
-      {/* 分類中インジケーター */}
-      {!note.category && (
-        <div className="flex items-center gap-1 mt-1">
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-gray-400 animate-pulse" />
-          <span className="text-[9px] text-black/25">分類中...</span>
-        </div>
-      )}
     </div>
   );
 }

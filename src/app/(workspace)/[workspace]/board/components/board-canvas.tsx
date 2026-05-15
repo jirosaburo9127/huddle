@@ -2,36 +2,39 @@
 
 import { useMemo } from "react";
 import type { BoardNoteWithProfile } from "@/lib/supabase/types";
-import { StickyNote } from "./sticky-note";
+import { StickyNote, categoryColor } from "./sticky-note";
 
 type Props = {
   notes: BoardNoteWithProfile[];
 };
 
+// ノートIDから擬似ランダムな位置・回転を決定（同じIDなら同じ位置）
+function notePosition(id: string, index: number, total: number) {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = ((hash << 5) - hash + id.charCodeAt(i)) | 0;
+  }
+  const h = Math.abs(hash);
+  // 画面を均等に埋めるため、indexベースのグリッド位置にランダムオフセットを加える
+  const cols = Math.max(4, Math.ceil(Math.sqrt(total * 1.5)));
+  const row = Math.floor(index / cols);
+  const col = index % cols;
+  const cellW = 100 / cols;
+  const cellH = cellW * 1.2;
+  const left = col * cellW + (h % 30) * cellW * 0.01;
+  const top = row * cellH + ((h >> 8) % 30) * cellH * 0.01;
+  const rotate = ((h % 13) - 6) * 1.2; // -7.2deg ~ +7.2deg
+  return { left: `${Math.min(left, 95)}%`, top: `${top}%`, rotate: `${rotate}deg` };
+}
+
 export function BoardCanvas({ notes }: Props) {
-  // カテゴリ別にグループ化（未分類は末尾）
-  const grouped = useMemo(() => {
-    const map = new Map<string, BoardNoteWithProfile[]>();
-    const uncategorized: BoardNoteWithProfile[] = [];
-
-    for (const note of notes) {
-      if (!note.category) {
-        uncategorized.push(note);
-      } else {
-        const list = map.get(note.category);
-        if (list) {
-          list.push(note);
-        } else {
-          map.set(note.category, [note]);
-        }
-      }
+  // カテゴリ一覧（凡例用）
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    for (const n of notes) {
+      if (n.category) set.add(n.category);
     }
-
-    const sorted = [...map.entries()].sort((a, b) => b[1].length - a[1].length);
-    if (uncategorized.length > 0) {
-      sorted.push(["未分類", uncategorized]);
-    }
-    return sorted;
+    return [...set];
   }, [notes]);
 
   if (notes.length === 0) {
@@ -40,33 +43,47 @@ export function BoardCanvas({ notes }: Props) {
         <div className="text-center">
           <div className="text-4xl mb-3">📝</div>
           <p className="text-sm">まだ付箋がありません</p>
-          <p className="text-xs mt-1 text-muted/70">チャットでアイディアを投稿してください</p>
+          <p className="text-xs mt-1 text-muted/70">下の入力欄からアイディアを投稿してください</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-4">
-      {grouped.map(([category, categoryNotes]) => (
-        <div key={category} className="mb-6">
-          {/* カテゴリヘッダ */}
-          <div className="flex items-center gap-2 mb-3">
-            <h3 className="text-sm font-bold text-foreground/80">
-              {category}
-            </h3>
-            <span className="text-xs bg-foreground/10 text-foreground/50 rounded-full px-2 py-0.5">
-              {categoryNotes.length}
+    <div className="flex-1 overflow-auto relative">
+      {/* カテゴリ凡例 */}
+      {categories.length > 0 && (
+        <div className="sticky top-0 z-10 flex flex-wrap gap-2 px-4 py-2 bg-background/80 backdrop-blur-sm">
+          {categories.map((cat) => (
+            <span
+              key={cat}
+              className={`text-[10px] px-2 py-0.5 text-gray-700 font-medium ${categoryColor(cat)}`}
+            >
+              {cat}
             </span>
-          </div>
-          {/* 付箋グリッド */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3">
-            {categoryNotes.map((note) => (
-              <StickyNote key={note.id} note={note} />
-            ))}
-          </div>
+          ))}
         </div>
-      ))}
+      )}
+
+      {/* 付箋が散らばるエリア */}
+      <div className="relative" style={{ minHeight: Math.max(500, Math.ceil(notes.length / 4) * 160) }}>
+        {notes.map((note, i) => {
+          const pos = notePosition(note.id, i, notes.length);
+          return (
+            <div
+              key={note.id}
+              className="absolute transition-all duration-500 hover:z-10 hover:scale-110"
+              style={{
+                left: pos.left,
+                top: pos.top,
+                transform: `rotate(${pos.rotate})`,
+              }}
+            >
+              <StickyNote note={note} />
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
