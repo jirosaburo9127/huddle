@@ -58,7 +58,7 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
     return () => document.removeEventListener("pointerdown", onDown);
   }, [showMore]);
 
-  const isHome = !pathname.includes("/dm-list") && !pathname.includes("/in-progress") && !pathname.includes("/calendar") && !pathname.includes("/files") && !pathname.includes("/dashboard");
+  const isHome = !pathname.includes("/dm-list") && !pathname.includes("/in-progress") && !pathname.includes("/calendar") && !pathname.includes("/files") && !pathname.includes("/dashboard") && !pathname.includes("/board");
   const isInProgress = pathname.includes("/in-progress");
   const isCalendar = pathname.includes("/calendar");
 
@@ -210,6 +210,21 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
                   </svg>
                 </span>
                 <span className="text-xs text-foreground">ファイル</span>
+              </Link>
+              <Link
+                href={`/${workspaceSlug}/board`}
+                onClick={() => {
+                  setShowMore(false);
+                  setSidebarOpen(false);
+                }}
+                className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
+              >
+                <span className="w-12 h-12 rounded-full border-2 border-muted/40 flex items-center justify-center">
+                  <svg className="w-5 h-5 text-foreground" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6z" />
+                  </svg>
+                </span>
+                <span className="text-xs text-foreground">ボード</span>
               </Link>
               <button
                 onClick={() => { setShowMore(false); setShowBookmark(true); }}

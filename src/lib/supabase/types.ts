@@ -74,3 +74,28 @@ export type MessageWithProfile = Message & {
   profiles: Profile;
   reactions?: Reaction[];
 };
+
+// 付箋ボード
+export type Board = {
+  id: string;
+  workspace_id: string;
+  title: string;
+  created_by: string;
+  is_active: boolean;
+  created_at: string;
+  closed_at: string | null;
+};
+
+export type BoardNote = {
+  id: string;
+  board_id: string;
+  user_id: string;
+  content: string;
+  category: string | null;
+  color: string;
+  created_at: string;
+};
+
+export type BoardNoteWithProfile = BoardNote & {
+  profiles?: Profile | null;
+};
