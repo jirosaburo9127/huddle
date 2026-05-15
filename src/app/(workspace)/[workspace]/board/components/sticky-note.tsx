@@ -4,18 +4,18 @@ import type { BoardNoteWithProfile } from "@/lib/supabase/types";
 
 // カテゴリ名から背景色を決定（同じカテゴリは同じ色）
 const CATEGORY_COLORS = [
-  "bg-amber-100 border-amber-300",
-  "bg-blue-100 border-blue-300",
-  "bg-green-100 border-green-300",
-  "bg-pink-100 border-pink-300",
-  "bg-purple-100 border-purple-300",
-  "bg-orange-100 border-orange-300",
-  "bg-teal-100 border-teal-300",
-  "bg-rose-100 border-rose-300",
+  "bg-amber-200",
+  "bg-sky-200",
+  "bg-lime-200",
+  "bg-pink-200",
+  "bg-violet-200",
+  "bg-orange-200",
+  "bg-teal-200",
+  "bg-rose-200",
 ];
 
 function categoryColor(category: string | null): string {
-  if (!category) return "bg-gray-100 border-gray-300";
+  if (!category) return "bg-stone-200";
   let hash = 0;
   for (let i = 0; i < category.length; i++) {
     hash = ((hash << 5) - hash + category.charCodeAt(i)) | 0;
@@ -44,28 +44,16 @@ export function StickyNote({ note }: Props) {
 
   return (
     <div
-      className={`rounded-xl border-2 p-3 shadow-sm transition-all duration-300 ${colorClass}`}
+      className={`aspect-square w-full p-3 shadow-md transition-all duration-300 flex flex-col ${colorClass}`}
+      style={{ minHeight: 120 }}
     >
-      {/* カテゴリラベル */}
-      {note.category && (
-        <div className="text-[10px] font-bold text-black/40 uppercase tracking-wider mb-1">
-          {note.category}
-        </div>
-      )}
-      {!note.category && (
-        <div className="text-[10px] text-black/30 mb-1 flex items-center gap-1">
-          <span className="inline-block w-2 h-2 rounded-full bg-gray-400 animate-pulse" />
-          分類中...
-        </div>
-      )}
-
       {/* 内容 */}
-      <p className="text-sm text-gray-800 whitespace-pre-wrap break-words leading-relaxed">
+      <p className="text-base text-gray-800 whitespace-pre-wrap break-words leading-relaxed flex-1 font-medium">
         {note.content}
       </p>
 
       {/* 投稿者 + 時刻 */}
-      <div className="flex items-center gap-1.5 mt-2">
+      <div className="flex items-center gap-1.5 mt-auto pt-2">
         {avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={avatarUrl} alt="" className="w-4 h-4 rounded-full object-cover" />
@@ -76,9 +64,17 @@ export function StickyNote({ note }: Props) {
             </span>
           </div>
         )}
-        <span className="text-[11px] text-black/50 truncate">{displayName}</span>
-        <span className="text-[10px] text-black/30 ml-auto shrink-0">{relativeTime(note.created_at)}</span>
+        <span className="text-[11px] text-black/40 truncate">{displayName}</span>
+        <span className="text-[10px] text-black/25 ml-auto shrink-0">{relativeTime(note.created_at)}</span>
       </div>
+
+      {/* 分類中インジケーター */}
+      {!note.category && (
+        <div className="flex items-center gap-1 mt-1">
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-gray-400 animate-pulse" />
+          <span className="text-[9px] text-black/25">分類中...</span>
+        </div>
+      )}
     </div>
   );
 }

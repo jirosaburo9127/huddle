@@ -27,7 +27,6 @@ export function BoardCanvas({ notes }: Props) {
       }
     }
 
-    // カテゴリを投稿数の多い順にソート
     const sorted = [...map.entries()].sort((a, b) => b[1].length - a[1].length);
     if (uncategorized.length > 0) {
       sorted.push(["未分類", uncategorized]);
@@ -49,27 +48,25 @@ export function BoardCanvas({ notes }: Props) {
 
   return (
     <div className="flex-1 overflow-y-auto p-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {grouped.map(([category, categoryNotes]) => (
-          <div key={category} className="space-y-2">
-            {/* カテゴリヘッダ */}
-            <div className="flex items-center gap-2 px-1">
-              <h3 className="text-xs font-bold text-foreground/70 uppercase tracking-wider">
-                {category}
-              </h3>
-              <span className="text-[10px] bg-foreground/10 text-foreground/50 rounded-full px-1.5 py-0.5">
-                {categoryNotes.length}
-              </span>
-            </div>
-            {/* 付箋リスト */}
-            <div className="space-y-2">
-              {categoryNotes.map((note) => (
-                <StickyNote key={note.id} note={note} />
-              ))}
-            </div>
+      {grouped.map(([category, categoryNotes]) => (
+        <div key={category} className="mb-6">
+          {/* カテゴリヘッダ */}
+          <div className="flex items-center gap-2 mb-3">
+            <h3 className="text-sm font-bold text-foreground/80">
+              {category}
+            </h3>
+            <span className="text-xs bg-foreground/10 text-foreground/50 rounded-full px-2 py-0.5">
+              {categoryNotes.length}
+            </span>
           </div>
-        ))}
-      </div>
+          {/* 付箋グリッド */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3">
+            {categoryNotes.map((note) => (
+              <StickyNote key={note.id} note={note} />
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
