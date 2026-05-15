@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import type { BoardNoteWithProfile } from "@/lib/supabase/types";
-import { BoardChatPanel } from "./board-chat-panel";
 import { BoardCanvas } from "./board-canvas";
 
 type Props = {
@@ -12,59 +11,57 @@ type Props = {
 };
 
 export function BoardLayout({ notes, onSubmit, disabled }: Props) {
-  // モバイルのタブ切替
-  const [mobileTab, setMobileTab] = useState<"chat" | "board">("chat");
+  const [input, setInput] = useState("");
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  function handleSubmit() {
+    const trimmed = input.trim();
+    if (!trimmed || disabled) return;
+    onSubmit(trimmed);
+    setInput("");
+    inputRef.current?.focus();
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit();
+    }
+  }
 
   return (
-    <>
-      {/* デスクトップ: 2カラム */}
-      <div className="hidden lg:flex flex-1 min-h-0">
-        {/* 左: チャットパネル */}
-        <div className="w-80 border-r border-border flex flex-col shrink-0">
-          <BoardChatPanel notes={notes} onSubmit={onSubmit} disabled={disabled} />
-        </div>
-        {/* 右: 付箋ボード */}
-        <BoardCanvas notes={notes} />
-      </div>
+    <div className="flex flex-col flex-1 min-h-0">
+      {/* 付箋ボード（全面表示） */}
+      <BoardCanvas notes={notes} />
 
-      {/* モバイル: タブ切替 */}
-      <div className="flex flex-col flex-1 min-h-0 lg:hidden">
-        {/* タブバー */}
-        <div className="flex border-b border-border/50 shrink-0">
+      {/* 入力欄（下部固定） */}
+      <div className="shrink-0 px-4 pb-3 pt-2 border-t border-border/50">
+        <div className="flex items-end gap-2">
+          <textarea
+            ref={inputRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="アイディアを入力..."
+            disabled={disabled}
+            rows={1}
+            className="flex-1 resize-none rounded-xl border border-border bg-input-bg px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-50"
+            style={{ maxHeight: 120 }}
+            onInput={(e) => {
+              const el = e.currentTarget;
+              el.style.height = "auto";
+              el.style.height = Math.min(el.scrollHeight, 120) + "px";
+            }}
+          />
           <button
-            onClick={() => setMobileTab("chat")}
-            className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
-              mobileTab === "chat"
-                ? "text-foreground border-b-2 border-accent -mb-px"
-                : "text-muted"
-            }`}
+            onClick={handleSubmit}
+            disabled={!input.trim() || disabled}
+            className="shrink-0 rounded-xl bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-40 transition-colors"
           >
-            💬 チャット
-          </button>
-          <button
-            onClick={() => setMobileTab("board")}
-            className={`flex-1 py-2.5 text-sm font-medium transition-colors relative ${
-              mobileTab === "board"
-                ? "text-foreground border-b-2 border-accent -mb-px"
-                : "text-muted"
-            }`}
-          >
-            📋 ボード
-            {notes.length > 0 && (
-              <span className="ml-1 text-[10px] bg-accent/20 text-accent rounded-full px-1.5">
-                {notes.length}
-              </span>
-            )}
+            投稿
           </button>
         </div>
-
-        {/* タブ内容 */}
-        {mobileTab === "chat" ? (
-          <BoardChatPanel notes={notes} onSubmit={onSubmit} disabled={disabled} />
-        ) : (
-          <BoardCanvas notes={notes} />
-        )}
       </div>
-    </>
+    </div>
   );
 }
