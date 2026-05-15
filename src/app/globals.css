@@ -117,6 +117,23 @@ html {
   100% { transform: translateX(320%); }
 }
 
+@keyframes mobile-detail-enter {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+.animate-mobile-detail-enter {
+  animation: mobile-detail-enter 0.22s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+.mobile-detail-transition {
+  animation: mobile-detail-enter 0.22s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+@media (min-width: 1024px) {
+  .animate-mobile-detail-enter,
+  .mobile-detail-transition {
+    animation: none;
+  }
+}
+
 /* ───── LP 用アニメーション ───── */
 @keyframes lp-fade-up {
   from { opacity: 0; transform: translateY(24px); }

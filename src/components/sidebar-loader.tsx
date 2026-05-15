@@ -5,6 +5,7 @@ import { Sidebar } from "@/components/sidebar";
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
 import { BottomTabBar } from "@/components/bottom-tab-bar";
 import { MainPane } from "@/components/main-pane";
+import { MobileDetailTransition } from "@/components/mobile-detail-transition";
 
 type WorkspaceShellProps = {
   workspaceSlug: string;
@@ -123,6 +124,7 @@ export async function WorkspaceShell({ workspaceSlug, children }: WorkspaceShell
       <KeyboardShortcuts workspaceId={result.workspace.id} workspaceSlug={workspaceSlug}>
         <MainPane>{children}</MainPane>
       </KeyboardShortcuts>
+      <MobileDetailTransition />
       <BottomTabBar workspaceSlug={workspaceSlug} workspaceId={result.workspace.id} currentUserId={user.id} members={result.members || []} />
     </>
   );

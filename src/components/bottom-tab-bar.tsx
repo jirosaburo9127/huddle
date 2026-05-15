@@ -163,6 +163,10 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
             <div className="grid grid-cols-3 gap-3">
               <Link
                 href={`/${workspaceSlug}/search`}
+                onClick={() => {
+                  setShowMore(false);
+                  setSidebarOpen(false);
+                }}
                 className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
               >
                 <span className="w-12 h-12 rounded-full border-2 border-muted/40 flex items-center justify-center">
@@ -174,6 +178,10 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
               </Link>
               <Link
                 href={`/${workspaceSlug}/dm-list`}
+                onClick={() => {
+                  setShowMore(false);
+                  setSidebarOpen(false);
+                }}
                 className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
               >
                 <span className="relative w-12 h-12 rounded-full border-2 border-muted/40 flex items-center justify-center">
@@ -190,6 +198,10 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
               </Link>
               <Link
                 href={`/${workspaceSlug}/files`}
+                onClick={() => {
+                  setShowMore(false);
+                  setSidebarOpen(false);
+                }}
                 className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
               >
                 <span className="w-12 h-12 rounded-full border-2 border-muted/40 flex items-center justify-center">

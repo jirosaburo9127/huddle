@@ -64,6 +64,13 @@ export default function FilesPage() {
   const tabsRef = useHorizontalOnlyScroll();
   const [filter, setFilter] = useState<"all" | FileItem["fileType"]>("all");
 
+  // files ページ表示時にモバイルサイドバーを閉じる（マウント時のみ実行する意図）
+  useEffect(() => {
+    setSidebarOpen(false);
+    // setSidebarOpen は zustand の安定参照だが、意図を明確にするため依存を空配列にする
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
