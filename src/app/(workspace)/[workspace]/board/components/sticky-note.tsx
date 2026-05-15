@@ -34,7 +34,7 @@ export function StickyNote({ note }: Props) {
   return (
     <div className={`w-28 h-28 p-2 shadow-md flex flex-col ${colorClass}`}>
       {/* 内容 */}
-      <p className="text-xs text-gray-800 leading-tight flex-1 overflow-hidden line-clamp-5">
+      <p className="text-sm font-bold text-gray-800 leading-tight flex-1 overflow-hidden line-clamp-4">
         {note.content}
       </p>
       {/* 投稿者 */}
