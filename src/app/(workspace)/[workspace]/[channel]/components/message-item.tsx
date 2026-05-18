@@ -16,7 +16,11 @@ import {
   extractVideoThumbnailUrl,
   stripFileUrlFragment,
 } from "@/lib/file-name";
-import { generateVideoThumbnailFile } from "@/lib/video-thumbnail-generator";
+import {
+  dataUrlToFile,
+  generateNativeVideoThumbnailDataUrl,
+  generateVideoThumbnailFile,
+} from "@/lib/video-thumbnail-generator";
 import { createClient } from "@/lib/supabase/client";
 
 type Props = {
@@ -196,9 +200,11 @@ function MessageContent({
   memberNames?: string[];
 }) {
   const { textLines, fileUrls } = splitContentAndFiles(content);
+  const [localBackfilledUrls, setLocalBackfilledUrls] = useState<Record<string, string>>({});
   const textContent = textLines.join("\n").trim();
+  const displayFileUrls = fileUrls.map((url) => localBackfilledUrls[url] ?? url);
   // このメッセージ内の画像URLのみのリスト（連続閲覧用）
-  const imageUrls = fileUrls.filter((u) => isImageFile(u));
+  const imageUrls = displayFileUrls.filter((u) => isImageFile(u));
   const videoBackfillTargetUrl = fileUrls.find((url) => isVideoFile(url) && !extractVideoThumbnailUrl(url));
 
   useEffect(() => {
@@ -209,13 +215,17 @@ function MessageContent({
     (async () => {
       try {
         const cleanUrl = stripFileUrlFragment(targetUrl);
-        const response = await fetch(cleanUrl);
-        if (!response.ok) return;
-        const blob = await response.blob();
-        if (cancelled) return;
-        const fileName = extractFileName(targetUrl);
-        const videoFile = new File([blob], fileName, { type: blob.type || "video/mp4" });
-        const thumbnail = await generateVideoThumbnailFile(videoFile);
+        const nativeThumbnail = await generateNativeVideoThumbnailDataUrl(cleanUrl);
+        let thumbnail = nativeThumbnail ? dataUrlToFile(nativeThumbnail) : null;
+        if (!thumbnail) {
+          const response = await fetch(cleanUrl);
+          if (!response.ok) return;
+          const blob = await response.blob();
+          if (cancelled) return;
+          const fileName = extractFileName(targetUrl);
+          const videoFile = new File([blob], fileName, { type: blob.type || "video/mp4" });
+          thumbnail = await generateVideoThumbnailFile(videoFile);
+        }
         if (!thumbnail || cancelled) return;
 
         const supabase = createClient();
@@ -231,6 +241,7 @@ function MessageContent({
           name: extractFileName(targetUrl),
           thumb: data.publicUrl,
         });
+        setLocalBackfilledUrls((prev) => ({ ...prev, [targetUrl]: newUrl }));
         await onVideoThumbnailBackfilled(messageId, targetUrl, newUrl);
       } catch {
         // 既存動画の形式や端末によって生成できない場合は通常表示にフォールバックする。
@@ -293,7 +304,7 @@ function MessageContent({
         </div>
       )}
       {/* 動画・その他のファイル（画像はすでに上で描画済みなのでスキップ） */}
-      {fileUrls.map((url, i) => {
+      {displayFileUrls.map((url, i) => {
         const fileName = extractFileName(url);
         if (isImageFile(url)) return null;
         if (isVideoFile(url)) {

@@ -64,7 +64,9 @@ export function VideoThumbnail({ url, className, captureAt = 0.1 }: Props) {
       if (cancelled) return;
       try {
         const duration = Number.isFinite(video.duration) ? video.duration : 0;
-        const target = duration > 0 ? Math.min(captureAt, Math.max(0, duration - 0.05)) : 0;
+        const target = duration > 0
+          ? Math.min(Math.max(captureAt, 1), Math.max(0, duration - 0.05))
+          : Math.max(captureAt, 1);
         if (Math.abs(video.currentTime - target) < 0.01) {
           drawFrame();
         } else {

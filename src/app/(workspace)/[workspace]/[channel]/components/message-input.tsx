@@ -5,7 +5,11 @@ import { createClient } from "@/lib/supabase/client";
 import { verifyFileMagicBytes } from "@/lib/file-validation";
 import { scanForSensitiveData } from "@/lib/dlp-scan";
 import { appendFileMetadataToUrl } from "@/lib/file-name";
-import { generateVideoThumbnailFile } from "@/lib/video-thumbnail-generator";
+import {
+  dataUrlToFile,
+  generateNativeVideoThumbnailDataUrl,
+  generateVideoThumbnailFile,
+} from "@/lib/video-thumbnail-generator";
 import type { MessageWithProfile } from "@/lib/supabase/types";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
 import { VideoThumbnail } from "@/components/video-thumbnail";
@@ -729,7 +733,10 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
       let thumbnailUrl: string | null = null;
       const isVideo = file.type.startsWith("video/") || /\.(mp4|mov|webm|m4v)$/i.test(file.name);
       if (isVideo) {
-        const thumbnail = await generateVideoThumbnailFile(file);
+        const nativeThumbnail = await generateNativeVideoThumbnailDataUrl(urlData.publicUrl);
+        const thumbnail = nativeThumbnail
+          ? dataUrlToFile(nativeThumbnail)
+          : await generateVideoThumbnailFile(file);
         if (thumbnail) {
           const thumbPath = `${channelId || "general"}/thumbs/${crypto.randomUUID()}-${sanitizeFileName(thumbnail.name)}`;
           const { error: thumbErr } = await supabase.storage
