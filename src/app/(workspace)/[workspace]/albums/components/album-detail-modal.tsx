@@ -75,35 +75,28 @@ export function AlbumDetailModal({ album, currentUserId, onClose, onAddItems }: 
   }, [imageItems]);
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center px-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/50" />
-      <div
-        className="relative w-full max-w-2xl lg:max-w-4xl rounded-2xl bg-sidebar border border-border shadow-xl max-h-[80vh] flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 z-[70] bg-background flex flex-col" onClick={(e) => e.stopPropagation()}>
         {/* ヘッダー */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 shrink-0">
-          <div className="min-w-0">
-            <h2 className="text-base font-bold text-foreground truncate">{album.title}</h2>
-            <span className="text-xs text-muted">#{album.channel_name} · {items.length}枚</span>
+          <button onClick={onClose} className="p-1 text-muted hover:text-foreground transition-colors">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <div className="min-w-0 text-center flex-1 px-2">
+            <h2 className="text-sm font-bold text-foreground truncate">{album.title}</h2>
+            <span className="text-[11px] text-muted">{items.length}枚</span>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={onAddItems}
-              className="text-xs bg-accent text-white px-3 py-1.5 rounded-lg hover:bg-accent-hover transition-colors"
-            >
-              追加
-            </button>
-            <button onClick={onClose} className="p-1 text-muted hover:text-foreground transition-colors">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
+          <button
+            onClick={onAddItems}
+            className="text-xs bg-accent text-white px-3 py-1.5 rounded-lg hover:bg-accent-hover transition-colors shrink-0"
+          >
+            追加
+          </button>
         </div>
 
-        {/* グリッド */}
-        <div className="flex-1 overflow-y-auto p-3">
+        {/* グリッド（余白なし） */}
+        <div className="flex-1 overflow-y-auto">
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <div className="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin" />
@@ -114,7 +107,7 @@ export function AlbumDetailModal({ album, currentUserId, onClose, onAddItems }: 
               <button onClick={onAddItems} className="text-accent text-xs mt-2 hover:underline">写真を追加</button>
             </div>
           ) : (
-            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-1.5">
+            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-px">
               {items.map((item) => {
                 const isVideo = isVideoUrl(item.url);
                 return (
@@ -163,7 +156,6 @@ export function AlbumDetailModal({ album, currentUserId, onClose, onAddItems }: 
             </div>
           )}
         </div>
-      </div>
 
       {/* Lightbox */}
       {lightbox && (
