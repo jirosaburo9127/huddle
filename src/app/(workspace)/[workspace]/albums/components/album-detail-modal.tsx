@@ -75,10 +75,10 @@ export function AlbumDetailModal({ album, currentUserId, onClose, onAddItems }: 
   }, [imageItems]);
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center" onClick={onClose}>
+    <div className="fixed inset-0 z-[70] flex items-center justify-center px-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/50" />
       <div
-        className="relative w-full sm:max-w-2xl lg:max-w-4xl sm:mx-4 rounded-t-2xl sm:rounded-2xl bg-sidebar border border-border shadow-xl max-h-[90vh] flex flex-col"
+        className="relative w-full max-w-2xl lg:max-w-4xl rounded-2xl bg-sidebar border border-border shadow-xl max-h-[80vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ヘッダー */}
