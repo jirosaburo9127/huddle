@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import type { RealtimePostgresInsertPayload } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import type { AlbumItem, AlbumSummary } from "@/lib/supabase/types";
@@ -32,7 +32,8 @@ export function AlbumDetailModal({ album, currentUserId, onClose, onAddItems }: 
         .select("*")
         .eq("album_id", album.id)
         .order("created_at", { ascending: true });
-      if (!cancelled && data) {
+      if (cancelled) return;
+      if (data) {
         setItems(data as AlbumItem[]);
       }
       setLoading(false);
@@ -63,9 +64,10 @@ export function AlbumDetailModal({ album, currentUserId, onClose, onAddItems }: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [album.id]);
 
-  const imageItems: MediaItem[] = items
-    .filter((i) => !isVideoUrl(i.url))
-    .map((i) => ({ url: i.url }));
+  const imageItems: MediaItem[] = useMemo(
+    () => items.filter((i) => !isVideoUrl(i.url)).map((i) => ({ url: i.url })),
+    [items]
+  );
 
   const handleImageClick = useCallback((url: string) => {
     const idx = imageItems.findIndex((i) => i.url === url);
@@ -118,7 +120,9 @@ export function AlbumDetailModal({ album, currentUserId, onClose, onAddItems }: 
                 return (
                   <button
                     key={item.id}
-                    onClick={() => isVideo ? undefined : handleImageClick(item.url)}
+                    type="button"
+                    disabled={isVideo}
+                    onClick={() => handleImageClick(item.url)}
                     className="aspect-square overflow-hidden bg-border/20 relative group"
                   >
                     {isVideo ? (

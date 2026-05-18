@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
@@ -12,7 +12,7 @@ import { CreateAlbumModal } from "./components/create-album-modal";
 export default function AlbumsPage() {
   const params = useParams<{ workspace: string }>();
   const workspaceSlug = params.workspace;
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const setSidebarOpen = useMobileNavStore((s) => s.setSidebarOpen);
 
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
@@ -26,17 +26,23 @@ export default function AlbumsPage() {
 
   useEffect(() => {
     setSidebarOpen(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [setSidebarOpen]);
 
   const fetchAlbums = useCallback(async () => {
     if (!workspaceId || !currentUserId) return;
-    const { data } = await supabase.rpc("get_my_albums", {
+    const { data, error } = await supabase.rpc("get_my_albums", {
       p_workspace_id: workspaceId,
       p_user_id: currentUserId,
     });
+    if (error) {
+      setAlbums([]);
+      setSelectedAlbum(null);
+      return;
+    }
     if (data && Array.isArray(data)) {
       setAlbums(data as AlbumSummary[]);
+    } else {
+      setAlbums([]);
     }
   }, [workspaceId, currentUserId, supabase]);
 
@@ -48,6 +54,8 @@ export default function AlbumsPage() {
       setAlbums([]);
       setChannels([]);
       setSelectedAlbum(null);
+      setWorkspaceId(null);
+      setCurrentUserId(null);
 
       try {
         const { data: { user } } = await supabase.auth.getUser();
@@ -100,8 +108,7 @@ export default function AlbumsPage() {
     }
     init();
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workspaceSlug]);
+  }, [workspaceSlug, supabase]);
 
   if (loading) {
     return (

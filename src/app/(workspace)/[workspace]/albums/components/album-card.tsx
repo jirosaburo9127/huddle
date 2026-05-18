@@ -13,7 +13,7 @@ export function AlbumCard({ album, onClick }: Props) {
   return (
     <button
       onClick={onClick}
-      className="text-left rounded-2xl overflow-hidden border border-border hover:border-accent/30 transition-all hover:shadow-lg group"
+      className="text-left rounded-2xl overflow-hidden transition-all hover:shadow-lg group"
     >
       {/* カバー画像 */}
       <div className="aspect-[4/3] bg-border/20 relative overflow-hidden">

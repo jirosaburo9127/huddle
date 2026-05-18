@@ -16,6 +16,7 @@ import { EventDisplay } from "./event-display";
 import { DateSeparator } from "./date-separator";
 import { ChannelNote } from "./channel-note";
 import { ChannelMembersModal } from "@/components/channel-members-modal";
+import { ChannelAlbums } from "./channel-albums";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
 import { showMessageNotification } from "@/lib/notification";
 import { clearPushBadge } from "@/lib/push-notifications";
@@ -85,6 +86,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
   const [replyTo, setReplyTo] = useState<MessageWithProfile | null>(null);
   // 独り言チャンネル用X風スレッドモーダル
   const [showMembersModal, setShowMembersModal] = useState(false);
+  const [showAlbums, setShowAlbums] = useState(false);
   const [showDeleteChannel, setShowDeleteChannel] = useState(false);
   const [deletingChannel, setDeletingChannel] = useState(false);
   const [showDecisionsOnly, setShowDecisionsOnly] = useState(false);
@@ -1832,19 +1834,34 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
 
                   {/* メンバー管理（DMでは非表示） */}
                   {!channel.is_dm && (
-                    <button
-                      role="menuitem"
-                      onClick={() => {
-                        setShowOverflowMenu(false);
-                        setShowMembersModal(true);
-                      }}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-white/[0.04] transition-colors"
-                    >
-                      <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                      </svg>
-                      メンバー管理
-                    </button>
+                    <>
+                      <button
+                        role="menuitem"
+                        onClick={() => {
+                          setShowOverflowMenu(false);
+                          setShowMembersModal(true);
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-white/[0.04] transition-colors"
+                      >
+                        <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                        メンバー管理
+                      </button>
+                      <button
+                        role="menuitem"
+                        onClick={() => {
+                          setShowOverflowMenu(false);
+                          setShowAlbums(true);
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-white/[0.04] transition-colors"
+                      >
+                        <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
+                        </svg>
+                        アルバム
+                      </button>
+                    </>
                   )}
 
                   {/* カテゴリ変更 (DMでは非表示) */}
@@ -2162,6 +2179,17 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
           workspaceId={channel.workspace_id}
           currentUserId={currentUserId}
           onClose={() => setShowMembersModal(false)}
+        />
+      )}
+
+      {/* チャンネルアルバム */}
+      {showAlbums && (
+        <ChannelAlbums
+          channelId={channel.id}
+          channelName={channel.name}
+          workspaceId={channel.workspace_id}
+          currentUserId={currentUserId}
+          onClose={() => setShowAlbums(false)}
         />
       )}
 
