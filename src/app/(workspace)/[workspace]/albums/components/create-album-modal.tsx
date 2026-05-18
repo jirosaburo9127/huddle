@@ -234,7 +234,7 @@ export function CreateAlbumModal({ workspaceId, currentUserId, channels, addToAl
     <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center" onClick={onClose}>
       <div className="absolute inset-0 bg-black/50" />
       <div
-        className="relative w-full sm:max-w-md sm:mx-4 rounded-t-2xl sm:rounded-2xl bg-sidebar border border-border shadow-xl max-h-[85vh] flex flex-col"
+        className="relative w-full sm:max-w-md sm:mx-4 rounded-t-2xl sm:rounded-2xl bg-sidebar border border-border shadow-xl max-h-[80vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 shrink-0">
@@ -341,10 +341,10 @@ export function CreateAlbumModal({ workspaceId, currentUserId, channels, addToAl
           )}
         </div>
 
-        <div className="shrink-0 px-4 py-3 border-t border-border/50">
+        <div className="shrink-0 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] border-t border-border/50">
           <button
             onClick={handleSubmit}
-            disabled={uploading || files.length === 0 || (!addToAlbumId && !title.trim())}
+            disabled={uploading || files.length === 0 || (!addToAlbumId && !title.trim()) || (!addToAlbumId && !channelId)}
             className="w-full rounded-xl bg-accent py-2.5 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-40 transition-colors"
           >
             {uploading ? "アップロード中..." : addToAlbumId ? `${files.length}枚を追加` : `アルバムを作成（${files.length}枚）`}
