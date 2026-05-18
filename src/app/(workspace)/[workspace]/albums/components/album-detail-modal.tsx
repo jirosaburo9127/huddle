@@ -121,8 +121,20 @@ export function AlbumDetailModal({ album, currentUserId, onClose, onAddItems }: 
                   <button
                     key={item.id}
                     type="button"
-                    disabled={isVideo}
-                    onClick={() => handleImageClick(item.url)}
+                    onClick={() => {
+                      if (isVideo) {
+                        // iOS: ネイティブAVPlayer / PC: 別タブ再生
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        const webkit = (window as any).webkit;
+                        if (webkit?.messageHandlers?.playVideo) {
+                          webkit.messageHandlers.playVideo.postMessage(item.url);
+                        } else {
+                          window.open(item.url, "_blank");
+                        }
+                      } else {
+                        handleImageClick(item.url);
+                      }
+                    }}
                     className="aspect-square overflow-hidden bg-border/20 relative group"
                   >
                     {isVideo ? (

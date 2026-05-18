@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { generateVideoThumbnailFile } from "@/lib/video-thumbnail-generator";
 
 type Props = {
   workspaceId: string;
@@ -57,10 +58,14 @@ function isImageFile(name: string): boolean {
   return /\.(jpg|jpeg|png|gif|webp|heic|heif|avif|bmp|tiff?)$/i.test(name);
 }
 
+function isVideoFile(file: File): boolean {
+  return file.type.startsWith("video/") || /\.(mp4|mov|webm|m4v)$/i.test(file.name);
+}
+
 export function CreateAlbumModal({ workspaceId, currentUserId, channels, addToAlbumId, onClose, onCreated }: Props) {
   const supabase = createClient();
   const [title, setTitle] = useState("");
-  const [channelId, setChannelId] = useState(channels[0]?.id || "");
+  const [channelId, setChannelId] = useState(channels.length > 0 ? channels[0].id : "");
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -145,8 +150,22 @@ export function CreateAlbumModal({ workspaceId, currentUserId, channels, addToAl
       }
 
       const { data: urlData } = supabase.storage.from("chat-files").getPublicUrl(path);
-      const publicUrl = urlData.publicUrl;
+      let publicUrl = urlData.publicUrl;
       const fileType = isImageFile(file.name) ? "image" : "video";
+
+      if (isVideoFile(file)) {
+        const thumbnail = await generateVideoThumbnailFile(file);
+        if (thumbnail) {
+          const thumbPath = `${uploadChannelId}/thumbs/${crypto.randomUUID()}-${thumbnail.name}`;
+          const { error: thumbErr } = await supabase.storage
+            .from("chat-files")
+            .upload(thumbPath, thumbnail, { contentType: thumbnail.type });
+          if (!thumbErr) {
+            const { data: thumbUrlData } = supabase.storage.from("chat-files").getPublicUrl(thumbPath);
+            publicUrl = `${publicUrl}#thumb=${encodeURIComponent(thumbUrlData.publicUrl)}`;
+          }
+        }
+      }
 
       await supabase.from("album_items").insert({
         album_id: albumId,
@@ -230,8 +249,15 @@ export function CreateAlbumModal({ workspaceId, currentUserId, channels, addToAl
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {/* チャンネル未参加の警告 */}
+          {!addToAlbumId && channels.length === 0 && (
+            <div className="text-sm text-mention text-center py-4">
+              参加しているチャンネルがありません。<br />
+              先にチャンネルに参加してください。
+            </div>
+          )}
           {/* タイトル（新規のみ） */}
-          {!addToAlbumId && (
+          {!addToAlbumId && channels.length > 0 && (
             <>
               <div>
                 <label className="text-xs font-medium text-muted block mb-1">タイトル</label>
