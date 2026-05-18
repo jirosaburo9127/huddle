@@ -231,10 +231,11 @@ export function CreateAlbumModal({ workspaceId, currentUserId, channels, addToAl
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center" onClick={onClose}>
+    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center" onClick={onClose}>
       <div className="absolute inset-0 bg-black/50" />
       <div
-        className="relative w-full sm:max-w-md sm:mx-4 rounded-t-2xl sm:rounded-2xl bg-sidebar border border-border shadow-xl max-h-[80vh] flex flex-col"
+        className="relative w-full sm:max-w-md sm:mx-4 rounded-t-2xl sm:rounded-2xl bg-sidebar border border-border shadow-xl max-h-[85vh] mb-0 sm:mb-0 flex flex-col"
+        style={{ marginBottom: "env(safe-area-inset-bottom, 0px)" }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 shrink-0">
