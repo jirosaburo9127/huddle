@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useState, useRef, useEffect, useMemo } from "react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { MessageWithProfile, Reaction } from "@/lib/supabase/types";
 import { EmojiPicker, EMOJI_LIST } from "./emoji-picker";
@@ -620,22 +621,41 @@ export const MessageItem = memo(function MessageItem({
     let albumData: { album_id?: string; title?: string; cover_url?: string | null; item_count?: number; is_new?: boolean } = {};
     try { albumData = JSON.parse(message.system_event); } catch { /* ignore */ }
     const senderName = message.profiles?.display_name || "";
+    const avatarUrl = message.profiles?.avatar_url;
+    const time = new Date(message.created_at).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
+    // アルバム集約ページへのリンク（pathnameからworkspace slugを取得）
+    const wsSlug = typeof window !== "undefined" ? window.location.pathname.split("/")[1] : "";
     return (
-      <div id={`msg-${message.id}`} className="px-2 py-2">
-        <div className="max-w-sm mx-auto rounded-xl overflow-hidden bg-sidebar border border-border/50 shadow-sm">
-          {albumData.cover_url && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={albumData.cover_url} alt="" className="w-full aspect-[16/9] object-cover" loading="lazy" />
-          )}
-          <div className="px-3 py-2">
-            <p className="text-sm text-foreground">{message.content}</p>
-            <div className="flex items-center gap-1.5 mt-1">
-              <span className="text-[11px] text-muted">{senderName}</span>
-              <span className="text-[10px] text-muted/50">
-                {new Date(message.created_at).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })}
-              </span>
-            </div>
+      <div id={`msg-${message.id}`} className="flex gap-3 px-4 py-2">
+        {/* アバター */}
+        {avatarUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={avatarUrl} alt="" className="w-9 h-9 rounded-full object-cover shrink-0 mt-0.5" />
+        ) : (
+          <div className="w-9 h-9 rounded-full bg-accent/20 flex items-center justify-center shrink-0 mt-0.5">
+            <span className="text-xs font-bold text-accent">{(senderName || "?")[0]?.toUpperCase()}</span>
           </div>
+        )}
+        <div className="min-w-0 flex-1">
+          {/* 名前 + 時刻 */}
+          <div className="flex items-baseline gap-2 mb-1">
+            <span className="text-sm font-semibold text-foreground">{senderName}</span>
+            <span className="text-[11px] text-muted">{time}</span>
+          </div>
+          {/* アルバムカード */}
+          <Link
+            href={`/${wsSlug}/albums`}
+            className="block max-w-xs rounded-xl overflow-hidden bg-sidebar border border-border/30 shadow-sm hover:shadow-md transition-shadow"
+          >
+            {albumData.cover_url && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={albumData.cover_url} alt="" className="w-full aspect-[16/9] object-cover" loading="lazy" />
+            )}
+            <div className="px-3 py-2">
+              <p className="text-sm text-foreground">{message.content}</p>
+              <span className="text-[11px] text-accent mt-0.5 block">アルバムを見る →</span>
+            </div>
+          </Link>
         </div>
       </div>
     );
