@@ -99,3 +99,31 @@ export type BoardNote = {
 export type BoardNoteWithProfile = BoardNote & {
   profiles?: Profile | null;
 };
+
+// アルバム
+export type Album = {
+  id: string;
+  channel_id: string;
+  title: string;
+  cover_url: string | null;
+  created_by: string;
+  created_at: string;
+};
+
+export type AlbumItem = {
+  id: string;
+  album_id: string;
+  url: string;
+  file_type: string;
+  file_name: string | null;
+  added_by: string;
+  created_at: string;
+};
+
+export type AlbumSummary = Album & {
+  channel_name: string;
+  channel_slug: string;
+  creator_name: string;
+  item_count: number;
+  first_item_url: string | null;
+};

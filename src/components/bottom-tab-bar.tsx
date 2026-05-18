@@ -58,7 +58,7 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
     return () => document.removeEventListener("pointerdown", onDown);
   }, [showMore]);
 
-  const isHome = !pathname.includes("/dm-list") && !pathname.includes("/in-progress") && !pathname.includes("/calendar") && !pathname.includes("/files") && !pathname.includes("/dashboard") && !pathname.includes("/board");
+  const isHome = !pathname.includes("/dm-list") && !pathname.includes("/in-progress") && !pathname.includes("/calendar") && !pathname.includes("/files") && !pathname.includes("/dashboard") && !pathname.includes("/albums");
   const isInProgress = pathname.includes("/in-progress");
   const isCalendar = pathname.includes("/calendar");
 
@@ -212,7 +212,7 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
                 <span className="text-xs text-foreground">ファイル</span>
               </Link>
               <Link
-                href={`/${workspaceSlug}/board`}
+                href={`/${workspaceSlug}/albums`}
                 onClick={() => {
                   setShowMore(false);
                   setSidebarOpen(false);
@@ -221,10 +221,10 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
               >
                 <span className="w-12 h-12 rounded-full border-2 border-muted/40 flex items-center justify-center">
                   <svg className="w-5 h-5 text-foreground" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
                   </svg>
                 </span>
-                <span className="text-xs text-foreground">ボード</span>
+                <span className="text-xs text-foreground">アルバム</span>
               </Link>
               <button
                 onClick={() => { setShowMore(false); setShowBookmark(true); }}
