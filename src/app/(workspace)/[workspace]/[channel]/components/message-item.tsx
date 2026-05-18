@@ -10,7 +10,14 @@ import { EventDisplay } from "./event-display";
 import { ImageLightbox } from "@/components/image-lightbox";
 import { VideoThumbnail } from "@/components/video-thumbnail";
 import { useReactorNames } from "@/lib/use-reactor-names";
-import { extractDisplayFileName } from "@/lib/file-name";
+import {
+  appendFileMetadataToUrl,
+  extractDisplayFileName,
+  extractVideoThumbnailUrl,
+  stripFileUrlFragment,
+} from "@/lib/file-name";
+import { generateVideoThumbnailFile } from "@/lib/video-thumbnail-generator";
+import { createClient } from "@/lib/supabase/client";
 
 type Props = {
   message: MessageWithProfile;
@@ -29,6 +36,7 @@ type Props = {
     due: string | null
   ) => Promise<void>;
   onBookmark?: (messageId: string) => Promise<void>;
+  onVideoThumbnailBackfilled?: (messageId: string, oldUrl: string, newUrl: string) => Promise<void>;
   isBookmarked?: boolean;
   isConsecutive?: boolean;
   hasPoll?: boolean;
@@ -50,12 +58,12 @@ function isStorageFileUrl(content: string): boolean {
 
 // 画像拡張子かどうか判定
 function isImageFile(url: string): boolean {
-  return /\.(jpg|jpeg|png|gif|webp|svg)(\?.*)?$/i.test(url);
+  return /\.(jpg|jpeg|png|gif|webp|svg)(\?.*)?$/i.test(stripFileUrlFragment(url));
 }
 
 // 動画拡張子かどうか判定
 function isVideoFile(url: string): boolean {
-  return /\.(mp4|mov|webm|m4v)(\?.*)?$/i.test(url);
+  return /\.(mp4|mov|webm|m4v)(\?.*)?$/i.test(stripFileUrlFragment(url));
 }
 
 // URLからファイル名を抽出（#name=... を優先、なければ UUID プレフィックスを除去）
@@ -169,17 +177,21 @@ function splitContentAndFiles(content: string): { textLines: string[]; fileUrls:
 
 // メッセージ本文のレンダリング（テキスト + ファイルの混在対応）
 function MessageContent({
+  messageId,
   content,
   imageError,
   onImageError,
   onImageClick,
+  onVideoThumbnailBackfilled,
   memberNames,
 }: {
+  messageId: string;
   content: string;
   imageError: boolean;
   onImageError: () => void;
   // クリックされた画像と、そのメッセージ内の全画像URL配列を渡す（連続閲覧用）
   onImageClick?: (allImageUrls: string[], clickedIndex: number) => void;
+  onVideoThumbnailBackfilled?: (messageId: string, oldUrl: string, newUrl: string) => Promise<void>;
   // メンションハイライト用 (workspace の display_name 配列)
   memberNames?: string[];
 }) {
@@ -187,6 +199,48 @@ function MessageContent({
   const textContent = textLines.join("\n").trim();
   // このメッセージ内の画像URLのみのリスト（連続閲覧用）
   const imageUrls = fileUrls.filter((u) => isImageFile(u));
+  const videoBackfillTargetUrl = fileUrls.find((url) => isVideoFile(url) && !extractVideoThumbnailUrl(url));
+
+  useEffect(() => {
+    const targetUrl = videoBackfillTargetUrl;
+    if (!targetUrl || !onVideoThumbnailBackfilled) return;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const cleanUrl = stripFileUrlFragment(targetUrl);
+        const response = await fetch(cleanUrl);
+        if (!response.ok) return;
+        const blob = await response.blob();
+        if (cancelled) return;
+        const fileName = extractFileName(targetUrl);
+        const videoFile = new File([blob], fileName, { type: blob.type || "video/mp4" });
+        const thumbnail = await generateVideoThumbnailFile(videoFile);
+        if (!thumbnail || cancelled) return;
+
+        const supabase = createClient();
+        const safeThumbName = thumbnail.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const thumbPath = `backfill-thumbs/${messageId}-${crypto.randomUUID()}-${safeThumbName}`;
+        const { error } = await supabase.storage
+          .from("chat-files")
+          .upload(thumbPath, thumbnail, { contentType: thumbnail.type });
+        if (error || cancelled) return;
+
+        const { data } = supabase.storage.from("chat-files").getPublicUrl(thumbPath);
+        const newUrl = appendFileMetadataToUrl(cleanUrl, {
+          name: extractFileName(targetUrl),
+          thumb: data.publicUrl,
+        });
+        await onVideoThumbnailBackfilled(messageId, targetUrl, newUrl);
+      } catch {
+        // 既存動画の形式や端末によって生成できない場合は通常表示にフォールバックする。
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [videoBackfillTargetUrl, messageId, onVideoThumbnailBackfilled]);
 
   return (
     <div>
@@ -517,6 +571,7 @@ export const MessageItem = memo(function MessageItem({
   onStatus,
   onUpdateDecisionMeta,
   onBookmark,
+  onVideoThumbnailBackfilled,
   isBookmarked,
   isConsecutive,
   hasPoll,
@@ -912,10 +967,12 @@ export const MessageItem = memo(function MessageItem({
                 </button>
               )}
               <MessageContent
+                messageId={message.id}
                 content={message.content}
                 imageError={imageError}
                 onImageError={() => setImageError(true)}
                 onImageClick={(urls, index) => setLightboxState({ urls, index })}
+                onVideoThumbnailBackfilled={onVideoThumbnailBackfilled}
                 memberNames={memberNames}
               />
               {/* 投票 (message に紐づく polls 行がある時だけ) */}

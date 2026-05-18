@@ -4,8 +4,11 @@ import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { verifyFileMagicBytes } from "@/lib/file-validation";
 import { scanForSensitiveData } from "@/lib/dlp-scan";
+import { appendFileMetadataToUrl } from "@/lib/file-name";
+import { generateVideoThumbnailFile } from "@/lib/video-thumbnail-generator";
 import type { MessageWithProfile } from "@/lib/supabase/types";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
+import { VideoThumbnail } from "@/components/video-thumbnail";
 
 // ファイルサイズ上限: 50MB（Supabase Free プランの Global file size limit が 50MB 固定のため）
 // Pro プラン移行時は Dashboard の「Global file size limit」を上げた後、こことバケット側 file_size_limit も再設定する
@@ -723,9 +726,29 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
         .from("chat-files")
         .getPublicUrl(path);
 
+      let thumbnailUrl: string | null = null;
+      if (file.type.startsWith("video/")) {
+        const thumbnail = await generateVideoThumbnailFile(file);
+        if (thumbnail) {
+          const thumbPath = `${channelId || "general"}/thumbs/${crypto.randomUUID()}-${sanitizeFileName(thumbnail.name)}`;
+          const { error: thumbErr } = await supabase.storage
+            .from("chat-files")
+            .upload(thumbPath, thumbnail, { contentType: thumbnail.type });
+          if (!thumbErr) {
+            const { data: thumbUrlData } = supabase.storage
+              .from("chat-files")
+              .getPublicUrl(thumbPath);
+            thumbnailUrl = thumbUrlData.publicUrl;
+          }
+        }
+      }
+
       // 公開URLに元のファイル名を #name=... として埋め込む
       // ストレージはサニタイズ名で保存するが、表示は元の名前を使いたいため
-      const urlWithName = `${urlData.publicUrl}#name=${encodeURIComponent(file.name)}`;
+      const urlWithName = appendFileMetadataToUrl(urlData.publicUrl, {
+        name: file.name,
+        thumb: thumbnailUrl,
+      });
 
       // 即送信せず保留キューに入れる
       setPendingAttachments((prev) => [
@@ -1084,10 +1107,13 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
                     className="w-20 h-20 object-cover"
                   />
                 ) : att.isVideo ? (
-                  <div className="w-20 h-20 flex items-center justify-center bg-black/20">
-                    <svg className="w-8 h-8 text-white/70" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M8 5v14l11-7z" />
-                    </svg>
+                  <div className="relative w-20 h-20 bg-black/20 overflow-hidden">
+                    <VideoThumbnail url={att.url} className="absolute inset-0 w-full h-full object-cover" />
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/10">
+                      <svg className="w-8 h-8 text-white/80 drop-shadow" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                    </div>
                   </div>
                 ) : (
                   <div className="w-32 h-20 flex items-center gap-2 px-2">

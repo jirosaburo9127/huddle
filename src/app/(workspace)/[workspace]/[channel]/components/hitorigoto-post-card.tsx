@@ -6,7 +6,7 @@ import type { MessageWithProfile } from "@/lib/supabase/types";
 import { PollDisplay } from "./poll-display";
 import { ImageLightbox } from "@/components/image-lightbox";
 import { VideoThumbnail } from "@/components/video-thumbnail";
-import { extractDisplayFileName } from "@/lib/file-name";
+import { extractDisplayFileName, stripFileUrlFragment } from "@/lib/file-name";
 
 type Props = {
   message: MessageWithProfile;
@@ -26,11 +26,11 @@ function isStorageFileUrl(content: string): boolean {
 }
 
 function isImageFile(url: string): boolean {
-  return /\.(jpg|jpeg|png|gif|webp|svg)(\?.*)?$/i.test(url);
+  return /\.(jpg|jpeg|png|gif|webp|svg)(\?.*)?$/i.test(stripFileUrlFragment(url));
 }
 
 function isVideoFile(url: string): boolean {
-  return /\.(mp4|mov|webm|m4v)(\?.*)?$/i.test(url);
+  return /\.(mp4|mov|webm|m4v)(\?.*)?$/i.test(stripFileUrlFragment(url));
 }
 
 function escapeHtml(text: string): string {

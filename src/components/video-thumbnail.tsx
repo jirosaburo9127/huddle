@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { extractVideoThumbnailUrl, stripFileUrlFragment } from "@/lib/file-name";
 
 // 動画ファイルのサムネイル表示。
 //
@@ -20,11 +21,16 @@ export function VideoThumbnail({ url, className, captureAt = 0.1 }: Props) {
   const ref = useRef<HTMLVideoElement | null>(null);
   const [posterUrl, setPosterUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
-  const videoSrc = `${url}#t=${captureAt}`;
+  const [metadataPosterFailed, setMetadataPosterFailed] = useState(false);
+  const metadataPosterUrl = extractVideoThumbnailUrl(url);
+  const visiblePosterUrl = metadataPosterUrl && !metadataPosterFailed ? metadataPosterUrl : posterUrl;
+  const videoSrc = `${stripFileUrlFragment(url)}#t=${captureAt}`;
 
   useEffect(() => {
     setPosterUrl(null);
     setFailed(false);
+    setMetadataPosterFailed(false);
+    if (metadataPosterUrl) return;
     const v = ref.current;
     if (!v) return;
     const video = v;
@@ -89,7 +95,7 @@ export function VideoThumbnail({ url, className, captureAt = 0.1 }: Props) {
       video.removeEventListener("seeked", drawFrame);
       video.removeEventListener("error", markFailed);
     };
-  }, [url, captureAt]);
+  }, [url, captureAt, metadataPosterUrl]);
 
   return (
     <div className={`${className ?? ""} relative overflow-hidden bg-gradient-to-br from-zinc-800 to-black`}>
@@ -103,11 +109,16 @@ export function VideoThumbnail({ url, className, captureAt = 0.1 }: Props) {
         className="absolute inset-0 w-full h-full object-cover video-thumbnail"
         aria-hidden="true"
       />
-      {posterUrl && (
+      {visiblePosterUrl && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={posterUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+        <img
+          src={visiblePosterUrl}
+          alt=""
+          className="absolute inset-0 w-full h-full object-cover"
+          onError={() => setMetadataPosterFailed(true)}
+        />
       )}
-      {failed && !posterUrl && (
+      {failed && !visiblePosterUrl && (
         <div className="absolute inset-0 flex items-center justify-center" aria-hidden="true">
           <svg className="w-10 h-10 text-white/45" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z" />

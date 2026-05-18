@@ -4,8 +4,37 @@
 // フラグメント (#) はサーバに送信されないのでストレージ取得には影響しない。
 
 export function appendOriginalFileNameToUrl(url: string, originalName: string): string {
-  if (!originalName) return url;
-  return `${url}#name=${encodeURIComponent(originalName)}`;
+  return appendFileMetadataToUrl(url, { name: originalName });
+}
+
+export function appendFileMetadataToUrl(
+  url: string,
+  metadata: { name?: string | null; thumb?: string | null }
+): string {
+  const hashIdx = url.indexOf("#");
+  const base = hashIdx >= 0 ? url.slice(0, hashIdx) : url;
+  const existing = hashIdx >= 0 ? url.slice(hashIdx + 1) : "";
+  const params = new URLSearchParams(existing);
+  if (metadata.name) params.set("name", metadata.name);
+  if (metadata.thumb) params.set("thumb", metadata.thumb);
+  const fragment = params.toString();
+  return fragment ? `${base}#${fragment}` : base;
+}
+
+export function stripFileUrlFragment(url: string): string {
+  const hashIdx = url.indexOf("#");
+  return hashIdx >= 0 ? url.slice(0, hashIdx) : url;
+}
+
+export function extractVideoThumbnailUrl(url: string): string | null {
+  try {
+    const hashIdx = url.indexOf("#");
+    if (hashIdx < 0) return null;
+    const params = new URLSearchParams(url.slice(hashIdx + 1));
+    return params.get("thumb");
+  } catch {
+    return null;
+  }
 }
 
 // URL から表示用ファイル名を取り出す。
