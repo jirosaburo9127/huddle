@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
 import type { AlbumSummary } from "@/lib/supabase/types";
@@ -12,6 +12,7 @@ import { CreateAlbumModal } from "./components/create-album-modal";
 export default function AlbumsPage() {
   const params = useParams<{ workspace: string }>();
   const workspaceSlug = params.workspace;
+  const searchParams = useSearchParams();
   const supabase = useMemo(() => createClient(), []);
   const setSidebarOpen = useMobileNavStore((s) => s.setSidebarOpen);
 
@@ -98,9 +99,15 @@ export default function AlbumsPage() {
           p_user_id: user.id,
         });
         if (!cancelled) {
-          setAlbums(
-            albumData && Array.isArray(albumData) ? (albumData as AlbumSummary[]) : []
-          );
+          const albumList = albumData && Array.isArray(albumData) ? (albumData as AlbumSummary[]) : [];
+          setAlbums(albumList);
+
+          // ?album=<id> で特定アルバムを自動オープン
+          const targetAlbumId = searchParams?.get("album");
+          if (targetAlbumId) {
+            const target = albumList.find((a) => a.id === targetAlbumId);
+            if (target) setSelectedAlbum(target);
+          }
         }
       } finally {
         if (!cancelled) setLoading(false);

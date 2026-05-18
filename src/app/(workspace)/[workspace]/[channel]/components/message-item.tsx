@@ -644,7 +644,7 @@ export const MessageItem = memo(function MessageItem({
           </div>
           {/* アルバムカード */}
           <Link
-            href={`/${wsSlug}/albums`}
+            href={`/${wsSlug}/albums?album=${albumData.album_id || ""}`}
             className="block max-w-xs rounded-xl overflow-hidden bg-sidebar border border-border/30 shadow-sm hover:shadow-md transition-shadow"
           >
             {albumData.cover_url && (
