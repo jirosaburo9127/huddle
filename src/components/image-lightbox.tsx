@@ -176,11 +176,11 @@ export function ImageLightbox(props: Props) {
         // 等倍時: 下スワイプで閉じる + 横スワイプで前後ナビ（mediaList 指定時のみ）
         // 横と縦のうち、どちらの動きが大きいかで挙動を分岐
         if (Math.abs(dx) > Math.abs(dy) && usingList) {
-          // 横方向: 画像を引きずる感じだけ（実際の遷移は touchEnd で判定）
-          setTx(g.startTx + dx * 0.5);
-          setTy(g.startTy + dy * 0.2);
+          // 横方向: 指に1:1追従（iPhoneフォトアプリ風）
+          setTx(g.startTx + dx);
+          setTy(0);
         } else {
-          // 縦方向（dismiss）
+          // 縦方向（dismiss）: 下方向は1:1、上方向は抑制
           setTx(g.startTx + dx * 0.3);
           setTy(g.startTy + (dy > 0 ? dy : dy * 0.3));
         }
@@ -442,7 +442,7 @@ export function ImageLightbox(props: Props) {
             opacity: 1 - dismissProgress * 0.4,
             transition:
               gestureRef.current.mode === "idle"
-                ? "transform 0.2s ease-out, opacity 0.2s ease-out"
+                ? "transform 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.2s ease-out"
                 : "none",
             touchAction: "none",
             WebkitUserSelect: "none",

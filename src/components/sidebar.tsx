@@ -938,8 +938,8 @@ export function Sidebar({
         {/* チャンネル・DM一覧 */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden py-2">
           {/* ツールバー: PC のみ表示（モバイルはボトムタブバーに移動） */}
-          {/* 5項目を 3+2 の 2 行 grid に分割して詰まりを解消 */}
-          <div className="hidden lg:grid lg:grid-cols-4 gap-y-2 mx-3 mb-3 py-3 rounded-xl bg-white/[0.02] border border-border/30 [&>a]:justify-self-center [&>button]:justify-self-center">
+          {/* 6項目を 3+3 の 2 行 grid に分割して詰まりを解消 */}
+          <div className="hidden lg:grid lg:grid-cols-3 gap-y-2 mx-3 mb-3 py-3 rounded-xl bg-white/[0.02] border border-border/30 [&>a]:justify-self-center [&>button]:justify-self-center">
             <Link
               href={`/${workspaceSlug}/dashboard`}
               onClick={() => setSidebarOpen(false)}
