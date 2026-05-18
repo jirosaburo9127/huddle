@@ -103,10 +103,28 @@ export function CreateAlbumModal({ workspaceId, currentUserId, channels, addToAl
       albumId = data.id;
     }
 
+    // アルバムが属するチャンネルIDを取得（追加時はアルバムから逆引き）
+    let uploadChannelId = channelId;
+    if (addToAlbumId) {
+      const { data: albumRow } = await supabase
+        .from("albums")
+        .select("channel_id")
+        .eq("id", addToAlbumId)
+        .maybeSingle();
+      if (albumRow) uploadChannelId = albumRow.channel_id;
+    }
+
     // ファイルアップロード + album_items INSERT
+    let uploadedCount = 0;
     for (let i = 0; i < files.length; i++) {
       setProgress(Math.round(((i) / files.length) * 100));
       let file = files[i];
+
+      // 50MBチェック
+      if (file.size > 50 * 1024 * 1024) {
+        alert(`「${file.name}」は50MBを超えているためスキップします`);
+        continue;
+      }
 
       // 画像なら圧縮
       if (isImageFile(file.name)) {
@@ -114,7 +132,7 @@ export function CreateAlbumModal({ workspaceId, currentUserId, channels, addToAl
       }
 
       const ext = file.name.split(".").pop() || "bin";
-      const path = `${channelId}/${crypto.randomUUID()}.${ext}`;
+      const path = `${uploadChannelId}/${crypto.randomUUID()}.${ext}`;
 
       const { error: uploadErr } = await supabase.storage
         .from("chat-files")
@@ -122,6 +140,7 @@ export function CreateAlbumModal({ workspaceId, currentUserId, channels, addToAl
 
       if (uploadErr) {
         console.error("Upload failed:", uploadErr);
+        alert(`「${file.name}」のアップロードに失敗しました: ${uploadErr.message}`);
         continue;
       }
 
@@ -136,6 +155,7 @@ export function CreateAlbumModal({ workspaceId, currentUserId, channels, addToAl
         file_name: file.name,
         added_by: currentUserId,
       });
+      uploadedCount++;
     }
 
     // カバー画像を設定（最初の画像）
@@ -150,6 +170,11 @@ export function CreateAlbumModal({ workspaceId, currentUserId, channels, addToAl
       if (firstItem) {
         await supabase.from("albums").update({ cover_url: firstItem.url }).eq("id", albumId);
       }
+    }
+
+    if (uploadedCount === 0) {
+      setUploading(false);
+      return;
     }
 
     // チャンネルにアルバム更新通知メッセージを投稿
@@ -168,16 +193,16 @@ export function CreateAlbumModal({ workspaceId, currentUserId, channels, addToAl
       album_id: albumId,
       title: albumTitle,
       cover_url: coverItem?.url || null,
-      item_count: files.length,
+      item_count: uploadedCount,
       is_new: !addToAlbumId,
     });
 
     await supabase.from("messages").insert({
-      channel_id: channelId,
+      channel_id: uploadChannelId,
       user_id: currentUserId,
       content: addToAlbumId
-        ? `📸 アルバムに${files.length}枚追加しました`
-        : `📸 アルバム「${title.trim()}」を作成しました（${files.length}枚）`,
+        ? `📸 アルバムに${uploadedCount}枚追加しました`
+        : `📸 アルバム「${title.trim()}」を作成しました（${uploadedCount}枚）`,
       system_event: eventData,
     });
 
