@@ -727,7 +727,8 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
         .getPublicUrl(path);
 
       let thumbnailUrl: string | null = null;
-      if (file.type.startsWith("video/")) {
+      const isVideo = file.type.startsWith("video/") || /\.(mp4|mov|webm|m4v)$/i.test(file.name);
+      if (isVideo) {
         const thumbnail = await generateVideoThumbnailFile(file);
         if (thumbnail) {
           const thumbPath = `${channelId || "general"}/thumbs/${crypto.randomUUID()}-${sanitizeFileName(thumbnail.name)}`;

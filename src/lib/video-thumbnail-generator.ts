@@ -2,7 +2,8 @@ export async function generateVideoThumbnailFile(
   file: File,
   captureAt = 0.1
 ): Promise<File | null> {
-  if (!file.type.startsWith("video/")) return null;
+  const isVideo = file.type.startsWith("video/") || /\.(mp4|mov|webm|m4v)$/i.test(file.name);
+  if (!isVideo) return null;
 
   return new Promise((resolve) => {
     const objectUrl = URL.createObjectURL(file);
