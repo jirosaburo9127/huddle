@@ -909,11 +909,16 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
 
   // チャンネル切替時: 未読位置または最下部に移動 + ResizeObserver
   useEffect(() => {
-    // myLastReadAt の取得を待ってからスクロール
-    const waitAndScroll = setTimeout(() => {
-      if (jumpActiveRef.current) return; // ジャンプ進行中はスキップ
-      requestAnimationFrame(() => requestAnimationFrame(scrollToUnreadOrBottom));
-    }, 300);
+    // DOM構築を待ってからスクロール（初期描画完了まで複数回試行）
+    let attempts = 0;
+    const tryScroll = () => {
+      if (jumpActiveRef.current) return;
+      scrollToUnreadOrBottom();
+    };
+    // 即座 + 100ms + 300ms + 600ms で4回試行（画像等の遅延ロードに対応）
+    tryScroll();
+    const timers = [100, 300, 600].map((ms) => setTimeout(tryScroll, ms));
+    const waitAndScroll = timers[0]; // cleanup用
     prevMessageCountRef.current = initialMessages.length;
 
     // 初期表示中はコンテンツ高さの変化を監視してスクロール位置を維持。
@@ -947,7 +952,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
     container.addEventListener("keydown", disarm);
     const timer = setTimeout(disarm, armedDurationMs);
     return () => {
-      clearTimeout(waitAndScroll);
+      timers.forEach(clearTimeout);
       clearTimeout(timer);
       container.removeEventListener("wheel", disarm);
       container.removeEventListener("touchmove", disarm);
@@ -1258,6 +1263,28 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
         );
       }
     }
+  }, [supabase]);
+
+  const handleVideoThumbnailBackfilled = useCallback(async (
+    messageId: string,
+    oldUrl: string,
+    newUrl: string
+  ) => {
+    const { data, error } = await supabase.rpc("backfill_message_video_thumbnail", {
+      p_message_id: messageId,
+      p_old_url: oldUrl,
+      p_new_url: newUrl,
+    });
+
+    if (error || !data) return;
+
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId
+          ? { ...m, content: m.content.replace(oldUrl, newUrl) }
+          : m
+      )
+    );
   }, [supabase]);
 
   // メッセージ削除（ソフトデリート）
@@ -2110,6 +2137,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                         onStatus={handleStatus}
                         onUpdateDecisionMeta={handleUpdateDecisionMeta}
                         onBookmark={handleBookmark}
+                        onVideoThumbnailBackfilled={handleVideoThumbnailBackfilled}
                         isBookmarked={bookmarkedIds.has(message.id)}
                         isConsecutive={isConsecutive}
                         hasPoll={pollMessageIds.has(message.id)}
