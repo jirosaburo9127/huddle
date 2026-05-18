@@ -9,11 +9,13 @@ import { CreateDmModal } from "@/components/create-dm-modal";
 
 type DmItem = {
   slug: string;
+  channelId: string;
   otherName: string;
   otherAvatar: string | null;
   isOnline: boolean;
   lastMessage: string | null;
   lastAt: string | null;
+  unreadCount: number;
 };
 
 type WsMember = {
@@ -91,6 +93,17 @@ export default function DmListPage() {
 
         if (!dms) return;
 
+        // 未読数を取得
+        const { data: unreadData } = await supabase.rpc("get_unread_counts", {
+          p_user_id: user.id,
+        });
+        const unreadMap = new Map<string, number>();
+        if (unreadData && Array.isArray(unreadData)) {
+          for (const row of unreadData as Array<{ channel_id: string; unread_count: number }>) {
+            unreadMap.set(row.channel_id, Number(row.unread_count));
+          }
+        }
+
         const result: DmItem[] = [];
         for (const dm of dms as Array<{ id: string; slug: string; channel_members: Array<{ user_id: string; profiles: { display_name: string; avatar_url: string | null; last_seen_at: string | null } | Array<{ display_name: string; avatar_url: string | null; last_seen_at: string | null }> }> | null }>) {
           const members = dm.channel_members || [];
@@ -115,11 +128,13 @@ export default function DmListPage() {
 
           result.push({
             slug: dm.slug,
+            channelId: dm.id,
             otherName: profile?.display_name || "DM",
             otherAvatar: profile?.avatar_url || null,
             isOnline,
             lastMessage: lastMsg?.content?.replace(/\s+/g, " ").trim().slice(0, 50) || null,
             lastAt: lastMsg?.created_at || null,
+            unreadCount: unreadMap.get(dm.id) || 0,
           });
         }
 
@@ -192,16 +207,25 @@ export default function DmListPage() {
                   )}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <div className="font-semibold text-sm text-foreground truncate">{dm.otherName}</div>
-                  {dm.lastMessage && (
-                    <div className="text-xs text-muted truncate mt-0.5">{dm.lastMessage}</div>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <span className={`font-semibold text-sm truncate ${dm.unreadCount > 0 ? "text-foreground" : "text-foreground"}`}>{dm.otherName}</span>
+                    {dm.lastAt && (
+                      <span className="text-[11px] text-muted shrink-0 ml-auto">
+                        {new Date(dm.lastAt).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo" })}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    {dm.lastMessage && (
+                      <span className={`text-xs truncate flex-1 ${dm.unreadCount > 0 ? "text-foreground font-medium" : "text-muted"}`}>{dm.lastMessage}</span>
+                    )}
+                    {dm.unreadCount > 0 && (
+                      <span className="shrink-0 bg-accent text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                        {dm.unreadCount > 99 ? "99+" : dm.unreadCount}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                {dm.lastAt && (
-                  <span className="text-[11px] text-muted shrink-0">
-                    {new Date(dm.lastAt).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo" })}
-                  </span>
-                )}
               </Link>
             ))}
           </div>
