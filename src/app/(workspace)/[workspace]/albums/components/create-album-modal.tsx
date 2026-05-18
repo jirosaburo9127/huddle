@@ -152,6 +152,35 @@ export function CreateAlbumModal({ workspaceId, currentUserId, channels, addToAl
       }
     }
 
+    // チャンネルにアルバム更新通知メッセージを投稿
+    // system_eventにアルバム情報をJSON埋め込み → message-itemで専用カード表示
+    const albumTitle = addToAlbumId ? undefined : title.trim();
+    const { data: coverItem } = await supabase
+      .from("album_items")
+      .select("url")
+      .eq("album_id", albumId)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    const eventData = JSON.stringify({
+      type: "album_update",
+      album_id: albumId,
+      title: albumTitle,
+      cover_url: coverItem?.url || null,
+      item_count: files.length,
+      is_new: !addToAlbumId,
+    });
+
+    await supabase.from("messages").insert({
+      channel_id: channelId,
+      user_id: currentUserId,
+      content: addToAlbumId
+        ? `📸 アルバムに${files.length}枚追加しました`
+        : `📸 アルバム「${title.trim()}」を作成しました（${files.length}枚）`,
+      system_event: eventData,
+    });
+
     setUploading(false);
     onCreated();
     onClose();

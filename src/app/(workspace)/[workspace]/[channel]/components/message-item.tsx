@@ -615,6 +615,32 @@ export const MessageItem = memo(function MessageItem({
     }
   }, [isEditing]);
 
+  // アルバム更新通知 — サムネイル付きカード表示
+  if (message.system_event && message.system_event.includes('"album_update"')) {
+    let albumData: { album_id?: string; title?: string; cover_url?: string | null; item_count?: number; is_new?: boolean } = {};
+    try { albumData = JSON.parse(message.system_event); } catch { /* ignore */ }
+    const senderName = message.profiles?.display_name || "";
+    return (
+      <div id={`msg-${message.id}`} className="px-2 py-2">
+        <div className="max-w-sm mx-auto rounded-xl overflow-hidden bg-sidebar border border-border/50 shadow-sm">
+          {albumData.cover_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={albumData.cover_url} alt="" className="w-full aspect-[16/9] object-cover" loading="lazy" />
+          )}
+          <div className="px-3 py-2">
+            <p className="text-sm text-foreground">{message.content}</p>
+            <div className="flex items-center gap-1.5 mt-1">
+              <span className="text-[11px] text-muted">{senderName}</span>
+              <span className="text-[10px] text-muted/50">
+                {new Date(message.created_at).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // 投票締切・決定登録・メンバー加入のシステムメッセージ — 控えめなセンタリング表示
   if (
     message.system_event === "poll_closed" ||
