@@ -176,8 +176,8 @@ export function ImageLightbox(props: Props) {
         // 等倍時: 下スワイプで閉じる + 横スワイプで前後ナビ（mediaList 指定時のみ）
         // 横と縦のうち、どちらの動きが大きいかで挙動を分岐
         if (Math.abs(dx) > Math.abs(dy) && usingList) {
-          // 横方向: 指に1:1追従（iPhoneフォトアプリ風）
-          setTx(g.startTx + dx);
+          // 横方向: 0.7倍に減衰して滑らかに追従（1:1だとブレが目立つ）
+          setTx(g.startTx + dx * 0.7);
           setTy(0);
         } else {
           // 縦方向（dismiss）: 下方向は1:1、上方向は抑制
@@ -198,8 +198,8 @@ export function ImageLightbox(props: Props) {
           onClose();
           return;
         }
-        // 横に 50px 以上スワイプされていたら前後にナビ（mediaList 指定時のみ）
-        if (usingList && Math.abs(tx) > 50 && Math.abs(tx) > Math.abs(ty) * 1.2) {
+        // 横に 60px 以上スワイプされていたら前後にナビ（mediaList 指定時のみ）
+        if (usingList && Math.abs(tx) > 60 && Math.abs(tx) > Math.abs(ty) * 1.5) {
           if (tx < 0 && canNext) {
             goNext();
             return;
@@ -398,7 +398,31 @@ export function ImageLightbox(props: Props) {
         </button>
       </div>
 
-      {/* 前後ナビはスワイプ操作で行う（ボタンなし） */}
+      {/* PC: 前後ナビボタン（モバイルはスワイプ操作） */}
+      {usingList && canPrev && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); goPrev(); }}
+          aria-label="前へ"
+          className="hidden lg:flex absolute left-4 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-black/60 border border-white/30 hover:bg-black/80 items-center justify-center text-white shadow-lg"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+      )}
+      {usingList && canNext && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); goNext(); }}
+          aria-label="次へ"
+          className="hidden lg:flex absolute right-4 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-black/60 border border-white/30 hover:bg-black/80 items-center justify-center text-white shadow-lg"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      )}
 
       {/* インデックス表示（連続閲覧時のみ） */}
       {usingList && mediaList && mediaList.length > 1 && (
@@ -442,7 +466,7 @@ export function ImageLightbox(props: Props) {
             opacity: 1 - dismissProgress * 0.4,
             transition:
               gestureRef.current.mode === "idle"
-                ? "transform 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.2s ease-out"
+                ? "transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.2s ease-out"
                 : "none",
             touchAction: "none",
             WebkitUserSelect: "none",
