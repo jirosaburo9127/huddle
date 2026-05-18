@@ -95,8 +95,8 @@ export function AlbumDetailModal({ album, currentUserId, onClose, onAddItems }: 
           </button>
         </div>
 
-        {/* グリッド（余白なし） */}
-        <div className="flex-1 overflow-y-auto">
+        {/* グリッド（余白なし、下部にBottomTabBar分の余白） */}
+        <div className="flex-1 overflow-y-auto pb-16 lg:pb-0">
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <div className="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin" />
