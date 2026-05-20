@@ -87,6 +87,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
   // 独り言チャンネル用X風スレッドモーダル
   const [showMembersModal, setShowMembersModal] = useState(false);
   const [showAlbums, setShowAlbums] = useState(false);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [showDeleteChannel, setShowDeleteChannel] = useState(false);
   const [deletingChannel, setDeletingChannel] = useState(false);
   const [showDecisionsOnly, setShowDecisionsOnly] = useState(false);
@@ -791,6 +792,25 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
       el.scrollTop = el.scrollHeight;
     }
   }, [channel.is_hitorigoto]);
+
+  // スクロール位置を監視して「最新へ」ボタンの表示/非表示を切り替え
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    function onScroll() {
+      if (!container) return;
+      if (channel.is_hitorigoto) {
+        // 独り言は逆順（最上部=最新）
+        setShowScrollToBottom(container.scrollTop > 300);
+      } else {
+        // 通常チャンネル（最下部=最新）
+        const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+        setShowScrollToBottom(distanceFromBottom > 300);
+      }
+    }
+    container.addEventListener("scroll", onScroll, { passive: true });
+    return () => container.removeEventListener("scroll", onScroll);
+  }, [channel.id, channel.is_hitorigoto]);
 
   // 「もっと前を読み込む」処理。通常はボタンが最上部、独り言は最下部に出る。
   // prepend 後のスクロール位置補正は通常チャンネルだけ必要 (独り言は逆順表示で
@@ -2153,6 +2173,25 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
             </div>
           )}
         </div>
+
+        {/* 最新へスクロールボタン */}
+        {showScrollToBottom && (
+          <div className="absolute bottom-20 right-4 z-20 lg:bottom-16">
+            <button
+              type="button"
+              onClick={() => {
+                scrollToBottom();
+                setShowScrollToBottom(false);
+              }}
+              className="w-10 h-10 rounded-full bg-sidebar border border-border shadow-lg flex items-center justify-center text-muted hover:text-foreground transition-colors"
+              aria-label="最新へ"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+              </svg>
+            </button>
+          </div>
+        )}
 
         {/* メッセージ入力 */}
         <MessageInput
