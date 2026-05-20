@@ -2176,7 +2176,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
 
         {/* 最新へスクロールボタン */}
         {showScrollToBottom && (
-          <div className="absolute bottom-20 right-4 z-20 lg:bottom-16">
+          <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 lg:bottom-16">
             <button
               type="button"
               onClick={() => {
