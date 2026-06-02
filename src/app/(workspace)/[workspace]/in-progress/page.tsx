@@ -229,7 +229,7 @@ export default function InProgressPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <header className="flex items-center gap-2 px-4 sm:px-6 py-2 border-b border-border bg-surface shrink-0">
+      <header className="flex items-center gap-2 px-3 sm:px-4 lg:px-9 py-3 lg:py-0 lg:h-14 bg-surface shrink-0">
         <button
           type="button"
           onClick={() => setSidebarOpen(true)}
@@ -240,10 +240,7 @@ export default function InProgressPage() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
-        <svg className="w-5 h-5 text-blue-400 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-        </svg>
-        <h1 className="font-bold text-lg shrink-0">進行中</h1>
+        <span style={{ fontSize: 18, fontWeight: 720, color: "var(--color-foreground)" }}>進行中</span>
         {/* ステータス絞り込みタブ (カプセル形式 + 件数併記) */}
         <div className="ml-auto flex gap-1 sm:gap-1.5 overflow-x-auto hide-scrollbar">
           {FILTER_OPTIONS.map((opt) => {

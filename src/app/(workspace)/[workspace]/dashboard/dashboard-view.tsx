@@ -236,20 +236,18 @@ export function DashboardView({
 
   return (
     <div className="flex flex-col h-full">
-      <header className="flex items-center px-6 py-3 border-b border-border bg-surface shrink-0">
-        {/* モバイル: サイドバーを開くボタン（元のチャンネルに戻るため） */}
+      <header className="flex items-center gap-2 px-3 sm:px-4 lg:px-9 py-3 lg:py-0 lg:h-14 bg-surface shrink-0">
         <button
           type="button"
           onClick={() => setSidebarOpen(true)}
-          className="lg:hidden mr-2 p-1 text-muted hover:text-foreground rounded transition-colors"
+          className="lg:hidden p-1 text-muted hover:text-foreground rounded transition-colors"
           aria-label="戻る"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
           </svg>
         </button>
-        <h1 className="font-bold text-lg">決定事項</h1>
-        <span className="ml-2 text-sm text-muted">{workspace.name}</span>
+        <span style={{ fontSize: 18, fontWeight: 720, color: "var(--color-foreground)" }}>決定事項</span>
       </header>
 
       <div className="flex-1 flex min-h-0 overflow-hidden">
