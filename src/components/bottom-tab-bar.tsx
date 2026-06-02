@@ -92,6 +92,7 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
         }`}
         aria-hidden={messageInputFocused}
       >
+        <div style={{ height: 0.75, background: "linear-gradient(90deg, #E96832, #38BDF8)" }} />
         <div className="flex items-center justify-around h-14 px-2 pt-2 pb-1">
           {/* ホーム */}
           <button

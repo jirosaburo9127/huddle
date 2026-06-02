@@ -227,7 +227,7 @@ export default function InProgressPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <header className="flex items-center gap-2 px-4 sm:px-6 py-2 border-b border-border bg-header shrink-0">
+      <header className="flex items-center gap-2 px-4 sm:px-6 py-2 border-b border-border bg-surface shrink-0">
         <button
           type="button"
           onClick={() => setSidebarOpen(true)}
@@ -324,11 +324,11 @@ export default function InProgressPage() {
             </div>
           )}
 
-          <div className="space-y-3">
+          <div>
             {loading ? (
-              <div className="text-center py-16 text-muted">読み込み中...</div>
+              <div className="text-center py-16" style={{ color: "var(--color-muted)" }}>読み込み中...</div>
             ) : items.length === 0 ? (
-              <div className="text-center py-16 text-muted">
+              <div className="text-center py-16" style={{ color: "var(--color-muted)" }}>
                 <svg className="w-12 h-12 mx-auto mb-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
@@ -341,76 +341,86 @@ export default function InProgressPage() {
                 </p>
               </div>
             ) : filteredItems.length === 0 ? (
-              <div className="text-center py-16 text-muted">
-                <p className="text-sm">このチャンネルの該当項目はありません</p>
+              <div className="text-center py-16" style={{ color: "var(--color-muted)" }}>
+                <p style={{ fontSize: 14 }}>このチャンネルの該当項目はありません</p>
               </div>
             ) : (
               filteredItems.map((item) => {
                 const isDone = item.status === "done";
-                const cardClasses = isDone
-                  ? "rounded-xl bg-white/[0.02] border border-border hover:bg-sidebar-hover transition-colors"
-                  : "rounded-xl bg-blue-400/[0.06] border border-blue-400/20 hover:bg-blue-400/[0.1] transition-colors";
-                const footerBorder = isDone
-                  ? "border-t border-border/50"
-                  : "border-t border-blue-400/15";
-                const ageColor = isDone
-                  ? "text-muted"
-                  : getAgeDays(item.created_at) >= 7
-                    ? "text-blue-300"
-                    : "text-muted";
+                const statusLabel = isDone ? "完了" : "進行中";
                 return (
-                  <div key={item.id} className={cardClasses}>
-                    <Link
-                      href={`/${params.workspace}/${item.channel_slug}?m=${item.id}`}
-                      className="block px-4 pt-3 pb-2"
-                    >
-                      <div className="flex items-start gap-3">
-                        {item.sender_avatar ? (
-                          <img src={item.sender_avatar} alt="" className="w-8 h-8 rounded-full object-cover shrink-0 mt-0.5" />
-                        ) : (
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
-                            isDone ? "bg-white/[0.06]" : "bg-blue-400/20"
-                          }`}>
-                            <span className={`text-xs font-bold ${isDone ? "text-muted" : "text-blue-400"}`}>
-                              {item.sender_name[0]?.toUpperCase()}
-                            </span>
-                          </div>
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-sm font-semibold text-foreground truncate max-w-[10em]">{item.sender_name.length > 10 ? item.sender_name.slice(0, 10) + "…" : item.sender_name}</span>
-                            <span className="text-xs text-muted shrink-0">{formatDate(item.created_at)}</span>
-                            <span className="text-xs text-muted truncate max-w-[10em]">#{item.channel_name.length > 10 ? item.channel_name.slice(0, 10) + "…" : item.channel_name}</span>
-                          </div>
-                          <div className={`text-sm whitespace-pre-wrap break-words line-clamp-3 ${
-                            isDone ? "text-foreground/70" : "text-foreground"
-                          }`}>
-                            {item.content}
-                          </div>
-                        </div>
-                      </div>
-                    </Link>
-                    <div className={`flex items-center justify-between gap-2 px-4 py-2 ${footerBorder}`}>
-                      <span className={`text-[11px] font-medium ${ageColor}`}>
-                        {getAgeLabel(item.created_at)}
+                  <div key={item.id} style={{
+                    padding: "12px 14px", marginBottom: 6, borderRadius: 12,
+                    background: "var(--color-background-soft)",
+                    display: "flex", gap: 12, alignItems: "flex-start",
+                  }}>
+                    {/* アバター */}
+                    {item.sender_avatar ? (
+                      <img src={item.sender_avatar} alt="" style={{ width: 32, height: 32, borderRadius: 16, objectFit: "cover", flexShrink: 0, marginTop: 2 }} />
+                    ) : (
+                      <span style={{
+                        width: 32, height: 32, borderRadius: 16,
+                        background: "var(--color-muted)", display: "flex",
+                        alignItems: "center", justifyContent: "center",
+                        fontSize: 11, fontWeight: 700, color: "#fff",
+                        flexShrink: 0, marginTop: 2,
+                      }}>
+                        {item.sender_name[0]?.toUpperCase()}
                       </span>
-                      {isDone ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] text-muted">
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                          </svg>
-                          完了済み
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => setConfirmTargetId(item.id)}
-                          disabled={!!completingId}
-                          className="rounded-lg border border-blue-400/30 px-2.5 py-1 text-[12px] font-medium text-blue-300 hover:bg-blue-400/10 disabled:opacity-50 transition-colors"
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      {/* タイトル行 + ステータスバッジ */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                        <Link
+                          href={`/${params.workspace}/${item.channel_slug}?m=${item.id}`}
+                          style={{
+                            fontSize: 14, fontWeight: 650, color: "var(--color-foreground)",
+                            flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                            textDecoration: "none",
+                          }}
                         >
-                          {completingId === item.id ? "更新中..." : "完了にする"}
-                        </button>
-                      )}
+                          {item.content.length > 30 ? item.content.slice(0, 30) + "…" : item.content}
+                        </Link>
+                        <span style={{
+                          fontSize: 10, fontWeight: 600, color: "var(--color-sky)",
+                          padding: "2px 8px", borderRadius: 999,
+                          background: "rgba(56,189,248,0.1)", flexShrink: 0,
+                        }}>{statusLabel}</span>
+                      </div>
+                      {/* チャンネル + 日時行 */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--color-muted)" }}>
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          # {item.channel_name.length > 10 ? item.channel_name.slice(0, 10) + "…" : item.channel_name}
+                        </span>
+                        <span style={{ marginLeft: "auto", flexShrink: 0 }}>
+                          {getAgeLabel(item.created_at)}
+                        </span>
+                      </div>
+                      {/* フッター: 完了ボタン等 */}
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", marginTop: 8 }}>
+                        {isDone ? (
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: "var(--color-muted)" }}>
+                            <svg style={{ width: 14, height: 14 }} fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                            完了済み
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setConfirmTargetId(item.id)}
+                            disabled={!!completingId}
+                            style={{
+                              borderRadius: 8, border: "1px solid rgba(56,189,248,0.3)",
+                              padding: "4px 10px", fontSize: 12, fontWeight: 500,
+                              color: "var(--color-sky)", background: "transparent",
+                              cursor: "pointer", opacity: completingId ? 0.5 : 1,
+                            }}
+                          >
+                            {completingId === item.id ? "更新中..." : "完了にする"}
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );

@@ -234,7 +234,7 @@ export function DashboardView({
 
   return (
     <div className="flex flex-col h-full">
-      <header className="flex items-center px-6 py-3 border-b border-border bg-header shrink-0">
+      <header className="flex items-center px-6 py-3 border-b border-border bg-surface shrink-0">
         {/* モバイル: サイドバーを開くボタン（元のチャンネルに戻るため） */}
         <button
           type="button"
@@ -321,55 +321,110 @@ export function DashboardView({
                 : "このチャンネルの決定事項はまだありません。"}
             </div>
           ) : (
-            <div className="space-y-2.5">
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, padding: "0 4px" }}>
               {filteredDecisions.map((d) => (
                 <Link
                   key={d.id}
                   href={`/${workspaceSlug}/${d.channel_slug}?m=${d.id}`}
-                  className="print-card group block rounded-xl border border-border bg-surface hover:border-accent/40 hover:bg-accent/[0.04] transition-all"
+                  className="print-card"
+                  style={{
+                    padding: "14px 12px",
+                    borderRadius: 4,
+                    background: "var(--color-background-soft)",
+                    display: "flex",
+                    flexDirection: "column",
+                    aspectRatio: "1",
+                    overflow: "hidden",
+                    textDecoration: "none",
+                    color: "inherit",
+                  }}
                 >
-                  {/* 上部メタ: チャンネルバッジ + 日付 */}
-                  <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-1.5">
-                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-accent bg-accent/10 rounded-full px-2 py-0.5 truncate max-w-[12em]">
-                      #{d.channel_name.length > 10 ? d.channel_name.slice(0, 10) + "…" : d.channel_name}
-                    </span>
-                    <span className="text-[11px] text-muted shrink-0">
-                      {getAgeLabel(d.created_at)} ・ {formatDate(d.created_at)}
+                  {/* 上部: チャンネル */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 4 }}>
+                    <span style={{
+                      fontSize: 10,
+                      color: "var(--color-muted)",
+                      opacity: 0.6,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      flex: 1,
+                    }}>
+                      #{d.channel_name}
                     </span>
                   </div>
 
-                  {/* 本文 */}
-                  <div className="px-4 pb-3">
-                    {isImageUrl(d.content) ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={d.content}
-                        alt="添付画像"
-                        className="max-h-72 rounded-lg border border-border object-contain"
-                      />
-                    ) : (
-                      <div className="text-base leading-relaxed whitespace-pre-wrap break-words text-foreground">
-                        {d.content}
-                      </div>
-                    )}
-                  </div>
+                  {/* メイン内容（AIタイトル相当） */}
+                  {isImageUrl(d.content) ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={d.content}
+                      alt="添付画像"
+                      style={{ maxHeight: 80, borderRadius: 4, objectFit: "contain", marginBottom: 3 }}
+                    />
+                  ) : (
+                    <div style={{
+                      fontSize: 13,
+                      fontWeight: 650,
+                      color: "var(--color-foreground)",
+                      lineHeight: 1.35,
+                      marginBottom: 3,
+                      overflow: "hidden",
+                      display: "-webkit-box",
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: "vertical" as const,
+                    }}>
+                      {d.content}
+                    </div>
+                  )}
 
-                  {/* Why / Due */}
-                  {/* フッター: 送信者 */}
-                  <div className="flex items-center gap-2 px-4 py-2 border-t border-border/40">
+                  {/* Why（本文サブテキスト相当） */}
+                  {d.decision_why && (
+                    <p style={{
+                      fontSize: 11,
+                      lineHeight: 1.4,
+                      color: "var(--color-muted)",
+                      margin: "0 0 auto",
+                      overflow: "hidden",
+                      display: "-webkit-box",
+                      WebkitLineClamp: 3,
+                      WebkitBoxOrient: "vertical",
+                    }}>{d.decision_why}</p>
+                  )}
+                  {/* Whyがない場合のスペーサー */}
+                  {!d.decision_why && <div style={{ flex: 1 }} />}
+
+                  {/* 下部: アバター + ユーザー + 時間 */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 6 }}>
                     {d.sender_avatar ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
                       <img
                         src={d.sender_avatar}
                         alt={d.sender_name}
-                        className="w-5 h-5 rounded-full object-cover"
+                        style={{ width: 20, height: 20, borderRadius: 10, objectFit: "cover" }}
                       />
                     ) : (
-                      <div className="w-5 h-5 rounded-full bg-muted/20 flex items-center justify-center text-[9px] font-bold text-muted">
-                        {d.sender_name.charAt(0).toUpperCase()}
-                      </div>
+                      <span style={{
+                        width: 20,
+                        height: 20,
+                        borderRadius: 10,
+                        background: "var(--color-muted)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 8,
+                        fontWeight: 700,
+                        color: "#fff",
+                      }}>
+                        {d.sender_name.charAt(0)}
+                      </span>
                     )}
-                    <span className="text-[12px] text-muted">{d.sender_name.length > 10 ? d.sender_name.slice(0, 10) + "…" : d.sender_name}</span>
+                    <span style={{ fontSize: 11, fontWeight: 500, color: "var(--color-foreground)" }}>
+                      {d.sender_name.length > 10 ? d.sender_name.slice(0, 10) + "…" : d.sender_name}
+                    </span>
+                    <span style={{ fontSize: 10, color: "var(--color-muted)", marginLeft: "auto" }}>
+                      {getAgeLabel(d.created_at)} {formatDate(d.created_at)}
+                    </span>
                   </div>
                 </Link>
               ))}
