@@ -947,6 +947,49 @@ export const MessageItem = memo(function MessageItem({
           </div>
         )}
 
+        {/* モバイル絵文字ピッカー（DM用） */}
+        {mobileEmojiOpen && onReact && (
+          <div className="fixed inset-0 z-[60] flex items-end lg:hidden" onClick={() => setMobileEmojiOpen(false)}>
+            <div className="absolute inset-0 bg-black/40" />
+            <div className="relative w-full animate-slide-up" onClick={(e) => e.stopPropagation()}>
+              <div className="w-full rounded-t-2xl bg-surface border-t border-border shadow-xl p-4 pb-20">
+                {EMOJI_LIST.map((group) => (
+                  <div key={group.category} className="mb-3">
+                    <p style={{ fontSize: 11, color: "var(--color-muted)", fontWeight: 500, marginBottom: 6 }}>{group.category}</p>
+                    {group.kind === "text" ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {group.emojis.map((emoji) => (
+                          <button
+                            key={emoji}
+                            type="button"
+                            onClick={() => { setMobileEmojiOpen(false); onReact(message.id, emoji); }}
+                            style={{ padding: "8px 12px", borderRadius: 12, border: "1px solid var(--color-border)", background: "none", fontSize: 14, fontWeight: 500, color: "var(--color-foreground)", cursor: "pointer" }}
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-8 gap-1.5">
+                        {group.emojis.map((emoji) => (
+                          <button
+                            key={emoji}
+                            type="button"
+                            onClick={() => { setMobileEmojiOpen(false); onReact(message.id, emoji); }}
+                            style={{ fontSize: 24, padding: 4, background: "none", border: "none", cursor: "pointer", borderRadius: 8 }}
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         {lightboxState && (
           <ImageLightbox
             url={lightboxState.urls[lightboxState.index]}
