@@ -1704,11 +1704,16 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
         >
           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
             {/* モバイル戻るボタン。
+                検索結果から来た場合はブラウザバックで検索に戻る。
                 DM の場合は DM 一覧ページに戻す。それ以外はサイドバーを開く既存挙動。 */}
             <button
               onClick={() => {
+                // 検索結果から飛んできた場合（referrerに/searchが含まれる or 履歴がある）
+                if (typeof window !== "undefined" && document.referrer.includes("/search")) {
+                  router.back();
+                  return;
+                }
                 if (channel.is_dm) {
-                  // workspaceSlug が空のときに `//dm-list` へ飛ばないようガード
                   if (!workspaceSlug) return;
                   router.push(`/${encodeURIComponent(workspaceSlug)}/dm-list`);
                 } else {
