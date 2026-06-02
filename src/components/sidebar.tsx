@@ -870,7 +870,7 @@ export function Sidebar({
           <div className="flex lg:hidden" style={{ gap: 4, marginLeft: "auto", marginRight: 2 }}>
             <Link
               href={`/${workspaceSlug}/in-progress`}
-              onClick={() => startDetailOpen("進行中")}
+              onClick={() => setSidebarOpen(false)}
               style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", height: 28, borderRadius: 999, border: "none", cursor: "pointer", background: "#EAF8FF", textDecoration: "none" }}
             >
               <span style={{ fontSize: 11, fontWeight: 600, color: "var(--color-foreground)" }}>進行中</span>
@@ -880,7 +880,7 @@ export function Sidebar({
             </Link>
             <Link
               href={`/${workspaceSlug}/dashboard`}
-              onClick={() => startDetailOpen("決定")}
+              onClick={() => setSidebarOpen(false)}
               style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", height: 28, borderRadius: 999, border: "none", cursor: "pointer", background: "#FFF1EA", textDecoration: "none" }}
             >
               <span style={{ fontSize: 11, fontWeight: 600, color: "var(--color-foreground)" }}>決定</span>
