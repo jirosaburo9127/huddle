@@ -49,10 +49,12 @@ export function WorkspaceLobby({ workspaceSlug }: { workspaceSlug: string }) {
             </svg>
           </div>
           <h2 className="text-xl font-bold mb-2 text-foreground">
-            左のサイドバーからチャンネルを選んでください
+            <span className="hidden lg:inline">左のサイドバーからチャンネルを選んでください</span>
+            <span className="lg:hidden">ホーム画面からチャンネルを選んでください</span>
           </h2>
           <p className="text-sm text-muted">
-            チャンネル一覧・ダイレクトメッセージはサイドバーに表示されています。
+            <span className="hidden lg:inline">チャンネル一覧・ダイレクトメッセージはサイドバーに表示されています。</span>
+            <span className="lg:hidden">左上のメニューからチャンネル一覧を開けます。</span>
           </p>
           <p className="text-xs text-muted/70 mt-4">workspace: {workspaceSlug}</p>
         </div>

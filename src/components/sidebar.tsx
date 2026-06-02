@@ -2009,9 +2009,9 @@ function ChannelCategoryList({
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
               </svg>
               <span style={{
-                fontSize: 12, fontWeight: isDesktop ? 650 : 600,
-                color: isDesktop ? "var(--color-foreground)" : "var(--color-muted)",
-                opacity: isDesktop ? 0.7 : 0.75, flex: 1, textAlign: "left" as const,
+                fontSize: isDesktop ? 12 : 13, fontWeight: isDesktop ? 650 : 600,
+                color: "var(--color-foreground)",
+                opacity: isDesktop ? 0.7 : 0.8, flex: 1, textAlign: "left" as const,
               }}>{label}</span>
               {isCollapsed && unreadTotal > 0 && (
                 <span style={{
@@ -2041,9 +2041,11 @@ function ChannelCategoryList({
                       height: isDesktop ? 36 : 34, borderRadius: 8,
                       border: "none", cursor: "pointer", marginBottom: isDesktop ? 1 : 0,
                       background: "none", position: "relative" as const, zIndex: 1,
-                      color: (isDesktop && isActive) || showUnreadStyle ? "var(--color-foreground)" : "var(--color-muted)",
-                      fontWeight: (isDesktop && isActive) || showUnreadStyle ? 700 : 500,
-                      fontSize: isDesktop ? 14 : (showUnreadStyle ? 15 : 14.5),
+                      color: isDesktop
+                        ? ((isActive || showUnreadStyle) ? "var(--color-foreground)" : "var(--color-muted)")
+                        : "var(--color-foreground)",
+                      fontWeight: (isDesktop && isActive) || showUnreadStyle ? 700 : isDesktop ? 500 : 500,
+                      fontSize: isDesktop ? 14 : (showUnreadStyle ? 15.5 : 15),
                       textAlign: "left" as const, textDecoration: "none",
                     }}
                   >
