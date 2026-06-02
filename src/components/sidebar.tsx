@@ -756,12 +756,9 @@ export function Sidebar({
               {Object.keys(unreadByWorkspace).length > 0 && (
                 <span style={{ width: 10, height: 10, borderRadius: "50%", background: "var(--color-mention)", flexShrink: 0 }} />
               )}
-              {/* シェブロンはモバイルのみ表示（PCモックにはない） */}
-              {!isDesktop && (
-                <svg style={{ width: 16, height: 16, color: "var(--color-muted)" }} fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                </svg>
-              )}
+              <svg style={{ width: 16, height: 16, color: "var(--color-muted)" }} fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
             </button>
             {/* ワークスペース切り替えドロップダウン */}
             {showWsSwitcher && (
