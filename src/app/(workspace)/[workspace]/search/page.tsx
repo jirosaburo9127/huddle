@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
@@ -19,6 +19,7 @@ type SearchResult = {
 
 export default function SearchPage() {
   const setSidebarOpen = useMobileNavStore((s) => s.setSidebarOpen);
+  useEffect(() => { setSidebarOpen(false); }, [setSidebarOpen]);
   const params = useParams<{ workspace: string }>();
   const router = useRouter();
   const [query, setQuery] = useState("");

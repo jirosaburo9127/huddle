@@ -50,6 +50,8 @@ const FILTER_OPTIONS: { value: StatusFilter; label: string }[] = [
 
 export default function InProgressPage() {
   const setSidebarOpen = useMobileNavStore((s) => s.setSidebarOpen);
+  // モバイルでマウント時にサイドバーを閉じて本ページを見せる
+  useEffect(() => { setSidebarOpen(false); }, [setSidebarOpen]);
   const params = useParams<{ workspace: string }>();
   const [items, setItems] = useState<StatusItem[]>([]);
   const [loading, setLoading] = useState(true);

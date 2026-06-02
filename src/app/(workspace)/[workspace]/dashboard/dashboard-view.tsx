@@ -81,6 +81,8 @@ export function DashboardView({
   isAdmin,
 }: Props) {
   const setSidebarOpen = useMobileNavStore((s) => s.setSidebarOpen);
+  // モバイルでマウント時にサイドバーを閉じて本ページを見せる
+  useEffect(() => { setSidebarOpen(false); }, [setSidebarOpen]);
 
   // マウント時: 決定事項を既読にしてサイドバーのバッジを 0 にする
   useEffect(() => {

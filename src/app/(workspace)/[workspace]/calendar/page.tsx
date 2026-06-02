@@ -37,6 +37,7 @@ function formatTime(iso: string): string {
 
 export default function CalendarPage() {
   const setSidebarOpen = useMobileNavStore((s) => s.setSidebarOpen);
+  useEffect(() => { setSidebarOpen(false); }, [setSidebarOpen]);
   const params = useParams<{ workspace: string }>();
   const router = useRouter();
 

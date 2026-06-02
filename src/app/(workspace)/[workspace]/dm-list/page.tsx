@@ -30,6 +30,7 @@ type WsMember = {
 
 export default function DmListPage() {
   const setSidebarOpen = useMobileNavStore((s) => s.setSidebarOpen);
+  useEffect(() => { setSidebarOpen(false); }, [setSidebarOpen]);
   const params = useParams<{ workspace: string }>();
   const [items, setItems] = useState<DmItem[]>([]);
   const [loading, setLoading] = useState(true);
