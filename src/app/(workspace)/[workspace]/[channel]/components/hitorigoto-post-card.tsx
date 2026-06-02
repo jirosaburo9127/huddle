@@ -114,30 +114,33 @@ function HitorigotoPostCardInner({
     <>
       <article
         id={`msg-${message.id}`}
-        className="rounded-2xl border border-border bg-surface p-4 mb-3 transition-colors"
+        style={{
+          display: "flex", gap: 12, padding: "14px 16px",
+          borderBottom: "1px solid var(--color-border)",
+        }}
       >
-        {/* ヘッダー: アバター + 名前 + 時間 */}
-        <div className="flex items-center gap-3 mb-2.5">
-          {avatarUrl ? (
-            <img src={avatarUrl} alt={displayName} className="w-10 h-10 rounded-full object-cover shrink-0" />
-          ) : (
-            <div className="w-10 h-10 rounded-full bg-muted/20 flex items-center justify-center shrink-0">
-              <span className="text-sm font-bold text-accent">{displayName[0]?.toUpperCase()}</span>
-            </div>
-          )}
-          <div className="min-w-0 flex-1">
-            <span className="font-semibold text-sm text-foreground">{displayName}</span>
-            <span className="text-xs text-muted ml-2">{relativeTime(message.created_at)}</span>
-          </div>
-        </div>
-
-        {/* コンテンツ */}
-        {textContent && (
-          <div
-            className="text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed mb-2"
-            dangerouslySetInnerHTML={{ __html: parseMarkdown(textContent) }}
-          />
+        {/* アバター */}
+        {avatarUrl ? (
+          <img src={avatarUrl} alt={displayName} style={{ width: 40, height: 40, borderRadius: 20, objectFit: "cover", flexShrink: 0 }} />
+        ) : (
+          <span style={{ width: 40, height: 40, borderRadius: 20, background: "var(--color-muted)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: "#fff", flexShrink: 0 }}>
+            {displayName[0]?.toUpperCase()}
+          </span>
         )}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {/* 名前 + 時間 */}
+          <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 2 }}>
+            <span style={{ fontSize: 14, fontWeight: 680, color: "var(--color-foreground)" }}>{displayName}</span>
+            <span style={{ fontSize: 12, color: "var(--color-muted)" }}>{relativeTime(message.created_at)}</span>
+          </div>
+
+          {/* コンテンツ */}
+          {textContent && (
+            <div
+              style={{ fontSize: 15, lineHeight: 1.65, color: "var(--color-foreground)", whiteSpace: "pre-wrap", wordBreak: "break-word", marginBottom: 4 }}
+              dangerouslySetInnerHTML={{ __html: parseMarkdown(textContent) }}
+            />
+          )}
 
         {/* ファイル（画像・動画） */}
         {fileUrls.length > 0 && (() => {
@@ -260,17 +263,18 @@ function HitorigotoPostCardInner({
 
         {/* フッター: 削除のみ (自分の投稿のみ表示) */}
         {message.user_id === currentUserId && onDelete && (
-          <div className="flex items-center justify-end mt-2" onClick={(e) => e.stopPropagation()}>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 6 }} onClick={(e) => e.stopPropagation()}>
             <button
               onClick={() => { if (confirm("削除しますか？")) onDelete(message.id); }}
-              className="p-1.5 rounded-lg text-muted hover:text-red-400 transition-colors"
+              style={{ padding: 4, borderRadius: 6, background: "none", border: "none", cursor: "pointer", color: "var(--color-muted)" }}
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <svg style={{ width: 16, height: 16 }} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
             </button>
           </div>
         )}
+        </div>
       </article>
 
       {lightboxState && (
