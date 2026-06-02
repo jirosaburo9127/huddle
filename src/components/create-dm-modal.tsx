@@ -143,7 +143,7 @@ export function CreateDmModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="w-full max-w-md rounded-2xl bg-sidebar border border-border p-6 space-y-4 animate-fade-in">
+      <div className="w-full max-w-md rounded-2xl bg-surface border border-border p-6 space-y-4 animate-fade-in">
         {/* ヘッダー */}
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-bold">新しいメッセージ</h3>
@@ -199,7 +199,7 @@ export function CreateDmModal({
                 key={member.user_id}
                 onClick={() => handleSelectMember(member.user_id)}
                 disabled={loading}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/[0.04] cursor-pointer transition-colors text-left disabled:opacity-50"
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-sidebar-hover cursor-pointer transition-colors text-left disabled:opacity-50"
               >
                 {/* アバター */}
                 {member.profiles.avatar_url ? (
@@ -209,7 +209,7 @@ export function CreateDmModal({
                     className="w-8 h-8 rounded-full object-cover shrink-0"
                   />
                 ) : (
-                  <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center shrink-0">
+                  <div className="w-8 h-8 rounded-full bg-muted/20 flex items-center justify-center shrink-0">
                     <span className="text-xs font-medium text-accent">
                       {member.profiles.display_name.charAt(0).toUpperCase()}
                     </span>

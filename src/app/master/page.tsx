@@ -53,7 +53,7 @@ export default async function MasterRoot() {
           <li key={w.id}>
             <Link
               href={`/master/ws/${w.id}`}
-              className="block rounded-xl border border-border bg-input-bg px-4 py-3 hover:bg-white/[0.04] transition-colors"
+              className="block rounded-xl border border-border bg-input-bg px-4 py-3 hover:bg-sidebar-hover transition-colors"
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0 flex-1">

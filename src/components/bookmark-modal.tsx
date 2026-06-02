@@ -126,7 +126,7 @@ export function BookmarkModal({ currentUserId, workspaceSlug, onClose }: Props) 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
       <div
-        className="w-full max-w-lg max-h-[80vh] rounded-2xl bg-sidebar border border-border flex flex-col animate-fade-in"
+        className="w-full max-w-lg max-h-[80vh] rounded-2xl bg-surface border border-border flex flex-col animate-fade-in"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ヘッダー */}

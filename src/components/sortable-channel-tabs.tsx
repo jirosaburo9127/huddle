@@ -89,7 +89,7 @@ function SortableRow({
         }
       }}
       className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors cursor-grab active:cursor-grabbing ${
-        active ? "bg-accent" : "hover:bg-white/[0.04]"
+        active ? "bg-accent" : "hover:bg-sidebar-hover"
       }`}
     >
       {/* ドラッグハンドル (装飾。長押しは行全体で受ける) */}
@@ -162,7 +162,7 @@ export function SortableChannelTabs({
         className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors flex items-center justify-between gap-2 ${
           selectedId === null
             ? "bg-accent text-white"
-            : "text-foreground hover:bg-white/[0.04]"
+            : "text-foreground hover:bg-sidebar-hover"
         }`}
       >
         <span className="truncate">全て</span>

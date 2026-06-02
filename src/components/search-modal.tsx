@@ -131,7 +131,7 @@ export function SearchModal({ workspaceId, workspaceSlug, onClose }: Props) {
       onClick={handleBackdropClick}
       className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh] bg-black/60 backdrop-blur-sm"
     >
-      <div className="w-full max-w-lg rounded-2xl bg-sidebar border border-border shadow-2xl overflow-hidden animate-fade-in">
+      <div className="w-full max-w-lg rounded-2xl bg-surface border border-border shadow-2xl overflow-hidden animate-fade-in">
         {/* 検索入力 */}
         <div className="flex items-center border-b border-border">
           {/* 検索アイコン */}
@@ -186,7 +186,7 @@ export function SearchModal({ workspaceId, workspaceSlug, onClose }: Props) {
             <button
               key={result.id}
               onClick={() => handleResultClick(result)}
-              className="w-full text-left px-4 py-3 hover:bg-white/[0.04] cursor-pointer border-b border-border/30 transition-colors"
+              className="w-full text-left px-4 py-3 hover:bg-sidebar-hover cursor-pointer border-b border-border/30 transition-colors"
             >
               {/* ヘッダー: チャンネル名 / ユーザー名 / 日付 */}
               <div className="flex items-center gap-2 text-xs text-muted mb-1">

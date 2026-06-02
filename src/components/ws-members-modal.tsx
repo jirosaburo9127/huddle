@@ -66,7 +66,7 @@ export function WsMembersModal({ members, workspaceId, currentUserId, onClose }:
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-2xl bg-sidebar border border-border p-6 space-y-4 animate-fade-in"
+        className="w-full max-w-md rounded-2xl bg-surface border border-border p-6 space-y-4 animate-fade-in"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ヘッダー */}
@@ -123,7 +123,7 @@ export function WsMembersModal({ members, workspaceId, currentUserId, onClose }:
               return (
                 <div
                   key={member.user_id}
-                  className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/[0.04] transition-colors"
+                  className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-sidebar-hover transition-colors"
                 >
                   {/* アバター + オンラインドット */}
                   <span className="relative shrink-0">
@@ -134,7 +134,7 @@ export function WsMembersModal({ members, workspaceId, currentUserId, onClose }:
                         className="w-8 h-8 rounded-full object-cover"
                       />
                     ) : (
-                      <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center">
+                      <div className="w-8 h-8 rounded-full bg-muted/20 flex items-center justify-center">
                         <span className="text-xs font-medium text-accent">
                           {name.charAt(0).toUpperCase()}
                         </span>

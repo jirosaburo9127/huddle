@@ -146,7 +146,7 @@ export function CreateChannelModal({
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-md max-h-[90vh] flex flex-col rounded-2xl bg-sidebar border border-border overflow-hidden">
+      <div className="w-full max-w-md max-h-[90vh] flex flex-col rounded-2xl bg-surface border border-border overflow-hidden">
         {/* ヘッダー */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border/50 shrink-0">
           <h3 className="text-lg font-bold">チャンネルを作成</h3>
@@ -293,11 +293,11 @@ export function CreateChannelModal({
                           key={m.user_id}
                           type="button"
                           onClick={() => toggleMember(m.user_id)}
-                          className={`w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-white/[0.04] transition-colors ${
+                          className={`w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-sidebar-hover transition-colors ${
                             checked ? "bg-accent/5" : ""
                           }`}
                         >
-                          <span className="w-8 h-8 shrink-0 rounded-full bg-accent/20 flex items-center justify-center overflow-hidden">
+                          <span className="w-8 h-8 shrink-0 rounded-full bg-muted/20 flex items-center justify-center overflow-hidden">
                             {m.profile.avatar_url ? (
                               // eslint-disable-next-line @next/next/no-img-element
                               <img
@@ -348,7 +348,7 @@ export function CreateChannelModal({
         </form>
 
         {/* フッター（sticky） */}
-        <div className="flex justify-end gap-2 px-6 py-4 border-t border-border/50 shrink-0 bg-sidebar">
+        <div className="flex justify-end gap-2 px-6 py-4 border-t border-border/50 shrink-0 bg-surface">
           <button
             type="button"
             onClick={onClose}

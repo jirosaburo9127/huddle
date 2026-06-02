@@ -577,7 +577,7 @@ export default function CalendarPage() {
         <h1 className="font-bold text-lg flex-1">カレンダー</h1>
         <button
           onClick={openCreate}
-          className="p-2 text-muted hover:text-accent rounded-lg hover:bg-white/[0.04] transition-colors"
+          className="p-2 text-muted hover:text-accent rounded-lg hover:bg-sidebar-hover transition-colors"
           title="予定を追加"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -586,7 +586,7 @@ export default function CalendarPage() {
         </button>
         <button
           onClick={() => setShowSubscribeModal(true)}
-          className="p-2 text-muted hover:text-accent rounded-lg hover:bg-white/[0.04] transition-colors"
+          className="p-2 text-muted hover:text-accent rounded-lg hover:bg-sidebar-hover transition-colors"
           title="外部カレンダーで表示"
           aria-label="外部カレンダーで表示"
         >
@@ -639,7 +639,7 @@ export default function CalendarPage() {
           </div>
 
           {/* カレンダーグリッド */}
-          <div className="grid grid-cols-7 gap-px bg-sidebar rounded-xl overflow-hidden border border-border">
+          <div className="grid grid-cols-7 gap-px bg-surface rounded-xl overflow-hidden border border-border">
             {calendarDays.map((day, idx) => {
               if (day === null) {
                 return <div key={`empty-${idx}`} className="min-h-[3.5rem] bg-sidebar" />;
@@ -656,7 +656,7 @@ export default function CalendarPage() {
                   className={`min-h-[3.5rem] p-1 flex flex-col items-center gap-0.5 transition-colors relative ${
                     isSelected
                       ? "bg-blue-400/15"
-                      : "bg-sidebar hover:bg-white/[0.04]"
+                      : "bg-sidebar hover:bg-sidebar-hover"
                   }`}
                 >
                   <span
@@ -741,7 +741,7 @@ export default function CalendarPage() {
                             ) : (
                               <div
                                 key={a.id}
-                                className="w-5 h-5 rounded-full bg-accent/20 border border-surface flex items-center justify-center"
+                                className="w-5 h-5 rounded-full bg-muted/20 border border-surface flex items-center justify-center"
                               >
                                 <span className="text-[8px] font-bold text-accent">
                                   {a.display_name[0]?.toUpperCase()}
@@ -795,7 +795,7 @@ export default function CalendarPage() {
       {showCreate && (
         <div className="fixed inset-0 z-[60] flex items-end lg:items-center justify-center" onClick={() => setShowCreate(false)}>
           <div className="absolute inset-0 bg-black/40" />
-          <div className="relative w-full max-w-md mx-4 mb-20 lg:mb-0 rounded-2xl bg-sidebar border border-border p-5 animate-slide-up max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+          <div className="relative w-full max-w-md mx-4 mb-20 lg:mb-0 rounded-2xl bg-surface border border-border p-5 animate-slide-up max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-base font-bold text-foreground mb-4">予定を追加</h3>
             {createError && <p className="text-sm text-red-400 mb-3">{createError}</p>}
             <div className="space-y-3">
@@ -822,7 +822,7 @@ export default function CalendarPage() {
                     </svg>
                   </button>
                   {showChannelList && (
-                    <div className="absolute top-full left-0 right-0 mt-1 max-h-64 flex flex-col rounded-lg border border-border bg-sidebar shadow-xl z-30 overflow-hidden">
+                    <div className="absolute top-full left-0 right-0 mt-1 max-h-64 flex flex-col rounded-lg border border-border bg-surface shadow-xl z-30 overflow-hidden">
                       <div className="p-2 border-b border-border/50 shrink-0">
                         <input
                           type="text"
@@ -843,7 +843,7 @@ export default function CalendarPage() {
                             setCreateAttendeeIds(new Set());
                             setShowChannelList(false);
                           }}
-                          className={`w-full px-3 py-2 text-sm text-left hover:bg-white/[0.04] transition-colors ${
+                          className={`w-full px-3 py-2 text-sm text-left hover:bg-sidebar-hover transition-colors ${
                             !createChannelId ? "text-accent font-medium" : "text-muted"
                           }`}
                         >
@@ -870,7 +870,7 @@ export default function CalendarPage() {
                                 onChannelSelect(ch.id);
                                 setShowChannelList(false);
                               }}
-                              className={`w-full px-3 py-2 text-sm text-left hover:bg-white/[0.04] transition-colors ${
+                              className={`w-full px-3 py-2 text-sm text-left hover:bg-sidebar-hover transition-colors ${
                                 createChannelId === ch.id ? "text-accent font-medium" : "text-foreground"
                               }`}
                             >
@@ -908,14 +908,14 @@ export default function CalendarPage() {
                   </div>
                   <div className="max-h-32 overflow-y-auto rounded-lg border border-border bg-input-bg p-2 space-y-1">
                     {createMembers.map((m) => (
-                      <label key={m.user_id} className="flex items-center gap-2 py-1 px-1 rounded hover:bg-white/[0.04] cursor-pointer">
+                      <label key={m.user_id} className="flex items-center gap-2 py-1 px-1 rounded hover:bg-sidebar-hover cursor-pointer">
                         <input type="checkbox" checked={createAttendeeIds.has(m.user_id)} onChange={() => {
                           setCreateAttendeeIds((prev) => { const next = new Set(prev); if (next.has(m.user_id)) next.delete(m.user_id); else next.add(m.user_id); return next; });
                         }} className="rounded border-border" />
                         {m.avatar_url ? (
                           <img src={m.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover" />
                         ) : (
-                          <div className="w-5 h-5 rounded-full bg-accent/20 flex items-center justify-center"><span className="text-[8px] font-bold text-accent">{m.display_name[0]?.toUpperCase()}</span></div>
+                          <div className="w-5 h-5 rounded-full bg-muted/20 flex items-center justify-center"><span className="text-[8px] font-bold text-muted">{m.display_name[0]?.toUpperCase()}</span></div>
                         )}
                         <span className="text-sm text-foreground truncate">{m.display_name}</span>
                       </label>
@@ -939,7 +939,7 @@ export default function CalendarPage() {
       {editingEvent && (
         <div className="fixed inset-0 z-[60] flex items-end lg:items-center justify-center" onClick={() => setEditingEvent(null)}>
           <div className="absolute inset-0 bg-black/40" />
-          <div className="relative w-full max-w-md mx-4 mb-20 lg:mb-0 rounded-2xl bg-sidebar border border-border p-5 animate-slide-up" onClick={(e) => e.stopPropagation()}>
+          <div className="relative w-full max-w-md mx-4 mb-20 lg:mb-0 rounded-2xl bg-surface border border-border p-5 animate-slide-up" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-base font-bold text-foreground mb-4">予定を編集</h3>
             <div className="space-y-3">
               <div>
@@ -989,7 +989,7 @@ export default function CalendarPage() {
                 </div>
                 <div className="max-h-32 overflow-y-auto rounded-lg border border-border bg-input-bg p-2 space-y-1">
                   {editMembers.map((m) => (
-                    <label key={m.user_id} className="flex items-center gap-2 py-1 px-1 rounded hover:bg-white/[0.04] cursor-pointer">
+                    <label key={m.user_id} className="flex items-center gap-2 py-1 px-1 rounded hover:bg-sidebar-hover cursor-pointer">
                       <input
                         type="checkbox"
                         checked={editAttendeeIds.has(m.user_id)}
@@ -1006,7 +1006,7 @@ export default function CalendarPage() {
                       {m.avatar_url ? (
                         <img src={m.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover" />
                       ) : (
-                        <div className="w-5 h-5 rounded-full bg-accent/20 flex items-center justify-center">
+                        <div className="w-5 h-5 rounded-full bg-muted/20 flex items-center justify-center">
                           <span className="text-[8px] font-bold text-accent">{m.display_name[0]?.toUpperCase()}</span>
                         </div>
                       )}
@@ -1054,7 +1054,7 @@ export default function CalendarPage() {
                           </svg>
                         </button>
                         {linkDropdownOpen && (
-                          <div className="absolute top-full left-0 right-0 mt-1 max-h-64 flex flex-col rounded-lg border border-border bg-sidebar shadow-xl z-30 overflow-hidden">
+                          <div className="absolute top-full left-0 right-0 mt-1 max-h-64 flex flex-col rounded-lg border border-border bg-surface shadow-xl z-30 overflow-hidden">
                             <div className="p-2 border-b border-border/50 shrink-0">
                               <input
                                 type="text"
@@ -1082,7 +1082,7 @@ export default function CalendarPage() {
                                       setLinkChannelId(ch.id);
                                       setLinkDropdownOpen(false);
                                     }}
-                                    className={`w-full px-3 py-2 text-sm text-left hover:bg-white/[0.04] transition-colors ${
+                                    className={`w-full px-3 py-2 text-sm text-left hover:bg-sidebar-hover transition-colors ${
                                       linkChannelId === ch.id ? "text-accent font-medium" : "text-foreground"
                                     }`}
                                   >
@@ -1178,7 +1178,7 @@ export default function CalendarPage() {
         >
           <div className="absolute inset-0 bg-black/50" />
           <div
-            className="relative w-full lg:max-w-md rounded-t-2xl lg:rounded-2xl bg-sidebar border border-border p-5 space-y-4 max-h-[90vh] overflow-y-auto"
+            className="relative w-full lg:max-w-md rounded-t-2xl lg:rounded-2xl bg-surface border border-border p-5 space-y-4 max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between">
@@ -1224,14 +1224,14 @@ export default function CalendarPage() {
                 <div className="space-y-2">
                   <a
                     href={webcalUrl}
-                    className="block w-full text-center px-4 py-2.5 text-sm font-medium rounded-lg border border-border hover:bg-white/[0.04] transition-colors"
+                    className="block w-full text-center px-4 py-2.5 text-sm font-medium rounded-lg border border-border hover:bg-sidebar-hover transition-colors"
                   >
                     📅 Apple カレンダーで開く
                   </a>
                   <button
                     type="button"
                     onClick={openGoogleAddByUrl}
-                    className="block w-full text-center px-4 py-2.5 text-sm font-medium rounded-lg border border-border hover:bg-white/[0.04] transition-colors"
+                    className="block w-full text-center px-4 py-2.5 text-sm font-medium rounded-lg border border-border hover:bg-sidebar-hover transition-colors"
                   >
                     📅 Google カレンダーに追加
                   </button>

@@ -154,7 +154,7 @@ export default function DmListPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <header className="flex items-center px-6 py-3 border-b border-border bg-header shrink-0">
+      <header className="flex items-center py-3 bg-surface shrink-0" style={{ paddingLeft: "clamp(16px, 3vw, 40px)", paddingRight: "clamp(16px, 3vw, 40px)" }}>
         <button
           type="button"
           onClick={() => setSidebarOpen(true)}
@@ -165,13 +165,12 @@ export default function DmListPage() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
-        <h1 className="font-bold text-lg flex-1">ダイレクトメッセージ</h1>
-        {/* 新しい DM 開始ボタン (PC版 sidebar と同じ + アイコン) */}
+        <h1 className="font-bold text-[18px] font-[720] flex-1">メッセージ</h1>
         <button
           type="button"
           onClick={() => setShowCreateDm(true)}
           disabled={!workspaceId || !currentUserId}
-          className="ml-2 p-2 text-muted hover:text-accent rounded-lg hover:bg-white/[0.04] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="ml-2 p-2 text-muted hover:text-foreground rounded-lg hover:bg-sidebar-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           aria-label="新しいメッセージ"
           title="新しいメッセージ"
         >
@@ -192,35 +191,37 @@ export default function DmListPage() {
               <Link
                 key={dm.slug}
                 href={`/${params.workspace}/${dm.slug}`}
-                className="flex items-center gap-3 px-4 py-3 border-b border-border/30 hover:bg-white/[0.02] transition-colors"
+                className="flex items-center gap-3 py-3 hover:bg-sidebar-hover transition-colors rounded-lg"
+                style={{ paddingLeft: "clamp(16px, 3vw, 40px)", paddingRight: "clamp(16px, 3vw, 40px)" }}
               >
                 <span className="relative shrink-0">
                   {dm.otherAvatar ? (
-                    <img src={dm.otherAvatar} alt={dm.otherName} className="w-11 h-11 rounded-full object-cover" />
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={dm.otherAvatar} alt={dm.otherName} className="w-10 h-10 rounded-full object-cover" />
                   ) : (
-                    <div className="w-11 h-11 rounded-full bg-accent/20 flex items-center justify-center">
-                      <span className="text-sm font-bold text-accent">{dm.otherName[0]?.toUpperCase()}</span>
+                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                      <span className="text-[15px] font-bold text-white">{dm.otherName[0]?.toUpperCase()}</span>
                     </div>
                   )}
                   {dm.isOnline && (
-                    <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-online border-2 border-sidebar" />
+                    <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-online border-2 border-surface" />
                   )}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className={`font-semibold text-sm truncate ${dm.unreadCount > 0 ? "text-foreground" : "text-foreground"}`}>{dm.otherName}</span>
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className={`text-[14px] truncate ${dm.unreadCount > 0 ? "font-bold text-foreground" : "font-[500] text-foreground"}`}>{dm.otherName}</span>
                     {dm.lastAt && (
                       <span className="text-[11px] text-muted shrink-0 ml-auto">
-                        {new Date(dm.lastAt).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo" })}
+                        {new Date(dm.lastAt).toLocaleDateString("ja-JP", { month: "numeric", day: "numeric", timeZone: "Asia/Tokyo" })}
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 mt-0.5">
+                  <div className="flex items-center gap-2">
                     {dm.lastMessage && (
-                      <span className={`text-xs truncate flex-1 ${dm.unreadCount > 0 ? "text-foreground font-medium" : "text-muted"}`}>{dm.lastMessage}</span>
+                      <span className={`text-[13px] truncate flex-1 ${dm.unreadCount > 0 ? "text-foreground font-semibold" : "text-muted font-normal"}`}>{dm.lastMessage}</span>
                     )}
                     {dm.unreadCount > 0 && (
-                      <span className="shrink-0 bg-accent text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                      <span className="shrink-0 w-5 h-5 rounded-full bg-accent text-white text-[10px] font-bold flex items-center justify-center">
                         {dm.unreadCount > 99 ? "99+" : dm.unreadCount}
                       </span>
                     )}

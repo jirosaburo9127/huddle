@@ -260,7 +260,7 @@ export default function InProgressPage() {
                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-full transition-colors shrink-0 ${
                   active
                     ? "bg-foreground/10 text-foreground"
-                    : "text-muted hover:bg-white/[0.04] hover:text-foreground"
+                    : "text-muted hover:bg-sidebar-hover hover:text-foreground"
                 }`}
               >
                 <span>{opt.label}</span>
@@ -348,7 +348,7 @@ export default function InProgressPage() {
               filteredItems.map((item) => {
                 const isDone = item.status === "done";
                 const cardClasses = isDone
-                  ? "rounded-xl bg-white/[0.02] border border-border hover:bg-white/[0.04] transition-colors"
+                  ? "rounded-xl bg-white/[0.02] border border-border hover:bg-sidebar-hover transition-colors"
                   : "rounded-xl bg-blue-400/[0.06] border border-blue-400/20 hover:bg-blue-400/[0.1] transition-colors";
                 const footerBorder = isDone
                   ? "border-t border-border/50"
@@ -428,7 +428,7 @@ export default function InProgressPage() {
           onClick={() => setShowFilter(false)}
         >
           <div
-            className="w-full bg-sidebar rounded-t-2xl max-h-[70vh] flex flex-col animate-slide-up"
+            className="w-full bg-surface rounded-t-2xl max-h-[70vh] flex flex-col animate-slide-up"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
@@ -473,7 +473,7 @@ export default function InProgressPage() {
         >
           <div className="absolute inset-0 bg-black/50" />
           <div
-            className="relative w-full lg:max-w-sm rounded-t-2xl lg:rounded-2xl bg-sidebar border border-border p-5 space-y-4"
+            className="relative w-full lg:max-w-sm rounded-t-2xl lg:rounded-2xl bg-surface border border-border p-5 space-y-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div>

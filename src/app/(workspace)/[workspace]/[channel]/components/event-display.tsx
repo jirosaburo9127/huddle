@@ -176,7 +176,7 @@ export function EventDisplay({ messageId, currentUserId }: Props) {
                   />
                 ) : (
                   <div
-                    className={`w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center text-[10px] font-bold text-accent border-2 border-sidebar ${
+                    className={`w-6 h-6 rounded-full bg-muted/20 flex items-center justify-center text-[10px] font-bold text-muted border-2 border-sidebar ${
                       a.id === currentUserId ? "ring-1 ring-accent" : ""
                     }`}
                   >

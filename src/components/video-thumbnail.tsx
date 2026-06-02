@@ -15,9 +15,10 @@ type Props = {
   className?: string;
   /** 表示するフレームの秒数（既定 0.1） */
   captureAt?: number;
+  fallbackLabel?: string | null;
 };
 
-export function VideoThumbnail({ url, className, captureAt = 0.1 }: Props) {
+export function VideoThumbnail({ url, className, captureAt = 1, fallbackLabel }: Props) {
   const ref = useRef<HTMLVideoElement | null>(null);
   const [posterUrl, setPosterUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
@@ -100,7 +101,7 @@ export function VideoThumbnail({ url, className, captureAt = 0.1 }: Props) {
   }, [url, captureAt, metadataPosterUrl]);
 
   return (
-    <div className={`${className ?? ""} relative overflow-hidden bg-gradient-to-br from-zinc-800 to-black`}>
+    <div className={`${className ?? ""} relative overflow-hidden bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.18),transparent_28%),linear-gradient(135deg,#262633,#050505)]`}>
       <video
         ref={ref}
         src={videoSrc}
@@ -125,6 +126,13 @@ export function VideoThumbnail({ url, className, captureAt = 0.1 }: Props) {
           <svg className="w-10 h-10 text-white/45" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z" />
           </svg>
+        </div>
+      )}
+      {!visiblePosterUrl && fallbackLabel && (
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent px-2 pb-2 pt-8">
+          <p className="text-[11px] font-medium leading-tight text-white line-clamp-2 break-words">
+            {fallbackLabel}
+          </p>
         </div>
       )}
     </div>

@@ -89,7 +89,7 @@ function Avatar({ url, name }: { url: string | null; name: string }) {
     );
   }
   return (
-    <div className="w-9 h-9 rounded-full bg-accent/20 flex items-center justify-center shrink-0 mt-0.5">
+    <div className="w-9 h-9 rounded-full bg-muted/20 flex items-center justify-center shrink-0 mt-0.5">
       <span className="text-xs font-bold text-accent">{(name || "?")[0]?.toUpperCase()}</span>
     </div>
   );
@@ -240,7 +240,7 @@ export function ActivityModal({ workspaceSlug, workspaceId, currentChannelSlug, 
     >
       <div className="absolute inset-0 bg-black/40" />
       <div
-        className="relative w-full sm:max-w-md sm:mx-4 rounded-t-2xl sm:rounded-2xl bg-sidebar border border-border shadow-xl max-h-[85vh] flex flex-col"
+        className="relative w-full sm:max-w-md sm:mx-4 rounded-t-2xl sm:rounded-2xl bg-surface border border-border shadow-xl max-h-[85vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 py-3 border-b border-border/50 shrink-0">
@@ -309,7 +309,7 @@ export function ActivityModal({ workspaceSlug, workspaceId, currentChannelSlug, 
                       className={`w-full text-left flex items-start gap-3 px-4 py-3 transition-colors ${
                         a.is_new
                           ? "bg-[#eff6ff] hover:bg-[#dbeafe]"
-                          : "hover:bg-white/[0.04]"
+                          : "hover:bg-sidebar-hover"
                       }`}
                     >
                       <Avatar url={a.reactor_avatar} name={a.reactor_name} />
@@ -352,7 +352,7 @@ export function ActivityModal({ workspaceSlug, workspaceId, currentChannelSlug, 
                       className={`w-full text-left flex items-start gap-3 px-4 py-3 transition-colors ${
                         a.is_new
                           ? "bg-[#eff6ff] hover:bg-[#dbeafe]"
-                          : "hover:bg-white/[0.04]"
+                          : "hover:bg-sidebar-hover"
                       }`}
                     >
                       <Avatar url={a.author_avatar} name={a.author_name} />
@@ -387,7 +387,7 @@ export function ActivityModal({ workspaceSlug, workspaceId, currentChannelSlug, 
                     className={`w-full text-left flex items-start gap-3 px-4 py-3 transition-colors ${
                       a.is_new
                         ? "bg-[#eff6ff] hover:bg-[#dbeafe]"
-                        : "hover:bg-white/[0.04]"
+                        : "hover:bg-sidebar-hover"
                     }`}
                   >
                     <Avatar url={a.replier_avatar} name={a.replier_name} />

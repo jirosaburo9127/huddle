@@ -66,7 +66,7 @@ export function InviteModal({ workspaceId, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/50">
-      <div className="w-full max-w-md rounded-xl bg-sidebar border border-border p-6 space-y-4">
+      <div className="w-full max-w-md rounded-xl bg-surface border border-border p-6 space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-bold">メンバーを招待</h3>
           <button

@@ -835,15 +835,15 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
   }, [channelId]);
 
   return (
-    <div className="shrink-0 px-4 pb-4 relative">
+    <div className="shrink-0 pb-4 relative px-4 lg:pl-20 lg:pr-9 lg:max-w-[1080px]">
       {/* 返信対象インジケーター (Chatwork風) */}
       {replyTo && (
-        <div className="mb-2 flex items-start gap-2 rounded-lg bg-accent/5 border border-accent/30 px-3 py-2">
-          <svg className="w-4 h-4 text-accent mt-0.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+        <div className="mb-2 flex items-start gap-2 rounded-lg bg-foreground/[0.03] border border-border px-3 py-2">
+          <svg className="w-4 h-4 text-muted mt-0.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
           </svg>
           <div className="flex-1 min-w-0">
-            <div className="text-xs font-semibold text-accent">
+            <div className="text-xs font-semibold text-foreground">
               @{replyTo.profiles?.display_name || "メンバー"} に返信
             </div>
             <div className="text-xs text-muted line-clamp-1 break-words">
@@ -882,7 +882,7 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
       <div className="relative" ref={mentionPickerRef}>
         {/* ピッカー */}
         {showMentionPicker && (
-          <div className="absolute bottom-full left-0 mb-1 w-72 max-h-72 flex flex-col rounded-xl bg-sidebar border border-border shadow-xl z-50 overflow-hidden">
+          <div className="absolute bottom-full left-0 mb-1 w-72 max-h-72 flex flex-col rounded-xl bg-surface border border-border shadow-xl z-50 overflow-hidden">
             <div className="p-2 border-b border-border/50 shrink-0">
               <input
                 type="text"
@@ -900,9 +900,9 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
                   <button
                     type="button"
                     onClick={() => selectBroadcastFromPicker("channel")}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-white/[0.04] transition-colors"
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-sidebar-hover transition-colors"
                   >
-                    <span className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center shrink-0 text-accent text-[10px] font-bold">All</span>
+                    <span className="w-6 h-6 rounded-full bg-muted/20 flex items-center justify-center shrink-0 text-muted text-[10px] font-bold">All</span>
                     <div className="flex-1 min-w-0">
                       <div className="text-foreground">@All</div>
                       <div className="text-[11px] text-muted">チャンネル全員に通知</div>
@@ -924,7 +924,7 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
                     key={member.user_id}
                     type="button"
                     onClick={() => selectMemberFromPicker(member)}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-white/[0.04] transition-colors"
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-sidebar-hover transition-colors"
                   >
                     {member.profiles.avatar_url ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
@@ -934,8 +934,8 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
                         className="w-6 h-6 rounded-full object-cover shrink-0"
                       />
                     ) : (
-                      <div className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center shrink-0">
-                        <span className="text-[10px] font-medium text-accent">
+                      <div className="w-6 h-6 rounded-full bg-muted/20 flex items-center justify-center shrink-0">
+                        <span className="text-[10px] font-medium text-muted">
                           {member.profiles.display_name.charAt(0).toUpperCase()}
                         </span>
                       </div>
@@ -951,13 +951,14 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
 
       <form
         onSubmit={handleSubmit}
-        className="relative flex flex-col rounded-xl border border-border bg-input-bg overflow-visible"
+        className="relative flex flex-col overflow-visible"
+        style={{ borderRadius: 14, background: "var(--color-sidebar)", border: "1px solid var(--color-border)" }}
       >
         {/* メンションサジェストリスト (form の上端基準で配置 = 入力 box の真上に固定) */}
         {showMention && filteredMentionMembers.length > 0 && (
           <div
             style={{ maxHeight: `${suggestMaxHeight}px` }}
-            className="absolute bottom-full left-0 mb-1 w-64 overflow-y-auto rounded-xl bg-sidebar border border-border shadow-xl z-50"
+            className="absolute bottom-full left-0 mb-1 w-64 overflow-y-auto rounded-xl bg-surface border border-border shadow-xl z-50"
           >
             {filteredMentionMembers.map((member, index) => (
               <button
@@ -971,7 +972,7 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
                 className={`flex items-center gap-2 px-3 py-2 text-sm w-full text-left cursor-pointer transition-colors ${
                   index === mentionIndex
                     ? "bg-accent/10"
-                    : "hover:bg-white/[0.04]"
+                    : "hover:bg-sidebar-hover"
                 }`}
               >
                 {member.profiles.avatar_url ? (
@@ -982,8 +983,8 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
                     className="w-6 h-6 rounded-full object-cover shrink-0"
                   />
                 ) : (
-                  <div className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center shrink-0">
-                    <span className="text-[10px] font-medium text-accent">
+                  <div className="w-6 h-6 rounded-full bg-muted/20 flex items-center justify-center shrink-0">
+                    <span className="text-[10px] font-medium text-muted">
                       {member.profiles.display_name.charAt(0).toUpperCase()}
                     </span>
                   </div>
@@ -1158,8 +1159,24 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
           accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.md,.markdown,.yaml,.yml,.zip,.rar,.7z,.tar,.gz,.json,.xml,.ics,.heic,.heif,.bmp,.tif,.tiff,.pages,.numbers,.key,.epub,.mobi,.kml,.gpx,text/calendar,text/markdown,application/x-yaml"
         />
 
-        {/* 入力欄行 */}
-        <div className="flex items-end gap-2 px-3 py-2">
+        {/* 入力欄行 — モック準拠 */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 6px 6px 14px" }}>
+          {/* モバイル: +ボタン（ツールバーの代わり） */}
+          <button
+            type="button"
+            className="lg:hidden"
+            onClick={() => setIsInputActive((v) => !v)}
+            style={{
+              width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center",
+              borderRadius: 14, border: "none", background: "none", cursor: "pointer",
+              color: "var(--color-muted)", flexShrink: 0,
+            }}
+          >
+            <svg style={{ width: 20, height: 20 }} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+          </button>
+
           <textarea
             ref={textareaRef}
             value={content}
@@ -1175,7 +1192,6 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
               setMessageInputFocused(true);
             }}
             onBlur={(e) => {
-              // ツールバー内のボタンへフォーカスが移った場合は非表示にしない
               const form = e.currentTarget.closest("form");
               setTimeout(() => {
                 if (form && form.contains(document.activeElement)) return;
@@ -1183,19 +1199,25 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
                 setMessageInputFocused(false);
               }, 0);
             }}
-            placeholder={placeholder || (channelName ? `#${channelName} にメッセージを送信` : "メッセージを入力")}
+            placeholder={placeholder || (channelName ? `#${channelName} にメッセージを送信` : "メッセージを入力...")}
             rows={1}
             maxLength={4000}
-            className="flex-1 resize-none overflow-y-auto bg-transparent text-base text-foreground placeholder-muted focus:outline-none max-h-[120px]"
+            style={{ flex: 1, fontSize: 15, padding: "8px 0", color: "var(--color-foreground)", background: "none", border: "none", outline: "none", resize: "none", maxHeight: 120, overflow: "auto" }}
           />
-          {/* 送信ボタン */}
+          {/* 送信ボタン — モック: 34px丸, accent背景, 紙飛行機fill */}
           <button
             type="submit"
             disabled={!content.trim() && pendingAttachments.length === 0}
-            className="shrink-0 rounded-lg bg-accent p-2 text-white hover:bg-accent-hover disabled:opacity-30 transition-colors"
+            style={{
+              width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
+              borderRadius: 17, border: "none", cursor: "pointer", flexShrink: 0,
+              background: "var(--color-accent)", color: "#FFFFFF",
+              opacity: (!content.trim() && pendingAttachments.length === 0) ? 0.3 : 1,
+              transition: "opacity 150ms",
+            }}
           >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+            <svg style={{ width: 16, height: 16 }} fill="currentColor" viewBox="0 0 24 24">
+              <path d="M3.478 2.404a.75.75 0 00-.926.941l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.404z" />
             </svg>
           </button>
         </div>

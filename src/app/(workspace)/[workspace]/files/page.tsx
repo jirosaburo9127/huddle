@@ -254,7 +254,7 @@ export default function FilesPage() {
             filtered.map((file) => (
               <div
                 key={file.id}
-                className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white/[0.02] border border-border/50 hover:bg-white/[0.04] transition-colors"
+                className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white/[0.02] border border-border/50 hover:bg-sidebar-hover transition-colors"
               >
                 {/* ファイルアイコン */}
                 <div className={`shrink-0 w-10 h-10 rounded-lg flex items-center justify-center ${

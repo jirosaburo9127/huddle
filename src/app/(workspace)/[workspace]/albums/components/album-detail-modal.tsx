@@ -131,7 +131,11 @@ export function AlbumDetailModal({ album, currentUserId, onClose, onAddItems }: 
                     className="aspect-square overflow-hidden bg-border/20 relative group"
                   >
                     {isVideo ? (
-                      <VideoThumbnail url={item.url} className="w-full h-full object-cover" />
+                      <VideoThumbnail
+                        url={item.url}
+                        className="w-full h-full object-cover"
+                        fallbackLabel={item.file_name || "動画"}
+                      />
                     ) : (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img

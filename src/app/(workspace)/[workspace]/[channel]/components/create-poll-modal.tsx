@@ -87,7 +87,7 @@ export function CreatePollModal({ channelId, onClose }: Props) {
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md max-h-[90vh] flex flex-col rounded-2xl bg-sidebar border border-border overflow-hidden"
+        className="w-full max-w-md max-h-[90vh] flex flex-col rounded-2xl bg-surface border border-border overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-border/50 shrink-0">
@@ -187,7 +187,7 @@ export function CreatePollModal({ channelId, onClose }: Props) {
           </div>
         </form>
 
-        <div className="flex justify-end gap-2 px-5 py-3 border-t border-border/50 shrink-0 bg-sidebar">
+        <div className="flex justify-end gap-2 px-5 py-3 border-t border-border/50 shrink-0 bg-surface">
           <button
             type="button"
             onClick={onClose}

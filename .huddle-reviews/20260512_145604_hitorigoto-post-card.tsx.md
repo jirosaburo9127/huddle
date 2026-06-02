@@ -1,0 +1,330 @@
+# src/app/(workspace)/[workspace]/[channel]/components/hitorigoto-post-card.tsx (2026-05-12T15:05:58)
+
+**種別**: ファイル全体
+
+
+## 変更前 diff
+
+```
+"use client";
+
+import { memo, useState } from "react";
+import { usePathname } from "next/navigation";
+import type { MessageWithProfile } from "@/lib/supabase/types";
+import { PollDisplay } from "./poll-display";
+import { ImageLightbox } from "@/components/image-lightbox";
+import { VideoThumbnail } from "@/components/video-thumbnail";
+import { extractDisplayFileName } from "@/lib/file-name";
+
+type Props = {
+  message: MessageWithProfile;
+  currentUserId: string;
+  onDelete?: (messageId: string) => Promise<void>;
+  hasPoll?: boolean;
+  // 親から1分ごとに更新される値。相対時間の再計算をトリガーする
+  // eslint-disable-next-line react/no-unused-prop-types
+  tick?: number;
+};
+
+// Supabase Storage URL判定
+function isStorageFileUrl(content: string): boolean {
+  const trimmed = content.trim();
+  if (trimmed.includes("\n")) return false;
+  return /^https:\/\/.*supabase.*\/storage\/v1\/object\/public\/chat-files\//.test(trimmed);
+}
+
+function isImageFile(url: string): boolean {
+  return /\.(jpg|jpeg|png|gif|webp|svg)(\?.*)?$/i.test(url);
+}
+
+function isVideoFile(url: string): boolean {
+  return /\.(mp4|mov|webm|m4v)(\?.*)?$/i.test(url);
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function parseMarkdown(text: string): string {
+  let html = escapeHtml(text);
+  html = html.replace(/```([\s\S]*?)```/g, (_m, code: string) =>
+    `<pre class="bg-white/[0.06] rounded-lg p-3 my-1 overflow-x-auto"><code class="text-sm font-mono">${code.trim()}</code></pre>`
+  );
+  html = html.replace(/`([^`\n]+)`/g, (_m, code: string) =>
+    `<code class="bg-white/[0.06] px-1.5 py-0.5 rounded text-sm font-mono">${code}</code>`
+  );
+  html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  html = html.replace(/(?:javascript|vbscript):/gi, "blocked:");
+  html = html.replace(/data:(?!image\/)/gi, "blocked:");
+  html = html.replace(
+    /(?<!["=>])(https?:\/\/[^\s<]+)/g,
+    (_m, raw: string) => {
+      const trimmed = raw.replace(/[。、．，）\])\}>"'`,.!?;:]+$/u, "");
+      const dropped = raw.slice(trimmed.length);
+      return `<a href="${trimmed}" target="_blank" rel="noopener noreferrer" class="text-accent underline break-all">${trimmed}</a>${dropped}`;
+    }
+  );
+  return html;
+}
+
+function splitContentAndFiles(content: string): { textLines: string[]; fileUrls: string[] } {
+  const lines = content.split("\n");
+  const textLines: string[] = [];
+  const fileUrls: string[] = [];
+  for (const line of lines) {
+    if (isStorageFileUrl(line)) {
+      fileUrls.push(line.trim());
+    } else {
+      textLines.push(line);
+    }
+  }
+  return { textLines, fileUrls };
+}
+
+// 相対時間表示
+function relativeTime(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const sec = Math.floor(diff / 1000);
+  if (sec < 60) return "たった今";
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}分前`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}時間前`;
+  const day = Math.floor(hr / 24);
+  if (day < 7) return `${day}日前`;
+  return new Date(dateStr).toLocaleDateString("ja-JP", { month: "short", day: "numeric" });
+}
+
+function HitorigotoPostCardInner({
+  message,
+  currentUserId,
+  onDelete,
+  hasPoll,
+}: Props) {
+  const [lightboxState, setLightboxState] = useState<{ urls: string[]; index: number } | null>(null);
+  const pathname = usePathname();
+  const channelSlug = pathname?.split("/")[2] ?? null;
+
+  // 削除済みは非表示
+  if (message.deleted_at) return null;
+
+  const profile = message.profiles;
+  const avatarUrl = profile?.avatar_url;
+  const displayName = profile?.display_name || "不明";
+  const { textLines, fileUrls } = splitContentAndFiles(message.content);
+  const textContent = textLines.join("\n").trim();
+
+  return (
+    <>
+      <article
+        id={`msg-${message.id}`}
+        className="rounded-2xl border border-border bg-surface p-4 mb-3 transition-colors"
+      >
+        {/* ヘッダー: アバター + 名前 + 時間 */}
+        <div className="flex items-center gap-3 mb-2.5">
+          {avatarUrl ? (
+            <img src={avatarUrl} alt={displayName} className="w-10 h-10 rounded-full object-cover shrink-0" />
+          ) : (
+            <div className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center shrink-0">
+              <span className="text-sm font-bold text-accent">{displayName[0]?.toUpperCase()}</span>
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <span className="font-semibold text-sm text-foreground">{displayName}</span>
+            <span className="text-xs text-muted ml-2">{relativeTime(message.created_at)}</span>
+          </div>
+        </div>
+
+        {/* コンテンツ */}
+        {textContent && (
+          <div
+            className="text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed mb-2"
+            dangerouslySetInnerHTML={{ __html: parseMarkdown(textContent) }}
+          />
+        )}
+
+        {/* ファイル（画像・動画） */}
+        {fileUrls.length > 0 && (() => {
+          const imageUrls = fileUrls.filter((u) => isImageFile(u));
+          return (
+          <div className="mb-2">
+            {/* 画像: 1枚なら単独、2枚以上は X 風の横スライドカルーセル */}
+            {imageUrls.length === 1 && (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={imageUrls[0]}
+                alt=""
+                className="rounded-xl max-w-full max-h-80 object-cover cursor-pointer mb-2"
+                loading="lazy"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setLightboxState({ urls: imageUrls, index: 0 });
+                }}
+              />
+            )}
+            {imageUrls.length >= 2 && (
+              <div className="-mx-1 mb-2 flex gap-2 overflow-x-auto snap-x snap-mandatory hide-scrollbar">
+                {imageUrls.map((url, idx) => (
+                  <button
+                    key={url + idx}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setLightboxState({ urls: imageUrls, index: idx });
+                    }}
+                    className="snap-start shrink-0 w-[78%] sm:w-[260px] aspect-square rounded-xl overflow-hidden bg-black/5 first:ml-1 last:mr-1 hover:opacity-90 transition-opacity"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={url} alt="" loading="lazy" className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
+            {/* 動画・その他のファイル（画像はすでに上で描画済みなのでスキップ） */}
+            <div className="space-y-2">
+            {fileUrls.map((url, i) =>
+              isImageFile(url) ? null : isVideoFile(url) ? (
+                <button
+                  key={i}
+                  type="button"
+                  className="block max-w-full sm:max-w-sm rounded-2xl overflow-hidden bg-black/80 hover:opacity-95 transition-opacity w-full"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    const webkit = (window as any).webkit;
+                    if (webkit?.messageHandlers?.playVideo) {
+                      webkit.messageHandlers.playVideo.postMessage(url);
+                    } else {
+                      window.open(url, "_blank");
+                    }
+                  }}
+                >
+                  <div className="relative aspect-video bg-black">
+                    <VideoThumbnail
+                      url={url}
+                      className="absolute inset-0 w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                      <div className="w-14 h-14 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
+                        <svg className="w-7 h-7 text-black ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M8 5v14l11-7z" />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="px-4 py-2 text-xs text-white/80 truncate text-left">
+                    {extractDisplayFileName(url)}
+                  </div>
+                </button>
+              ) : (
+                <a
+                  key={i}
+                  href={url}
+                  download={extractDisplayFileName(url)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    try {
+                      const { Capacitor } = await import("@capacitor/core");
+                      if (Capacitor.isNativePlatform()) return;
+                      e.preventDefault();
+                      const fileName = extractDisplayFileName(url);
+                      const res = await fetch(url);
+                      const blob = await res.blob();
+                      const blobUrl = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = blobUrl;
+                      a.download = fileName;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      URL.revokeObjectURL(blobUrl);
+                    } catch {
+                      // 失敗時は標準のリンク動作にフォールバック
+                    }
+                  }}
+                  className="text-sm text-accent underline break-all block"
+                >
+                  {extractDisplayFileName(url)}
+                </a>
+              )
+            )}
+            </div>
+          </div>
+          );
+        })()}
+
+        {/* 投票 */}
+        {hasPoll && (
+          <div className="mb-2" onClick={(e) => e.stopPropagation()}>
+            <PollDisplay messageId={message.id} currentUserId={currentUserId} />
+          </div>
+        )}
+
+        {/* フッター: 削除のみ (自分の投稿のみ表示) */}
+        {message.user_id === currentUserId && onDelete && (
+          <div className="flex items-center justify-end mt-2" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => { if (confirm("削除しますか？")) onDelete(message.id); }}
+              className="p-1.5 rounded-lg text-muted hover:text-red-400 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+          </div>
+        )}
+      </article>
+
+      {lightboxState && (
+        <ImageLightbox
+          mediaList={lightboxState.urls.map((u) => ({
+            url: u,
+            authorName: displayName,
+            authorAvatar: avatarUrl,
+            timestamp: message.created_at,
+          }))}
+          currentIndex={lightboxState.index}
+          onIndexChange={(newIndex) =>
+            setLightboxState((prev) => (prev ? { ...prev, index: newIndex } : null))
+          }
+          onClose={() => setLightboxState(null)}
+          contextLabel={channelSlug ? `#${channelSlug}` : undefined}
+        />
+      )}
+    </>
+  );
+}
+
+export const HitorigotoPostCard = memo(HitorigotoPostCardInner);
+
+```
+
+
+## Codex レビュー
+
+- [優先度: 今すぐ] `parseMarkdown()` の URL 自動リンクが `<pre><code>` / インラインコード内にも適用されます。コードブロック中の URL がリンク化されて表示内容が壊れるため、Markdown パースはトークン化するか、リンク化をコード領域以外に限定してください。
+
+- [優先度: 今すぐ] ファイルダウンロードの `onClick` で `e.preventDefault()` 後に `fetch()` などが失敗すると、`catch` で握りつぶされて標準リンク動作にもフォールバックしません。失敗時は `window.open(url, "_blank")` する、または blob 生成成功後にだけ既定動作を止める構造にしてください。
+
+- [優先度: 後で] 削除ボタンと画像/動画ボタンにアクセシブル名がありません。`aria-label="削除"`、`aria-label="画像を拡大"`、`aria-label="動画を再生"` などを追加してください。
+
+- [優先度: 後で] `relativeTime()` は未来日時や不正な日時で不自然な表示になります。`Number.isNaN(date.getTime())` と `diff < 0` を扱い、不正値は空文字または日付表示、未来値は「たった今」などに丸めてください。
+
+
+## 影響分析 (Claude read-only)
+
+- **何が変わるか**: 独り言投稿カードの細かなバグ修正です。コードブロック内のURLが勝手にリンク化されて表示が崩れる問題、ファイルダウンロード失敗時に何も起こらず無反応になる問題、削除/画像/動画ボタンを音声読み上げが読めない問題、未来日時や不正な日時で変な表示になる問題、を直します。
+- **影響範囲**: HitorigotoPostCard は channel-view.tsx からのみ使われており、修正対象の関数 (parseMarkdown / relativeTime / splitContentAndFiles) はこのファイル内ローカル定義です。grep の結果 master ページや message-item.tsx にも同名関数がありますが、それぞれ別ファイルの独立した実装で今回の変更とは無関係です。コンポーネント自体の見た目や props は変わりません。
+- **LEVEL**: 軽微
+- **根拠**: 修正対象の関数はすべて hitorigoto-post-card.tsx 内クロージャで外部 export されていないため。
+
+
+## ステータス
+
+ユーザーが『スキップ』選択

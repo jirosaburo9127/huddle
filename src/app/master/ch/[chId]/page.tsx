@@ -139,7 +139,7 @@ export default async function MasterChannelMessages({
                   }`}
                 >
                   {/* avatar */}
-                  <div className="shrink-0 w-7 h-7 rounded-full bg-accent/20 flex items-center justify-center text-[11px] font-bold text-accent">
+                  <div className="shrink-0 w-7 h-7 rounded-full bg-muted/20 flex items-center justify-center text-[11px] font-bold text-muted">
                     {m.profiles.is_bot
                       ? "🍊"
                       : (m.profiles.display_name || "?")[0].toUpperCase()}

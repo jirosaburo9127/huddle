@@ -122,7 +122,7 @@ export function ChannelMembersModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-2xl bg-sidebar border border-border p-6 space-y-4 animate-fade-in"
+        className="w-full max-w-md rounded-2xl bg-surface border border-border p-6 space-y-4 animate-fade-in"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ヘッダー */}
@@ -193,7 +193,7 @@ export function ChannelMembersModal({
                       className="w-8 h-8 rounded-full object-cover shrink-0"
                     />
                   ) : (
-                    <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center shrink-0">
+                    <div className="w-8 h-8 rounded-full bg-muted/20 flex items-center justify-center shrink-0">
                       <span className="text-xs font-medium text-accent">
                         {member.profiles.display_name.charAt(0).toUpperCase()}
                       </span>
@@ -241,7 +241,7 @@ export function ChannelMembersModal({
                       className="w-8 h-8 rounded-full object-cover shrink-0"
                     />
                   ) : (
-                    <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center shrink-0">
+                    <div className="w-8 h-8 rounded-full bg-muted/20 flex items-center justify-center shrink-0">
                       <span className="text-xs font-medium text-accent">
                         {member.profiles.display_name.charAt(0).toUpperCase()}
                       </span>

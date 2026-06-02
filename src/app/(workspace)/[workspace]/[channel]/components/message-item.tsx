@@ -50,6 +50,8 @@ type Props = {
   // メンションハイライト用: workspace 全メンバーの display_name 配列
   // 渡せば本文中の @<name> を厳密マッチで span 化する
   memberNames?: string[];
+  // DM時はLINE風バブルUIで表示
+  isDm?: boolean;
 };
 
 // Supabase Storage URLかどうか判定
@@ -119,7 +121,7 @@ function parseMarkdown(text: string, memberNames: string[] = []): string {
       const dropped = raw.slice(trimmed.length);
       return (
         `<a href="${trimmed}" target="_blank" rel="noopener noreferrer" ` +
-        `class="inline-flex items-center gap-1 text-accent underline underline-offset-2 decoration-accent/50 hover:decoration-accent break-all">` +
+        `class="inline-flex items-center gap-1 text-foreground font-semibold underline underline-offset-2 decoration-foreground/30 hover:decoration-foreground/60 break-all">` +
         `<svg class="inline-block w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true">` +
         `<path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>` +
         `</svg>` +
@@ -157,7 +159,7 @@ function parseMarkdown(text: string, memberNames: string[] = []): string {
     const re = new RegExp(`(?<=^|[^a-zA-Z0-9_@])@(${alternation})`, "g");
     html = html.replace(re, (_m, name: string) => {
       const displayName = name === "channel" ? "All" : name.replace(/\u00A0/g, " ");
-      return `<span class="text-accent font-semibold">@${displayName}</span>`;
+      return `<span class="text-foreground font-semibold">@${displayName}</span>`;
     });
   }
 
@@ -258,7 +260,7 @@ function MessageContent({
       {/* テキスト部分 */}
       {textContent && (
         <div
-          className="text-base leading-[1.65] text-foreground whitespace-pre-wrap break-words [&_pre]:whitespace-pre [&_pre]:my-2"
+          className="text-[15.5px] font-[450] leading-[1.7] text-foreground whitespace-pre-wrap break-words [&_pre]:whitespace-pre [&_pre]:my-2 max-w-[780px]"
           dangerouslySetInnerHTML={{ __html: parseMarkdown(textContent, memberNames) }}
         />
       )}
@@ -420,7 +422,7 @@ function ReactionBadges({
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+      <div className="flex flex-wrap items-center gap-1.5 mt-2 mb-1">
         {reactions.map(({ emoji, count, reacted, names }) => (
           <div key={emoji} className="relative group/reaction">
             <button
@@ -436,10 +438,10 @@ function ReactionBadges({
                 }
               }}
               onContextMenu={(e) => e.preventDefault()}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm border cursor-pointer transition-colors select-none ${
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm cursor-pointer transition-colors select-none ${
                 reacted
-                  ? "bg-accent/10 border-accent/30 text-accent"
-                  : "bg-white/[0.03] border-border/50 text-muted hover:border-accent/30"
+                  ? "bg-accent/[0.12] text-accent"
+                  : "bg-foreground/[0.035] text-muted hover:bg-foreground/[0.06]"
               }`}
             >
               {emoji.length <= 2 ? (
@@ -467,7 +469,7 @@ function ReactionBadges({
                 e.stopPropagation();
                 setShowQuickPicker((v) => !v);
               }}
-              className="inline-flex items-center justify-center w-7 h-7 rounded-full border border-border/50 bg-white/[0.03] text-muted hover:text-accent hover:border-accent/30 transition-colors"
+              className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-foreground/[0.035] text-muted hover:bg-foreground/[0.06] hover:text-accent transition-colors"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -479,7 +481,7 @@ function ReactionBadges({
                 <div className="fixed inset-0 z-[60] flex items-end" onClick={() => setShowQuickPicker(false)}>
                   <div className="absolute inset-0 bg-black/40" />
                   <div className="relative w-full animate-slide-up" onClick={(e) => e.stopPropagation()}>
-                    <div className="w-full rounded-t-2xl bg-sidebar border-t border-border shadow-xl p-4 pb-20">
+                    <div className="w-full rounded-t-2xl bg-surface border-t border-border shadow-xl p-4 pb-20">
                       {EMOJI_LIST.map((group) => (
                         <div key={group.category} className="mb-3">
                           <p className="text-[11px] text-muted font-medium mb-1.5">{group.category}</p>
@@ -535,7 +537,7 @@ function ReactionBadges({
           onClick={() => setLongPressNames(null)}
         >
           <div className="absolute inset-0 bg-black/40" />
-          <div className="relative w-full rounded-t-2xl bg-sidebar border-t border-border px-5 pt-4 pb-20 animate-slide-up" onClick={(e) => e.stopPropagation()}>
+          <div className="relative w-full rounded-t-2xl bg-surface border-t border-border px-5 pt-4 pb-20 animate-slide-up" onClick={(e) => e.stopPropagation()}>
             <div className="w-10 h-1 rounded-full bg-muted/30 mx-auto mb-4" />
             <div className="flex items-center gap-2 mb-3">
               {longPressNames.emoji.length <= 2 ? (
@@ -590,6 +592,7 @@ export const MessageItem = memo(function MessageItem({
   readCount = -1,
   memberCount = 0,
   memberNames,
+  isDm,
 }: Props) {
   const profile = message.profiles;
   const isOwn = message.user_id === currentUserId;
@@ -698,20 +701,20 @@ export const MessageItem = memo(function MessageItem({
           // eslint-disable-next-line @next/next/no-img-element
           <img src={avatarUrl} alt="" className="w-9 h-9 rounded-full object-cover shrink-0 mt-0.5" />
         ) : (
-          <div className="w-9 h-9 rounded-full bg-accent/20 flex items-center justify-center shrink-0 mt-0.5">
+          <div className="w-9 h-9 rounded-full bg-muted/20 flex items-center justify-center shrink-0 mt-0.5">
             <span className="text-xs font-bold text-accent">{(senderName || "?")[0]?.toUpperCase()}</span>
           </div>
         )}
         <div className="min-w-0 flex-1">
           {/* 名前 + 時刻 */}
           <div className="flex items-baseline gap-2 mb-1">
-            <span className="text-sm font-semibold text-foreground">{senderName}</span>
-            <span className="text-[11px] text-muted">{time}</span>
+            <span className="text-sm font-[680] text-foreground">{senderName}</span>
+            <span className="text-xs text-muted/70">{time}</span>
           </div>
           {/* アルバムカード */}
           <Link
             href={`/${wsSlug}/albums?album=${albumData.album_id || ""}`}
-            className="block max-w-xs rounded-xl overflow-hidden bg-sidebar border border-border/30 shadow-sm hover:shadow-md transition-shadow"
+            className="block max-w-xs rounded-xl overflow-hidden bg-surface border border-border/30 shadow-sm hover:shadow-md transition-shadow"
           >
             {albumData.cover_url && (
               // eslint-disable-next-line @next/next/no-img-element
@@ -780,21 +783,197 @@ export const MessageItem = memo(function MessageItem({
     }
   }
 
+  // DM: LINE風バブルUI（モック準拠）
+  if (isDm && !isBot) {
+    return (
+      <>
+        <div
+          id={`msg-${message.id}`}
+          style={{
+            display: "flex",
+            justifyContent: isOwn ? "flex-end" : "flex-start",
+            gap: isOwn ? 0 : 10,
+            marginBottom: 20,
+            padding: "0 16px",
+          }}
+          onClick={(e) => {
+            const selection = typeof window !== "undefined" ? window.getSelection() : null;
+            if (selection && selection.toString().length > 0) return;
+            const target = e.target as HTMLElement | null;
+            if (target && target.closest("a")) return;
+            if (typeof window !== "undefined" && window.innerWidth >= 1024) return;
+            setShowActions((v) => !v);
+          }}
+        >
+          {/* 相手のアバター（自分の投稿では非表示） */}
+          {!isOwn && !isConsecutive && (
+            <span style={{
+              width: 32, height: 32, borderRadius: 16, flexShrink: 0,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 12, fontWeight: 700, color: "#fff",
+              background: "var(--color-muted)", overflow: "hidden",
+            }}>
+              {profile?.avatar_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={profile.avatar_url} alt="" style={{ width: 32, height: 32, borderRadius: 16, objectFit: "cover" }} />
+              ) : (
+                initial
+              )}
+            </span>
+          )}
+          {!isOwn && isConsecutive && <div style={{ width: 32, flexShrink: 0 }} />}
+          <div style={{ maxWidth: "75%" }}>
+            {/* 相手の名前（先頭メッセージのみ） */}
+            {!isOwn && !isConsecutive && (
+              <span style={{ fontSize: 12, color: "var(--color-muted)", marginBottom: 3, display: "block" }}>
+                {profile?.display_name || "不明なユーザー"}
+              </span>
+            )}
+            {/* バブル */}
+            <div style={{
+              padding: "10px 14px",
+              borderRadius: isOwn ? "14px 4px 14px 14px" : "4px 14px 14px 14px",
+              background: isOwn ? "rgba(56,189,248,0.12)" : "var(--color-sidebar)",
+              fontSize: 14.5, lineHeight: 1.6, color: "var(--color-foreground)",
+            }}>
+              <MessageContent
+                messageId={message.id}
+                content={message.content}
+                imageError={imageError}
+                onImageError={() => setImageError(true)}
+                onImageClick={(urls, index) => setLightboxState({ urls, index })}
+                onVideoThumbnailBackfilled={onVideoThumbnailBackfilled}
+                memberNames={memberNames}
+              />
+            </div>
+            {/* リアクションバッジ */}
+            {groupedReactions.length > 0 && !isEditing && (
+              <ReactionBadges
+                reactions={groupedReactions}
+                onReact={onReact ? (emoji: string) => onReact(message.id, emoji) : undefined}
+              />
+            )}
+            {/* 時刻 + 既読 */}
+            <div style={{ display: "flex", justifyContent: isOwn ? "flex-end" : "flex-start", gap: 4, marginTop: 4 }}>
+              {isOwn && readCount >= 0 && readCount > 0 && (
+                <span style={{ fontSize: 10, color: "var(--color-muted)" }}>既読</span>
+              )}
+              <span style={{ fontSize: 10, color: "var(--color-muted)" }}>{time}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* モバイルアクションシート（DM用） */}
+        {showActions && !isEditing && (
+          <div
+            className="fixed inset-0 z-[60] flex items-end justify-center lg:hidden"
+            onClick={(e) => { e.stopPropagation(); setShowActions(false); }}
+          >
+            <div className="absolute inset-0 bg-black/40" />
+            <div
+              className="relative w-full max-w-sm mx-4 mb-20 rounded-2xl bg-surface border border-border p-5 animate-slide-up"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="grid grid-cols-3 gap-3">
+                {/* リアクション */}
+                {onReact && (
+                  <button
+                    onClick={() => { setShowActions(false); setMobileEmojiOpen(true); }}
+                    style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "12px 0", borderRadius: 8, border: "none", background: "none", cursor: "pointer" }}
+                  >
+                    <span style={{ width: 48, height: 48, borderRadius: 24, border: "2px solid var(--color-muted)", opacity: 0.4, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <svg style={{ width: 20, height: 20, color: "var(--color-foreground)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </span>
+                    <span style={{ fontSize: 12, color: "var(--color-foreground)" }}>リアクション</span>
+                  </button>
+                )}
+                {onReply && (
+                  <button
+                    onClick={() => { setShowActions(false); onReply(message); }}
+                    style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "12px 0", borderRadius: 8, border: "none", background: "none", cursor: "pointer" }}
+                  >
+                    <span style={{ width: 48, height: 48, borderRadius: 24, border: "2px solid var(--color-muted)", opacity: 0.4, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <svg style={{ width: 20, height: 20, color: "var(--color-foreground)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                      </svg>
+                    </span>
+                    <span style={{ fontSize: 12, color: "var(--color-foreground)" }}>返信</span>
+                  </button>
+                )}
+                {isOwn && (
+                  <button
+                    onClick={() => { setShowActions(false); setIsEditing(true); setEditContent(message.content); }}
+                    style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "12px 0", borderRadius: 8, border: "none", background: "none", cursor: "pointer" }}
+                  >
+                    <span style={{ width: 48, height: 48, borderRadius: 24, border: "2px solid var(--color-muted)", opacity: 0.4, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <svg style={{ width: 20, height: 20, color: "var(--color-foreground)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                    </span>
+                    <span style={{ fontSize: 12, color: "var(--color-foreground)" }}>編集</span>
+                  </button>
+                )}
+                {isOwn && (
+                  <button
+                    onClick={() => { setShowActions(false); setIsDeleting(true); }}
+                    style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "12px 0", borderRadius: 8, border: "none", background: "none", cursor: "pointer" }}
+                  >
+                    <span style={{ width: 48, height: 48, borderRadius: 24, border: "2px solid var(--color-mention)", opacity: 0.4, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <svg style={{ width: 20, height: 20, color: "var(--color-mention)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </span>
+                    <span style={{ fontSize: 12, color: "var(--color-mention)" }}>削除</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 削除確認ダイアログ */}
+        {isDeleting && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+            <div className="w-full max-w-sm rounded-xl bg-surface border border-border flex flex-col p-6">
+              <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>メッセージを削除</h3>
+              <p style={{ fontSize: 14, color: "var(--color-muted)", marginBottom: 16 }}>このメッセージを削除しますか？</p>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                <button onClick={() => setIsDeleting(false)} style={{ padding: "8px 16px", fontSize: 14, color: "var(--color-muted)", background: "none", border: "none", cursor: "pointer" }}>キャンセル</button>
+                <button onClick={handleDelete} style={{ padding: "8px 16px", fontSize: 14, fontWeight: 600, color: "#fff", background: "var(--color-mention)", borderRadius: 8, border: "none", cursor: "pointer" }}>削除</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {lightboxState && (
+          <ImageLightbox
+            url={lightboxState.urls[lightboxState.index]}
+            onClose={() => setLightboxState(null)}
+          />
+        )}
+      </>
+    );
+  }
+
   return (
     <>
       <div
         id={`msg-${message.id}`}
-        className={`group relative flex gap-3 px-2 transition-colors ${
-          isBot
-            ? (isConsecutive ? "py-3 my-2" : "pt-4 pb-3 my-2")
-            : (isConsecutive ? "py-1" : "pt-3 pb-1")
-        } ${
+        className={`group relative flex px-4 lg:px-2 transition-colors ${
           message.status === "in_progress"
             ? "rounded-lg bg-blue-400/[0.06] hover:bg-blue-400/[0.1]"
             : isBot
             ? "bg-[#fffefa] hover:bg-[#fff9ed]"
-            : "rounded-lg hover:bg-white/[0.02]"
+            : "rounded-lg lg:hover:bg-black/[0.015]"
         }`}
+        style={{
+          gap: 12, paddingTop: 6, paddingBottom: 6,
+          marginTop: isBot
+            ? 10
+            : (isConsecutive ? 10 : 32),
+        }}
         onClick={(e) => {
           // テキストをドラッグ選択した直後の click は無視する
           // （そうしないとコピーのために選択した瞬間にメニューが開く）
@@ -820,7 +999,7 @@ export const MessageItem = memo(function MessageItem({
           </div>
         ) : (
           <div className={`relative shrink-0 w-9 h-9 rounded-full flex items-center justify-center mt-0.5 ${
-            isBot ? "bg-[#ffedd5] text-base" : "bg-accent/20 text-accent text-[13px] font-bold"
+            isBot ? "bg-[#ffedd5] text-base" : "bg-muted/20 text-muted text-[13px] font-bold"
           }`}>
             {isBot ? (
               <span className="leading-none" aria-label={profile?.display_name}>🍊</span>
@@ -844,13 +1023,13 @@ export const MessageItem = memo(function MessageItem({
         <div className="min-w-0 flex-1">
           {/* ユーザー名と時刻（先頭メッセージのみ） */}
           {!isConsecutive && (
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className={`font-semibold text-base ${isOwn ? "text-accent" : "text-foreground"}`}>
+            <div className="flex items-baseline gap-2 flex-wrap mb-1">
+              <span className="text-sm font-[680] text-foreground">
                 {profile?.display_name || "不明なユーザー"}
               </span>
-              <span className="text-sm text-muted/70">{time}</span>
+              <span className="text-xs text-muted/70">{time}</span>
               {message.edited_at && (
-                <span className="text-sm text-muted/70">(編集済み)</span>
+                <span className="text-xs text-muted/70">(編集済み)</span>
               )}
               {message.is_decision && (
                 <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-red-400/15 text-[11px] font-semibold text-red-400">
@@ -915,14 +1094,14 @@ export const MessageItem = memo(function MessageItem({
                     e.stopPropagation();
                     if (parentMessage) onJumpToMessage?.(parentMessage.id);
                   }}
-                  className="mt-1 mb-2 w-full text-left rounded-lg bg-accent/[0.06] hover:bg-accent/[0.1] transition-colors overflow-hidden"
+                  className="mt-1 mb-2 w-full text-left rounded-lg bg-foreground/[0.03] hover:bg-foreground/[0.06] transition-colors overflow-hidden"
                 >
                   {parentMessage ? (
                     <>
                       {/* 返信先ヘッダー: アバター + 表示名 + 時刻 */}
                       <div className="flex items-center gap-2 px-3 pt-2 pb-1">
                         <svg
-                          className="w-3.5 h-3.5 text-accent shrink-0"
+                          className="w-3.5 h-3.5 text-muted shrink-0"
                           fill="none"
                           stroke="currentColor"
                           strokeWidth={2.5}
@@ -946,11 +1125,11 @@ export const MessageItem = memo(function MessageItem({
                             className="w-5 h-5 rounded-full object-cover shrink-0"
                           />
                         ) : (
-                          <span className="shrink-0 w-5 h-5 rounded-full bg-accent/20 flex items-center justify-center text-[10px] font-bold text-accent">
+                          <span className="shrink-0 w-5 h-5 rounded-full bg-muted/20 flex items-center justify-center text-[10px] font-bold text-muted">
                             {(parentMessage.profiles?.display_name || "?")[0].toUpperCase()}
                           </span>
                         )}
-                        <span className="text-xs font-semibold text-accent truncate">
+                        <span className="text-xs font-semibold text-muted truncate">
                           {parentMessage.profiles?.display_name || "元メッセージ"}
                         </span>
                         <span className="text-[11px] text-muted/70 shrink-0">
@@ -1016,7 +1195,7 @@ export const MessageItem = memo(function MessageItem({
               onClick={() => !metaSaving && setShowDecisionMetaModal(false)}
             >
               <div
-                className="w-full max-w-md rounded-2xl bg-sidebar border border-border p-5 space-y-4"
+                className="w-full max-w-md rounded-2xl bg-surface border border-border p-5 space-y-4"
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="flex items-center justify-between">
@@ -1060,7 +1239,7 @@ export const MessageItem = memo(function MessageItem({
                   <button
                     type="button"
                     onClick={() => !metaSaving && setShowDecisionMetaModal(false)}
-                    className="px-3 py-1.5 text-sm rounded-lg border border-border text-muted hover:text-foreground hover:bg-white/[0.04] transition-colors"
+                    className="px-3 py-1.5 text-sm rounded-lg border border-border text-muted hover:text-foreground hover:bg-sidebar-hover transition-colors"
                   >
                     キャンセル
                   </button>
@@ -1112,7 +1291,7 @@ export const MessageItem = memo(function MessageItem({
 
           {/* PC: アクションバー（ホバーで表示、メッセージ右下） */}
           {!isEditing && (
-          <div className="hidden lg:flex absolute -bottom-2 right-3 z-10 transition-opacity items-center gap-0.5 bg-sidebar/95 backdrop-blur-sm border border-border/60 rounded-lg px-1 py-0.5 shadow-lg opacity-0 group-hover:opacity-100">
+          <div className="hidden lg:flex absolute -bottom-2 right-3 z-10 transition-opacity items-center gap-0.5 bg-surface/95 backdrop-blur-sm border border-border/60 rounded-lg px-1 py-0.5 shadow-lg opacity-0 group-hover:opacity-100">
             {/* 決定ボタン */}
             {onDecision && (
               <button
@@ -1226,7 +1405,7 @@ export const MessageItem = memo(function MessageItem({
         >
           <div className="absolute inset-0 bg-black/40" />
           <div
-            className="relative w-full max-w-sm mx-4 mb-20 rounded-2xl bg-sidebar border border-border p-5 animate-slide-up"
+            className="relative w-full max-w-sm mx-4 mb-20 rounded-2xl bg-surface border border-border p-5 animate-slide-up"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="grid grid-cols-3 gap-3">
@@ -1234,7 +1413,7 @@ export const MessageItem = memo(function MessageItem({
               {onReply && (
                 <button
                   onClick={() => { setShowActions(false); onReply(message); }}
-                  className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
+                  className="flex flex-col items-center gap-2 py-3 rounded-lg hover:bg-sidebar-hover transition-colors"
                 >
                   <span className="w-12 h-12 rounded-full border-2 border-muted/40 flex items-center justify-center">
                     <svg className="w-5 h-5 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1248,7 +1427,7 @@ export const MessageItem = memo(function MessageItem({
               {onDecision && (
                 <button
                   onClick={() => { setShowActions(false); onDecision(message.id, !message.is_decision); }}
-                  className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] active:scale-90 transition-all"
+                  className="flex flex-col items-center gap-2 py-3 rounded-lg hover:bg-sidebar-hover active:scale-90 transition-all"
                 >
                   <span className={`w-12 h-12 rounded-full border-2 flex items-center justify-center ${message.is_decision ? "border-accent bg-accent/15" : "border-muted/40"}`}>
                     <svg className={`w-5 h-5 ${message.is_decision ? "text-accent" : "text-foreground"}`} fill={message.is_decision ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
@@ -1264,7 +1443,7 @@ export const MessageItem = memo(function MessageItem({
               {onStatus && (
                 <button
                   onClick={() => { setShowActions(false); onStatus(message.id, "in_progress"); }}
-                  className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] active:scale-90 transition-all"
+                  className="flex flex-col items-center gap-2 py-3 rounded-lg hover:bg-sidebar-hover active:scale-90 transition-all"
                 >
                   <span className={`w-12 h-12 rounded-full border-2 flex items-center justify-center ${message.status === "in_progress" ? "border-blue-400 bg-blue-400/15" : "border-muted/40"}`}>
                     <svg className={`w-5 h-5 ${message.status === "in_progress" ? "text-blue-400" : "text-foreground"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1280,7 +1459,7 @@ export const MessageItem = memo(function MessageItem({
               {onReact && (
                 <button
                   onClick={() => { setShowActions(false); setMobileEmojiOpen(true); }}
-                  className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
+                  className="flex flex-col items-center gap-2 py-3 rounded-lg hover:bg-sidebar-hover transition-colors"
                 >
                   <span className="w-12 h-12 rounded-full border-2 border-muted/40 flex items-center justify-center">
                     <svg className="w-5 h-5 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1294,7 +1473,7 @@ export const MessageItem = memo(function MessageItem({
               {onBookmark && (
                 <button
                   onClick={() => { setShowActions(false); onBookmark(message.id); }}
-                  className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
+                  className="flex flex-col items-center gap-2 py-3 rounded-lg hover:bg-sidebar-hover transition-colors"
                 >
                   <span className={`w-12 h-12 rounded-full border-2 flex items-center justify-center ${isBookmarked ? "border-accent/40" : "border-muted/40"}`}>
                     <svg className={`w-5 h-5 ${isBookmarked ? "text-accent" : "text-foreground"}`} fill={isBookmarked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
@@ -1308,7 +1487,7 @@ export const MessageItem = memo(function MessageItem({
               {isOwn && (
                 <button
                   onClick={() => { setShowActions(false); setIsEditing(true); setEditContent(message.content); }}
-                  className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
+                  className="flex flex-col items-center gap-2 py-3 rounded-lg hover:bg-sidebar-hover transition-colors"
                 >
                   <span className="w-12 h-12 rounded-full border-2 border-muted/40 flex items-center justify-center">
                     <svg className="w-5 h-5 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1322,7 +1501,7 @@ export const MessageItem = memo(function MessageItem({
               {isOwn && (
                 <button
                   onClick={() => { setShowActions(false); setIsDeleting(true); }}
-                  className="flex flex-col items-center gap-2 py-3 rounded-xl hover:bg-white/[0.04] transition-colors"
+                  className="flex flex-col items-center gap-2 py-3 rounded-lg hover:bg-sidebar-hover transition-colors"
                 >
                   <span className="w-12 h-12 rounded-full border-2 border-mention/40 flex items-center justify-center">
                     <svg className="w-5 h-5 text-mention" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1341,7 +1520,7 @@ export const MessageItem = memo(function MessageItem({
       {/* 削除確認ダイアログ */}
       {isDeleting && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-sm max-h-[85vh] rounded-xl bg-sidebar border border-border flex flex-col">
+          <div className="w-full max-w-sm max-h-[85vh] rounded-xl bg-surface border border-border flex flex-col">
             {/* ヘッダー (固定) */}
             <div className="px-6 pt-6 pb-2 shrink-0">
               <h3 className="text-lg font-bold">メッセージを削除</h3>
@@ -1377,7 +1556,7 @@ export const MessageItem = memo(function MessageItem({
         <div className="fixed inset-0 z-[60] flex items-end lg:hidden" onClick={() => setMobileEmojiOpen(false)}>
           <div className="absolute inset-0 bg-black/40" />
           <div className="relative w-full animate-slide-up" onClick={(e) => e.stopPropagation()}>
-            <div className="w-full rounded-t-2xl bg-sidebar border-t border-border shadow-xl p-4 pb-20">
+            <div className="w-full rounded-t-2xl bg-surface border-t border-border shadow-xl p-4 pb-20">
               {EMOJI_LIST.map((group) => (
                 <div key={group.category} className="mb-3">
                   <p className="text-[11px] text-muted font-medium mb-1.5">{group.category}</p>

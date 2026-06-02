@@ -168,7 +168,7 @@ export default function InvitePage() {
             </a>
             <a
               href={`/login?invite=${token}`}
-              className="block w-full rounded-xl border border-border py-2 px-6 font-medium text-foreground hover:bg-white/[0.04] transition-colors text-center"
+              className="block w-full rounded-xl border border-border py-2 px-6 font-medium text-foreground hover:bg-sidebar-hover transition-colors text-center"
             >
               ログインして参加
             </a>

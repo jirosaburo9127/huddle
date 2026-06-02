@@ -1696,11 +1696,11 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
         </div>
       )}
       {/* チャンネルエリア */}
-      <div className="flex flex-col h-full flex-1 min-w-0">
+      <div className="flex flex-col h-full flex-1 min-w-0 bg-surface">
         {/* チャンネルヘッダー */}
         <header
           onClick={handleHeaderTap}
-          className="flex items-center gap-2 px-3 sm:px-4 py-3 lg:py-0 lg:h-14 border-b border-border bg-header shrink-0 cursor-pointer"
+          className="flex items-center gap-2 px-3 sm:px-4 lg:px-9 py-3 lg:py-0 lg:h-14 bg-surface shrink-0 cursor-pointer"
         >
           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
             {/* モバイル戻るボタン。
@@ -1742,24 +1742,24 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
               </>
             ) : (
               <>
-                <span className="text-muted font-medium shrink-0">#</span>
-                <h1 className="font-bold text-base sm:text-lg truncate min-w-0">
+                <span className="text-sky font-medium shrink-0 lg:text-lg">#</span>
+                <h1 className="font-bold text-base sm:text-lg lg:text-[18px] lg:font-[720] truncate min-w-0">
                   {channel.name}
                 </h1>
               </>
             )}
             {channel.topic && (
-              <span className="ml-2 text-sm text-muted truncate hidden lg:inline">
+              <span className="ml-2 text-[13px] text-muted/65 truncate hidden lg:inline">
                 {channel.topic}
               </span>
             )}
           </div>
-          <div className="flex items-center shrink-0">
+          <div className="flex items-center shrink-0 ml-auto lg:pr-2">
             {/* 全ての操作は ⋯ メニューに集約（タイトルが長くても崩れない） */}
             <div className="relative" ref={overflowMenuRef}>
               <button
                 onClick={() => setShowOverflowMenu((v) => !v)}
-                className="p-1.5 text-muted hover:text-foreground rounded-lg hover:bg-white/[0.04] transition-colors"
+                className="p-1.5 text-muted hover:text-foreground rounded-lg hover:bg-sidebar-hover transition-colors"
                 title="メニュー"
                 aria-haspopup="menu"
                 aria-expanded={showOverflowMenu}
@@ -1771,7 +1771,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
               {showOverflowMenu && (
                 <div
                   role="menu"
-                  className="absolute right-0 mt-1 w-56 rounded-xl border border-border bg-sidebar shadow-lg z-20 py-1"
+                  className="absolute right-0 mt-1 w-56 rounded-xl border border-border bg-surface shadow-lg z-20 py-1"
                 >
                   {/* 決定事項フィルタ */}
                   <button
@@ -1780,7 +1780,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                       setShowOverflowMenu(false);
                       setShowDecisionsOnly((v) => !v);
                     }}
-                    className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-white/[0.04] transition-colors ${
+                    className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-sidebar-hover transition-colors ${
                       showDecisionsOnly ? "text-accent" : "text-foreground"
                     }`}
                   >
@@ -1807,7 +1807,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                         }
                         setMikanEnabled(next);
                       }}
-                      className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-white/[0.04] transition-colors ${
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-sidebar-hover transition-colors ${
                         mikanEnabled ? "text-accent" : "text-foreground"
                       }`}
                     >
@@ -1830,7 +1830,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                         setIsMuted(data);
                       }
                     }}
-                    className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-white/[0.04] transition-colors ${
+                    className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-sidebar-hover transition-colors ${
                       isMuted ? "text-accent" : "text-foreground"
                     }`}
                   >
@@ -1855,7 +1855,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                         setShowOverflowMenu(false);
                         setShowNote((v) => !v);
                       }}
-                      className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-white/[0.04] transition-colors ${
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-sidebar-hover transition-colors ${
                         showNote ? "text-accent" : "text-foreground"
                       }`}
                     >
@@ -1871,7 +1871,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                     href={`${pathname}/media`}
                     role="menuitem"
                     onClick={() => setShowOverflowMenu(false)}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-white/[0.04] transition-colors"
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-sidebar-hover transition-colors"
                   >
                     <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -1888,7 +1888,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                           setShowOverflowMenu(false);
                           setShowMembersModal(true);
                         }}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-white/[0.04] transition-colors"
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-sidebar-hover transition-colors"
                       >
                         <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -1901,7 +1901,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                           setShowOverflowMenu(false);
                           setShowAlbums(true);
                         }}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-white/[0.04] transition-colors"
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-sidebar-hover transition-colors"
                       >
                         <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
@@ -1929,7 +1929,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                           setShowCategoryPicker(true);
                         })();
                       }}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-white/[0.04] transition-colors"
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-sidebar-hover transition-colors"
                     >
                       <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
@@ -1969,7 +1969,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                             window.location.reload();
                           }
                         }}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-white/[0.04] transition-colors"
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-sidebar-hover transition-colors"
                       >
                         <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -2016,7 +2016,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
         )}
 
         {/* メッセージ一覧 */}
-        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-4">
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto overflow-x-hidden pt-1 pb-20 px-0 lg:pl-20 lg:pr-9 lg:max-w-[1080px]">
           {/* 通常チャンネルは最上部 (上に行くほど過去)、独り言は最下部 (下に行くほど過去)
               に「もっと前を読み込む」ボタンを置く。下の独り言ブロック末尾でも同じボタンを使う */}
           {messages.length > 0 && hasMoreOlder && !channel.is_hitorigoto && loadMoreOlderButton}
@@ -2165,6 +2165,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                         readCount={getReadCount(message)}
                         memberCount={memberCountForRead}
                         memberNames={workspaceMemberNames}
+                        isDm={channel.is_dm}
                       />
                     </div>
                   );
@@ -2183,7 +2184,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                 scrollToBottom();
                 setShowScrollToBottom(false);
               }}
-              className="w-10 h-10 rounded-full bg-sidebar border border-border shadow-lg flex items-center justify-center text-muted hover:text-foreground transition-colors"
+              className="w-10 h-10 rounded-full bg-surface border border-border shadow-lg flex items-center justify-center text-muted hover:text-foreground transition-colors"
               aria-label="最新へ"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -2267,7 +2268,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
           onClick={() => !categorySaving && setShowCategoryPicker(false)}
         >
           <div
-            className="w-full max-w-sm rounded-2xl bg-sidebar border border-border p-5 space-y-3"
+            className="w-full max-w-sm rounded-2xl bg-surface border border-border p-5 space-y-3"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between">
@@ -2284,7 +2285,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
               </button>
             </div>
             <div className="space-y-1">
-              <label className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer hover:bg-white/[0.04] transition-colors">
+              <label className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer hover:bg-sidebar-hover transition-colors">
                 <input
                   type="radio"
                   name="channel-category"
@@ -2296,7 +2297,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
               {wsCategories.map((cat) => (
                 <label
                   key={cat.slug}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer hover:bg-white/[0.04] transition-colors"
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer hover:bg-sidebar-hover transition-colors"
                 >
                   <input
                     type="radio"
@@ -2352,7 +2353,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
       {/* チャンネル削除確認ダイアログ */}
       {showDeleteChannel && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50" onClick={() => setShowDeleteChannel(false)}>
-          <div className="w-full max-w-sm rounded-2xl bg-sidebar border border-border p-6 space-y-4 animate-fade-in" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-sm rounded-2xl bg-surface border border-border p-6 space-y-4 animate-fade-in" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-bold">チャンネルを削除</h3>
             <p className="text-sm text-muted">
               <span className="font-semibold text-foreground">#{channel.name}</span> を削除しますか？メッセージも全て削除されます。この操作は取り消せません。

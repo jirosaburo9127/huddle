@@ -365,7 +365,7 @@ export function DashboardView({
                         className="w-5 h-5 rounded-full object-cover"
                       />
                     ) : (
-                      <div className="w-5 h-5 rounded-full bg-accent/20 flex items-center justify-center text-[9px] font-bold text-accent">
+                      <div className="w-5 h-5 rounded-full bg-muted/20 flex items-center justify-center text-[9px] font-bold text-muted">
                         {d.sender_name.charAt(0).toUpperCase()}
                       </div>
                     )}
@@ -474,7 +474,7 @@ export function DashboardView({
                           <button
                             type="button"
                             onClick={() => copyShareUrl(t.token)}
-                            className="px-3 py-1.5 text-xs rounded-lg border border-border hover:bg-white/[0.04] transition-colors"
+                            className="px-3 py-1.5 text-xs rounded-lg border border-border hover:bg-sidebar-hover transition-colors"
                           >
                             {copiedToken === t.token ? "コピー済み" : "コピー"}
                           </button>
@@ -507,7 +507,7 @@ export function DashboardView({
           onClick={() => setShowFilter(false)}
         >
           <div
-            className="w-full bg-sidebar rounded-t-2xl max-h-[70vh] flex flex-col animate-slide-up"
+            className="w-full bg-surface rounded-t-2xl max-h-[70vh] flex flex-col animate-slide-up"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">

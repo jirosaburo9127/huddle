@@ -1,0 +1,11 @@
+/* モックページ用 */
+
+/* タップ/クリック後にフォーカス枠が残らないようにする */
+/* キーボード操作時のみ表示 */
+button:focus {
+  outline: none;
+}
+button:focus-visible {
+  outline: 2px solid #38BDF8;
+  outline-offset: 2px;
+}

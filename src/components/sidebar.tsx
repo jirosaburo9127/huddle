@@ -113,6 +113,21 @@ export function Sidebar({
   // アクティビティ（自分の投稿へのリアクション通知）
   const [showActivity, setShowActivity] = useState(false);
   const [hasUnreadActivity, setHasUnreadActivity] = useState(false);
+  // PC/モバイル判定（モックのスタイル差分を切り替えるため）
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => {
+    const check = () => setIsDesktop(typeof window !== "undefined" && window.innerWidth >= 1024);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+  // 独り言プレビュー（サイドバーに最新数件を横スクロール表示）
+  const [hitorigotoPreview, setHitorigotoPreview] = useState<Array<{
+    content: string;
+    created_at: string;
+    display_name: string;
+    avatar_url: string | null;
+  }>>([]);
 
   async function handleAddCategory() {
     if (!newCatLabel.trim() || catAdding) return;
@@ -181,6 +196,34 @@ export function Sidebar({
       setProfileAvatarUrl(data.avatar_url);
     }
   }, [currentUserId]);
+
+  // 独り言プレビュー: 最新3件を取得
+  useEffect(() => {
+    if (!hitorigotoChannel) return;
+    const supabase = sidebarSupabaseRef.current;
+    (async () => {
+      const { data } = await supabase
+        .from("messages")
+        .select("content, created_at, profiles(display_name, avatar_url)")
+        .eq("channel_id", hitorigotoChannel.id)
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false })
+        .limit(3);
+      if (data) {
+        setHitorigotoPreview(
+          data.map((m: { content: string; created_at: string; profiles: { display_name: string; avatar_url: string | null } | { display_name: string; avatar_url: string | null }[] | null }) => {
+            const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
+            return {
+              content: m.content,
+              created_at: m.created_at,
+              display_name: p?.display_name || "?",
+              avatar_url: p?.avatar_url || null,
+            };
+          })
+        );
+      }
+    })();
+  }, [hitorigotoChannel]);
 
   useEffect(() => {
     if (showSettings) {
@@ -260,6 +303,23 @@ export function Sidebar({
     const found = [...channels, ...dmChannels].find((c) => c.slug === slug);
     return found?.id ?? null;
   }, [pathname, channels, dmChannels, hitorigotoChannel]);
+
+  const dmUnreadTotal = useMemo(
+    () => dmChannels.reduce((sum, dm) => sum + (unreadState[dm.id] || 0), 0),
+    [dmChannels, unreadState]
+  );
+
+  const inProgressCount = useMemo(() => {
+    const progressSlugs = new Set(
+      categories
+        .filter((cat) => cat.label.includes("進行中"))
+        .map((cat) => cat.slug)
+    );
+    return channels.filter((ch) => {
+      const category = ch.id in categoryOverrides ? categoryOverrides[ch.id] : ch.category;
+      return category ? progressSlugs.has(category) : false;
+    }).length;
+  }, [channels, categories, categoryOverrides]);
 
   // polling の refetchUnread は [currentUserId, workspace.id] だけに依存させているため
   // currentChannelId はクロージャで初期値に固定される。最新値を参照するため ref を使う
@@ -672,38 +732,40 @@ export function Sidebar({
       <aside
         data-sidebar
         className={`
-          fixed top-0 bottom-14 left-0 z-40 w-full sm:w-64 bg-sidebar flex flex-col border-r border-border
+          fixed top-0 bottom-14 left-0 z-40 w-full sm:w-64 bg-surface lg:bg-sidebar flex flex-col lg:border-r lg:border-border/50
           transform-gpu transition-transform duration-200 ease-out
           lg:bottom-0 lg:relative lg:z-auto lg:translate-x-0 lg:transform-none
           ${sidebarOpen ? "translate-x-0 pointer-events-auto" : "-translate-x-[24%] pointer-events-none lg:pointer-events-auto"}
         `}
       >
-        {/* ヘッダー: ワークスペース名 + 右上にプロフィールアイコン（大） */}
-        {/* status bar 領域は Capacitor の ios.backgroundColor (#000000) で同色化 */}
-        {/* PC では右側のチャンネルヘッダーと高さを揃える (lg:h-14)
-            PC では Huddle 黒ヘッダーとの境界をはっきりさせるためグレー寄りの色に */}
-        <div className="px-4 py-3 lg:py-0 lg:h-14 lg:min-h-14 lg:max-h-14 flex items-center justify-between gap-2 border-b border-border/50 bg-black text-white lg:bg-zinc-800">
-          {/* 左: WS 名（▼ ドロップダウン） */}
-          <div className="relative min-w-0" ref={wsSwitcherRef}>
+        {/* ヘッダー — モック準拠インラインスタイル */}
+        <div
+          className="shrink-0 flex items-center"
+          style={{ padding: "12px 16px", height: 56, background: isDesktop ? "var(--color-sidebar)" : "var(--color-surface)" }}
+        >
+          {/* 左: WS名 + シェブロン */}
+          <div className="relative" style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }} ref={wsSwitcherRef}>
             <button
               onClick={() => setShowWsSwitcher((prev) => !prev)}
-              className="flex items-center gap-1.5 text-lg font-bold text-white hover:text-white/80 transition-colors text-left max-w-full"
+              style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer" }}
             >
-              <span className="truncate max-w-[7em]">{workspace.name}</span>
-              {/* 他のワークスペースに未読がある時はドットを表示 */}
+              {/* ロゴアイコン（PCのみ。モバイルモックにはない） */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {isDesktop && <img src="/icons/icon-192.png" alt="Huddle" style={{ width: 28, height: 28, borderRadius: 7 }} />}
+              <span style={{ fontSize: isDesktop ? 14 : 17, fontWeight: isDesktop ? 700 : 650, color: "var(--color-foreground)", whiteSpace: "nowrap" }}>{workspace.name}</span>
               {Object.keys(unreadByWorkspace).length > 0 && (
-                <span
-                  className="shrink-0 w-2.5 h-2.5 rounded-full bg-mention"
-                  aria-label="他のワークスペースに未読あり"
-                />
+                <span style={{ width: 10, height: 10, borderRadius: "50%", background: "var(--color-mention)", flexShrink: 0 }} />
               )}
-              <svg className="w-5 h-5 shrink-0 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-              </svg>
+              {/* シェブロンはモバイルのみ表示（PCモックにはない） */}
+              {!isDesktop && (
+                <svg style={{ width: 16, height: 16, color: "var(--color-muted)" }} fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              )}
             </button>
             {/* ワークスペース切り替えドロップダウン */}
             {showWsSwitcher && (
-              <div className="absolute left-0 top-full mt-1 w-56 bg-sidebar border border-border rounded-xl shadow-lg z-50 py-1 animate-fade-in">
+              <div className="absolute left-0 top-full mt-1 w-56 bg-surface border border-border rounded-lg shadow-lg z-50 py-1 animate-fade-in">
                 {allWorkspaces.map((ws) => {
                   const wsUnread = unreadByWorkspace[ws.id] || 0;
                   return (
@@ -714,7 +776,7 @@ export function Sidebar({
                       className={`flex items-center justify-between gap-2 px-3 py-2 text-sm truncate transition-colors rounded-lg mx-1 ${
                         ws.id === workspace.id
                           ? "text-accent bg-accent/10 font-semibold"
-                          : "text-foreground hover:bg-white/[0.04]"
+                          : "text-foreground hover:bg-sidebar-hover"
                       }`}
                     >
                       <span className="truncate">{ws.name}</span>
@@ -733,7 +795,7 @@ export function Sidebar({
                       setShowWsSwitcher(false);
                       setShowInviteModal(true);
                     }}
-                    className="block w-full px-3 py-2 text-sm text-foreground hover:bg-white/[0.04] transition-colors rounded-lg mx-1 text-left"
+                    className="block w-full px-3 py-2 text-sm text-foreground hover:bg-sidebar-hover transition-colors rounded-lg mx-1 text-left"
                   >
                     メンバーを招待
                   </button>
@@ -765,14 +827,14 @@ export function Sidebar({
                         window.location.reload();
                       }
                     }}
-                    className="block w-full px-3 py-2 text-sm text-foreground hover:bg-white/[0.04] transition-colors rounded-lg mx-1 text-left"
+                    className="block w-full px-3 py-2 text-sm text-foreground hover:bg-sidebar-hover transition-colors rounded-lg mx-1 text-left"
                   >
                     このワークスペースの名前を変更
                   </button>
                   <Link
                     href="/?create=true"
                     onClick={() => setShowWsSwitcher(false)}
-                    className="block px-3 py-2 text-sm text-muted hover:text-accent transition-colors rounded-lg mx-1 hover:bg-white/[0.04]"
+                    className="block px-3 py-2 text-sm text-muted hover:text-accent transition-colors rounded-lg mx-1 hover:bg-sidebar-hover"
                   >
                     + 新しいワークスペースを作成
                   </Link>
@@ -806,242 +868,238 @@ export function Sidebar({
               </div>
             )}
           </div>
-          {/* 右: アイコン群（WS 名の長さに関係なく常に右寄せ） */}
-          <div className="flex items-center gap-1 shrink-0">
-            {/* WSメンバー一覧ボタン（PCのみ） */}
-            <button
-              onClick={() => setShowWsMembers(true)}
-              className="hidden lg:flex shrink-0 w-9 h-9 items-center justify-center text-white/80 hover:text-white rounded-lg hover:bg-white/[0.1] transition-colors"
-              title="ワークスペースメンバー"
+
+          {/* 中: モバイルのみ進行中/決定チップ（ヘッダー行内、モック準拠） */}
+          <div className="flex lg:hidden" style={{ gap: 4, marginLeft: "auto", marginRight: 2 }}>
+            <Link
+              href={`/${workspaceSlug}/in-progress`}
+              onClick={() => startDetailOpen("進行中")}
+              style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", height: 28, borderRadius: 999, border: "none", cursor: "pointer", background: "#EAF8FF", textDecoration: "none" }}
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              <span style={{ fontSize: 11, fontWeight: 600, color: "var(--color-foreground)" }}>進行中</span>
+              <span style={{ fontSize: 9, fontWeight: 700, color: "var(--color-sky)", width: 16, height: 16, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", background: "#fff" }}>
+                {inProgressCount}
+              </span>
+            </Link>
+            <Link
+              href={`/${workspaceSlug}/dashboard`}
+              onClick={() => startDetailOpen("決定")}
+              style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", height: 28, borderRadius: 999, border: "none", cursor: "pointer", background: "#FFF1EA", textDecoration: "none" }}
+            >
+              <span style={{ fontSize: 11, fontWeight: 600, color: "var(--color-foreground)" }}>決定</span>
+              <span style={{ fontSize: 9, fontWeight: 700, color: "var(--color-accent)", width: 16, height: 16, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", background: "#fff" }}>
+                {decisionUnreadCount}
+              </span>
+            </Link>
+          </div>
+
+          {/* 右: アイコン群 — PC: 30px/18px/muted、モバイル: 44px/23px/fg */}
+          <div style={{ display: "flex", gap: 0, alignItems: "center", marginLeft: isDesktop ? "auto" : 6 }}>
+            {/* 検索（PCのみ） */}
+            {isDesktop && (
+              <Link
+                href={`/${workspaceSlug}/search`}
+                onClick={() => setSidebarOpen(false)}
+                style={{ width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 8, color: "var(--color-muted)", cursor: "pointer" }}
+                aria-label="検索"
+              >
+                <svg style={{ width: 18, height: 18 }} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </Link>
+            )}
+            {/* DM */}
+            <Link
+              href={`/${workspaceSlug}/dm-list`}
+              onClick={() => { if (pathname.includes("/dm-list")) { setSidebarOpen(false); } else { startDetailOpen("DM"); } }}
+              style={{
+                position: "relative",
+                width: isDesktop ? 30 : 36, height: isDesktop ? 30 : 36,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                borderRadius: isDesktop ? 8 : 10,
+                color: isDesktop ? "var(--color-muted)" : "var(--color-foreground)",
+                marginRight: isDesktop ? 0 : -4,
+              }}
+              aria-label="DM"
+            >
+              <svg style={{ width: isDesktop ? 18 : 23, height: isDesktop ? 18 : 23, transform: isDesktop ? undefined : "translateY(-1px)" }} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
               </svg>
-            </button>
-            {/* アクティビティ (ベル): モバイルは独り言左、PCはプロフィール左 */}
+              {dmUnreadTotal > 0 && (
+                <span style={{ position: "absolute", top: 4, right: 2, width: 8, height: 8, borderRadius: "50%", background: "var(--color-accent)" }} />
+              )}
+            </Link>
+            {/* ベル */}
             <button
               type="button"
               onClick={() => setShowActivity(true)}
               aria-label="アクティビティ"
-              className="relative shrink-0 w-9 h-9 flex items-center justify-center text-white/80 hover:text-white rounded-lg hover:bg-white/[0.1] transition-colors"
+              style={{
+                position: "relative",
+                width: isDesktop ? 30 : 36, height: isDesktop ? 30 : 36,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                borderRadius: isDesktop ? 8 : 10,
+                background: "none", border: "none", cursor: "pointer",
+                color: isDesktop ? "var(--color-muted)" : "var(--color-foreground)",
+              }}
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+              <svg style={{ width: isDesktop ? 18 : 23, height: isDesktop ? 18 : 23 }} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
               </svg>
               {hasUnreadActivity && (
-                <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-mention" aria-hidden="true" />
+                <span style={{ position: "absolute", top: 4, right: 4, width: 8, height: 8, borderRadius: "50%", background: "var(--color-accent)" }} />
               )}
-            </button>
-            {/* 独り言ボタン（モバイルのみ、アバター左に吹き出し風） */}
-            {hitorigotoChannel && (
-              <Link
-                href={`/${workspaceSlug}/${hitorigotoChannel.slug}`}
-                onClick={() => {
-                  if (pathname === `/${workspaceSlug}/${hitorigotoChannel.slug}`) {
-                    setSidebarOpen(false);
-                  } else {
-                    startDetailOpen("独り言");
-                  }
-                }}
-                className="lg:hidden relative shrink-0 mr-2"
-              >
-                {/* 吹き出し本体 — pill 型 + 控えめな影 */}
-                <div className="relative bg-sidebar rounded-full pl-3 pr-3.5 py-1.5 text-foreground text-sm font-semibold flex items-center gap-1.5 shadow-sm hover:bg-sidebar-hover transition-colors">
-                  <svg className="w-4 h-4 shrink-0 text-muted" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
-                  </svg>
-                  独り言
-                  {/* 吹き出しの三角（右向き） — 小さく内側に配置 */}
-                  <div className="absolute -right-[3px] top-1/2 -translate-y-1/2 w-2 h-2 bg-sidebar rotate-45" />
-                </div>
-                {(unreadState[hitorigotoChannel.id] ?? 0) > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 bg-mention text-white text-[9px] font-bold rounded-full min-w-[16px] h-[16px] flex items-center justify-center px-0.5">
-                    {unreadState[hitorigotoChannel.id]}
-                  </span>
-                )}
-              </Link>
-            )}
-            {/* 右上: プロフィールアイコン */}
-            <button
-              onClick={() => setShowSettings(true)}
-              className="shrink-0 lg:ml-1"
-              title="設定"
-            >
-              {(() => {
-                const me = members.find((m) => m.user_id === currentUserId);
-                const profile = me?.profiles;
-                const p = Array.isArray(profile) ? profile[0] : profile;
-                return p?.avatar_url ? (
-                  <img src={p.avatar_url} alt="" className="w-9 h-9 rounded-full object-cover" />
-                ) : (
-                  <span className="w-9 h-9 rounded-full bg-accent/20 flex items-center justify-center text-sm font-bold text-accent">
-                    {(p?.display_name || "?")[0].toUpperCase()}
-                  </span>
-                );
-              })()}
             </button>
           </div>
         </div>
 
-        {/* 投稿検索バー（PCのみ） */}
-        <div className="hidden lg:block px-3 py-2 relative">
-          <input
-            type="text"
-            placeholder="投稿を検索..."
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              // デバウンス検索
-              if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-              const q = e.target.value;
-              searchTimerRef.current = setTimeout(async () => {
-                if (!q.trim()) { setSearchResults([]); return; }
-                const supabase = sidebarSupabaseRef.current;
-                const { data } = await supabase.rpc("search_messages", {
-                  p_user_id: currentUserId,
-                  p_workspace_id: workspace.id,
-                  p_query: q.trim(),
-                });
-                if (data && Array.isArray(data)) setSearchResults(data as SearchResult[]);
-                else setSearchResults([]);
-              }, 500);
-            }}
-            className="w-full bg-background/50 rounded-xl px-3 py-2 text-base border border-border/50 focus:border-accent focus:bg-input-bg placeholder-muted/60 transition-all outline-none"
-          />
-          {/* 検索結果ドロップダウン */}
-          {searchQuery.trim() && searchResults.length > 0 && (
-            <div className="absolute left-3 right-3 top-full mt-1 z-50 max-h-80 overflow-y-auto rounded-xl bg-sidebar border border-border shadow-xl">
-              {searchResults.map((r) => (
-                <Link
-                  key={r.id}
-                  href={`/${workspaceSlug}/${r.channel_slug}?m=${encodeURIComponent(r.id)}`}
-                  onClick={() => { setSearchQuery(""); setSearchResults([]); }}
-                  className="block px-3 py-2.5 border-b border-border/30 hover:bg-white/[0.04] transition-colors"
-                >
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-xs font-semibold text-foreground truncate max-w-[8em]">{r.sender_name}</span>
-                    <span className="text-[11px] text-muted">{new Date(r.created_at).toLocaleDateString("ja-JP", { month: "short", day: "numeric", timeZone: "Asia/Tokyo" })}</span>
-                    <span className="text-[11px] text-accent ml-auto">#{r.channel_name.length > 8 ? r.channel_name.slice(0, 8) + "…" : r.channel_name}</span>
-                  </div>
-                  <p className="text-xs text-foreground/70 line-clamp-1">{r.content.replace(/\n/g, " ").slice(0, 80)}</p>
-                </Link>
-              ))}
-            </div>
-          )}
-          {searchQuery.trim() && searchResults.length === 0 && (
-            <div className="absolute left-3 right-3 top-full mt-1 z-50 rounded-xl bg-sidebar border border-border shadow-xl px-3 py-4 text-center text-xs text-muted">
-              一致する投稿はありません
-            </div>
-          )}
-        </div>
+        {/* グラデーションライン（モバイルモック準拠、PCにはない） */}
+        <div className="lg:hidden" style={{ height: 0.75, background: "linear-gradient(90deg, #E96832, #38BDF8)" }} />
 
         {/* チャンネル・DM一覧 */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden py-2">
-          {/* ツールバー: PC のみ表示（モバイルはボトムタブバーに移動） */}
-          {/* 6項目を 3+3 の 2 行 grid に分割して詰まりを解消 */}
-          <div className="hidden lg:grid lg:grid-cols-3 gap-y-2 mx-3 mb-3 py-3 rounded-xl bg-white/[0.02] border border-border/30 [&>a]:justify-self-center [&>button]:justify-self-center">
-            <Link
-              href={`/${workspaceSlug}/dashboard`}
-              onClick={() => setSidebarOpen(false)}
-              className="relative flex flex-col items-center gap-1 px-2 py-1 rounded-lg text-muted hover:text-accent transition-colors"
-              title="決定事項"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span className="text-xs whitespace-nowrap">決定</span>
-              {decisionUnreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-accent text-white text-[9px] font-bold rounded-full min-w-[16px] h-[16px] flex items-center justify-center px-0.5">
-                  {decisionUnreadCount > 99 ? "99+" : decisionUnreadCount}
-                </span>
-              )}
-            </Link>
+        <div className="flex-1 overflow-y-auto overflow-x-hidden" style={{ padding: "8px 12px 8px" }}>
+          {/* ステータスチップ: PCのみ均等幅ボタン（モバイルはヘッダー内pill）— モック準拠インラインスタイル */}
+          <div className="hidden lg:flex" style={{ gap: 6, padding: "8px 4px 8px", flexShrink: 0 }}>
             <Link
               href={`/${workspaceSlug}/in-progress`}
               onClick={() => setSidebarOpen(false)}
-              className="flex flex-col items-center gap-1 px-2 py-1 rounded-lg text-muted hover:text-blue-400 transition-colors"
-              title="進行中"
+              style={{
+                flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                padding: "6px 0", height: 34,
+                borderRadius: 10, border: "none", cursor: "pointer",
+                background: "rgba(56,189,248,0.15)", fontSize: 13, fontWeight: 650, color: "var(--color-foreground)",
+                textDecoration: "none",
+              }}
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-              <span className="text-xs whitespace-nowrap">進行中</span>
+              進行中
+              <span style={{
+                fontSize: 11, fontWeight: 700, color: "var(--color-sky)",
+                width: 18, height: 18, borderRadius: "50%",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                background: "#fff",
+              }}>{inProgressCount}</span>
             </Link>
             <Link
-              href={`/${workspaceSlug}/calendar`}
+              href={`/${workspaceSlug}/dashboard`}
               onClick={() => setSidebarOpen(false)}
-              className="flex flex-col items-center gap-1 px-2 py-1 rounded-lg text-muted hover:text-accent transition-colors"
-              title="カレンダー"
+              style={{
+                flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                padding: "6px 0", height: 34,
+                borderRadius: 10, border: "none", cursor: "pointer",
+                background: "rgba(233,104,50,0.12)", fontSize: 13, fontWeight: 650, color: "var(--color-foreground)",
+                textDecoration: "none",
+              }}
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
-              </svg>
-              <span className="text-xs whitespace-nowrap">カレンダー</span>
+              決定
+              <span style={{
+                fontSize: 11, fontWeight: 700, color: "var(--color-accent)",
+                width: 18, height: 18, borderRadius: "50%",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                background: "#fff",
+              }}>{decisionUnreadCount}</span>
             </Link>
-            <Link
-              href={`/${workspaceSlug}/files`}
-              onClick={() => setSidebarOpen(false)}
-              className="flex flex-col items-center gap-1 px-2 py-1 rounded-lg text-muted hover:text-accent transition-colors"
-              title="ファイル"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-              </svg>
-              <span className="text-xs whitespace-nowrap">ファイル</span>
-            </Link>
-            <Link
-              href={`/${workspaceSlug}/albums`}
-              onClick={() => setSidebarOpen(false)}
-              className="flex flex-col items-center gap-1 px-2 py-1 rounded-lg text-muted hover:text-pink-400 transition-colors"
-              title="アルバム"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
-              </svg>
-              <span className="text-xs whitespace-nowrap">アルバム</span>
-            </Link>
-            <button
-              onClick={() => setShowBookmarkModal(true)}
-              className="flex flex-col items-center gap-1 px-2 py-1 rounded-lg text-muted hover:text-accent transition-colors"
-              title="ブックマーク"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-              </svg>
-              <span className="text-xs whitespace-nowrap">保存</span>
-            </button>
           </div>
 
-          {/* チャンネルセクション */}
-          <div className="px-3 mt-4 mb-1 flex items-center justify-between">
-            <span className="text-sm font-semibold uppercase text-muted tracking-wider">
-              チャンネル
-            </span>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => {
-                  setCatList(categories);
-                  setCatError("");
-                  setNewCatLabel("");
-                  setShowCategoryManager(true);
-                }}
-                className="text-muted hover:text-accent transition-colors p-2 -m-1 rounded-lg hover:bg-white/[0.04]"
-                title="カテゴリ管理"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                </svg>
-              </button>
-              <button
-                onClick={() => setShowCreateChannel(true)}
-                className="text-muted hover:text-accent transition-colors p-2 -m-1 rounded-lg hover:bg-white/[0.04]"
-                title="チャンネル作成"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                </svg>
-              </button>
+          {/* 独り言プレビュー — PC/モバイル各モック準拠 */}
+          {hitorigotoChannel && hitorigotoPreview.length > 0 && (
+            <div style={{ flexShrink: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", padding: isDesktop ? "6px 8px 4px" : "2px 10px 4px", flexShrink: 0 }}>
+                <span style={{ fontSize: 12, fontWeight: isDesktop ? 650 : 600, color: isDesktop ? "var(--color-foreground)" : "var(--color-muted)", opacity: isDesktop ? 0.7 : 0.75, flex: 1 }}>独り言</span>
+                <Link
+                  href={`/${workspaceSlug}/${hitorigotoChannel.slug}`}
+                  onClick={() => setSidebarOpen(false)}
+                  style={{ fontSize: 11, color: "var(--color-muted)", opacity: 0.6, background: "none", border: "none", cursor: "pointer", padding: 0, textDecoration: "none" }}
+                >もっと見る</Link>
+              </div>
+              <div style={{ display: "flex", gap: isDesktop ? 6 : 8, padding: isDesktop ? "2px 4px 10px" : "2px 10px 8px", overflowX: "auto", minHeight: isDesktop ? 56 : undefined, flexShrink: 0 }}>
+                {hitorigotoPreview.map((note, i) => {
+                  const ago = (() => {
+                    const diff = Date.now() - new Date(note.created_at).getTime();
+                    const h = Math.floor(diff / 3600000);
+                    if (h < 1) return "今";
+                    if (h < 24) return `${h}h`;
+                    const d = Math.floor(h / 24);
+                    return d < 7 ? `${d}日前` : "1w+";
+                  })();
+                  return (
+                    <Link
+                      key={i}
+                      href={`/${workspaceSlug}/${hitorigotoChannel.slug}`}
+                      onClick={() => setSidebarOpen(false)}
+                      style={{
+                        width: isDesktop ? 160 : "68%", minWidth: isDesktop ? 140 : undefined, maxWidth: isDesktop ? 160 : undefined,
+                        padding: isDesktop ? "6px 8px" : "8px 10px",
+                        borderRadius: isDesktop ? 8 : 12, border: "none", cursor: "pointer",
+                        background: isDesktop ? "#FFFFFF" : "var(--color-sidebar)",
+                        textAlign: "left" as const,
+                        display: "flex", gap: isDesktop ? 6 : 10, flexShrink: 0,
+                        alignItems: isDesktop ? "flex-start" : "center",
+                        height: isDesktop ? undefined : 80, textDecoration: "none",
+                      }}
+                    >
+                      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" as const, gap: 3 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                          {note.avatar_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={note.avatar_url} alt="" style={{
+                              width: isDesktop ? 18 : 20, height: isDesktop ? 18 : 20,
+                              borderRadius: isDesktop ? 9 : 10, objectFit: "cover" as const, flexShrink: 0,
+                              marginTop: isDesktop ? 1 : 0,
+                            }} />
+                          ) : (
+                            <span style={{
+                              width: isDesktop ? 18 : 20, height: isDesktop ? 18 : 20,
+                              borderRadius: isDesktop ? 9 : 10, background: "var(--color-muted)",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              fontSize: 8, fontWeight: 700, color: "#fff", flexShrink: 0,
+                              marginTop: isDesktop ? 1 : 0,
+                            }}>
+                              {note.display_name.charAt(0)}
+                            </span>
+                          )}
+                          <span style={{ fontSize: isDesktop ? 10 : 11, color: "var(--color-foreground)", fontWeight: 600 }}>{note.display_name}</span>
+                          <span style={{ fontSize: isDesktop ? 9 : 10, color: "var(--color-muted)", marginLeft: "auto" }}>{ago}</span>
+                        </div>
+                        <p style={{
+                          fontSize: isDesktop ? 10.5 : 12, lineHeight: isDesktop ? 1.35 : 1.45,
+                          color: isDesktop ? "var(--color-muted)" : "var(--color-foreground)",
+                          margin: isDesktop ? "2px 0 0" : 0,
+                          overflow: "hidden", display: "-webkit-box",
+                          WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
+                        }}>{note.content.replace(/\n/g, " ").slice(0, 70)}</p>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
             </div>
+          )}
+
+          {/* チャンネルセクション — ヘッダーは控えめに、＋ボタンのみ */}
+          <div className="mt-1 mb-0.5 flex items-center justify-end" style={{ gap: 2 }}>
+            <button
+              onClick={() => {
+                setCatList(categories);
+                setCatError("");
+                setNewCatLabel("");
+                setShowCategoryManager(true);
+              }}
+              className="text-muted/50 hover:text-muted transition-colors p-1 rounded hover:bg-sidebar-hover"
+              title="カテゴリ管理"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+              </svg>
+            </button>
+            <button
+              onClick={() => setShowCreateChannel(true)}
+              className="text-muted/50 hover:text-muted transition-colors p-1 rounded hover:bg-sidebar-hover"
+              title="チャンネル作成"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+            </button>
           </div>
 
           <ChannelCategoryList
@@ -1060,42 +1118,19 @@ export function Sidebar({
             categoryOverrides={categoryOverrides}
           />
 
-          {/* 独り言チャンネル（カテゴリの下、PCのみ。モバイルはヘッダー横） */}
-          {hitorigotoChannel && (
-            <div className="hidden lg:block px-2 mt-2 mb-1">
-              <Link
-                href={`/${workspaceSlug}/${hitorigotoChannel.slug}`}
-                onClick={() => setSidebarOpen(false)}
-                className={`flex items-center gap-2.5 px-3 py-2.5 text-base font-semibold rounded-xl transition-colors ${
-                  pathname === `/${workspaceSlug}/${hitorigotoChannel.slug}`
-                    ? "bg-sidebar-active text-foreground"
-                    : "text-muted hover:text-foreground hover:bg-sidebar-hover"
-                }`}
-              >
-                <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
-                </svg>
-                <span className="flex-1">独り言</span>
-                {(unreadState[hitorigotoChannel.id] ?? 0) > 0 && (
-                  <span className="ml-auto bg-mention text-white text-[11px] font-bold rounded-full min-w-[20px] h-5 px-1.5 flex items-center justify-center">
-                    {unreadState[hitorigotoChannel.id]}
-                  </span>
-                )}
-              </Link>
-            </div>
-          )}
+          {/* 独り言チャンネルはプレビューカードから開く。個別リンク行は不要 */}
 
-          {/* DMセクション（PCのみ。モバイルはボトムタブのDMページ） */}
-          <div className="hidden lg:flex px-3 mt-4 mb-1 items-center justify-between">
-            <span className="text-sm font-semibold uppercase text-muted tracking-wider">
+          {/* DMセクション（PCのみ。モバイルはボトムタブのDMページ）— モック準拠インラインスタイル */}
+          <div className="hidden lg:flex items-center justify-between" style={{ padding: "16px 8px 6px" }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--color-muted)", opacity: 0.75 }}>
               ダイレクトメッセージ
             </span>
             <button
               onClick={() => setShowCreateDm(true)}
-              className="text-muted hover:text-accent transition-colors p-2 -m-1 rounded-lg hover:bg-white/[0.04]"
+              className="text-muted/50 hover:text-muted transition-colors p-1 rounded hover:bg-sidebar-hover"
               title="新しいメッセージ"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
               </svg>
             </button>
@@ -1149,39 +1184,53 @@ export function Sidebar({
                   if (isActive) setSidebarOpen(false);
                   else startDetailOpen(name);
                 }}
-                className={`
-                  flex items-center gap-2 px-3 py-2 text-base rounded-xl mx-2 transition-colors
-                  ${
-                    isActive
-                      ? "bg-accent/10 text-accent"
-                      : "text-muted hover:text-foreground hover:bg-white/[0.04]"
-                  }
-                `}
+                style={{
+                  display: "flex", alignItems: "center", gap: 10,
+                  padding: "0 10px", height: 38, borderRadius: 8,
+                  cursor: "pointer", marginBottom: 1, textDecoration: "none",
+                  color: dmShowUnreadStyle ? "var(--color-foreground)" : "var(--color-muted)",
+                  fontWeight: dmShowUnreadStyle ? 700 : 500,
+                }}
               >
                 {/* アバター + オンラインドット */}
-                <span className="relative shrink-0">
+                <span style={{ position: "relative", display: "inline-flex" }}>
                   {avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={avatarUrl}
                       alt={name}
-                      className="w-5 h-5 rounded-full object-cover"
+                      style={{ width: 28, height: 28, borderRadius: 14, objectFit: "cover" as const }}
                     />
                   ) : (
-                    <span className="w-5 h-5 rounded-full bg-accent/20 flex items-center justify-center text-[10px] font-medium text-accent">
+                    <span style={{
+                      width: 28, height: 28, borderRadius: 14,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 11, fontWeight: 700, color: "#fff", background: "var(--color-muted)",
+                    }}>
                       {name.charAt(0).toUpperCase()}
                     </span>
                   )}
-                  <span
-                    className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-sidebar ${statusDotColor}`}
-                  />
+                  {isOnline && (
+                    <span style={{
+                      position: "absolute", bottom: -1, right: -1,
+                      width: 10, height: 10, borderRadius: 5,
+                      border: "2px solid var(--color-sidebar)", background: "var(--color-online)",
+                    }} />
+                  )}
                 </span>
-                <span
-                  className={`truncate ${dmShowUnreadStyle ? "font-semibold text-foreground" : ""}`}
-                >
+                <span style={{
+                  fontSize: 14, flex: 1, overflow: "hidden",
+                  textOverflow: "ellipsis", whiteSpace: "nowrap" as const,
+                }}>
                   {name}
                 </span>
                 {dmShowUnreadStyle && (
-                  <span className="ml-auto bg-accent text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                  <span style={{
+                    width: 20, height: 20, borderRadius: "50%",
+                    fontSize: 10, fontWeight: 700, color: "#fff",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    background: "var(--color-accent)",
+                  }}>
                     {dmUnread > 99 ? "99+" : dmUnread}
                   </span>
                 )}
@@ -1192,7 +1241,7 @@ export function Sidebar({
           {/* メンバー招待ボタン */}
           <button
             onClick={() => setShowInviteModal(true)}
-            className="flex items-center gap-2 px-3 py-2 text-[13px] text-muted hover:text-accent mx-2 rounded-xl hover:bg-white/[0.04] transition-colors w-full mt-2"
+            className="flex items-center gap-2 px-3 py-2 text-[13px] text-muted hover:text-accent mx-2 rounded-lg hover:bg-sidebar-hover transition-colors w-full mt-2"
           >
             <svg
               className="w-4 h-4"
@@ -1232,7 +1281,7 @@ export function Sidebar({
               const initial = name[0].toUpperCase();
               return (
                 <>
-                  <span className="w-7 h-7 rounded-full bg-accent/20 flex items-center justify-center text-[11px] font-bold text-accent shrink-0">
+                  <span className="w-7 h-7 rounded-full bg-muted/20 flex items-center justify-center text-[11px] font-bold text-muted shrink-0">
                     {p?.avatar_url ? (
                       <img src={p.avatar_url} alt={name} className="w-7 h-7 rounded-full object-cover" />
                     ) : initial}
@@ -1245,7 +1294,7 @@ export function Sidebar({
             {isMaster && (
               <Link
                 href="/master"
-                className="text-muted hover:text-foreground transition-colors p-1.5 rounded-lg hover:bg-white/[0.04] shrink-0"
+                className="text-muted hover:text-foreground transition-colors p-1.5 rounded-lg hover:bg-sidebar-hover shrink-0"
                 title="マスター画面（全WS閲覧）"
                 aria-label="マスター画面を開く"
               >
@@ -1255,7 +1304,7 @@ export function Sidebar({
             {/* LP プレビュー（アプリ内から /about に直接ジャンプ） */}
             <Link
               href="/about"
-              className="text-muted hover:text-foreground transition-colors p-1.5 rounded-lg hover:bg-white/[0.04] shrink-0"
+              className="text-muted hover:text-foreground transition-colors p-1.5 rounded-lg hover:bg-sidebar-hover shrink-0"
               title="LPプレビュー"
               aria-label="ランディングページを開く"
             >
@@ -1266,7 +1315,7 @@ export function Sidebar({
             </Link>
             <button
               onClick={() => setShowSettings(true)}
-              className="text-muted hover:text-foreground transition-colors p-1.5 rounded-lg hover:bg-white/[0.04] shrink-0"
+              className="text-muted hover:text-foreground transition-colors p-1.5 rounded-lg hover:bg-sidebar-hover shrink-0"
               title="設定"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -1282,7 +1331,7 @@ export function Sidebar({
             >
               <button
                 type="submit"
-                className="text-muted hover:text-foreground transition-colors p-1.5 rounded-lg hover:bg-white/[0.04] shrink-0"
+                className="text-muted hover:text-foreground transition-colors p-1.5 rounded-lg hover:bg-sidebar-hover shrink-0"
                 title="ログアウト"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -1294,7 +1343,7 @@ export function Sidebar({
         </div>
         {/* チャンネル読み込み中オーバーレイ（一覧の上に重ねる） */}
         {pendingDetailOpen && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center bg-sidebar/80 backdrop-blur-sm lg:hidden">
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-surface/80 backdrop-blur-sm lg:hidden">
             <div className="flex flex-col items-center gap-2">
               <div className="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin" />
               {detailTransitionTitle && (
@@ -1382,156 +1431,156 @@ export function Sidebar({
           onClick={() => setShowCategoryManager(false)}
         >
           <div
-            className="w-full max-w-sm rounded-2xl bg-sidebar border border-border p-5 space-y-4 animate-fade-in"
+            style={{ width: "100%", maxWidth: 400, borderRadius: 16, background: "var(--color-surface)", border: "1px solid var(--color-border)", padding: 20 }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold">カテゴリ管理</h3>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--color-foreground)", margin: 0 }}>カテゴリ管理</h3>
               <button
                 onClick={() => setShowCategoryManager(false)}
-                className="text-muted hover:text-foreground transition-colors"
+                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--color-muted)", padding: 4 }}
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <svg style={{ width: 20, height: 20 }} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
 
+            <p style={{ fontSize: 12, color: "var(--color-muted)", marginBottom: 12 }}>色はチャンネル一覧の # 部分に反映されます</p>
+
             {catError && (
-              <div className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">{catError}</div>
+              <div style={{ borderRadius: 8, background: "rgba(239,68,68,0.1)", padding: "8px 12px", fontSize: 13, color: "#ef4444", marginBottom: 12 }}>{catError}</div>
             )}
 
-            <div className="space-y-1 max-h-60 overflow-y-auto">
+            <div style={{ maxHeight: 300, overflowY: "auto", marginBottom: 16 }}>
               {catList.map((cat, idx) => (
                 <div
                   key={cat.slug}
-                  className="flex flex-col gap-1.5 px-3 py-2 rounded-lg bg-white/[0.03] border border-border/50"
+                  style={{ display: "flex", flexDirection: "column", gap: 6, padding: "10px 12px", borderRadius: 10, background: "var(--color-background-soft)", marginBottom: 6 }}
                 >
-                  <div className="flex items-center gap-1">
-                  {/* 上下ボタン */}
-                  <div className="flex flex-col shrink-0">
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    {/* 上下ボタン */}
+                    <div style={{ display: "flex", flexDirection: "column", flexShrink: 0 }}>
+                      <button
+                        type="button"
+                        disabled={idx === 0}
+                        onClick={async () => {
+                          const prev = catList[idx - 1];
+                          setCatError("");
+                          const supabase = sidebarSupabaseRef.current;
+                          const { error } = await supabase.rpc("swap_category_order", {
+                            p_workspace_id: workspace.id,
+                            p_slug_a: cat.slug,
+                            p_slug_b: prev.slug,
+                          });
+                          if (error) { setCatError(error.message); return; }
+                          setCatList((list) => {
+                            const next = [...list];
+                            next[idx] = list[idx - 1];
+                            next[idx - 1] = list[idx];
+                            return next;
+                          });
+                        }}
+                        style={{ background: "none", border: "none", cursor: "pointer", color: "var(--color-muted)", opacity: idx === 0 ? 0.2 : 1, padding: 0 }}
+                      >
+                        <svg style={{ width: 14, height: 14 }} fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={idx === catList.length - 1}
+                        onClick={async () => {
+                          const next = catList[idx + 1];
+                          setCatError("");
+                          const supabase = sidebarSupabaseRef.current;
+                          const { error } = await supabase.rpc("swap_category_order", {
+                            p_workspace_id: workspace.id,
+                            p_slug_a: cat.slug,
+                            p_slug_b: next.slug,
+                          });
+                          if (error) { setCatError(error.message); return; }
+                          setCatList((list) => {
+                            const n = [...list];
+                            n[idx] = list[idx + 1];
+                            n[idx + 1] = list[idx];
+                            return n;
+                          });
+                        }}
+                        style={{ background: "none", border: "none", cursor: "pointer", color: "var(--color-muted)", opacity: idx === catList.length - 1 ? 0.2 : 1, padding: 0 }}
+                      >
+                        <svg style={{ width: 14, height: 14 }} fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                    </div>
+                    {/* # プレビュー + カテゴリ名 */}
+                    <span style={{ fontSize: 15, fontWeight: 600, color: cat.color || "var(--color-muted)", flexShrink: 0 }}>#</span>
+                    <span style={{ fontSize: 14, fontWeight: 500, color: "var(--color-foreground)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cat.label}</span>
+                    {/* 編集 */}
                     <button
                       type="button"
-                      disabled={idx === 0}
                       onClick={async () => {
-                        const prev = catList[idx - 1];
+                        const input = prompt("カテゴリ名を変更", cat.label);
+                        if (input === null || input.trim() === "" || input.trim() === cat.label) return;
                         setCatError("");
                         const supabase = sidebarSupabaseRef.current;
-                        const { error } = await supabase.rpc("swap_category_order", {
+                        const { error } = await supabase.rpc("rename_workspace_category", {
                           p_workspace_id: workspace.id,
-                          p_slug_a: cat.slug,
-                          p_slug_b: prev.slug,
+                          p_slug: cat.slug,
+                          p_new_label: input.trim(),
                         });
                         if (error) { setCatError(error.message); return; }
-                        setCatList((list) => {
-                          const next = [...list];
-                          next[idx] = list[idx - 1];
-                          next[idx - 1] = list[idx];
-                          return next;
-                        });
+                        setCatList((list) =>
+                          list.map((c) => c.slug === cat.slug ? { ...c, label: input.trim() } : c)
+                        );
                       }}
-                      className="text-muted hover:text-foreground disabled:opacity-20 transition-colors"
+                      style={{ flexShrink: 0, padding: 4, background: "none", border: "none", cursor: "pointer", color: "var(--color-muted)", borderRadius: 4 }}
+                      title="名前を変更"
                     >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+                      <svg style={{ width: 16, height: 16 }} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                       </svg>
                     </button>
+                    {/* 削除 */}
                     <button
                       type="button"
-                      disabled={idx === catList.length - 1}
                       onClick={async () => {
-                        const next = catList[idx + 1];
+                        if (!confirm(`カテゴリ「${cat.label}」を削除しますか？\n該当チャンネルは「その他」に移動します。`)) return;
                         setCatError("");
                         const supabase = sidebarSupabaseRef.current;
-                        const { error } = await supabase.rpc("swap_category_order", {
+                        const { error } = await supabase.rpc("delete_workspace_category", {
                           p_workspace_id: workspace.id,
-                          p_slug_a: cat.slug,
-                          p_slug_b: next.slug,
+                          p_slug: cat.slug,
                         });
-                        if (error) { setCatError(error.message); return; }
-                        setCatList((list) => {
-                          const n = [...list];
-                          n[idx] = list[idx + 1];
-                          n[idx + 1] = list[idx];
-                          return n;
-                        });
+                        if (error) {
+                          setCatError(error.message);
+                        } else {
+                          setCatList((prev) => prev.filter((c) => c.slug !== cat.slug));
+                        }
                       }}
-                      className="text-muted hover:text-foreground disabled:opacity-20 transition-colors"
+                      style={{ flexShrink: 0, padding: 4, background: "none", border: "none", cursor: "pointer", color: "var(--color-muted)", borderRadius: 4 }}
+                      title="削除"
                     >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                      <svg style={{ width: 16, height: 16 }} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                       </svg>
                     </button>
                   </div>
-                  {/* カテゴリ名 */}
-                  <span
-                    className="text-sm flex-1 truncate font-medium"
-                    style={{ color: cat.color || undefined }}
-                  >{cat.label}</span>
-                  {/* 編集ボタン */}
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const input = prompt("カテゴリ名を変更", cat.label);
-                      if (input === null || input.trim() === "" || input.trim() === cat.label) return;
-                      setCatError("");
-                      const supabase = sidebarSupabaseRef.current;
-                      const { error } = await supabase.rpc("rename_workspace_category", {
-                        p_workspace_id: workspace.id,
-                        p_slug: cat.slug,
-                        p_new_label: input.trim(),
-                      });
-                      if (error) { setCatError(error.message); return; }
-                      setCatList((list) =>
-                        list.map((c) => c.slug === cat.slug ? { ...c, label: input.trim() } : c)
-                      );
-                    }}
-                    className="shrink-0 p-1 text-muted hover:text-accent rounded hover:bg-accent/10 transition-colors"
-                    title="名前を変更"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                  </button>
-                  {/* 削除ボタン */}
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      if (!confirm(`カテゴリ「${cat.label}」を削除しますか？\n該当チャンネルは「その他」に移動します。`)) return;
-                      setCatError("");
-                      const supabase = sidebarSupabaseRef.current;
-                      const { error } = await supabase.rpc("delete_workspace_category", {
-                        p_workspace_id: workspace.id,
-                        p_slug: cat.slug,
-                      });
-                      if (error) {
-                        setCatError(error.message);
-                      } else {
-                        setCatList((prev) => prev.filter((c) => c.slug !== cat.slug));
-                      }
-                    }}
-                    className="shrink-0 p-1 text-muted hover:text-red-400 rounded hover:bg-red-500/10 transition-colors"
-                    title="削除"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                  </div>
-                  {/* カラーピッカー: 無色 + 7色のドット */}
-                  <div className="flex items-center gap-1 pl-7">
+                  {/* カラーピッカー: # の色を変更 */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 5, paddingLeft: 28 }}>
                     <button
                       type="button"
                       onClick={() => handleChangeCategoryColor(cat.slug, null)}
-                      className={`w-4 h-4 rounded-full border-2 transition-all ${
-                        !cat.color
-                          ? "border-foreground/60 ring-2 ring-foreground/30"
-                          : "border-border hover:border-foreground/40"
-                      }`}
+                      style={{
+                        width: 18, height: 18, borderRadius: "50%",
+                        border: !cat.color ? "2px solid var(--color-foreground)" : "2px solid var(--color-border)",
+                        background: "none", cursor: "pointer", padding: 0,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                      }}
                       title="無色"
-                      aria-label="無色"
                     >
-                      <svg className="w-full h-full text-muted" viewBox="0 0 20 20" fill="currentColor">
+                      <svg style={{ width: 12, height: 12, color: "var(--color-muted)" }} viewBox="0 0 20 20" fill="currentColor">
                         <line x1="3" y1="17" x2="17" y2="3" stroke="currentColor" strokeWidth="2" />
                       </svg>
                     </button>
@@ -1540,26 +1589,26 @@ export function Sidebar({
                         key={c.value}
                         type="button"
                         onClick={() => handleChangeCategoryColor(cat.slug, c.value)}
-                        style={{ backgroundColor: c.value }}
-                        className={`w-4 h-4 rounded-full border-2 transition-all ${
-                          cat.color === c.value
-                            ? "border-foreground/60 ring-2 ring-foreground/30 scale-110"
-                            : "border-transparent hover:scale-110"
-                        }`}
+                        style={{
+                          width: 18, height: 18, borderRadius: "50%",
+                          backgroundColor: c.value, cursor: "pointer", padding: 0,
+                          border: cat.color === c.value ? "2px solid var(--color-foreground)" : "2px solid transparent",
+                          transform: cat.color === c.value ? "scale(1.15)" : undefined,
+                          transition: "transform 150ms, border 150ms",
+                        }}
                         title={c.label}
-                        aria-label={c.label}
                       />
                     ))}
                   </div>
                 </div>
               ))}
               {catList.length === 0 && (
-                <div className="text-xs text-muted py-2 text-center">カテゴリがありません</div>
+                <div style={{ fontSize: 12, color: "var(--color-muted)", padding: "8px 0", textAlign: "center" }}>カテゴリがありません</div>
               )}
             </div>
 
-            <div className="space-y-2">
-              <div className="flex gap-2">
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ display: "flex", gap: 8 }}>
                 <input
                   type="text"
                   value={newCatLabel}
@@ -1571,33 +1620,41 @@ export function Sidebar({
                     }
                   }}
                   placeholder="新しいカテゴリ名"
-                  style={{ color: newCatColor || undefined }}
-                  className="flex-1 rounded-lg border border-border bg-input-bg px-3 py-2 text-sm text-foreground placeholder-muted focus:border-accent focus:outline-none"
+                  style={{
+                    flex: 1, borderRadius: 10, border: "1px solid var(--color-border)",
+                    background: "var(--color-input-bg)", padding: "8px 12px",
+                    fontSize: 14, color: "var(--color-foreground)", outline: "none",
+                  }}
                 />
                 <button
                   type="button"
                   onClick={handleAddCategory}
                   disabled={!newCatLabel.trim() || catAdding}
-                  className="shrink-0 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50 transition-colors"
+                  style={{
+                    flexShrink: 0, borderRadius: 10, padding: "8px 16px",
+                    fontSize: 13, fontWeight: 600, color: "#fff",
+                    background: "var(--color-accent)", border: "none", cursor: "pointer",
+                    opacity: (!newCatLabel.trim() || catAdding) ? 0.5 : 1,
+                  }}
                 >
                   {catAdding ? "..." : "追加"}
                 </button>
               </div>
-              {/* 新規カテゴリの色 */}
-              <div className="flex items-center gap-1">
-                <span className="text-[11px] text-muted mr-1">色</span>
+              {/* 新規カテゴリの # 色 */}
+              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                <span style={{ fontSize: 11, color: "var(--color-muted)", marginRight: 2 }}># 色</span>
                 <button
                   type="button"
                   onClick={() => setNewCatColor(null)}
-                  className={`w-4 h-4 rounded-full border-2 transition-all ${
-                    !newCatColor
-                      ? "border-foreground/60 ring-2 ring-foreground/30"
-                      : "border-border hover:border-foreground/40"
-                  }`}
+                  style={{
+                    width: 18, height: 18, borderRadius: "50%",
+                    border: !newCatColor ? "2px solid var(--color-foreground)" : "2px solid var(--color-border)",
+                    background: "none", cursor: "pointer", padding: 0,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}
                   title="無色"
-                  aria-label="無色"
                 >
-                  <svg className="w-full h-full text-muted" viewBox="0 0 20 20" fill="currentColor">
+                  <svg style={{ width: 12, height: 12, color: "var(--color-muted)" }} viewBox="0 0 20 20" fill="currentColor">
                     <line x1="3" y1="17" x2="17" y2="3" stroke="currentColor" strokeWidth="2" />
                   </svg>
                 </button>
@@ -1606,14 +1663,14 @@ export function Sidebar({
                     key={c.value}
                     type="button"
                     onClick={() => setNewCatColor(c.value)}
-                    style={{ backgroundColor: c.value }}
-                    className={`w-4 h-4 rounded-full border-2 transition-all ${
-                      newCatColor === c.value
-                        ? "border-foreground/60 ring-2 ring-foreground/30 scale-110"
-                        : "border-transparent hover:scale-110"
-                    }`}
+                    style={{
+                      width: 18, height: 18, borderRadius: "50%",
+                      backgroundColor: c.value, cursor: "pointer", padding: 0,
+                      border: newCatColor === c.value ? "2px solid var(--color-foreground)" : "2px solid transparent",
+                      transform: newCatColor === c.value ? "scale(1.15)" : undefined,
+                      transition: "transform 150ms, border 150ms",
+                    }}
                     title={c.label}
-                    aria-label={c.label}
                   />
                 ))}
               </div>
@@ -1624,10 +1681,13 @@ export function Sidebar({
               type="button"
               onClick={() => {
                 setShowCategoryManager(false);
-                // サイドバーに即反映するためページを再検証
                 router.refresh();
               }}
-              className="w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white hover:bg-accent-hover transition-colors"
+              style={{
+                width: "100%", marginTop: 16, borderRadius: 10, padding: "10px 0",
+                fontSize: 14, fontWeight: 600, color: "#fff",
+                background: "var(--color-accent)", border: "none", cursor: "pointer",
+              }}
             >
               決定
             </button>
@@ -1639,11 +1699,11 @@ export function Sidebar({
       {showSettings && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50" onClick={() => setShowSettings(false)}>
           <div
-            className="w-full max-w-md max-h-[85vh] mb-16 lg:mb-0 flex flex-col rounded-2xl bg-sidebar border border-border animate-fade-in overflow-hidden"
+            className="w-full max-w-md max-h-[85vh] mb-16 lg:mb-0 flex flex-col rounded-2xl bg-surface border border-border animate-fade-in overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {/* ヘッダー: 常に画面に残るよう sticky 相当に固定 */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border/50 bg-sidebar shrink-0">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border/50 bg-surface shrink-0">
               <h2 className="text-lg font-bold">設定</h2>
               <button
                 onClick={() => setShowSettings(false)}
@@ -1666,7 +1726,7 @@ export function Sidebar({
                 <button
                   type="button"
                   onClick={() => avatarInputRef.current?.click()}
-                  className="relative w-16 h-16 rounded-full shrink-0 overflow-hidden bg-accent/20 flex items-center justify-center hover:opacity-80 transition-opacity group"
+                  className="relative w-16 h-16 rounded-full shrink-0 overflow-hidden bg-muted/20 flex items-center justify-center hover:opacity-80 transition-opacity group"
                   disabled={profileUploading}
                 >
                   {profileAvatarUrl ? (
@@ -1707,7 +1767,7 @@ export function Sidebar({
                     value={profileDisplayName}
                     onChange={(e) => setProfileDisplayName(e.target.value)}
                     placeholder="表示名を入力"
-                    className="w-full bg-background/50 rounded-xl px-3 py-2 text-sm border border-border/50 focus:border-accent focus:bg-input-bg placeholder-muted/60 transition-all outline-none"
+                    className="w-full bg-background/50 rounded-lg px-3 py-2 text-sm border border-border/50 focus:border-accent focus:bg-input-bg placeholder-muted/60 transition-all outline-none"
                   />
                 </div>
               </div>
@@ -1716,7 +1776,7 @@ export function Sidebar({
                   type="button"
                   onClick={handleProfileSave}
                   disabled={profileSaving || !profileDisplayName.trim()}
-                  className="px-4 py-2 text-sm rounded-xl bg-accent text-white hover:bg-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 text-sm rounded-lg bg-accent text-white hover:bg-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {profileSaving ? "保存中..." : "保存"}
                 </button>
@@ -1730,7 +1790,7 @@ export function Sidebar({
             {/* ストレージ使用量 */}
             <div>
               <h3 className="text-sm font-semibold text-foreground mb-3">ストレージ</h3>
-              <div className="rounded-xl border border-border bg-input-bg p-4">
+              <div className="rounded-lg border border-border bg-input-bg p-4">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm text-muted">使用量</span>
                   <span className="text-sm font-medium text-foreground">
@@ -1773,7 +1833,7 @@ export function Sidebar({
               >
                 <button
                   type="submit"
-                  className="px-4 py-2 text-sm rounded-xl border border-mention/30 text-mention hover:bg-mention/10 transition-colors"
+                  className="px-4 py-2 text-sm rounded-lg border border-mention/30 text-mention hover:bg-mention/10 transition-colors"
                 >
                   ログアウト
                 </button>
@@ -1822,6 +1882,15 @@ function ChannelCategoryList({
   onOpenMembers,
   categoryOverrides,
 }: ChannelCategoryListProps) {
+  // PC/モバイル判定（モックのスタイル差分を切り替えるため）
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => {
+    const check = () => setIsDesktop(typeof window !== "undefined" && window.innerWidth >= 1024);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
   // user_id → profile 変換マップ
   const profileById = useMemo(() => {
     const m = new Map<string, { display_name: string; avatar_url: string | null }>();
@@ -1902,8 +1971,8 @@ function ChannelCategoryList({
   ], [categories]);
 
   return (
-    <div className="space-y-3">
-      {sections.map(({ key, label, color }) => {
+    <div>
+      {sections.map(({ key, label, color }, catIdx) => {
         const list = grouped.get(key) || [];
         if (list.length === 0) return null;
         const isCollapsed = collapsed.has(key);
@@ -1913,35 +1982,50 @@ function ChannelCategoryList({
           0
         );
         return (
-          <div key={key} className="space-y-1">
-            <div className="w-full flex items-center">
-              <button
-                type="button"
-                onClick={() => toggleCollapsed(key)}
-                className="flex-1 min-w-0 flex items-center gap-1.5 px-3 py-2 text-base font-semibold text-muted hover:text-foreground transition-colors"
+          <div key={key} style={{ marginBottom: 2 }}>
+            {/* カテゴリヘッダー — モック準拠インラインスタイル */}
+            <button
+              type="button"
+              onClick={() => toggleCollapsed(key)}
+              style={{
+                width: "100%", display: "flex", alignItems: "center", gap: 6,
+                padding: "6px 10px 3px", border: "none", background: "none",
+                cursor: "pointer", marginTop: catIdx === 0 ? (isDesktop ? 0 : 2) : (isDesktop ? 10 : 6),
+                position: "relative", zIndex: 2,
+              }}
+            >
+              <svg
+                style={{
+                  width: 14, height: 14,
+                  color: isDesktop
+                    ? "var(--color-muted)"
+                    : (color ? `${color}B3` : "var(--color-muted)"),
+                  opacity: 0.7, flexShrink: 0,
+                  transition: "transform 150ms",
+                  transform: isCollapsed ? "rotate(-90deg)" : "rotate(0deg)",
+                }}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                viewBox="0 0 24 24"
               >
-                <svg
-                  className={`w-3.5 h-3.5 shrink-0 transition-transform ${
-                    isCollapsed ? "-rotate-90" : ""
-                  }`}
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2.5}
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                </svg>
-                <span
-                  className="truncate text-left"
-                  style={{ color: color || undefined }}
-                >■ {label}</span>
-                {isCollapsed && unreadTotal > 0 && (
-                  <span className="ml-auto bg-accent text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
-                    {unreadTotal > 99 ? "99+" : unreadTotal}
-                  </span>
-                )}
-              </button>
-            </div>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+              <span style={{
+                fontSize: 12, fontWeight: isDesktop ? 650 : 600,
+                color: isDesktop ? "var(--color-foreground)" : "var(--color-muted)",
+                opacity: isDesktop ? 0.7 : 0.75, flex: 1, textAlign: "left" as const,
+              }}>{label}</span>
+              {isCollapsed && unreadTotal > 0 && (
+                <span style={{
+                  width: isDesktop ? 20 : 16, height: isDesktop ? 20 : 16, borderRadius: "50%",
+                  fontSize: isDesktop ? 10 : 9, fontWeight: 700, color: "#fff",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  background: "var(--color-accent)", opacity: isDesktop ? 1 : 0.85,
+                }}>{unreadTotal > 99 ? "99+" : unreadTotal}</span>
+              )}
+            </button>
+            {/* チャンネル行 — モック準拠インラインスタイル */}
             {!isCollapsed &&
               list.map((channel) => {
                 const href = `/${workspaceSlug}/${channel.slug}`;
@@ -1950,83 +2034,41 @@ function ChannelCategoryList({
                 const showUnreadStyle = unreadCount > 0 && !isActive;
                 const chMemberIds = channelMembersMap[channel.id] || [];
                 return (
-                  <div
+                  <Link
                     key={channel.id}
-                    className={`
-                      flex items-center min-w-0 mx-2 rounded-xl transition-colors
-                      ${
-                        isActive
-                          ? "bg-accent/10"
-                          : "hover:bg-white/[0.04]"
-                      }
-                    `}
+                    href={href}
+                    onClick={() => onNavigate(isActive, channel.name)}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 10,
+                      padding: isDesktop ? "0 10px" : "0 10px 0 28px",
+                      height: isDesktop ? 36 : 34, borderRadius: 8,
+                      border: "none", cursor: "pointer", marginBottom: isDesktop ? 1 : 0,
+                      background: "none", position: "relative" as const, zIndex: 1,
+                      color: (isDesktop && isActive) || showUnreadStyle ? "var(--color-foreground)" : "var(--color-muted)",
+                      fontWeight: (isDesktop && isActive) || showUnreadStyle ? 700 : 500,
+                      fontSize: isDesktop ? 14 : (showUnreadStyle ? 15 : 14.5),
+                      textAlign: "left" as const, textDecoration: "none",
+                    }}
                   >
-                    <Link
-                      href={href}
-                      onClick={() => onNavigate(isActive, channel.name)}
-                      className={`flex items-center min-w-0 flex-1 px-3 py-2 text-base ${
-                        isActive
-                          ? "text-accent"
-                          : "text-muted hover:text-foreground"
-                      }`}
-                      style={!isActive && color ? { color } : undefined}
-                    >
-                      <span
-                        className={`mr-2 shrink-0 ${!isActive && color ? "" : "text-accent/50"}`}
-                        style={!isActive && color ? { color, opacity: 0.7 } : undefined}
-                      >#</span>
-                      <span
-                        className={`truncate min-w-0 flex-1 ${
-                          showUnreadStyle ? "font-semibold" : ""
-                        } ${showUnreadStyle && !color ? "text-foreground" : ""}`}
-                      >
-                        {channel.name}
-                      </span>
-                      {showUnreadStyle && (
-                        <span className="ml-2 bg-accent text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
-                          {unreadCount > 99 ? "99+" : unreadCount}
-                        </span>
-                      )}
-                    </Link>
-                    {/* チャンネル所属メンバー: タップでメンバー一覧モーダル */}
-                    {chMemberIds.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => onOpenMembers(channel.id)}
-                        aria-label="このチャンネルのメンバー"
-                        className="shrink-0 flex items-center gap-0 p-1 mr-2 rounded hover:bg-white/[0.08] active:bg-white/[0.12] transition-colors"
-                      >
-                        <span className="flex -space-x-1">
-                          {chMemberIds.slice(0, 3).map((uid) => {
-                            const p = profileById.get(uid);
-                            if (!p) return null;
-                            const initial = (p.display_name || "?")[0]?.toUpperCase();
-                            return p.avatar_url ? (
-                              /* eslint-disable-next-line @next/next/no-img-element */
-                              <img
-                                key={uid}
-                                src={p.avatar_url}
-                                alt={p.display_name}
-                                title={p.display_name}
-                                className="w-4 h-4 rounded-full object-cover border border-sidebar"
-                              />
-                            ) : (
-                              <span
-                                key={uid}
-                                title={p.display_name}
-                                className="w-4 h-4 rounded-full bg-accent/20 flex items-center justify-center border border-sidebar"
-                              >
-                                <span className="text-[8px] font-bold text-accent leading-none">{initial}</span>
-                              </span>
-                            );
-                          })}
-                        </span>
-                        {chMemberIds.length > 3 && (
-                          <span className="ml-1 text-[9px] text-muted">+{chMemberIds.length - 3}</span>
-                        )}
-                      </button>
+                    <span style={{
+                      fontSize: isDesktop ? 16 : 15,
+                      color: (isDesktop && isActive) ? "var(--color-sky)" : (color || "var(--color-muted)"),
+                      opacity: (isDesktop && isActive) ? 1 : showUnreadStyle ? 0.7 : 0.4,
+                    }}>#</span>
+                    <span style={{
+                      flex: 1, overflow: "hidden", textOverflow: "ellipsis",
+                      whiteSpace: "nowrap" as const,
+                    }}>{channel.name}</span>
+                    {showUnreadStyle && (
+                      <span style={{
+                        width: isDesktop ? 20 : 16, height: isDesktop ? 20 : 16, borderRadius: "50%",
+                        fontSize: isDesktop ? 10 : 9, fontWeight: 700, color: "#fff",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        background: "var(--color-accent)", opacity: isDesktop ? 1 : 0.85,
+                        flexShrink: 0, marginLeft: "auto",
+                      }}>{unreadCount > 99 ? "99+" : unreadCount}</span>
                     )}
-                  </div>
+                  </Link>
                 );
               })}
           </div>

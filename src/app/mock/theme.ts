@@ -1,0 +1,91 @@
+export type MockTheme = {
+  bg: string;
+  bgSoft: string;
+  surface: string;
+  panel: string;
+  sidebar: string;
+  sidebarHover: string;
+  sidebarActive: string;
+  inputBg: string;
+  border: string;
+  fg: string;
+  muted: string;
+  accent: string;
+  accentHover: string;
+  accentSoft: string;
+  sky: string;
+  skyHover: string;
+  skySoft: string;
+  online: string;
+  mention: string;
+  hover: string;
+};
+
+export const themes: Record<string, MockTheme> = {
+  dawn: {
+    bg: "#FAFAF8",
+    bgSoft: "#F5F5F2",
+    surface: "#FFFFFF",
+    panel: "#F0F0ED",
+    sidebar: "#F5F5F2",
+    sidebarHover: "#EDEDEA",
+    sidebarActive: "#EDF6FC",
+    inputBg: "#F2F3F5",
+    border: "#E5E7EB",
+    fg: "#111111",
+    muted: "#6B7280",
+    accent: "#E96832",
+    accentHover: "#D55E2B",
+    accentSoft: "#FEF0E8",
+    sky: "#38BDF8",
+    skyHover: "#0EA5E9",
+    skySoft: "#EDF6FC",
+    online: "#22c55e",
+    mention: "#ef4444",
+    hover: "#F5F5F2",
+  },
+  midnight: {
+    bg: "#111116",
+    bgSoft: "#16161e",
+    surface: "#1a1a22",
+    panel: "#1e1e28",
+    sidebar: "#16161e",
+    sidebarHover: "#22222e",
+    sidebarActive: "#1a2a38",
+    inputBg: "#1e1e28",
+    border: "#28283a",
+    fg: "#e4e4ed",
+    muted: "#6b6b80",
+    accent: "#E96832",
+    accentHover: "#FF9060",
+    accentSoft: "rgba(233,104,50,0.15)",
+    sky: "#38BDF8",
+    skyHover: "#5CCCFA",
+    skySoft: "rgba(56,189,248,0.12)",
+    online: "#34d399",
+    mention: "#f87171",
+    hover: "#22222e",
+  },
+  warm: {
+    bg: "#FAF8F5",
+    bgSoft: "#F5F0E8",
+    surface: "#FFFFFF",
+    panel: "#F0EBE3",
+    sidebar: "#F5F0E8",
+    sidebarHover: "#EDE7DD",
+    sidebarActive: "#FEF0E8",
+    inputBg: "#F0EBE3",
+    border: "#DDD6C8",
+    fg: "#2c2418",
+    muted: "#8a7e6e",
+    accent: "#E96832",
+    accentHover: "#D55E2B",
+    accentSoft: "#FEF0E8",
+    sky: "#38BDF8",
+    skyHover: "#0EA5E9",
+    skySoft: "#EAF8FF",
+    online: "#5a9a60",
+    mention: "#c05040",
+    hover: "#EDE7DD",
+  },
+};

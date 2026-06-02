@@ -121,7 +121,7 @@ function HitorigotoPostCardInner({
           {avatarUrl ? (
             <img src={avatarUrl} alt={displayName} className="w-10 h-10 rounded-full object-cover shrink-0" />
           ) : (
-            <div className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-full bg-muted/20 flex items-center justify-center shrink-0">
               <span className="text-sm font-bold text-accent">{displayName[0]?.toUpperCase()}</span>
             </div>
           )}

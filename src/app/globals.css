@@ -3,20 +3,25 @@
 /* デフォルトは Dawn（ライト）。data-theme 未設定でも初回ロード時にちらつかない。
    ダークモードに切り替える場合は [data-theme="midnight"] が下で上書きする。 */
 @theme {
-  --color-background: #f7f7fa;
-  --color-surface: #ffffff;
-  --color-sidebar: #ebebf2;
-  --color-sidebar-hover: #dddde8;
-  --color-sidebar-active: #d0d0e0;
-  --color-header: #f7f7fa;
-  --color-input-bg: #ebebf2;
-  --color-border: #c8c8d8;
-  --color-border-subtle: #dddde8;
-  --color-foreground: #0f0f1a;
-  --color-muted: #55556a;
-  /* Dawn は完全モノクロ */
-  --color-accent: #0f0f1a;
-  --color-accent-hover: #000000;
+  /* Dawn — モノクロ基調 + オレンジ×水色アクセント */
+  --color-background: #FAFAF8;
+  --color-background-soft: #F5F5F2;
+  --color-surface: #FFFFFF;
+  --color-sidebar: #F5F5F2;
+  --color-sidebar-hover: #EDEDEA;
+  --color-sidebar-active: #EDF6FC;
+  --color-header: #FAFAF8;
+  --color-input-bg: #F2F3F5;
+  --color-border: #E5E7EB;
+  --color-border-subtle: #F0F0EE;
+  --color-foreground: #111111;
+  --color-muted: #6B7280;
+  --color-accent: #E96832;
+  --color-accent-hover: #D55E2B;
+  --color-accent-soft: #FEF0E8;
+  --color-sky: #38BDF8;
+  --color-sky-hover: #0EA5E9;
+  --color-sky-soft: #EDF6FC;
   --color-online: #22c55e;
   --color-mention: #ef4444;
   --font-sans: var(--font-geist-sans);
@@ -357,18 +362,23 @@ html {
 /* Midnight（ダークモード） */
 [data-theme="midnight"] {
   --color-background: #111116;
+  --color-background-soft: #16161e;
   --color-surface: #1a1a22;
   --color-sidebar: #16161e;
   --color-sidebar-hover: #22222e;
-  --color-sidebar-active: #2a2a38;
+  --color-sidebar-active: #1a2a38;
   --color-header: #141418;
   --color-input-bg: #1e1e28;
   --color-border: #28283a;
   --color-border-subtle: #1f1f2e;
   --color-foreground: #e4e4ed;
   --color-muted: #6b6b80;
-  --color-accent: #3a3a4a;
-  --color-accent-hover: #4a4a5a;
+  --color-accent: #E96832;
+  --color-accent-hover: #FF9060;
+  --color-accent-soft: rgba(233, 104, 50, 0.15);
+  --color-sky: #38BDF8;
+  --color-sky-hover: #5CCCFA;
+  --color-sky-soft: rgba(56, 189, 248, 0.12);
   --color-online: #34d399;
   --color-mention: #f87171;
 }
@@ -384,20 +394,24 @@ html {
 
 /* Warm（あったかベージュ） */
 [data-theme="warm"] {
-  --color-background: #f5f0e8;
-  --color-surface: #faf7f2;
-  --color-sidebar: #ebe5d9;
-  --color-sidebar-hover: #dfd8ca;
-  --color-sidebar-active: #d4ccbc;
-  --color-header: #f5f0e8;
-  --color-input-bg: #ebe5d9;
-  --color-border: #cdc5b4;
-  --color-border-subtle: #ddd6c8;
+  --color-background: #FAF8F5;
+  --color-background-soft: #F5F0E8;
+  --color-surface: #FFFFFF;
+  --color-sidebar: #F5F0E8;
+  --color-sidebar-hover: #EDE7DD;
+  --color-sidebar-active: #FEF0E8;
+  --color-header: #FAF8F5;
+  --color-input-bg: #F0EBE3;
+  --color-border: #DDD6C8;
+  --color-border-subtle: #E8E2D6;
   --color-foreground: #2c2418;
   --color-muted: #8a7e6e;
-  /* Warm もインク寄りのダークブラウンに */
-  --color-accent: #2c2418;
-  --color-accent-hover: #1a1510;
+  --color-accent: #E96832;
+  --color-accent-hover: #D55E2B;
+  --color-accent-soft: #FEF0E8;
+  --color-sky: #38BDF8;
+  --color-sky-hover: #0EA5E9;
+  --color-sky-soft: #EAF8FF;
   --color-online: #5a9a60;
   --color-mention: #c05040;
 }

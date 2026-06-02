@@ -130,7 +130,7 @@ export default function SearchPage() {
                   {r.sender_avatar ? (
                     <img src={r.sender_avatar} alt="" className="w-6 h-6 rounded-full object-cover shrink-0" />
                   ) : (
-                    <div className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center shrink-0">
+                    <div className="w-6 h-6 rounded-full bg-muted/20 flex items-center justify-center shrink-0">
                       <span className="text-[9px] font-bold text-accent">{r.sender_name[0]?.toUpperCase()}</span>
                     </div>
                   )}

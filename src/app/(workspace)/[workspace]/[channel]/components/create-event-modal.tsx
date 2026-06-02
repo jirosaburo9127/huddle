@@ -178,7 +178,7 @@ export function CreateEventModal({ channelId, onCreated, onClose }: Props) {
       onClick={onClose}
     >
       <div
-        className="w-full sm:max-w-md max-h-[90vh] flex flex-col rounded-t-2xl sm:rounded-2xl bg-sidebar border border-border overflow-hidden"
+        className="w-full sm:max-w-md max-h-[90vh] flex flex-col rounded-t-2xl sm:rounded-2xl bg-surface border border-border overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ヘッダー */}
@@ -277,7 +277,7 @@ export function CreateEventModal({ channelId, onCreated, onClose }: Props) {
                         className="w-5 h-5 rounded-full object-cover"
                       />
                     ) : (
-                      <div className="w-5 h-5 rounded-full bg-accent/20 flex items-center justify-center text-[10px] font-bold text-accent">
+                      <div className="w-5 h-5 rounded-full bg-muted/20 flex items-center justify-center text-[10px] font-bold text-muted">
                         {m.display_name.charAt(0)}
                       </div>
                     )}
@@ -293,7 +293,7 @@ export function CreateEventModal({ channelId, onCreated, onClose }: Props) {
         </form>
 
         {/* フッター */}
-        <div className="flex justify-end gap-2 px-5 py-3 border-t border-border/50 shrink-0 bg-sidebar">
+        <div className="flex justify-end gap-2 px-5 py-3 border-t border-border/50 shrink-0 bg-surface">
           <button
             type="button"
             onClick={onClose}

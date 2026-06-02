@@ -94,7 +94,7 @@ export default async function MasterWorkspaceChannels({
           <li key={c.id}>
             <Link
               href={`/master/ch/${c.id}`}
-              className="block rounded-xl border border-border bg-input-bg px-4 py-3 hover:bg-white/[0.04] transition-colors"
+              className="block rounded-xl border border-border bg-input-bg px-4 py-3 hover:bg-sidebar-hover transition-colors"
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0 flex-1">

@@ -125,7 +125,14 @@ export async function WorkspaceShell({ workspaceSlug, children }: WorkspaceShell
         <MainPane>{children}</MainPane>
       </KeyboardShortcuts>
       <MobileDetailTransition />
-      <BottomTabBar workspaceSlug={workspaceSlug} workspaceId={result.workspace.id} currentUserId={user.id} members={result.members || []} />
+      <BottomTabBar
+        workspaceSlug={workspaceSlug}
+        workspaceId={result.workspace.id}
+        currentUserId={user.id}
+        members={result.members || []}
+        channels={result.channels || []}
+        hitorigotoChannel={result.hitorigoto_channel ?? null}
+      />
     </>
   );
 }
