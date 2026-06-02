@@ -240,10 +240,10 @@ export function DashboardView({
           type="button"
           onClick={() => setSidebarOpen(true)}
           className="lg:hidden mr-2 p-1 text-muted hover:text-foreground rounded transition-colors"
-          aria-label="サイドバーを開く"
+          aria-label="戻る"
         >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
           </svg>
         </button>
         <h1 className="font-bold text-lg">決定事項</h1>
@@ -329,11 +329,11 @@ export function DashboardView({
                   className="print-card"
                   style={{
                     padding: "14px 12px",
-                    borderRadius: 4,
+                    borderRadius: 10,
                     background: "var(--color-background-soft)",
                     display: "flex",
                     flexDirection: "column",
-                    aspectRatio: "1",
+                    minHeight: 140,
                     overflow: "hidden",
                     textDecoration: "none",
                     color: "inherit",
