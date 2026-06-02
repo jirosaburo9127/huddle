@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
 import { createClient } from "@/lib/supabase/client";
 
@@ -22,11 +21,23 @@ export default function SearchPage() {
   useEffect(() => { setSidebarOpen(false); }, [setSidebarOpen]);
   const params = useParams<{ workspace: string }>();
   const router = useRouter();
-  const [query, setQuery] = useState("");
+  const searchParams = useSearchParams();
+  const initialQuery = searchParams.get("q") || "";
+  const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const initialSearchDone = useRef(false);
+
+  // URLパラメータからの初期検索
+  useEffect(() => {
+    if (initialQuery && !initialSearchDone.current) {
+      initialSearchDone.current = true;
+      doSearch(initialQuery);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialQuery]);
 
   async function doSearch(q: string) {
     if (!q.trim()) { setResults([]); setSearched(false); return; }
@@ -53,7 +64,17 @@ export default function SearchPage() {
   function handleInput(value: string) {
     setQuery(value);
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => doSearch(value), 500);
+    debounceRef.current = setTimeout(() => {
+      doSearch(value);
+      // URLにクエリを保持（ブラウザバックで復元可能）
+      const url = new URL(window.location.href);
+      if (value.trim()) {
+        url.searchParams.set("q", value.trim());
+      } else {
+        url.searchParams.delete("q");
+      }
+      window.history.replaceState({}, "", url.toString());
+    }, 500);
   }
 
   // コンテンツのハイライト表示。
@@ -122,10 +143,14 @@ export default function SearchPage() {
           <div>
             <p className="px-4 py-2 text-xs text-muted">{results.length}件の結果</p>
             {results.map((r) => (
-              <Link
+              <button
                 key={r.id}
-                href={`/${params.workspace}/${r.channel_slug}?m=${r.id}`}
-                className="block px-4 py-3 border-b border-border/30 hover:bg-white/[0.02] transition-colors"
+                type="button"
+                onClick={() => {
+                  // 検索結果を残したまま遷移（ブラウザバックで検索結果に戻れる）
+                  router.push(`/${params.workspace}/${r.channel_slug}?m=${r.id}`);
+                }}
+                className="block w-full text-left px-4 py-3 border-b border-border/30 hover:bg-sidebar-hover transition-colors"
               >
                 <div className="flex items-center gap-2 mb-1">
                   {r.sender_avatar ? (
@@ -144,7 +169,7 @@ export default function SearchPage() {
                 <div className="text-sm text-foreground/80 line-clamp-2 break-words">
                   {renderHighlighted(r.content.replace(/\n/g, " ").slice(0, 150), query)}
                 </div>
-              </Link>
+              </button>
             ))}
           </div>
         )}
