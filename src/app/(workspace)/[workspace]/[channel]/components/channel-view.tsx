@@ -1708,8 +1708,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                 DM の場合は DM 一覧ページに戻す。それ以外はサイドバーを開く既存挙動。 */}
             <button
               onClick={() => {
-                // 検索結果から飛んできた場合（referrerに/searchが含まれる or 履歴がある）
-                if (typeof window !== "undefined" && document.referrer.includes("/search")) {
+                if (searchParams?.get("from") === "search") {
                   router.back();
                   return;
                 }

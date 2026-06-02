@@ -148,7 +148,7 @@ export default function SearchPage() {
                 type="button"
                 onClick={() => {
                   // 検索結果を残したまま遷移（ブラウザバックで検索結果に戻れる）
-                  router.push(`/${params.workspace}/${r.channel_slug}?m=${r.id}`);
+                  router.push(`/${params.workspace}/${r.channel_slug}?m=${r.id}&from=search`);
                 }}
                 className="block w-full text-left px-4 py-3 border-b border-border/30 hover:bg-sidebar-hover transition-colors"
               >
