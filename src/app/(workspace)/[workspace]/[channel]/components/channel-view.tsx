@@ -2013,6 +2013,26 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
           </div>
         </header>
 
+        {/* 検索結果に戻るバー */}
+        {searchParams?.get("from") === "search" && (
+          <button
+            type="button"
+            onClick={() => router.back()}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              padding: "8px 16px", width: "100%",
+              background: "var(--color-sky-soft)", border: "none",
+              borderBottom: "1px solid var(--color-border)",
+              cursor: "pointer", flexShrink: 0,
+            }}
+          >
+            <svg style={{ width: 16, height: 16, color: "var(--color-sky)" }} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--color-sky)" }}>検索結果に戻る</span>
+          </button>
+        )}
+
         {/* 固定メモバナー */}
         {hasNote && !showNote && (
           <div className="px-4 py-2 border-b border-border/50 bg-accent/5 flex items-center justify-between">
