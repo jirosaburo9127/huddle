@@ -335,7 +335,7 @@ export function Sidebar({
   // 単一の Map で管理することで、過去にあった「全バッジ消失」「ad-hoc 空配列ガード」
   // 「current チャンネルだけ除外」といった条件分岐の重なりを排除する。
   const lastOptimisticReadRef = useRef<Map<string, number>>(new Map());
-  const READ_GUARD_MS = 8000;
+  const READ_GUARD_MS = 15000;
 
   // 既読化の責務は ChannelView に移管したので、Sidebar から mark_channel_read は呼ばない。
   // (URL 推測でチャンネル ID を起点に既読化していたが、ChannelView マウントで一元化)

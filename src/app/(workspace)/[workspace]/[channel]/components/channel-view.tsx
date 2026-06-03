@@ -2172,9 +2172,9 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                             unreadLineState === "fading" ? "opacity-0" : "opacity-100"
                           }`}
                         >
-                          <div className="flex-1 border-t-2 border-red-500" />
-                          <span className="text-[11px] font-bold text-white bg-red-500 rounded-full px-2.5 py-0.5 shrink-0">ここから未読</span>
-                          <div className="flex-1 border-t-2 border-red-500" />
+                          <div className="flex-1 border-t-2 border-accent" />
+                          <span className="text-[11px] font-bold text-white bg-accent rounded-full px-2.5 py-0.5 shrink-0">ここから未読</span>
+                          <div className="flex-1 border-t-2 border-accent" />
                         </div>
                       )}
                       {showDateSeparator && (
