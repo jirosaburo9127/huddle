@@ -935,9 +935,9 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
       if (jumpActiveRef.current) return;
       scrollToUnreadOrBottom();
     };
-    // 即座 + 100ms + 300ms + 600ms で4回試行（画像等の遅延ロードに対応）
+    // 即座 + 50ms + 150ms + 400ms + 800ms + 1500ms で6回試行（画像等の遅延ロードに対応）
     tryScroll();
-    const timers = [100, 300, 600].map((ms) => setTimeout(tryScroll, ms));
+    const timers = [50, 150, 400, 800, 1500].map((ms) => setTimeout(tryScroll, ms));
     const waitAndScroll = timers[0]; // cleanup用
     prevMessageCountRef.current = initialMessages.length;
 
