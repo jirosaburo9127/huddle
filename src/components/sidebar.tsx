@@ -1720,7 +1720,8 @@ export function Sidebar({
               type="button"
               onClick={() => {
                 setShowCategoryManager(false);
-                router.refresh();
+                // モバイルでも即反映されるよう強制リロード
+                window.location.reload();
               }}
               style={{
                 width: "100%", marginTop: 16, borderRadius: 10, padding: "10px 0",
