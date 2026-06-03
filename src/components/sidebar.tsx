@@ -1087,11 +1087,11 @@ export function Sidebar({
                 style={{
                   display: "flex", alignItems: "center", gap: 4,
                   padding: "4px 8px", borderRadius: 6,
-                  fontSize: 11, fontWeight: 500, color: "var(--color-muted)",
+                  fontSize: 12.5, fontWeight: 500, color: "var(--color-muted)",
                   textDecoration: "none",
                 }}
               >
-                <svg style={{ width: 14, height: 14 }} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                <svg style={{ width: 16, height: 16 }} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d={item.icon} />
                 </svg>
                 {item.label}
@@ -1103,11 +1103,11 @@ export function Sidebar({
               style={{
                 display: "flex", alignItems: "center", gap: 4,
                 padding: "4px 8px", borderRadius: 6,
-                fontSize: 11, fontWeight: 500, color: "var(--color-muted)",
+                fontSize: 12.5, fontWeight: 500, color: "var(--color-muted)",
                 background: "none", border: "none", cursor: "pointer",
               }}
             >
-              <svg style={{ width: 14, height: 14 }} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+              <svg style={{ width: 16, height: 16 }} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
               </svg>
               保存
