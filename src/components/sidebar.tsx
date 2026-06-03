@@ -479,9 +479,11 @@ export function Sidebar({
         const currentId = currentChannelIdRef.current;
         const now = Date.now();
         setUnreadState(() => {
+          const hitorigotoId = hitorigotoChannel?.id;
           const next: Record<string, number> = {};
           for (const row of serverCounts) {
             if (row.channel_id === currentId) continue;
+            if (row.channel_id === hitorigotoId) continue;
             const lastReadAt = lastOptimisticReadRef.current.get(row.channel_id);
             if (lastReadAt && now - lastReadAt < READ_GUARD_MS) continue;
             const count = Number(row.unread_count);
