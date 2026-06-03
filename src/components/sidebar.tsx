@@ -1037,62 +1037,57 @@ export function Sidebar({
                         height: isDesktop ? undefined : 80, textDecoration: "none",
                       }}
                     >
-                      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" as const, gap: 3 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                          {note.avatar_url ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={note.avatar_url} alt="" style={{
-                              width: isDesktop ? 18 : 20, height: isDesktop ? 18 : 20,
-                              borderRadius: isDesktop ? 9 : 10, objectFit: "cover" as const, flexShrink: 0,
-                              marginTop: isDesktop ? 1 : 0,
-                            }} />
-                          ) : (
-                            <span style={{
-                              width: isDesktop ? 18 : 20, height: isDesktop ? 18 : 20,
-                              borderRadius: isDesktop ? 9 : 10, background: "var(--color-muted)",
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                              fontSize: 8, fontWeight: 700, color: "#fff", flexShrink: 0,
-                              marginTop: isDesktop ? 1 : 0,
-                            }}>
-                              {note.display_name.charAt(0)}
-                            </span>
-                          )}
-                          <span style={{ fontSize: isDesktop ? 10 : 11, color: "var(--color-foreground)", fontWeight: 600 }}>{note.display_name}</span>
-                          <span style={{ fontSize: isDesktop ? 9 : 10, color: "var(--color-muted)", marginLeft: "auto" }}>{ago}</span>
-                        </div>
-                        {(() => {
-                          // 画像URLを検出してサムネ表示
-                          const lines = note.content.split("\n");
-                          const imageUrl = lines.find(l => /^https:\/\/.*supabase.*\/storage\/.*\.(jpg|jpeg|png|gif|webp)/i.test(l.trim()));
-                          const textContent = lines.filter(l => !/^https:\/\/.*supabase.*\/storage\//.test(l.trim())).join(" ").trim();
-                          return (
-                            <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                              {imageUrl && (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={imageUrl.trim().split("#")[0]} alt="" style={{
-                                  width: isDesktop ? 40 : 52, height: isDesktop ? 40 : 52,
-                                  objectFit: "cover", borderRadius: 8, flexShrink: 0,
-                                }} loading="lazy" />
-                              )}
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                {textContent ? (
-                                  <p style={{
-                                    fontSize: isDesktop ? 10.5 : 12, lineHeight: isDesktop ? 1.35 : 1.45,
-                                    color: isDesktop ? "var(--color-muted)" : "var(--color-foreground)",
-                                    margin: 0,
-                                    overflow: "hidden", display: "-webkit-box",
-                                    WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
-                                  }}>{textContent.slice(0, 70)}</p>
-                                ) : !imageUrl ? (
-                                  <p style={{
-                                    fontSize: isDesktop ? 10.5 : 12, color: "var(--color-muted)", margin: 0,
-                                  }}>📎 ファイル</p>
-                                ) : null}
+                      {(() => {
+                        const lines = note.content.split("\n");
+                        const imageUrl = lines.find(l => /^https:\/\/.*supabase.*\/storage\/.*\.(jpg|jpeg|png|gif|webp)/i.test(l.trim()));
+                        const textContent = lines.filter(l => !/^https:\/\/.*supabase.*\/storage\//.test(l.trim())).join(" ").trim();
+                        return (
+                          <div style={{ display: "flex", gap: 8, alignItems: "flex-start", flex: 1, minWidth: 0 }}>
+                            {/* 画像サムネイル（あれば左端） */}
+                            {imageUrl && (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={imageUrl.trim().split("#")[0]} alt="" style={{
+                                width: isDesktop ? 44 : 56, height: isDesktop ? 44 : 56,
+                                objectFit: "cover", borderRadius: 8, flexShrink: 0,
+                              }} loading="lazy" />
+                            )}
+                            {/* 右側: 名前+時刻+テキスト */}
+                            <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" as const, gap: 2 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                {note.avatar_url ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={note.avatar_url} alt="" style={{
+                                    width: isDesktop ? 16 : 18, height: isDesktop ? 16 : 18,
+                                    borderRadius: "50%", objectFit: "cover" as const, flexShrink: 0,
+                                  }} />
+                                ) : (
+                                  <span style={{
+                                    width: isDesktop ? 16 : 18, height: isDesktop ? 16 : 18,
+                                    borderRadius: "50%", background: "var(--color-muted)",
+                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                    fontSize: 7, fontWeight: 700, color: "#fff", flexShrink: 0,
+                                  }}>
+                                    {note.display_name.charAt(0)}
+                                  </span>
+                                )}
+                                <span style={{ fontSize: isDesktop ? 10 : 11, color: "var(--color-foreground)", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{note.display_name}</span>
+                                <span style={{ fontSize: isDesktop ? 9 : 10, color: "var(--color-muted)", marginLeft: "auto", flexShrink: 0 }}>{ago}</span>
                               </div>
+                              {textContent ? (
+                                <p style={{
+                                  fontSize: isDesktop ? 10.5 : 12, lineHeight: isDesktop ? 1.35 : 1.4,
+                                  color: isDesktop ? "var(--color-muted)" : "var(--color-foreground)",
+                                  margin: 0,
+                                  overflow: "hidden", display: "-webkit-box",
+                                  WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
+                                }}>{textContent.slice(0, 70)}</p>
+                              ) : !imageUrl ? (
+                                <p style={{ fontSize: isDesktop ? 10.5 : 12, color: "var(--color-muted)", margin: 0 }}>📎 ファイル</p>
+                              ) : null}
                             </div>
-                          );
-                        })()}
-                      </div>
+                          </div>
+                        );
+                      })()}
                     </Link>
                   );
                 })}
