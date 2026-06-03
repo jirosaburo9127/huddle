@@ -1060,13 +1060,38 @@ export function Sidebar({
                           <span style={{ fontSize: isDesktop ? 10 : 11, color: "var(--color-foreground)", fontWeight: 600 }}>{note.display_name}</span>
                           <span style={{ fontSize: isDesktop ? 9 : 10, color: "var(--color-muted)", marginLeft: "auto" }}>{ago}</span>
                         </div>
-                        <p style={{
-                          fontSize: isDesktop ? 10.5 : 12, lineHeight: isDesktop ? 1.35 : 1.45,
-                          color: isDesktop ? "var(--color-muted)" : "var(--color-foreground)",
-                          margin: isDesktop ? "2px 0 0" : 0,
-                          overflow: "hidden", display: "-webkit-box",
-                          WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
-                        }}>{note.content.replace(/\n/g, " ").slice(0, 70)}</p>
+                        {(() => {
+                          // 画像URLを検出してサムネ表示
+                          const lines = note.content.split("\n");
+                          const imageUrl = lines.find(l => /^https:\/\/.*supabase.*\/storage\/.*\.(jpg|jpeg|png|gif|webp)/i.test(l.trim()));
+                          const textContent = lines.filter(l => !/^https:\/\/.*supabase.*\/storage\//.test(l.trim())).join(" ").trim();
+                          return (
+                            <>
+                              {textContent && (
+                                <p style={{
+                                  fontSize: isDesktop ? 10.5 : 12, lineHeight: isDesktop ? 1.35 : 1.45,
+                                  color: isDesktop ? "var(--color-muted)" : "var(--color-foreground)",
+                                  margin: isDesktop ? "2px 0 0" : 0,
+                                  overflow: "hidden", display: "-webkit-box",
+                                  WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
+                                }}>{textContent.slice(0, 70)}</p>
+                              )}
+                              {imageUrl && (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={imageUrl.trim().split("#")[0]} alt="" style={{
+                                  width: "100%", height: isDesktop ? 40 : 48, objectFit: "cover",
+                                  borderRadius: 6, marginTop: 3,
+                                }} loading="lazy" />
+                              )}
+                              {!textContent && !imageUrl && (
+                                <p style={{
+                                  fontSize: isDesktop ? 10.5 : 12, color: "var(--color-muted)",
+                                  margin: isDesktop ? "2px 0 0" : 0,
+                                }}>📎 ファイル</p>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
                     </Link>
                   );
