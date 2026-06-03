@@ -929,15 +929,19 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
 
   // チャンネル切替時: 未読位置または最下部に移動 + ResizeObserver
   useEffect(() => {
-    // DOM構築を待ってからスクロール（初期描画完了まで複数回試行）
-    let attempts = 0;
+    // DOM構築を待ってからスクロール
     const tryScroll = () => {
       if (jumpActiveRef.current) return;
-      scrollToUnreadOrBottom();
+      // requestAnimationFrameでレンダリング完了を待つ
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          scrollToUnreadOrBottom();
+        });
+      });
     };
-    // 即座 + 50ms + 150ms + 400ms + 800ms + 1500ms で6回試行（画像等の遅延ロードに対応）
+    // 即座 + 複数回試行（画像等の遅延ロードに対応）
     tryScroll();
-    const timers = [50, 150, 400, 800, 1500].map((ms) => setTimeout(tryScroll, ms));
+    const timers = [100, 300, 700, 1500, 3000].map((ms) => setTimeout(tryScroll, ms));
     const waitAndScroll = timers[0]; // cleanup用
     prevMessageCountRef.current = initialMessages.length;
 
