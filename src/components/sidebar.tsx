@@ -358,8 +358,8 @@ export function Sidebar({
       lastOptimisticReadRef.current.set(channelId, Date.now());
       // 2.5. 進行中の refetchUnread レスポンスを無効化（既読化より前に発行されたリクエストのため）
       unreadGenerationRef.current++;
-      // 3. iOS アプリアイコンのバッジを即時にサーバ真実と同期
-      syncAppBadgeFromServer(currentUserId);
+      // 3. iOS アプリアイコンのバッジを遅延同期（DB反映を待つ）
+      setTimeout(() => syncAppBadgeFromServer(currentUserId), 3000);
     }
     window.addEventListener("huddle:channelRead", onChannelRead);
     return () => window.removeEventListener("huddle:channelRead", onChannelRead);
