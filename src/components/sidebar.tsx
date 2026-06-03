@@ -1066,30 +1066,30 @@ export function Sidebar({
                           const imageUrl = lines.find(l => /^https:\/\/.*supabase.*\/storage\/.*\.(jpg|jpeg|png|gif|webp)/i.test(l.trim()));
                           const textContent = lines.filter(l => !/^https:\/\/.*supabase.*\/storage\//.test(l.trim())).join(" ").trim();
                           return (
-                            <>
-                              {textContent && (
-                                <p style={{
-                                  fontSize: isDesktop ? 10.5 : 12, lineHeight: isDesktop ? 1.35 : 1.45,
-                                  color: isDesktop ? "var(--color-muted)" : "var(--color-foreground)",
-                                  margin: isDesktop ? "2px 0 0" : 0,
-                                  overflow: "hidden", display: "-webkit-box",
-                                  WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
-                                }}>{textContent.slice(0, 70)}</p>
-                              )}
+                            <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
                               {imageUrl && (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img src={imageUrl.trim().split("#")[0]} alt="" style={{
-                                  width: "100%", height: isDesktop ? 40 : 48, objectFit: "cover",
-                                  borderRadius: 6, marginTop: 3,
+                                  width: isDesktop ? 40 : 52, height: isDesktop ? 40 : 52,
+                                  objectFit: "cover", borderRadius: 8, flexShrink: 0,
                                 }} loading="lazy" />
                               )}
-                              {!textContent && !imageUrl && (
-                                <p style={{
-                                  fontSize: isDesktop ? 10.5 : 12, color: "var(--color-muted)",
-                                  margin: isDesktop ? "2px 0 0" : 0,
-                                }}>📎 ファイル</p>
-                              )}
-                            </>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                {textContent ? (
+                                  <p style={{
+                                    fontSize: isDesktop ? 10.5 : 12, lineHeight: isDesktop ? 1.35 : 1.45,
+                                    color: isDesktop ? "var(--color-muted)" : "var(--color-foreground)",
+                                    margin: 0,
+                                    overflow: "hidden", display: "-webkit-box",
+                                    WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
+                                  }}>{textContent.slice(0, 70)}</p>
+                                ) : !imageUrl ? (
+                                  <p style={{
+                                    fontSize: isDesktop ? 10.5 : 12, color: "var(--color-muted)", margin: 0,
+                                  }}>📎 ファイル</p>
+                                ) : null}
+                              </div>
+                            </div>
                           );
                         })()}
                       </div>
