@@ -66,7 +66,9 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
     return () => document.removeEventListener("pointerdown", onDown);
   }, [showMore]);
 
-  const isHome = !pathname.includes("/dm-list") && !pathname.includes("/in-progress") && !pathname.includes("/calendar") && !pathname.includes("/files") && !pathname.includes("/dashboard") && !pathname.includes("/albums");
+  // ホームはWSトップ（/ws-slug のみ）の時だけアクティブ。チャンネル等を開いている時は非アクティブ
+  const pathParts = pathname.split("/").filter(Boolean);
+  const isHome = pathParts.length <= 1;
   const isCalendar = pathname.includes("/calendar");
   const isAlbums = pathname.includes("/albums");
   const [showQuickPost, setShowQuickPost] = useState(false);
