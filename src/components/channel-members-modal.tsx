@@ -118,11 +118,11 @@ export function ChannelMembersModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      className="fixed inset-0 z-50 flex items-end lg:items-center justify-center bg-black/50"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-2xl bg-surface border border-border p-6 space-y-4 animate-fade-in"
+        className="w-full lg:max-w-md rounded-t-2xl lg:rounded-2xl bg-surface border border-border p-6 space-y-4 animate-slide-up lg:animate-fade-in max-h-[85vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ヘッダー */}
