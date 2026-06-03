@@ -3,6 +3,7 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { PullToRefresh } from "@/components/pull-to-refresh";
 import type { Workspace, Channel } from "@/lib/supabase/types";
 import type { WorkspaceCategory } from "@/lib/channel-categories";
 import { UNCATEGORIZED_LABEL, CATEGORY_COLORS } from "@/lib/channel-categories";
@@ -197,33 +198,50 @@ export function Sidebar({
     }
   }, [currentUserId]);
 
-  // 独り言プレビュー: 最新3件を取得
-  useEffect(() => {
+  // 独り言プレビュー: 最新3件を取得する関数
+  const fetchHitorigotoPreview = useCallback(async () => {
     if (!hitorigotoChannel) return;
     const supabase = sidebarSupabaseRef.current;
-    (async () => {
-      const { data } = await supabase
-        .from("messages")
-        .select("content, created_at, profiles(display_name, avatar_url)")
-        .eq("channel_id", hitorigotoChannel.id)
-        .is("deleted_at", null)
-        .order("created_at", { ascending: false })
-        .limit(3);
-      if (data) {
-        setHitorigotoPreview(
-          data.map((m: { content: string; created_at: string; profiles: { display_name: string; avatar_url: string | null } | { display_name: string; avatar_url: string | null }[] | null }) => {
-            const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
-            return {
-              content: m.content,
-              created_at: m.created_at,
-              display_name: p?.display_name || "?",
-              avatar_url: p?.avatar_url || null,
-            };
-          })
-        );
-      }
-    })();
+    const { data } = await supabase
+      .from("messages")
+      .select("content, created_at, profiles(display_name, avatar_url)")
+      .eq("channel_id", hitorigotoChannel.id)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(3);
+    if (data) {
+      setHitorigotoPreview(
+        data.map((m: { content: string; created_at: string; profiles: { display_name: string; avatar_url: string | null } | { display_name: string; avatar_url: string | null }[] | null }) => {
+          const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
+          return {
+            content: m.content,
+            created_at: m.created_at,
+            display_name: p?.display_name || "?",
+            avatar_url: p?.avatar_url || null,
+          };
+        })
+      );
+    }
   }, [hitorigotoChannel]);
+
+  // 初回取得 + Realtime購読で即時反映
+  useEffect(() => {
+    if (!hitorigotoChannel) return;
+    fetchHitorigotoPreview();
+
+    // Realtimeで独り言チャンネルの新規メッセージを監視
+    const supabase = sidebarSupabaseRef.current;
+    const subscription = supabase
+      .channel(`hitorigoto-preview-${hitorigotoChannel.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "messages", filter: `channel_id=eq.${hitorigotoChannel.id}` },
+        () => { fetchHitorigotoPreview(); }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(subscription); };
+  }, [hitorigotoChannel, fetchHitorigotoPreview]);
 
   useEffect(() => {
     if (showSettings) {
@@ -955,7 +973,8 @@ export function Sidebar({
         {/* グラデーションライン（モバイルモック準拠、PCにはない） */}
         <div className="lg:hidden" style={{ height: 0.75, background: "linear-gradient(90deg, #E96832, #38BDF8)" }} />
 
-        {/* チャンネル・DM一覧 */}
+        {/* チャンネル・DM一覧（プルリフレッシュ対応） */}
+        <PullToRefresh onRefresh={async () => { await fetchHitorigotoPreview(); }}>
         <div className="flex-1 overflow-y-auto overflow-x-hidden" style={{ padding: "8px 12px 8px" }}>
           {/* ステータスチップ: PCのみ均等幅ボタン（モバイルはヘッダー内pill）— モック準拠インラインスタイル */}
           <div className="hidden lg:flex" style={{ gap: 6, padding: "8px 4px 8px", flexShrink: 0 }}>
@@ -1330,6 +1349,7 @@ export function Sidebar({
               </div>
             )}
         </div>
+        </PullToRefresh>
 
         {/* 下部: ユーザー名 + 設定（PCのみ。モバイルは右上アイコン+ボトムタブに移動） */}
         <div className="hidden lg:block px-3 py-3 border-t border-border/50 space-y-2">
