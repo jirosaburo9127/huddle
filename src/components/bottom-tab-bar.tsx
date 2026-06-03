@@ -27,7 +27,10 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
   const [showBookmark, setShowBookmark] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
   const [quickPostTarget, setQuickPostTarget] = useState<string>("");
+  const [quickPostTargetId, setQuickPostTargetId] = useState<string>("");
   const [quickPostText, setQuickPostText] = useState("");
+  const [showChannelPicker, setShowChannelPicker] = useState(false);
+  const [quickPostSending, setQuickPostSending] = useState(false);
 
   // URL が変わったら「その他」ポップオーバー (showMore) のみ閉じる。
   // サイドバーはここでは閉じない: チャンネル遷移時は ChannelView マウント時
@@ -292,6 +295,7 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
             </button>
             <button
               type="button"
+              onClick={() => setShowChannelPicker((v) => !v)}
               className={`flex h-[46px] w-full items-center justify-between rounded-2xl border px-4 text-left transition-colors ${
                 quickPostTarget
                   ? "border-border bg-background-soft"
@@ -308,6 +312,22 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
               </svg>
             </button>
+            {/* チャンネルピッカー */}
+            {showChannelPicker && (
+              <div style={{ maxHeight: 200, overflowY: "auto", borderRadius: 12, border: "1px solid var(--color-border)", background: "var(--color-surface)", marginTop: 4 }}>
+                {channels.filter((ch) => !ch.is_dm).map((ch) => (
+                  <button
+                    key={ch.id}
+                    type="button"
+                    onClick={() => { setQuickPostTarget(ch.name); setQuickPostTargetId(ch.id); setShowChannelPicker(false); }}
+                    style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", border: "none", background: quickPostTarget === ch.name ? "var(--color-background-soft)" : "none", cursor: "pointer", fontSize: 14, color: "var(--color-foreground)", textAlign: "left" }}
+                  >
+                    <span style={{ color: "var(--color-muted)" }}>#</span>
+                    <span>{ch.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="mt-4 flex items-center justify-between">
               <span className="text-[12px] font-semibold text-muted">最近使ったチャンネル</span>
               <button type="button" className="inline-flex items-center gap-1 text-[12px] text-muted">
@@ -322,7 +342,7 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
                 <button
                   key={target.id}
                   type="button"
-                  onClick={() => setQuickPostTarget(target.name)}
+                  onClick={() => { setQuickPostTarget(target.name); setQuickPostTargetId(target.id); }}
                   className={`rounded-full px-3 py-1.5 text-[13px] font-semibold transition-colors ${
                     quickPostTarget === target.name
                       ? "bg-sky-soft text-foreground ring-1 ring-sky/30"
@@ -352,10 +372,33 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
               </button>
               <button
                 type="button"
-                disabled={!canQuickPost}
+                disabled={!canQuickPost || quickPostSending}
+                onClick={async () => {
+                  if (!canQuickPost || quickPostSending) return;
+                  setQuickPostSending(true);
+                  try {
+                    const { createClient } = await import("@/lib/supabase/client");
+                    const supabase = createClient();
+                    const { error } = await supabase.from("messages").insert({
+                      channel_id: quickPostTargetId,
+                      user_id: currentUserId,
+                      content: quickPostText.trim(),
+                    });
+                    if (error) {
+                      alert("送信に失敗しました: " + error.message);
+                    } else {
+                      setQuickPostText("");
+                      setQuickPostTarget("");
+                      setQuickPostTargetId("");
+                      setShowQuickPost(false);
+                    }
+                  } finally {
+                    setQuickPostSending(false);
+                  }
+                }}
                 className="ml-auto rounded-full bg-accent px-6 py-3 text-sm font-semibold text-white transition-colors disabled:bg-background-soft disabled:text-muted"
               >
-                送信
+                {quickPostSending ? "送信中..." : "送信"}
               </button>
             </div>
           </div>
