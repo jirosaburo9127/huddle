@@ -376,8 +376,7 @@ export function Sidebar({
       lastOptimisticReadRef.current.set(channelId, Date.now());
       // 2.5. 進行中の refetchUnread レスポンスを無効化（既読化より前に発行されたリクエストのため）
       unreadGenerationRef.current++;
-      // 3. iOS アプリアイコンのバッジを遅延同期（DB反映を待つ）
-      setTimeout(() => syncAppBadgeFromServer(currentUserId), 3000);
+      // 3. アプリバッジはunreadState変更で自動反映される
     }
     window.addEventListener("huddle:channelRead", onChannelRead);
     return () => window.removeEventListener("huddle:channelRead", onChannelRead);
@@ -437,13 +436,20 @@ export function Sidebar({
     setupAppStateHandler();
   }, [currentUserId]);
 
-  // タブタイトルに未読数を表示（Chatwork風: (3) Huddle）
-  // 現WSの他チャンネルの未読 + 他WSの未読を合算
+  // タブタイトル + アプリバッジに未読数を反映
+  // unreadStateは独り言除外済みなので安全
   useEffect(() => {
     const channelTotal = Object.values(unreadState).reduce((sum, n) => sum + n, 0);
     const otherWsTotal = Object.values(unreadByWorkspace).reduce((sum, n) => sum + n, 0);
     const total = channelTotal + otherWsTotal;
     document.title = total > 0 ? `(${total}) Huddle` : "Huddle";
+    // アプリバッジもunreadStateベースで設定（独り言除外済み）
+    import("@capacitor/core").then(({ Capacitor }) => {
+      if (!Capacitor.isNativePlatform()) return;
+      import("@capawesome/capacitor-badge").then(({ Badge }) => {
+        Badge.set({ count: Math.max(0, total) }).catch(() => {});
+      }).catch(() => {});
+    }).catch(() => {});
   }, [unreadState, unreadByWorkspace]);
 
   // DM の未読合計を Zustand に書き出し、BottomTabBar の「その他」「DM」に
@@ -525,8 +531,7 @@ export function Sidebar({
         setUnreadByWorkspace(nextWs);
       }
 
-      // ネイティブ（iOS）アプリアイコンのバッジもここで一緒に同期
-      syncAppBadgeFromServer(currentUserId);
+      // アプリバッジはunreadState変更時のuseEffectで自動同期（独り言除外済み）
 
       // アクティビティ (自分の投稿へのリアクション) 未読判定（現WSのみ）
       const { data: hasAct } = await supabase.rpc("has_unread_activity", {
