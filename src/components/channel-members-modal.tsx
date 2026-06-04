@@ -170,7 +170,7 @@ export function ChannelMembersModal({
         )}
 
         {/* コンテンツ */}
-        <div className="flex-1 min-h-0 overflow-y-auto space-y-1">
+        <div className="flex-1 min-h-0 overflow-y-auto space-y-1 pb-20">
           {loading ? (
             <div className="px-3 py-6 text-center text-sm text-muted">読み込み中...</div>
           ) : activeTab === "members" ? (
