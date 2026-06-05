@@ -41,6 +41,13 @@ export default function CalendarPage() {
   const params = useParams<{ workspace: string }>();
   const router = useRouter();
 
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => {
+    const check = () => setIsDesktop(typeof window !== "undefined" && window.innerWidth >= 1024);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth() + 1); // 1-indexed
@@ -574,8 +581,7 @@ export default function CalendarPage() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
-        <span className="mr-2 text-lg">📅</span>
-        <h1 className="font-bold text-lg flex-1">カレンダー</h1>
+        <span style={{ fontSize: 18, fontWeight: 720, color: "var(--color-foreground)", flex: 1 }}>カレンダー</span>
         <button
           onClick={openCreate}
           className="p-2 text-muted hover:text-accent rounded-lg hover:bg-sidebar-hover transition-colors"
@@ -598,8 +604,8 @@ export default function CalendarPage() {
         </button>
       </header>
 
-      <div className="flex-1 overflow-y-auto p-4">
-        <div className="max-w-lg mx-auto">
+      <div className="flex-1 overflow-y-auto p-4 lg:p-6">
+        <div className="max-w-lg lg:max-w-full mx-auto">
           {/* 月ナビゲーション */}
           <div className="flex items-center justify-between mb-4">
             <button
@@ -630,7 +636,7 @@ export default function CalendarPage() {
             {WEEKDAYS.map((wd, i) => (
               <div
                 key={wd}
-                className={`text-center text-xs font-medium py-1 ${
+                className={`text-center text-xs lg:text-sm font-medium py-1 lg:py-2 ${
                   i === 0 ? "text-red-400" : i === 6 ? "text-blue-400" : "text-muted"
                 }`}
               >
@@ -643,7 +649,7 @@ export default function CalendarPage() {
           <div className="grid grid-cols-7 gap-px bg-surface rounded-xl overflow-hidden border border-border">
             {calendarDays.map((day, idx) => {
               if (day === null) {
-                return <div key={`empty-${idx}`} className="min-h-[3.5rem] bg-sidebar" />;
+                return <div key={`empty-${idx}`} className="min-h-[3.5rem] lg:min-h-[6rem] bg-sidebar" />;
               }
               const dayEvents = eventsByDay.get(day) ?? [];
               const isSelected = selectedDay === day;
@@ -654,7 +660,7 @@ export default function CalendarPage() {
                 <button
                   key={day}
                   onClick={() => setSelectedDay(day)}
-                  className={`min-h-[3.5rem] p-1 flex flex-col items-center gap-0.5 transition-colors relative ${
+                  className={`min-h-[3.5rem] lg:min-h-[6rem] p-1 lg:p-2 flex flex-col items-center lg:items-start gap-0.5 transition-colors relative ${
                     isSelected
                       ? "bg-blue-400/15"
                       : "bg-sidebar hover:bg-sidebar-hover"
@@ -673,18 +679,18 @@ export default function CalendarPage() {
                   >
                     {day}
                   </span>
-                  {/* イベントバー（最大2件表示） */}
-                  {dayEvents.slice(0, 2).map((ev) => (
+                  {/* イベントバー */}
+                  {dayEvents.slice(0, isDesktop ? 3 : 2).map((ev) => (
                     <div
                       key={ev.id}
-                      className="w-full rounded-sm px-0.5 truncate text-[9px] leading-tight bg-blue-500/80 text-white font-medium"
+                      className="w-full rounded-sm lg:rounded px-0.5 lg:px-1.5 lg:py-0.5 truncate text-[9px] lg:text-[11px] leading-tight bg-blue-500/80 text-white font-medium"
                     >
                       {ev.title}
                     </div>
                   ))}
-                  {dayEvents.length > 2 && (
-                    <span className="text-[9px] text-muted">
-                      +{dayEvents.length - 2}
+                  {dayEvents.length > (isDesktop ? 3 : 2) && (
+                    <span className="text-[9px] lg:text-[11px] text-muted">
+                      +{dayEvents.length - (isDesktop ? 3 : 2)}
                     </span>
                   )}
                 </button>
