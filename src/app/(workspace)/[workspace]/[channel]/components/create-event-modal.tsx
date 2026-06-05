@@ -293,7 +293,7 @@ export function CreateEventModal({ channelId, onCreated, onClose }: Props) {
         </form>
 
         {/* フッター */}
-        <div className="flex justify-end gap-2 px-5 py-3 border-t border-border/50 shrink-0 bg-surface">
+        <div className="flex justify-end gap-2 px-5 py-3 pb-20 sm:pb-3 border-t border-border/50 shrink-0 bg-surface">
           <button
             type="button"
             onClick={onClose}
