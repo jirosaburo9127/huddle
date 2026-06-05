@@ -68,9 +68,10 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
     return () => document.removeEventListener("pointerdown", onDown);
   }, [showMore]);
 
-  // ホームはWSトップ（/ws-slug のみ）の時だけアクティブ。チャンネル等を開いている時は非アクティブ
+  // ホームはWSトップ or サイドバー表示中の時アクティブ
+  const sidebarOpen = useMobileNavStore((s) => s.sidebarOpen);
   const pathParts = pathname.split("/").filter(Boolean);
-  const isHome = pathParts.length <= 1;
+  const isHome = pathParts.length <= 1 || sidebarOpen;
   const isCalendar = pathname.includes("/calendar");
   const isAlbums = pathname.includes("/albums");
   const [showQuickPost, setShowQuickPost] = useState(false);
