@@ -933,7 +933,7 @@ export function Sidebar({
             {/* DM */}
             <Link
               href={`/${workspaceSlug}/dm-list`}
-              onClick={() => { if (pathname.includes("/dm-list")) { setSidebarOpen(false); } else { startDetailOpen("DM"); } }}
+              onClick={() => setSidebarOpen(false)}
               style={{
                 position: "relative",
                 width: isDesktop ? 30 : 36, height: isDesktop ? 30 : 36,
