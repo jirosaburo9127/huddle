@@ -2130,7 +2130,8 @@ function ChannelCategoryList({
                       padding: isDesktop ? "0 10px" : "0 10px 0 28px",
                       height: isDesktop ? 36 : 34, borderRadius: 8,
                       border: "none", cursor: "pointer", marginBottom: isDesktop ? 1 : 0,
-                      background: "none", position: "relative" as const, zIndex: 1,
+                      background: (isDesktop && isActive) ? "var(--color-sky-soft)" : "none",
+                      position: "relative" as const, zIndex: 1,
                       color: isDesktop
                         ? ((isActive || showUnreadStyle) ? "var(--color-foreground)" : "var(--color-muted)")
                         : "var(--color-foreground)",
