@@ -31,6 +31,8 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
   const [quickPostText, setQuickPostText] = useState("");
   const [showChannelPicker, setShowChannelPicker] = useState(false);
   const [quickPostSending, setQuickPostSending] = useState(false);
+  const [quickPostUploading, setQuickPostUploading] = useState(false);
+  const quickPostFileRef = useRef<HTMLInputElement>(null);
 
   // URL が変わったら「その他」ポップオーバー (showMore) のみ閉じる。
   // サイドバーはここでは閉じない: チャンネル遷移時は ChannelView マウント時
@@ -362,16 +364,72 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
               className="mt-5 h-[112px] w-full resize-none rounded-2xl border-0 bg-background-soft px-4 py-3 text-[15px] text-foreground outline-none placeholder:text-muted"
             />
             <div className="mt-4 flex items-center gap-5">
-              <button type="button" className="text-muted hover:text-foreground">
-                <svg className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94a3 3 0 114.243 4.243L8.552 18.32a1.5 1.5 0 11-2.121-2.121l9.192-9.193" />
-                </svg>
+              {/* ファイル添付 */}
+              <button
+                type="button"
+                disabled={quickPostUploading}
+                onClick={() => {
+                  if (quickPostFileRef.current) {
+                    quickPostFileRef.current.accept = "*/*";
+                    quickPostFileRef.current.click();
+                  }
+                }}
+                className="text-muted hover:text-foreground disabled:opacity-50"
+              >
+                {quickPostUploading ? (
+                  <svg className="h-6 w-6 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                ) : (
+                  <svg className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94a3 3 0 114.243 4.243L8.552 18.32a1.5 1.5 0 11-2.121-2.121l9.192-9.193" />
+                  </svg>
+                )}
               </button>
-              <button type="button" className="text-muted hover:text-foreground">
+              {/* 画像添付 */}
+              <button
+                type="button"
+                disabled={quickPostUploading}
+                onClick={() => {
+                  if (quickPostFileRef.current) {
+                    quickPostFileRef.current.accept = "image/*,video/*";
+                    quickPostFileRef.current.click();
+                  }
+                }}
+                className="text-muted hover:text-foreground disabled:opacity-50"
+              >
                 <svg className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
                 </svg>
               </button>
+              {/* 非表示ファイルinput */}
+              <input
+                ref={quickPostFileRef}
+                type="file"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  setQuickPostUploading(true);
+                  try {
+                    const { createClient } = await import("@/lib/supabase/client");
+                    const supabase = createClient();
+                    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 100);
+                    const path = `quickpost/${crypto.randomUUID()}-${safeName}`;
+                    const { error: upErr } = await supabase.storage.from("chat-files").upload(path, file);
+                    if (upErr) { alert("アップロード失敗: " + upErr.message); return; }
+                    const { data: urlData } = supabase.storage.from("chat-files").getPublicUrl(path);
+                    const url = urlData.publicUrl + `#name=${encodeURIComponent(file.name)}`;
+                    setQuickPostText((prev) => (prev ? prev + "\n" : "") + url);
+                  } catch {
+                    alert("アップロードに失敗しました");
+                  } finally {
+                    setQuickPostUploading(false);
+                    if (quickPostFileRef.current) quickPostFileRef.current.value = "";
+                  }
+                }}
+              />
               <button
                 type="button"
                 disabled={!canQuickPost || quickPostSending}
