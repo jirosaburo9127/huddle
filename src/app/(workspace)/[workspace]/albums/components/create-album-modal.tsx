@@ -298,12 +298,11 @@ export function CreateAlbumModal({ workspaceId, currentUserId, channels, addToAl
           <div>
             <button
               onClick={() => {
-                // iOS WKWebView では multiple 付きの PHPicker が
-                // 完了ボタンを返さない問題があるため、1枚ずつ選択する
                 const input = document.createElement("input");
                 input.type = "file";
-                input.accept = "image/*,video/*";
-                // multiple を外す（iOS互換性のため）
+                input.multiple = true;
+                // accept を指定しない → iOS がドキュメントピッカーを使用し
+                // multiple 選択の完了ボタンが正常に動作する
                 input.style.position = "fixed";
                 input.style.top = "0";
                 input.style.left = "0";
@@ -315,17 +314,22 @@ export function CreateAlbumModal({ workspaceId, currentUserId, channels, addToAl
                   if (input.parentNode) input.parentNode.removeChild(input);
                 };
                 input.addEventListener("change", () => {
-                  if (input.files && input.files.length > 0) handleFiles(input.files);
+                  if (input.files && input.files.length > 0) {
+                    // 画像・動画のみフィルタ
+                    const filtered = Array.from(input.files).filter(
+                      (f) => f.type.startsWith("image/") || f.type.startsWith("video/") || isImageFile(f.name) || isVideoFile(f)
+                    );
+                    if (filtered.length > 0) handleFiles(filtered);
+                  }
                   cleanup();
                 });
                 input.addEventListener("cancel", cleanup);
-                // iOS で blur 等で閉じた場合のフォールバック
                 setTimeout(() => cleanup(), 120000);
                 input.click();
               }}
               className="w-full rounded-xl border-2 border-dashed border-border py-8 text-center text-sm text-muted hover:border-accent hover:text-accent transition-colors"
             >
-              📷 写真・動画を選択{files.length > 0 ? "（追加）" : ""}
+              📷 写真・動画を選択
             </button>
           </div>
 
