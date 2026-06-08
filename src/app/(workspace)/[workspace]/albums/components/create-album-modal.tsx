@@ -91,148 +91,159 @@ export function CreateAlbumModal({ workspaceId, currentUserId, channels, addToAl
     if (files.length === 0) return;
     setUploading(true);
 
-    let albumId = addToAlbumId;
+    try {
+      let albumId = addToAlbumId;
 
-    // アルバム作成（新規の場合）
-    if (!albumId) {
-      const { data, error } = await supabase
-        .from("albums")
-        .insert({ channel_id: channelId, title: title.trim(), created_by: currentUserId })
-        .select()
-        .single();
-      if (error || !data) {
-        alert("アルバムの作成に失敗しました");
-        setUploading(false);
-        return;
-      }
-      albumId = data.id;
-    }
-
-    // アルバムが属するチャンネルIDを取得（追加時はアルバムから逆引き）
-    let uploadChannelId = channelId;
-    if (addToAlbumId) {
-      const { data: albumRow } = await supabase
-        .from("albums")
-        .select("channel_id")
-        .eq("id", addToAlbumId)
-        .maybeSingle();
-      if (albumRow) uploadChannelId = albumRow.channel_id;
-    }
-
-    // ファイルアップロード + album_items INSERT
-    let uploadedCount = 0;
-    for (let i = 0; i < files.length; i++) {
-      setProgress(Math.round(((i) / files.length) * 100));
-      let file = files[i];
-
-      // 50MBチェック
-      if (file.size > 50 * 1024 * 1024) {
-        alert(`「${file.name}」は50MBを超えているためスキップします`);
-        continue;
+      // アルバム作成（新規の場合）
+      if (!albumId) {
+        const { data, error } = await supabase
+          .from("albums")
+          .insert({ channel_id: channelId, title: title.trim(), created_by: currentUserId })
+          .select()
+          .single();
+        if (error || !data) {
+          // eslint-disable-next-line no-console
+          console.error("[album] create failed:", error);
+          alert("アルバムの作成に失敗しました");
+          return;
+        }
+        albumId = data.id;
       }
 
-      // 画像なら圧縮
-      if (isImageFile(file.name)) {
-        file = await compressImage(file);
+      // アルバムが属するチャンネルIDを取得（追加時はアルバムから逆引き）
+      let uploadChannelId = channelId;
+      if (addToAlbumId) {
+        const { data: albumRow } = await supabase
+          .from("albums")
+          .select("channel_id")
+          .eq("id", addToAlbumId)
+          .maybeSingle();
+        if (albumRow) uploadChannelId = albumRow.channel_id;
       }
 
-      const ext = file.name.split(".").pop() || "bin";
-      const path = `${uploadChannelId}/${crypto.randomUUID()}.${ext}`;
+      // ファイルアップロード + album_items INSERT
+      let uploadedCount = 0;
+      for (let i = 0; i < files.length; i++) {
+        setProgress(Math.round(((i) / files.length) * 100));
+        let file = files[i];
 
-      const { error: uploadErr } = await supabase.storage
-        .from("chat-files")
-        .upload(path, file, { contentType: file.type });
+        // 50MBチェック
+        if (file.size > 50 * 1024 * 1024) {
+          alert(`「${file.name}」は50MBを超えているためスキップします`);
+          continue;
+        }
 
-      if (uploadErr) {
-        console.error("Upload failed:", uploadErr);
-        alert(`「${file.name}」のアップロードに失敗しました: ${uploadErr.message}`);
-        continue;
-      }
+        // 画像なら圧縮
+        if (isImageFile(file.name)) {
+          file = await compressImage(file);
+        }
 
-      const { data: urlData } = supabase.storage.from("chat-files").getPublicUrl(path);
-      let publicUrl = urlData.publicUrl;
-      const fileType = isImageFile(file.name) ? "image" : "video";
+        const ext = file.name.split(".").pop() || "bin";
+        const path = `${uploadChannelId}/${crypto.randomUUID()}.${ext}`;
 
-      if (isVideoFile(file)) {
-        const thumbnail = await generateVideoThumbnailFile(file);
-        if (thumbnail) {
-          const thumbPath = `${uploadChannelId}/thumbs/${crypto.randomUUID()}-${thumbnail.name}`;
-          const { error: thumbErr } = await supabase.storage
-            .from("chat-files")
-            .upload(thumbPath, thumbnail, { contentType: thumbnail.type });
-          if (!thumbErr) {
-            const { data: thumbUrlData } = supabase.storage.from("chat-files").getPublicUrl(thumbPath);
-            publicUrl = `${publicUrl}#thumb=${encodeURIComponent(thumbUrlData.publicUrl)}`;
+        const { error: uploadErr } = await supabase.storage
+          .from("chat-files")
+          .upload(path, file, { contentType: file.type });
+
+        if (uploadErr) {
+          // eslint-disable-next-line no-console
+          console.error("[album] upload failed:", uploadErr);
+          alert(`「${file.name}」のアップロードに失敗しました: ${uploadErr.message}`);
+          continue;
+        }
+
+        const { data: urlData } = supabase.storage.from("chat-files").getPublicUrl(path);
+        let publicUrl = urlData.publicUrl;
+        const fileType = isImageFile(file.name) ? "image" : "video";
+
+        if (isVideoFile(file)) {
+          const thumbnail = await generateVideoThumbnailFile(file);
+          if (thumbnail) {
+            const thumbPath = `${uploadChannelId}/thumbs/${crypto.randomUUID()}-${thumbnail.name}`;
+            const { error: thumbErr } = await supabase.storage
+              .from("chat-files")
+              .upload(thumbPath, thumbnail, { contentType: thumbnail.type });
+            if (!thumbErr) {
+              const { data: thumbUrlData } = supabase.storage.from("chat-files").getPublicUrl(thumbPath);
+              publicUrl = `${publicUrl}#thumb=${encodeURIComponent(thumbUrlData.publicUrl)}`;
+            }
           }
+        }
+
+        const { error: itemErr } = await supabase.from("album_items").insert({
+          album_id: albumId,
+          url: publicUrl,
+          file_type: fileType,
+          file_name: file.name,
+          added_by: currentUserId,
+        });
+        if (itemErr) {
+          // eslint-disable-next-line no-console
+          console.error("[album] item insert failed:", itemErr);
+          continue;
+        }
+        uploadedCount++;
+      }
+
+      // カバー画像を設定（最初の画像）
+      if (!addToAlbumId) {
+        const { data: firstItem } = await supabase
+          .from("album_items")
+          .select("url")
+          .eq("album_id", albumId)
+          .order("created_at", { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        if (firstItem) {
+          await supabase.from("albums").update({ cover_url: firstItem.url }).eq("id", albumId);
         }
       }
 
-      await supabase.from("album_items").insert({
-        album_id: albumId,
-        url: publicUrl,
-        file_type: fileType,
-        file_name: file.name,
-        added_by: currentUserId,
-      });
-      uploadedCount++;
-    }
+      if (uploadedCount === 0) {
+        return;
+      }
 
-    // カバー画像を設定（最初の画像）
-    if (!addToAlbumId) {
-      const { data: firstItem } = await supabase
+      // チャンネルにアルバム更新通知メッセージを投稿
+      const albumTitle = addToAlbumId ? undefined : title.trim();
+      const { data: coverItem } = await supabase
         .from("album_items")
         .select("url")
         .eq("album_id", albumId)
         .order("created_at", { ascending: true })
         .limit(1)
         .maybeSingle();
-      if (firstItem) {
-        await supabase.from("albums").update({ cover_url: firstItem.url }).eq("id", albumId);
-      }
-    }
 
-    if (uploadedCount === 0) {
+      const eventData = JSON.stringify({
+        type: "album_update",
+        album_id: albumId,
+        title: albumTitle,
+        cover_url: coverItem?.url || null,
+        item_count: uploadedCount,
+        is_new: !addToAlbumId,
+      });
+
+      await supabase.from("messages").insert({
+        channel_id: uploadChannelId,
+        user_id: currentUserId,
+        content: addToAlbumId
+          ? `📸 アルバムに${uploadedCount}枚追加しました`
+          : `📸 アルバム「${title.trim()}」を作成しました（${uploadedCount}枚）`,
+        system_event: eventData,
+      });
+
+      onCreated();
+      onClose();
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error("[album] handleSubmit unexpected error:", err);
+      alert("アップロード中にエラーが発生しました");
+    } finally {
       setUploading(false);
-      return;
     }
-
-    // チャンネルにアルバム更新通知メッセージを投稿
-    // system_eventにアルバム情報をJSON埋め込み → message-itemで専用カード表示
-    const albumTitle = addToAlbumId ? undefined : title.trim();
-    const { data: coverItem } = await supabase
-      .from("album_items")
-      .select("url")
-      .eq("album_id", albumId)
-      .order("created_at", { ascending: true })
-      .limit(1)
-      .maybeSingle();
-
-    const eventData = JSON.stringify({
-      type: "album_update",
-      album_id: albumId,
-      title: albumTitle,
-      cover_url: coverItem?.url || null,
-      item_count: uploadedCount,
-      is_new: !addToAlbumId,
-    });
-
-    await supabase.from("messages").insert({
-      channel_id: uploadChannelId,
-      user_id: currentUserId,
-      content: addToAlbumId
-        ? `📸 アルバムに${uploadedCount}枚追加しました`
-        : `📸 アルバム「${title.trim()}」を作成しました（${uploadedCount}枚）`,
-      system_event: eventData,
-    });
-
-    setUploading(false);
-    onCreated();
-    onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center px-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/50" />
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 px-4" onClick={onClose}>
       <div
         className="relative w-full max-w-md rounded-2xl bg-surface border border-border shadow-xl max-h-[80vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
