@@ -298,29 +298,34 @@ export function CreateAlbumModal({ workspaceId, currentUserId, channels, addToAl
           <div>
             <button
               onClick={() => {
-                // iOS WKWebView ではモーダル内の hidden file input が正常動作しないため
-                // body 直下に動的 input を作成して即破棄する
+                // iOS WKWebView では multiple 付きの PHPicker が
+                // 完了ボタンを返さない問題があるため、1枚ずつ選択する
                 const input = document.createElement("input");
                 input.type = "file";
                 input.accept = "image/*,video/*";
-                input.multiple = true;
-                input.style.position = "absolute";
-                input.style.opacity = "0";
-                input.style.pointerEvents = "none";
+                // multiple を外す（iOS互換性のため）
+                input.style.position = "fixed";
+                input.style.top = "0";
+                input.style.left = "0";
+                input.style.opacity = "0.01";
+                input.style.width = "1px";
+                input.style.height = "1px";
                 document.body.appendChild(input);
+                const cleanup = () => {
+                  if (input.parentNode) input.parentNode.removeChild(input);
+                };
                 input.addEventListener("change", () => {
-                  if (input.files) handleFiles(input.files);
-                  document.body.removeChild(input);
+                  if (input.files && input.files.length > 0) handleFiles(input.files);
+                  cleanup();
                 });
-                // キャンセル時もクリーンアップ
-                input.addEventListener("cancel", () => {
-                  document.body.removeChild(input);
-                });
+                input.addEventListener("cancel", cleanup);
+                // iOS で blur 等で閉じた場合のフォールバック
+                setTimeout(() => cleanup(), 120000);
                 input.click();
               }}
               className="w-full rounded-xl border-2 border-dashed border-border py-8 text-center text-sm text-muted hover:border-accent hover:text-accent transition-colors"
             >
-              📷 写真・動画を選択
+              📷 写真・動画を選択{files.length > 0 ? "（追加）" : ""}
             </button>
           </div>
 
