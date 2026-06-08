@@ -2340,10 +2340,10 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
           onClick={() => !categorySaving && setShowCategoryPicker(false)}
         >
           <div
-            className="w-full max-w-sm rounded-2xl bg-surface border border-border p-5 space-y-3"
+            className="w-full max-w-sm max-h-[80vh] flex flex-col rounded-2xl bg-surface border border-border overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between px-5 pt-5 pb-3 shrink-0">
               <h3 className="text-base font-bold">カテゴリを選択</h3>
               <button
                 type="button"
@@ -2356,7 +2356,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                 </svg>
               </button>
             </div>
-            <div className="space-y-1">
+            <div className="flex-1 overflow-y-auto px-5 space-y-1">
               <label className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer hover:bg-sidebar-hover transition-colors">
                 <input
                   type="radio"
@@ -2383,7 +2383,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                 </label>
               ))}
             </div>
-            <div className="flex justify-end gap-2 pt-2">
+            <div className="flex justify-end gap-2 px-5 py-3 border-t border-border/50 shrink-0">
               <button
                 type="button"
                 onClick={() => !categorySaving && setShowCategoryPicker(false)}
