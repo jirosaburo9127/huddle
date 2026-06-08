@@ -496,13 +496,19 @@ export default function CalendarPage() {
     setEditSaving(true);
     const supabase = createClient();
     const dt = new Date(editStartAt);
-    await supabase.rpc("update_event", {
+    const { error: rpcErr } = await supabase.rpc("update_event", {
       p_event_id: editingEvent.id,
       p_title: editTitle.trim(),
       p_start_at: dt.toISOString(),
       p_location: editLocation.trim() || null,
       p_attendee_ids: Array.from(editAttendeeIds),
     });
+    if (rpcErr) {
+      // eslint-disable-next-line no-console
+      console.error("[calendar] update_event failed:", rpcErr);
+      setEditSaving(false);
+      return;
+    }
     // 一覧を再取得
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
