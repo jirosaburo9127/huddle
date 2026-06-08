@@ -51,6 +51,32 @@ const WEB_SEARCH_MAX_USES = 5;
 // プロンプト
 // =============================================================================
 
+// 盛り上がっている会話に自然に参加する (active_discussion 起点)
+const SYSTEM_PROMPT_ACTIVE_DISCUSSION = `あなたは「みかん」というオンラインチームチャットのファシリテーター AI です。
+このチャンネルでは今、活発な会話が行われています。
+あなたの役割は、会話の流れに自然に参加し、議論を整理したり有用な情報を提供することです。
+
+# やること（以下から最適なものを1つ選ぶ）
+- 議論が散らばっている場合: 論点を整理する（「ここまでの論点をまとめると①… ②… ですね」）
+- 意見が対立している場合: 両方の良い点を認めつつ、共通点や折衷案を提示する
+- 情報が不足している場合: 関連する事実やデータを調べて提供する
+- 次のアクションが不明確な場合: 具体的な次のステップを提案する
+- 盛り上がっている話題をさらに深める質問をする
+
+# ルール
+- 柔らかい丁寧語。「ですます」調
+- 2〜4行で短く。長い説教はしない
+- 誰の味方でもなく中立的
+- 特定の人を名指しで批判しない
+- 「みなさん」「全員」など強い呼びかけは避ける
+- 会話の邪魔にならないよう、的確に短く
+- 絵文字は1〜2個まで
+- 会話の内容が挨拶やテスト投稿など実質的でない場合は「__SKIP__」とだけ返す
+
+# 出力形式
+- 1回の返信は本文のみ。短く。
+- 返信先のメッセージへの引用は不要`;
+
 // ファシリテーターとしての通常会話 + 予定登録 (mention 起点)
 const SYSTEM_PROMPT_MENTION = `あなたは「みかん」というオンラインチームチャットのファシリテーター AI です。
 以下の役割と性格を厳守してください。
@@ -250,7 +276,19 @@ interface MentionPayload {
   };
 }
 
-type WebhookPayload = MentionPayload | { type: string; table: string };
+interface ActiveDiscussionPayload {
+  type: "INSERT";
+  table: "active_discussion";
+  schema: string;
+  record: {
+    channel_id: string;
+    message_id: string;
+    msg_count: number;
+    user_count: number;
+  };
+}
+
+type WebhookPayload = MentionPayload | ActiveDiscussionPayload | { type: string; table: string };
 
 interface MessageRow {
   id: string;
@@ -330,6 +368,90 @@ Deno.serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       auth: { persistSession: false },
     });
+
+    // active_discussion: 盛り上がっている会話への自動参加
+    if (payload.table === "active_discussion") {
+      const adPayload = payload as ActiveDiscussionPayload;
+      const channelId = adPayload.record.channel_id;
+
+      // チャンネル情報
+      const { data: adCh } = await supabase
+        .from("channels")
+        .select("id, name, mikan_enabled")
+        .eq("id", channelId)
+        .maybeSingle();
+      if (!adCh || !adCh.mikan_enabled) return new Response("channel not enabled", { status: 200 });
+
+      // 直近の文脈
+      const { data: adHistory } = await supabase
+        .from("messages")
+        .select("id, user_id, content, created_at, profiles(display_name)")
+        .eq("channel_id", channelId)
+        .is("deleted_at", null)
+        .is("parent_id", null)
+        .order("created_at", { ascending: false })
+        .limit(CONTEXT_WINDOW_MESSAGES);
+
+      const adCtx = ((adHistory ?? []) as unknown as MessageRow[]).slice().reverse();
+      if (adCtx.length === 0) return new Response("no context", { status: 200 });
+
+      const adConversation = adCtx.map((m) => {
+        const name = m.user_id === MIKAN_USER_ID
+          ? "みかん"
+          : (m.profiles?.display_name ?? "誰か");
+        const isMikan = m.user_id === MIKAN_USER_ID;
+        return {
+          role: isMikan ? "assistant" as const : "user" as const,
+          content: isMikan ? m.content : `${name}: ${m.content}`,
+        };
+      });
+
+      const adAiRes = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+          "anthropic-beta": "web-fetch-2025-09-10",
+        },
+        body: JSON.stringify({
+          model: MODEL,
+          max_tokens: 2000,
+          tools: [WEB_SEARCH_TOOL, WEB_FETCH_TOOL],
+          system: [
+            { type: "text", text: SYSTEM_PROMPT_ACTIVE_DISCUSSION, cache_control: { type: "ephemeral" } },
+            { type: "text", text: `現在日時 (JST): ${nowJstString()}` },
+          ],
+          messages: adConversation,
+        }),
+      });
+
+      if (!adAiRes.ok) {
+        const errText = await adAiRes.text();
+        console.error("[mikan] active_discussion api failed:", adAiRes.status, errText);
+        return new Response("ai failed", { status: 200 });
+      }
+
+      const adAiJson = await adAiRes.json() as { content: ContentBlock[] };
+      const adReplyText = adAiJson.content
+        .filter((c): c is Extract<ContentBlock, { type: "text" }> => c.type === "text")
+        .map((c) => c.text)
+        .join("\n")
+        .trim();
+
+      if (!adReplyText || adReplyText === "__SKIP__") {
+        return new Response("skipped (no suitable topic)", { status: 200 });
+      }
+
+      await supabase.from("messages").insert({
+        channel_id: channelId,
+        user_id: MIKAN_USER_ID,
+        content: adReplyText,
+      });
+
+      console.log(`[mikan] active_discussion posted to ${adCh.name} (${adPayload.record.msg_count} msgs, ${adPayload.record.user_count} users)`);
+      return new Response("active_discussion ok", { status: 200 });
+    }
 
     // mention 起点のみ受け付ける。messages テーブル INSERT (旧 Mode B) は捨てる
     if (payload.table !== "mentions") {
