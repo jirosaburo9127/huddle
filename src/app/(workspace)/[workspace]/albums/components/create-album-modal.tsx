@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { generateVideoThumbnailFile } from "@/lib/video-thumbnail-generator";
 
@@ -70,7 +70,6 @@ export function CreateAlbumModal({ workspaceId, currentUserId, channels, addToAl
   const [previews, setPreviews] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFiles = useCallback((newFiles: FileList | File[]) => {
     const arr = Array.from(newFiles);
@@ -297,16 +296,28 @@ export function CreateAlbumModal({ workspaceId, currentUserId, channels, addToAl
 
           {/* ファイル選択 */}
           <div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*,video/*"
-              multiple
-              onChange={(e) => e.target.files && handleFiles(e.target.files)}
-              className="hidden"
-            />
             <button
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => {
+                // iOS WKWebView ではモーダル内の hidden file input が正常動作しないため
+                // body 直下に動的 input を作成して即破棄する
+                const input = document.createElement("input");
+                input.type = "file";
+                input.accept = "image/*,video/*";
+                input.multiple = true;
+                input.style.position = "absolute";
+                input.style.opacity = "0";
+                input.style.pointerEvents = "none";
+                document.body.appendChild(input);
+                input.addEventListener("change", () => {
+                  if (input.files) handleFiles(input.files);
+                  document.body.removeChild(input);
+                });
+                // キャンセル時もクリーンアップ
+                input.addEventListener("cancel", () => {
+                  document.body.removeChild(input);
+                });
+                input.click();
+              }}
               className="w-full rounded-xl border-2 border-dashed border-border py-8 text-center text-sm text-muted hover:border-accent hover:text-accent transition-colors"
             >
               📷 写真・動画を選択
