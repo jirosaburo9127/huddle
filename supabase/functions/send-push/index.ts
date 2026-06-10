@@ -394,8 +394,8 @@ Deno.serve(async (req) => {
       if (systemEvent === "poll_closed") return "投票が締め切られました";
       if (systemEvent === "decision_marked") return "決定事項を登録しました";
       if (systemEvent === "member_joined") return "ワークスペースに参加しました";
-      // 行頭/空白の直後にある @トークンを除去（NBSP=U+00A0 も非空白扱いで1トークンにマッチ）
-      const stripped = (content || "").replace(/(^|\s)@\S{1,40}/g, "$1");
+      // @記号だけ除去して宛名は残す（「@田中太郎」→「田中太郎」）
+      const stripped = (content || "").replace(/(^|\s)@(\S{1,40})/g, "$1$2");
       const lines = stripped.split("\n");
       const transformed = lines
         .map((line) => {
