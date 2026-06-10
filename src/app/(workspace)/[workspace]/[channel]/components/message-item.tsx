@@ -979,7 +979,7 @@ export const MessageItem = memo(function MessageItem({
                     <span style={{ fontSize: 12, color: "var(--color-foreground)" }}>編集</span>
                   </button>
                 )}
-                {isOwn && (
+                {(isOwn || isBot) && (
                   <button
                     onClick={() => { setShowActions(false); setIsDeleting(true); }}
                     style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "12px 0", borderRadius: 8, border: "none", background: "none", cursor: "pointer" }}
@@ -1488,16 +1488,18 @@ export const MessageItem = memo(function MessageItem({
                   </svg>
                   編集
                 </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); setIsDeleting(true); }}
-                  className="flex items-center gap-1 px-2 py-0.5 text-[13px] text-muted hover:text-mention border border-transparent hover:border-border/50 rounded transition-colors"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                  削除
-                </button>
               </>
+            )}
+            {(isOwn || isBot) && (
+              <button
+                onClick={(e) => { e.stopPropagation(); setIsDeleting(true); }}
+                className="flex items-center gap-1 px-2 py-0.5 text-[13px] text-muted hover:text-mention border border-transparent hover:border-border/50 rounded transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                削除
+              </button>
             )}
           </div>
         )}
