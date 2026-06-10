@@ -791,7 +791,7 @@ export function Sidebar({
                 {allWorkspaces.map((ws) => {
                   const wsUnread = unreadByWorkspace[ws.id] || 0;
                   return (
-                    <Link
+                    <a
                       key={ws.id}
                       href={`/${ws.slug}`}
                       onClick={() => setShowWsSwitcher(false)}
@@ -807,7 +807,7 @@ export function Sidebar({
                           {wsUnread > 99 ? "99+" : wsUnread}
                         </span>
                       )}
-                    </Link>
+                    </a>
                   );
                 })}
                 <div className="border-t border-border/50 mt-1 pt-1">
