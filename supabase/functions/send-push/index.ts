@@ -433,7 +433,7 @@ Deno.serve(async (req) => {
         return `💬 ${senderName} がスレッドに返信 (#${channel.name})`;
       }
       // DM
-      if (channel.is_dm) return senderName;
+      if (channel.is_dm) return `✉️ ${senderName}`;
       // メンション
       if (isMentioned) {
         return `${senderName} があなたをメンション (#${channel.name})`;
