@@ -1396,9 +1396,9 @@ export const MessageItem = memo(function MessageItem({
             </div>
           )}
 
-          {/* PC: アクションバー（ホバーで表示、メッセージ右下） */}
+          {/* PC: アクションバー（ホバーで表示、メッセージ右上） */}
           {!isEditing && (
-          <div className="hidden lg:flex absolute -bottom-2 right-3 z-10 transition-opacity items-center gap-0.5 bg-surface/95 backdrop-blur-sm border border-border/60 rounded-lg px-1 py-0.5 shadow-lg opacity-0 group-hover:opacity-100">
+          <div className="hidden lg:flex absolute -top-3 right-3 z-10 transition-opacity items-center gap-0.5 bg-surface/95 backdrop-blur-sm border border-border/60 rounded-lg px-1 py-0.5 shadow-lg opacity-0 group-hover:opacity-100">
             {/* 決定ボタン */}
             {onDecision && (
               <button
