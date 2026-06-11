@@ -99,7 +99,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showOverflowMenu, setShowOverflowMenu] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
-  const [iconCropFile, setIconCropFile] = useState<File | null>(null);
+  const [iconCropSource, setIconCropSource] = useState<File | string | null>(null);
   const [categoryValue, setCategoryValue] = useState<string | null>(channel.category ?? null);
   const [categorySaving, setCategorySaving] = useState(false);
   const [wsCategories, setWsCategories] = useState<WorkspaceCategory[]>([]);
@@ -1997,22 +1997,28 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                       role="menuitem"
                       onClick={() => {
                         setShowOverflowMenu(false);
-                        const input = document.createElement("input");
-                        input.type = "file";
-                        input.accept = "image/*";
-                        input.style.position = "fixed";
-                        input.style.opacity = "0.01";
-                        input.style.width = "1px";
-                        input.style.height = "1px";
-                        document.body.appendChild(input);
-                        const cleanup = () => { if (input.parentNode) input.parentNode.removeChild(input); };
-                        input.addEventListener("change", () => {
-                          const file = input.files?.[0];
-                          cleanup();
-                          if (file) setIconCropFile(file);
-                        });
-                        input.addEventListener("cancel", cleanup);
-                        input.click();
+                        if (channel.icon_url) {
+                          // 既存アイコンがある → 編集モーダルを直接開く
+                          setIconCropSource(channel.icon_url.split("?")[0]);
+                        } else {
+                          // 新規 → ファイル選択
+                          const input = document.createElement("input");
+                          input.type = "file";
+                          input.accept = "image/*";
+                          input.style.position = "fixed";
+                          input.style.opacity = "0.01";
+                          input.style.width = "1px";
+                          input.style.height = "1px";
+                          document.body.appendChild(input);
+                          const cleanup = () => { if (input.parentNode) input.parentNode.removeChild(input); };
+                          input.addEventListener("change", () => {
+                            const file = input.files?.[0];
+                            cleanup();
+                            if (file) setIconCropSource(file);
+                          });
+                          input.addEventListener("cancel", cleanup);
+                          input.click();
+                        }
                       }}
                       className="flex items-center gap-3 w-full px-3 py-2 text-sm text-left text-foreground hover:bg-sidebar-hover rounded-lg transition-colors"
                     >
@@ -2493,10 +2499,30 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
       )}
 
       {/* チャンネルアイコン クロッピングモーダル */}
-      {iconCropFile && (
+      {iconCropSource && (
         <IconCropModal
-          file={iconCropFile}
-          onClose={() => setIconCropFile(null)}
+          source={iconCropSource}
+          onClose={() => setIconCropSource(null)}
+          onReplace={() => {
+            // 別の画像を選び直す
+            setIconCropSource(null);
+            const input = document.createElement("input");
+            input.type = "file";
+            input.accept = "image/*";
+            input.style.position = "fixed";
+            input.style.opacity = "0.01";
+            input.style.width = "1px";
+            input.style.height = "1px";
+            document.body.appendChild(input);
+            const cleanup = () => { if (input.parentNode) input.parentNode.removeChild(input); };
+            input.addEventListener("change", () => {
+              const file = input.files?.[0];
+              cleanup();
+              if (file) setIconCropSource(file);
+            });
+            input.addEventListener("cancel", cleanup);
+            input.click();
+          }}
           onSave={async (croppedBlob) => {
             const path = `channel-icons/${channel.id}.jpg`;
             const { error: uploadErr } = await supabase.storage
@@ -2516,7 +2542,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
               alert("アイコンの保存に失敗しました: " + updateErr.message);
               return;
             }
-            setIconCropFile(null);
+            setIconCropSource(null);
             window.location.reload();
           }}
         />
@@ -2525,8 +2551,13 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
   );
 }
 
-// アイコンクロッピングモーダル
-function IconCropModal({ file, onClose, onSave }: { file: File; onClose: () => void; onSave: (blob: Blob) => Promise<void> }) {
+// アイコンクロッピングモーダル（File または 既存URL を受け取る）
+function IconCropModal({ source, onClose, onReplace, onSave }: {
+  source: File | string;
+  onClose: () => void;
+  onReplace: () => void;
+  onSave: (blob: Blob) => Promise<void>;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
   const [imgLoaded, setImgLoaded] = useState(false);
@@ -2536,21 +2567,23 @@ function IconCropModal({ file, onClose, onSave }: { file: File; onClose: () => v
   const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
   const CANVAS_SIZE = 200;
 
-  // 画像読み込み
+  // 画像読み込み（File or URL）
   useEffect(() => {
     const img = new Image();
-    const url = URL.createObjectURL(file);
+    img.crossOrigin = "anonymous";
+    const isFile = source instanceof File;
+    const url = isFile ? URL.createObjectURL(source) : source;
     img.onload = () => {
       imgRef.current = img;
-      // 画像を正方形にフィットさせる初期スケール
       const minDim = Math.min(img.width, img.height);
-      setScale(CANVAS_SIZE / minDim);
-      setOffset({ x: -(img.width * (CANVAS_SIZE / minDim) - CANVAS_SIZE) / 2, y: -(img.height * (CANVAS_SIZE / minDim) - CANVAS_SIZE) / 2 });
+      const s = CANVAS_SIZE / minDim;
+      setScale(s);
+      setOffset({ x: -(img.width * s - CANVAS_SIZE) / 2, y: -(img.height * s - CANVAS_SIZE) / 2 });
       setImgLoaded(true);
     };
     img.src = url;
-    return () => URL.revokeObjectURL(url);
-  }, [file]);
+    return () => { if (isFile) URL.revokeObjectURL(url); };
+  }, [source]);
 
   // 描画（四角形クロップ）
   useEffect(() => {
@@ -2578,7 +2611,6 @@ function IconCropModal({ file, onClose, onSave }: { file: File; onClose: () => v
   const handleSave = async () => {
     if (!imgRef.current) return;
     setSaving(true);
-    // 高解像度で出力（256x256）
     const outSize = 256;
     const outCanvas = document.createElement("canvas");
     outCanvas.width = outSize;
@@ -2621,7 +2653,6 @@ function IconCropModal({ file, onClose, onSave }: { file: File; onClose: () => v
                 if (!imgRef.current) return;
                 const minDim = Math.min(imgRef.current.width, imgRef.current.height);
                 const newScale = parseFloat(e.target.value) * CANVAS_SIZE / minDim;
-                // 中心を維持してスケール変更
                 const cx = CANVAS_SIZE / 2;
                 const cy = CANVAS_SIZE / 2;
                 const imgCx = (cx - offset.x) / scale;
@@ -2634,7 +2665,14 @@ function IconCropModal({ file, onClose, onSave }: { file: File; onClose: () => v
             <span className="text-xs text-muted">大</span>
           </div>
         )}
-        <div className="flex justify-end gap-2">
+        <div className="flex items-center gap-2">
+          <button onClick={onReplace} className="px-3 py-2 text-sm text-muted hover:text-accent border border-border rounded-lg transition-colors flex items-center gap-1.5">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            別の画像
+          </button>
+          <div className="flex-1" />
           <button onClick={onClose} className="px-4 py-2 text-sm text-muted hover:text-foreground rounded-lg transition-colors">キャンセル</button>
           <button onClick={handleSave} disabled={saving || !imgLoaded} className="px-4 py-2 text-sm font-medium bg-accent text-white rounded-lg hover:bg-accent-hover disabled:opacity-50 transition-colors">
             {saving ? "保存中..." : "保存"}
