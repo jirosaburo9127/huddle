@@ -27,8 +27,12 @@ export default function SettingsPage() {
   const [newColor, setNewColor] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [catError, setCatError] = useState("");
+  const [currentEmail, setCurrentEmail] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [emailSaving, setEmailSaving] = useState(false);
+  const [emailMsg, setEmailMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  // ワークスペースID取得
+  // ワークスペースID & メールアドレス取得
   useEffect(() => {
     (async () => {
       const { data } = await supabase
@@ -37,6 +41,8 @@ export default function SettingsPage() {
         .eq("slug", params.workspace)
         .maybeSingle();
       if (data) setWorkspaceId(data.id);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.email) setCurrentEmail(user.email);
     })();
   }, [params.workspace, supabase]);
 
@@ -275,9 +281,50 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        {/* ログアウト */}
+        {/* アカウント */}
         <section>
           <h2 className="text-sm font-semibold text-foreground mb-3">アカウント</h2>
+
+          {/* メールアドレス変更 */}
+          <div className="mb-4 space-y-2">
+            <label className="text-xs text-muted">メールアドレス</label>
+            <p className="text-sm text-foreground">{currentEmail || "読み込み中..."}</p>
+            <div className="flex gap-2">
+              <input
+                type="email"
+                value={newEmail}
+                onChange={(e) => { setNewEmail(e.target.value); setEmailMsg(null); }}
+                placeholder="新しいメールアドレス"
+                className="flex-1 rounded-lg border border-border bg-input-bg px-3 py-2 text-sm text-foreground placeholder-muted focus:border-accent focus:outline-none"
+              />
+              <button
+                type="button"
+                disabled={emailSaving || !newEmail.trim() || newEmail.trim() === currentEmail}
+                onClick={async () => {
+                  setEmailSaving(true);
+                  setEmailMsg(null);
+                  const { error } = await supabase.auth.updateUser({ email: newEmail.trim() });
+                  if (error) {
+                    setEmailMsg({ type: "error", text: "変更に失敗しました: " + error.message });
+                  } else {
+                    setEmailMsg({ type: "success", text: "確認メールを送信しました。新しいメールアドレスに届いたリンクをクリックして変更を完了してください。" });
+                    setNewEmail("");
+                  }
+                  setEmailSaving(false);
+                }}
+                className="shrink-0 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50 transition-colors"
+              >
+                {emailSaving ? "送信中..." : "変更"}
+              </button>
+            </div>
+            {emailMsg && (
+              <div className={`rounded-lg px-3 py-2 text-sm ${emailMsg.type === "error" ? "bg-red-500/10 text-red-400" : "bg-green-500/10 text-green-400"}`}>
+                {emailMsg.text}
+              </div>
+            )}
+          </div>
+
+          {/* ログアウト */}
           <form action={signOut}>
             <button
               type="submit"
