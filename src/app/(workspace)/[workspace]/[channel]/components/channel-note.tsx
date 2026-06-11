@@ -141,13 +141,37 @@ export function ChannelNote({ channelId, onClose }: Props) {
           <div className="text-muted text-sm">読み込み中...</div>
         ) : isEditing ? (
           <div className="space-y-3">
+            {/* テキスト入力（画像URLは非表示、テキスト部分のみ編集） */}
             <textarea
               ref={textareaRef}
-              value={editContent}
-              onChange={(e) => setEditContent(e.target.value)}
-              className="w-full min-h-[200px] resize-y rounded-lg border border-border bg-input-bg px-3 py-2 text-sm leading-relaxed text-foreground focus:border-accent focus:outline-none"
+              value={editContent.split("\n").filter((l) => !/^https?:\/\/[^\s]*\/storage\/v1\/object\/public\/chat-files\/.*\.(jpg|jpeg|png|gif|webp)/i.test(l.trim())).join("\n")}
+              onChange={(e) => {
+                // 画像URLを保持しつつテキスト部分だけ更新
+                const imageLines = editContent.split("\n").filter((l) => /^https?:\/\/[^\s]*\/storage\/v1\/object\/public\/chat-files\/.*\.(jpg|jpeg|png|gif|webp)/i.test(l.trim()));
+                const newText = e.target.value;
+                setEditContent(imageLines.length > 0 ? newText + "\n" + imageLines.join("\n") : newText);
+              }}
+              className="w-full min-h-[120px] resize-y rounded-lg border border-border bg-input-bg px-3 py-2 text-sm leading-relaxed text-foreground focus:border-accent focus:outline-none"
               placeholder="このチャンネルの目的、よく使うリンク、約束ごとなど"
             />
+            {/* 画像サムネイルプレビュー */}
+            {editContent.split("\n").filter((l) => /^https?:\/\/[^\s]*\/storage\/v1\/object\/public\/chat-files\/.*\.(jpg|jpeg|png|gif|webp)/i.test(l.trim())).length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {editContent.split("\n").filter((l) => /^https?:\/\/[^\s]*\/storage\/v1\/object\/public\/chat-files\/.*\.(jpg|jpeg|png|gif|webp)/i.test(l.trim())).map((url, i) => (
+                  <div key={i} className="relative group">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={url.trim()} alt="" className="h-20 w-20 object-cover rounded-lg border border-border" />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditContent((prev) => prev.split("\n").filter((l) => l.trim() !== url.trim()).join("\n"));
+                      }}
+                      className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-mention text-white rounded-full flex items-center justify-center text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
+                    >✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <button
                 onClick={handleSave}
@@ -185,18 +209,7 @@ export function ChannelNote({ channelId, onClose }: Props) {
                       return;
                     }
                     const { data: urlData } = supabase.storage.from("chat-files").getPublicUrl(path);
-                    const imageUrl = urlData.publicUrl;
-                    // カーソル位置に画像URLを挿入
-                    const ta = textareaRef.current;
-                    if (ta) {
-                      const pos = ta.selectionStart ?? editContent.length;
-                      const before = editContent.slice(0, pos);
-                      const after = editContent.slice(pos);
-                      const insert = (before.endsWith("\n") || before === "" ? "" : "\n") + imageUrl + "\n";
-                      setEditContent(before + insert + after);
-                    } else {
-                      setEditContent((prev) => prev + (prev ? "\n" : "") + imageUrl + "\n");
-                    }
+                    setEditContent((prev) => prev + (prev ? "\n" : "") + urlData.publicUrl);
                   });
                   input.addEventListener("cancel", cleanup);
                   input.click();
