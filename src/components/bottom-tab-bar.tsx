@@ -32,6 +32,7 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
   const [showChannelPicker, setShowChannelPicker] = useState(false);
   const [quickPostSending, setQuickPostSending] = useState(false);
   const [quickPostUploading, setQuickPostUploading] = useState(false);
+  const [quickPostFiles, setQuickPostFiles] = useState<Array<{ url: string; name: string; isImage: boolean; preview?: string }>>([]);
   const quickPostFileRef = useRef<HTMLInputElement>(null);
 
   // URL が変わったら「その他」ポップオーバー (showMore) のみ閉じる。
@@ -90,7 +91,7 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
       ...normalChannels,
     ].slice(0, 5);
   }, [channels, hitorigotoChannel]);
-  const canQuickPost = quickPostTarget && quickPostText.trim();
+  const canQuickPost = quickPostTarget && (quickPostText.trim() || quickPostFiles.length > 0);
 
   return (
     <>
@@ -364,6 +365,34 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
               placeholder="メッセージを入力..."
               className="mt-5 h-[112px] w-full resize-none rounded-2xl border-0 bg-background-soft px-4 py-3 text-[15px] text-foreground outline-none placeholder:text-muted"
             />
+            {/* 添付ファイルプレビュー */}
+            {quickPostFiles.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {quickPostFiles.map((f, i) => (
+                  <div key={i} className="relative group">
+                    {f.isImage && f.preview ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={f.preview} alt="" className="h-16 w-16 object-cover rounded-lg border border-border" />
+                    ) : (
+                      <div className="h-16 w-16 rounded-lg border border-border bg-sidebar flex flex-col items-center justify-center">
+                        <svg className="w-5 h-5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                        </svg>
+                        <span className="text-[9px] text-muted mt-0.5 px-1 truncate max-w-[60px]">{f.name.split(".").pop()}</span>
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (f.preview) URL.revokeObjectURL(f.preview);
+                        setQuickPostFiles((prev) => prev.filter((_, j) => j !== i));
+                      }}
+                      className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-mention text-white rounded-full flex items-center justify-center text-[10px]"
+                    >✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="mt-4 flex items-center gap-5">
               {/* ファイル添付 */}
               <button
@@ -422,7 +451,9 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
                     if (upErr) { alert("アップロード失敗: " + upErr.message); return; }
                     const { data: urlData } = supabase.storage.from("chat-files").getPublicUrl(path);
                     const url = urlData.publicUrl + `#name=${encodeURIComponent(file.name)}`;
-                    setQuickPostText((prev) => (prev ? prev + "\n" : "") + url);
+                    const isImage = file.type.startsWith("image/");
+                    const preview = isImage ? URL.createObjectURL(file) : undefined;
+                    setQuickPostFiles((prev) => [...prev, { url, name: file.name, isImage, preview }]);
                   } catch {
                     alert("アップロードに失敗しました");
                   } finally {
@@ -440,15 +471,20 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
                   try {
                     const { createClient } = await import("@/lib/supabase/client");
                     const supabase = createClient();
+                    // テキスト + ファイルURLを結合
+                    const parts = [quickPostText.trim(), ...quickPostFiles.map((f) => f.url)].filter(Boolean);
                     const { error } = await supabase.from("messages").insert({
                       channel_id: quickPostTargetId,
                       user_id: currentUserId,
-                      content: quickPostText.trim(),
+                      content: parts.join("\n"),
                     });
                     if (error) {
                       alert("送信に失敗しました: " + error.message);
                     } else {
+                      // プレビューURLを解放
+                      for (const f of quickPostFiles) { if (f.preview) URL.revokeObjectURL(f.preview); }
                       setQuickPostText("");
+                      setQuickPostFiles([]);
                       setQuickPostTarget("");
                       setQuickPostTargetId("");
                       setShowQuickPost(false);
