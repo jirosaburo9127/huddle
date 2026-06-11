@@ -98,6 +98,10 @@ export function Sidebar({
   const [showWsMembers, setShowWsMembers] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [storageUsageMB, setStorageUsageMB] = useState<number | null>(null);
+  const [settingsEmail, setSettingsEmail] = useState("");
+  const [settingsNewEmail, setSettingsNewEmail] = useState("");
+  const [settingsEmailSaving, setSettingsEmailSaving] = useState(false);
+  const [settingsEmailMsg, setSettingsEmailMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showWsSwitcher, setShowWsSwitcher] = useState(false);
@@ -246,16 +250,21 @@ export function Sidebar({
   useEffect(() => {
     if (showSettings) {
       loadProfile();
-      // Storage使用量をDB経由で取得（メッセージ内のファイルURL数 × 平均サイズで概算）
+      // Storage使用量をDB経由で取得
       (async () => {
         const supabase = sidebarSupabaseRef.current;
-        // storage.objectsテーブルから直接集計
         const { data, error } = await supabase.rpc("get_storage_usage");
         if (!error && data !== null) {
           setStorageUsageMB(Math.round((data as number) / 1024 / 1024));
         } else {
           setStorageUsageMB(0);
         }
+      })();
+      // メールアドレス取得
+      (async () => {
+        const supabase = sidebarSupabaseRef.current;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user?.email) setSettingsEmail(user.email);
       })();
     }
   }, [showSettings, loadProfile]);
@@ -1905,6 +1914,46 @@ export function Sidebar({
             <div>
               <h3 className="text-sm font-semibold text-foreground mb-3">テーマ</h3>
               <ThemeSelector />
+            </div>
+
+            {/* メールアドレス変更 */}
+            <div>
+              <h3 className="text-sm font-semibold text-foreground mb-3">メールアドレス</h3>
+              <p className="text-sm text-muted mb-2">{settingsEmail || "読み込み中..."}</p>
+              <div className="flex gap-2">
+                <input
+                  type="email"
+                  value={settingsNewEmail}
+                  onChange={(e) => { setSettingsNewEmail(e.target.value); setSettingsEmailMsg(null); }}
+                  placeholder="新しいメールアドレス"
+                  className="flex-1 rounded-lg border border-border bg-input-bg px-3 py-2 text-sm text-foreground placeholder-muted focus:border-accent focus:outline-none"
+                />
+                <button
+                  type="button"
+                  disabled={settingsEmailSaving || !settingsNewEmail.trim() || settingsNewEmail.trim() === settingsEmail}
+                  onClick={async () => {
+                    setSettingsEmailSaving(true);
+                    setSettingsEmailMsg(null);
+                    const supabase = sidebarSupabaseRef.current;
+                    const { error } = await supabase.auth.updateUser({ email: settingsNewEmail.trim() });
+                    if (error) {
+                      setSettingsEmailMsg({ type: "error", text: "変更に失敗しました: " + error.message });
+                    } else {
+                      setSettingsEmailMsg({ type: "success", text: "確認メールを送信しました。新しいメールアドレスのリンクをクリックして完了してください。" });
+                      setSettingsNewEmail("");
+                    }
+                    setSettingsEmailSaving(false);
+                  }}
+                  className="shrink-0 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50 transition-colors"
+                >
+                  {settingsEmailSaving ? "送信中..." : "変更"}
+                </button>
+              </div>
+              {settingsEmailMsg && (
+                <div className={`mt-2 rounded-lg px-3 py-2 text-sm ${settingsEmailMsg.type === "error" ? "bg-red-500/10 text-red-400" : "bg-green-500/10 text-green-400"}`}>
+                  {settingsEmailMsg.text}
+                </div>
+              )}
             </div>
 
             {/* セキュリティ（デバイス一覧・ログイン履歴・MFA状態） */}
