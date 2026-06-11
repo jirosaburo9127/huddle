@@ -2552,34 +2552,13 @@ function IconCropModal({ file, onClose, onSave }: { file: File; onClose: () => v
     return () => URL.revokeObjectURL(url);
   }, [file]);
 
-  // 描画
+  // 描画（四角形クロップ）
   useEffect(() => {
     if (!imgLoaded || !imgRef.current || !canvasRef.current) return;
     const ctx = canvasRef.current.getContext("2d");
     if (!ctx) return;
     ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(CANVAS_SIZE / 2, CANVAS_SIZE / 2, CANVAS_SIZE / 2, 0, Math.PI * 2);
-    ctx.clip();
     ctx.drawImage(imgRef.current, offset.x, offset.y, imgRef.current.width * scale, imgRef.current.height * scale);
-    ctx.restore();
-    // 円の外を半透明で塗る
-    ctx.save();
-    ctx.fillStyle = "rgba(0,0,0,0.4)";
-    ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-    ctx.globalCompositeOperation = "destination-out";
-    ctx.beginPath();
-    ctx.arc(CANVAS_SIZE / 2, CANVAS_SIZE / 2, CANVAS_SIZE / 2, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-    // 元の画像を円内に再描画
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(CANVAS_SIZE / 2, CANVAS_SIZE / 2, CANVAS_SIZE / 2, 0, Math.PI * 2);
-    ctx.clip();
-    ctx.drawImage(imgRef.current, offset.x, offset.y, imgRef.current.width * scale, imgRef.current.height * scale);
-    ctx.restore();
   }, [imgLoaded, scale, offset]);
 
   const handlePointerDown = (e: React.PointerEvent) => {
@@ -2606,9 +2585,6 @@ function IconCropModal({ file, onClose, onSave }: { file: File; onClose: () => v
     outCanvas.height = outSize;
     const ctx = outCanvas.getContext("2d")!;
     const ratio = outSize / CANVAS_SIZE;
-    ctx.beginPath();
-    ctx.arc(outSize / 2, outSize / 2, outSize / 2, 0, Math.PI * 2);
-    ctx.clip();
     ctx.drawImage(imgRef.current, offset.x * ratio, offset.y * ratio, imgRef.current.width * scale * ratio, imgRef.current.height * scale * ratio);
     outCanvas.toBlob(async (blob) => {
       if (blob) await onSave(blob);
@@ -2625,7 +2601,7 @@ function IconCropModal({ file, onClose, onSave }: { file: File; onClose: () => v
             ref={canvasRef}
             width={CANVAS_SIZE}
             height={CANVAS_SIZE}
-            className="rounded-full cursor-grab active:cursor-grabbing touch-none"
+            className="rounded-lg cursor-grab active:cursor-grabbing touch-none"
             style={{ width: CANVAS_SIZE, height: CANVAS_SIZE, border: "2px solid var(--color-border)" }}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
