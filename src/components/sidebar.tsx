@@ -2140,11 +2140,24 @@ function ChannelCategoryList({
                       textAlign: "left" as const, textDecoration: "none",
                     }}
                   >
-                    <span style={{
-                      fontSize: isDesktop ? 16 : 15,
-                      color: (isDesktop && isActive) ? "var(--color-sky)" : (color || "var(--color-muted)"),
-                      opacity: (isDesktop && isActive) ? 1 : showUnreadStyle ? 0.7 : 0.4,
-                    }}>#</span>
+                    {channel.icon_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={channel.icon_url}
+                        alt=""
+                        style={{
+                          width: isDesktop ? 20 : 18, height: isDesktop ? 20 : 18,
+                          borderRadius: 4, objectFit: "cover", flexShrink: 0,
+                          opacity: (isDesktop && isActive) ? 1 : showUnreadStyle ? 0.9 : 0.6,
+                        }}
+                      />
+                    ) : (
+                      <span style={{
+                        fontSize: isDesktop ? 16 : 15,
+                        color: (isDesktop && isActive) ? "var(--color-sky)" : (color || "var(--color-muted)"),
+                        opacity: (isDesktop && isActive) ? 1 : showUnreadStyle ? 0.7 : 0.4,
+                      }}>#</span>
+                    )}
                     <span style={{
                       flex: 1, overflow: "hidden", textOverflow: "ellipsis",
                       whiteSpace: "nowrap" as const,

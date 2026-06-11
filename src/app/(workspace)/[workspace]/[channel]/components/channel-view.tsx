@@ -1990,6 +1990,59 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                     </button>
                   )}
 
+                  {/* チャンネルアイコン変更 */}
+                  {!channel.is_dm && (
+                    <button
+                      role="menuitem"
+                      onClick={() => {
+                        setShowOverflowMenu(false);
+                        const input = document.createElement("input");
+                        input.type = "file";
+                        input.accept = "image/*";
+                        input.style.position = "fixed";
+                        input.style.opacity = "0.01";
+                        input.style.width = "1px";
+                        input.style.height = "1px";
+                        document.body.appendChild(input);
+                        const cleanup = () => { if (input.parentNode) input.parentNode.removeChild(input); };
+                        input.addEventListener("change", async () => {
+                          const file = input.files?.[0];
+                          cleanup();
+                          if (!file) return;
+                          // 圧縮してアップロード
+                          const ext = file.name.split(".").pop() || "png";
+                          const path = `channel-icons/${channel.id}.${ext}`;
+                          const { error: uploadErr } = await supabase.storage
+                            .from("chat-files")
+                            .upload(path, file, { contentType: file.type, upsert: true });
+                          if (uploadErr) {
+                            alert("アイコンのアップロードに失敗しました: " + uploadErr.message);
+                            return;
+                          }
+                          const { data: urlData } = supabase.storage.from("chat-files").getPublicUrl(path);
+                          const iconUrl = urlData.publicUrl + "?t=" + Date.now();
+                          const { error: updateErr } = await supabase
+                            .from("channels")
+                            .update({ icon_url: iconUrl })
+                            .eq("id", channel.id);
+                          if (updateErr) {
+                            alert("アイコンの保存に失敗しました: " + updateErr.message);
+                            return;
+                          }
+                          window.location.reload();
+                        });
+                        input.addEventListener("cancel", cleanup);
+                        input.click();
+                      }}
+                      className="flex items-center gap-3 w-full px-3 py-2 text-sm text-left text-foreground hover:bg-sidebar-hover rounded-lg transition-colors"
+                    >
+                      <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      アイコンを変更
+                    </button>
+                  )}
+
                   {/* チャンネル名変更 / 削除 は general と DM では非表示 */}
                   {!channel.is_dm && channel.slug !== "general" && (
                     <>

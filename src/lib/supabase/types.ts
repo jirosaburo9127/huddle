@@ -32,6 +32,7 @@ export type Channel = {
   mikan_enabled?: boolean;
   topic: string | null;
   category: ChannelCategory | null;
+  icon_url?: string | null;
   created_by: string;
   created_at: string;
 };
