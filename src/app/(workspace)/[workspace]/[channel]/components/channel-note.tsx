@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 type Props = {
@@ -24,6 +24,11 @@ function renderMarkdownPreview(text: string): string {
   html = html.replace(/`([^`\n]+)`/g, '<code class="bg-white/[0.06] px-1.5 py-0.5 rounded text-sm font-mono">$1</code>');
   // 太字
   html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  // 画像URL（chat-files内の画像）
+  html = html.replace(
+    /(?<!["=])(https?:\/\/[^\s<]*\/storage\/v1\/object\/public\/chat-files\/[^\s<]*\.(?:jpg|jpeg|png|gif|webp)(?:\?[^\s<]*)?)/gi,
+    '<img src="$1" alt="" class="rounded-lg max-w-full my-2" style="max-height:300px;object-fit:contain;" />'
+  );
   // URL
   html = html.replace(
     /(?<!["=])(https?:\/\/[^\s<]+)/g,
@@ -45,7 +50,9 @@ export function ChannelNote({ channelId, onClose }: Props) {
   const [editContent, setEditContent] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
   const supabase = createClient();
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // 固定メモの取得
   useEffect(() => {
@@ -135,15 +142,12 @@ export function ChannelNote({ channelId, onClose }: Props) {
         ) : isEditing ? (
           <div className="space-y-3">
             <textarea
+              ref={textareaRef}
               value={editContent}
               onChange={(e) => setEditContent(e.target.value)}
-              className="w-full h-40 resize-none rounded-lg border border-border bg-input-bg px-3 py-2 text-sm leading-relaxed text-foreground focus:border-accent focus:outline-none"
-              maxLength={800}
+              className="w-full min-h-[200px] resize-y rounded-lg border border-border bg-input-bg px-3 py-2 text-sm leading-relaxed text-foreground focus:border-accent focus:outline-none"
               placeholder="このチャンネルの目的、よく使うリンク、約束ごとなど"
             />
-            <div className="text-right text-[11px] text-muted">
-              {editContent.trim().length}/800
-            </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={handleSave}
@@ -151,6 +155,58 @@ export function ChannelNote({ channelId, onClose }: Props) {
                 className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50 transition-colors"
               >
                 {isSaving ? "保存中..." : "保存"}
+              </button>
+              <button
+                type="button"
+                disabled={uploading}
+                onClick={() => {
+                  const input = document.createElement("input");
+                  input.type = "file";
+                  input.accept = "image/*";
+                  input.style.position = "fixed";
+                  input.style.opacity = "0.01";
+                  input.style.width = "1px";
+                  input.style.height = "1px";
+                  document.body.appendChild(input);
+                  const cleanup = () => { if (input.parentNode) input.parentNode.removeChild(input); };
+                  input.addEventListener("change", async () => {
+                    const file = input.files?.[0];
+                    cleanup();
+                    if (!file) return;
+                    setUploading(true);
+                    const ext = file.name.split(".").pop() || "png";
+                    const path = `note-images/${channelId}/${crypto.randomUUID()}.${ext}`;
+                    const { error: uploadErr } = await supabase.storage
+                      .from("chat-files")
+                      .upload(path, file, { contentType: file.type });
+                    setUploading(false);
+                    if (uploadErr) {
+                      alert("画像のアップロードに失敗しました: " + uploadErr.message);
+                      return;
+                    }
+                    const { data: urlData } = supabase.storage.from("chat-files").getPublicUrl(path);
+                    const imageUrl = urlData.publicUrl;
+                    // カーソル位置に画像URLを挿入
+                    const ta = textareaRef.current;
+                    if (ta) {
+                      const pos = ta.selectionStart ?? editContent.length;
+                      const before = editContent.slice(0, pos);
+                      const after = editContent.slice(pos);
+                      const insert = (before.endsWith("\n") || before === "" ? "" : "\n") + imageUrl + "\n";
+                      setEditContent(before + insert + after);
+                    } else {
+                      setEditContent((prev) => prev + (prev ? "\n" : "") + imageUrl + "\n");
+                    }
+                  });
+                  input.addEventListener("cancel", cleanup);
+                  input.click();
+                }}
+                className="rounded-lg px-3 py-2 text-sm text-muted hover:text-accent border border-border hover:border-accent/30 transition-colors flex items-center gap-1.5"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                {uploading ? "アップロード中..." : "画像"}
               </button>
               <button
                 onClick={() => setIsEditing(false)}

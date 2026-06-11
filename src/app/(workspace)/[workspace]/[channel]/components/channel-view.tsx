@@ -1791,7 +1791,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
               {showOverflowMenu && (
                 <div
                   role="menu"
-                  className="absolute right-0 mt-1 w-56 rounded-xl border border-border bg-surface shadow-lg z-20 py-1"
+                  className="absolute right-0 mt-1 w-64 rounded-xl border border-border bg-surface shadow-lg z-20 py-1"
                 >
                   {/* 決定事項フィルタ */}
                   <button
