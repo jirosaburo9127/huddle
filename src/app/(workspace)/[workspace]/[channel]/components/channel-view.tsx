@@ -99,6 +99,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showOverflowMenu, setShowOverflowMenu] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+  const [iconCropFile, setIconCropFile] = useState<File | null>(null);
   const [categoryValue, setCategoryValue] = useState<string | null>(channel.category ?? null);
   const [categorySaving, setCategorySaving] = useState(false);
   const [wsCategories, setWsCategories] = useState<WorkspaceCategory[]>([]);
@@ -2005,31 +2006,10 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                         input.style.height = "1px";
                         document.body.appendChild(input);
                         const cleanup = () => { if (input.parentNode) input.parentNode.removeChild(input); };
-                        input.addEventListener("change", async () => {
+                        input.addEventListener("change", () => {
                           const file = input.files?.[0];
                           cleanup();
-                          if (!file) return;
-                          // 圧縮してアップロード
-                          const ext = file.name.split(".").pop() || "png";
-                          const path = `channel-icons/${channel.id}.${ext}`;
-                          const { error: uploadErr } = await supabase.storage
-                            .from("chat-files")
-                            .upload(path, file, { contentType: file.type, upsert: true });
-                          if (uploadErr) {
-                            alert("アイコンのアップロードに失敗しました: " + uploadErr.message);
-                            return;
-                          }
-                          const { data: urlData } = supabase.storage.from("chat-files").getPublicUrl(path);
-                          const iconUrl = urlData.publicUrl + "?t=" + Date.now();
-                          const { error: updateErr } = await supabase
-                            .from("channels")
-                            .update({ icon_url: iconUrl })
-                            .eq("id", channel.id);
-                          if (updateErr) {
-                            alert("アイコンの保存に失敗しました: " + updateErr.message);
-                            return;
-                          }
-                          window.location.reload();
+                          if (file) setIconCropFile(file);
                         });
                         input.addEventListener("cancel", cleanup);
                         input.click();
@@ -2511,6 +2491,180 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
           </div>
         </div>
       )}
+
+      {/* チャンネルアイコン クロッピングモーダル */}
+      {iconCropFile && (
+        <IconCropModal
+          file={iconCropFile}
+          onClose={() => setIconCropFile(null)}
+          onSave={async (croppedBlob) => {
+            const path = `channel-icons/${channel.id}.jpg`;
+            const { error: uploadErr } = await supabase.storage
+              .from("chat-files")
+              .upload(path, croppedBlob, { contentType: "image/jpeg", upsert: true });
+            if (uploadErr) {
+              alert("アイコンのアップロードに失敗しました: " + uploadErr.message);
+              return;
+            }
+            const { data: urlData } = supabase.storage.from("chat-files").getPublicUrl(path);
+            const iconUrl = urlData.publicUrl + "?t=" + Date.now();
+            const { error: updateErr } = await supabase
+              .from("channels")
+              .update({ icon_url: iconUrl })
+              .eq("id", channel.id);
+            if (updateErr) {
+              alert("アイコンの保存に失敗しました: " + updateErr.message);
+              return;
+            }
+            setIconCropFile(null);
+            window.location.reload();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// アイコンクロッピングモーダル
+function IconCropModal({ file, onClose, onSave }: { file: File; onClose: () => void; onSave: (blob: Blob) => Promise<void> }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const imgRef = useRef<HTMLImageElement | null>(null);
+  const [imgLoaded, setImgLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [scale, setScale] = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
+  const CANVAS_SIZE = 200;
+
+  // 画像読み込み
+  useEffect(() => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      imgRef.current = img;
+      // 画像を正方形にフィットさせる初期スケール
+      const minDim = Math.min(img.width, img.height);
+      setScale(CANVAS_SIZE / minDim);
+      setOffset({ x: -(img.width * (CANVAS_SIZE / minDim) - CANVAS_SIZE) / 2, y: -(img.height * (CANVAS_SIZE / minDim) - CANVAS_SIZE) / 2 });
+      setImgLoaded(true);
+    };
+    img.src = url;
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  // 描画
+  useEffect(() => {
+    if (!imgLoaded || !imgRef.current || !canvasRef.current) return;
+    const ctx = canvasRef.current.getContext("2d");
+    if (!ctx) return;
+    ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(CANVAS_SIZE / 2, CANVAS_SIZE / 2, CANVAS_SIZE / 2, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.drawImage(imgRef.current, offset.x, offset.y, imgRef.current.width * scale, imgRef.current.height * scale);
+    ctx.restore();
+    // 円の外を半透明で塗る
+    ctx.save();
+    ctx.fillStyle = "rgba(0,0,0,0.4)";
+    ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.beginPath();
+    ctx.arc(CANVAS_SIZE / 2, CANVAS_SIZE / 2, CANVAS_SIZE / 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    // 元の画像を円内に再描画
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(CANVAS_SIZE / 2, CANVAS_SIZE / 2, CANVAS_SIZE / 2, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.drawImage(imgRef.current, offset.x, offset.y, imgRef.current.width * scale, imgRef.current.height * scale);
+    ctx.restore();
+  }, [imgLoaded, scale, offset]);
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    e.preventDefault();
+    dragRef.current = { startX: e.clientX, startY: e.clientY, origX: offset.x, origY: offset.y };
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  };
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!dragRef.current) return;
+    setOffset({
+      x: dragRef.current.origX + (e.clientX - dragRef.current.startX),
+      y: dragRef.current.origY + (e.clientY - dragRef.current.startY),
+    });
+  };
+  const handlePointerUp = () => { dragRef.current = null; };
+
+  const handleSave = async () => {
+    if (!imgRef.current) return;
+    setSaving(true);
+    // 高解像度で出力（256x256）
+    const outSize = 256;
+    const outCanvas = document.createElement("canvas");
+    outCanvas.width = outSize;
+    outCanvas.height = outSize;
+    const ctx = outCanvas.getContext("2d")!;
+    const ratio = outSize / CANVAS_SIZE;
+    ctx.beginPath();
+    ctx.arc(outSize / 2, outSize / 2, outSize / 2, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.drawImage(imgRef.current, offset.x * ratio, offset.y * ratio, imgRef.current.width * scale * ratio, imgRef.current.height * scale * ratio);
+    outCanvas.toBlob(async (blob) => {
+      if (blob) await onSave(blob);
+      setSaving(false);
+    }, "image/jpeg", 0.9);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="bg-surface rounded-2xl border border-border p-5 space-y-4 w-full max-w-xs" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-base font-bold text-center">アイコンを調整</h3>
+        <div className="flex justify-center">
+          <canvas
+            ref={canvasRef}
+            width={CANVAS_SIZE}
+            height={CANVAS_SIZE}
+            className="rounded-full cursor-grab active:cursor-grabbing touch-none"
+            style={{ width: CANVAS_SIZE, height: CANVAS_SIZE, border: "2px solid var(--color-border)" }}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+          />
+        </div>
+        {imgLoaded && (
+          <div className="flex items-center gap-2 px-2">
+            <span className="text-xs text-muted">小</span>
+            <input
+              type="range"
+              min={0.5}
+              max={4}
+              step={0.01}
+              value={scale * (imgRef.current ? Math.min(imgRef.current.width, imgRef.current.height) / CANVAS_SIZE : 1)}
+              onChange={(e) => {
+                if (!imgRef.current) return;
+                const minDim = Math.min(imgRef.current.width, imgRef.current.height);
+                const newScale = parseFloat(e.target.value) * CANVAS_SIZE / minDim;
+                // 中心を維持してスケール変更
+                const cx = CANVAS_SIZE / 2;
+                const cy = CANVAS_SIZE / 2;
+                const imgCx = (cx - offset.x) / scale;
+                const imgCy = (cy - offset.y) / scale;
+                setScale(newScale);
+                setOffset({ x: cx - imgCx * newScale, y: cy - imgCy * newScale });
+              }}
+              className="flex-1 accent-accent"
+            />
+            <span className="text-xs text-muted">大</span>
+          </div>
+        )}
+        <div className="flex justify-end gap-2">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-muted hover:text-foreground rounded-lg transition-colors">キャンセル</button>
+          <button onClick={handleSave} disabled={saving || !imgLoaded} className="px-4 py-2 text-sm font-medium bg-accent text-white rounded-lg hover:bg-accent-hover disabled:opacity-50 transition-colors">
+            {saving ? "保存中..." : "保存"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
