@@ -2197,7 +2197,7 @@ function ChannelCategoryList({
                         style={{
                           width: isDesktop ? 20 : 18, height: isDesktop ? 20 : 18,
                           borderRadius: 4, objectFit: "cover", flexShrink: 0,
-                          opacity: (isDesktop && isActive) ? 1 : showUnreadStyle ? 0.9 : 0.6,
+                          opacity: 1,
                         }}
                       />
                     ) : (
