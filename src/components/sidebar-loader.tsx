@@ -43,6 +43,7 @@ export async function WorkspaceShell({ workspaceSlug, children }: WorkspaceShell
       is_hitorigoto: boolean;
       topic: string | null;
       category: string | null;
+      icon_url: string | null;
       created_by: string;
       created_at: string;
     }>;
