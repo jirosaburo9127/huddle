@@ -74,7 +74,7 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
   const pathParts = pathname.split("/").filter(Boolean);
   const isHome = pathParts.length <= 1 || sidebarOpen;
   const isCalendar = pathname.includes("/calendar");
-  const isAlbums = pathname.includes("/albums");
+  const isSearch = pathname.includes("/search");
   const [showQuickPost, setShowQuickPost] = useState(false);
   const currentUserProfile = useMemo(() => {
     const me = members.find((m) => m.user_id === currentUserId);
@@ -144,19 +144,19 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
             </span>
           </button>
 
-          {/* アルバム */}
+          {/* 検索 */}
           <Link
-            href={`/${workspaceSlug}/albums`}
+            href={`/${workspaceSlug}/search`}
             onClick={() => setSidebarOpen(false)}
             className={`relative flex flex-col items-center gap-0.5 py-1 px-3 rounded-lg transition-colors ${
-              isAlbums ? "text-foreground" : "text-muted"
+              isSearch ? "text-foreground" : "text-muted"
             }`}
           >
-            <svg className="w-[23px] h-[23px]" fill="none" stroke="currentColor" strokeWidth={isAlbums ? 2 : 1.2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
+            <svg className="w-[23px] h-[23px]" fill="none" stroke="currentColor" strokeWidth={isSearch ? 2 : 1.2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
-            <span className="text-[10px]">アルバム</span>
-            {isAlbums && <span className="absolute bottom-0 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-foreground" />}
+            <span className="text-[10px]">検索</span>
+            {isSearch && <span className="absolute bottom-0 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-foreground" />}
           </Link>
 
           {/* その他 (DM 未読があればアイコン右上にバッジ) */}
@@ -203,7 +203,7 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
       >
             <div className="grid grid-cols-3 gap-3">
               <Link
-                href={`/${workspaceSlug}/search`}
+                href={`/${workspaceSlug}/albums`}
                 onClick={() => {
                   setShowMore(false);
                   setSidebarOpen(false);
@@ -212,10 +212,10 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
               >
                 <span className="w-12 h-12 rounded-full border-2 border-muted/40 flex items-center justify-center">
                   <svg className="w-5 h-5 text-foreground" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
                   </svg>
                 </span>
-                <span className="text-xs text-foreground">検索</span>
+                <span className="text-xs text-foreground">アルバム</span>
               </Link>
               <Link
                 href={`/${workspaceSlug}/dm-list`}
