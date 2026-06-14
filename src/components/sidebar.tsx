@@ -987,8 +987,50 @@ export function Sidebar({
         {/* グラデーションライン（モバイルモック準拠、PCにはない） */}
         <div className="lg:hidden" style={{ height: 0.75, background: "linear-gradient(90deg, #E96832, #38BDF8)" }} />
 
-        {/* 固定エリア: 独り言 + カレンダー・ファイル・アルバム・保存 */}
+        {/* 固定エリア: 進行中・決定 + 独り言 + カレンダー等 */}
         <div className="shrink-0" style={{ padding: "8px 12px 0" }}>
+          {/* PC: 進行中・決定チップ（固定表示、独り言の上） */}
+          <div className="hidden lg:flex" style={{ gap: 6, padding: "0 4px 6px", flexShrink: 0 }}>
+            <Link
+              href={`/${workspaceSlug}/in-progress`}
+              onClick={() => setSidebarOpen(false)}
+              style={{
+                flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                padding: "6px 0", height: 34,
+                borderRadius: 10, border: "none", cursor: "pointer",
+                background: "rgba(56,189,248,0.15)", fontSize: 13, fontWeight: 650, color: "var(--color-foreground)",
+                textDecoration: "none",
+              }}
+            >
+              進行中
+              <span style={{
+                fontSize: 11, fontWeight: 700, color: "var(--color-sky)",
+                width: 18, height: 18, borderRadius: "50%",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                background: "#fff",
+              }}>{inProgressCount}</span>
+            </Link>
+            <Link
+              href={`/${workspaceSlug}/dashboard`}
+              onClick={() => setSidebarOpen(false)}
+              style={{
+                flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                padding: "6px 0", height: 34,
+                borderRadius: 10, border: "none", cursor: "pointer",
+                background: "rgba(233,104,50,0.12)", fontSize: 13, fontWeight: 650, color: "var(--color-foreground)",
+                textDecoration: "none",
+              }}
+            >
+              決定
+              <span style={{
+                fontSize: 11, fontWeight: 700, color: "var(--color-accent)",
+                width: 18, height: 18, borderRadius: "50%",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                background: "#fff",
+              }}>{decisionUnreadCount}</span>
+            </Link>
+          </div>
+
           {/* 独り言プレビュー — PC/モバイル各モック準拠（固定表示） */}
           {hitorigotoChannel && hitorigotoPreview.length > 0 && (
             <div style={{ flexShrink: 0 }}>
@@ -1111,47 +1153,6 @@ export function Sidebar({
             </button>
           </div>
 
-          {/* PC: 進行中・決定チップ（固定表示） */}
-          <div className="hidden lg:flex" style={{ gap: 6, padding: "4px 4px 6px", flexShrink: 0 }}>
-            <Link
-              href={`/${workspaceSlug}/in-progress`}
-              onClick={() => setSidebarOpen(false)}
-              style={{
-                flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                padding: "6px 0", height: 34,
-                borderRadius: 10, border: "none", cursor: "pointer",
-                background: "rgba(56,189,248,0.15)", fontSize: 13, fontWeight: 650, color: "var(--color-foreground)",
-                textDecoration: "none",
-              }}
-            >
-              進行中
-              <span style={{
-                fontSize: 11, fontWeight: 700, color: "var(--color-sky)",
-                width: 18, height: 18, borderRadius: "50%",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                background: "#fff",
-              }}>{inProgressCount}</span>
-            </Link>
-            <Link
-              href={`/${workspaceSlug}/dashboard`}
-              onClick={() => setSidebarOpen(false)}
-              style={{
-                flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                padding: "6px 0", height: 34,
-                borderRadius: 10, border: "none", cursor: "pointer",
-                background: "rgba(233,104,50,0.12)", fontSize: 13, fontWeight: 650, color: "var(--color-foreground)",
-                textDecoration: "none",
-              }}
-            >
-              決定
-              <span style={{
-                fontSize: 11, fontWeight: 700, color: "var(--color-accent)",
-                width: 18, height: 18, borderRadius: "50%",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                background: "#fff",
-              }}>{decisionUnreadCount}</span>
-            </Link>
-          </div>
         </div>
 
         {/* チャンネル・DM一覧（プルリフレッシュ対応） */}
