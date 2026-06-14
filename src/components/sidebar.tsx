@@ -1031,9 +1031,9 @@ export function Sidebar({
             </Link>
           </div>
 
-          {/* 独り言プレビュー — PC/モバイル各モック準拠（固定表示） */}
+          {/* 独り言プレビュー — PCのみ固定表示（スマホはスクロールエリア内） */}
           {hitorigotoChannel && hitorigotoPreview.length > 0 && (
-            <div style={{ flexShrink: 0 }}>
+            <div className="hidden lg:block" style={{ flexShrink: 0 }}>
               <div style={{ display: "flex", alignItems: "center", padding: isDesktop ? "6px 8px 4px" : "2px 10px 4px", flexShrink: 0 }}>
                 <span style={{ fontSize: 12, fontWeight: isDesktop ? 650 : 600, color: isDesktop ? "var(--color-foreground)" : "var(--color-muted)", opacity: isDesktop ? 0.7 : 0.75, flex: 1 }}>独り言</span>
               </div>
@@ -1158,6 +1158,86 @@ export function Sidebar({
         {/* チャンネル・DM一覧（プルリフレッシュ対応） */}
         <PullToRefresh onRefresh={async () => { await fetchHitorigotoPreview(); }}>
         <div className="flex-1 overflow-y-auto overflow-x-hidden" style={{ padding: "0 12px 8px" }}>
+          {/* スマホ用: 独り言プレビュー（スクロールエリア内） */}
+          {hitorigotoChannel && hitorigotoPreview.length > 0 && (
+            <div className="lg:hidden" style={{ flexShrink: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", padding: "2px 10px 4px", flexShrink: 0 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: "var(--color-muted)", opacity: 0.75, flex: 1 }}>独り言</span>
+              </div>
+              <div style={{ display: "flex", gap: 8, padding: "2px 10px 8px", overflowX: "auto", flexShrink: 0 }}>
+                {hitorigotoPreview.map((note, i) => {
+                  const lines = note.content.split("\n");
+                  const imageUrl = lines.find((l: string) => /^https:\/\/.*supabase.*\/storage\/.*\.(jpg|jpeg|png|gif|webp)/i.test(l.trim()));
+                  const textContent = lines.filter((l: string) => !/^https:\/\/.*supabase.*\/storage\//.test(l.trim())).join(" ").trim();
+                  const ago = (() => {
+                    const diff = Date.now() - new Date(note.created_at).getTime();
+                    const h = Math.floor(diff / 3600000);
+                    if (h < 1) return "今";
+                    if (h < 24) return `${h}h`;
+                    const d = Math.floor(h / 24);
+                    return d < 7 ? `${d}日前` : "1w+";
+                  })();
+                  return (
+                    <Link
+                      key={i}
+                      href={`/${workspaceSlug}/${hitorigotoChannel.slug}`}
+                      onClick={() => setSidebarOpen(false)}
+                      style={{
+                        width: "68%", padding: "8px 10px",
+                        borderRadius: 12, border: "none", cursor: "pointer",
+                        background: "var(--color-sidebar)",
+                        textAlign: "left" as const,
+                        display: "flex", gap: 10, flexShrink: 0,
+                        alignItems: "center",
+                        height: 80, textDecoration: "none",
+                      }}
+                    >
+                      <div style={{ display: "flex", gap: 8, alignItems: "flex-start", flex: 1, minWidth: 0 }}>
+                        {imageUrl && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={imageUrl.trim().split("#")[0]} alt="" style={{
+                            width: 56, height: 56,
+                            objectFit: "cover", borderRadius: 8, flexShrink: 0,
+                          }} loading="lazy" />
+                        )}
+                        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" as const, gap: 2 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                            {note.avatar_url ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={note.avatar_url} alt="" style={{
+                                width: 18, height: 18,
+                                borderRadius: "50%", objectFit: "cover" as const, flexShrink: 0,
+                              }} />
+                            ) : (
+                              <span style={{
+                                width: 18, height: 18,
+                                borderRadius: "50%", background: "var(--color-muted)",
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                fontSize: 7, fontWeight: 700, color: "#fff", flexShrink: 0,
+                              }}>{note.display_name.charAt(0)}</span>
+                            )}
+                            <span style={{ fontSize: 11, color: "var(--color-foreground)", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{note.display_name}</span>
+                            <span style={{ fontSize: 10, color: "var(--color-muted)", marginLeft: "auto", flexShrink: 0 }}>{ago}</span>
+                          </div>
+                          {textContent ? (
+                            <p style={{
+                              fontSize: 12, lineHeight: 1.4,
+                              color: "var(--color-foreground)",
+                              margin: 0, overflow: "hidden", display: "-webkit-box",
+                              WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
+                            }}>{textContent.slice(0, 70)}</p>
+                          ) : !imageUrl ? (
+                            <p style={{ fontSize: 12, color: "var(--color-muted)", margin: 0 }}>📎 ファイル</p>
+                          ) : null}
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* チャンネルセクション — ヘッダーは控えめに、＋ボタンのみ */}
           <div className="mt-1 mb-0.5 flex items-center justify-end" style={{ gap: 2 }}>
             <button
