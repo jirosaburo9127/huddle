@@ -987,9 +987,115 @@ export function Sidebar({
         {/* グラデーションライン（モバイルモック準拠、PCにはない） */}
         <div className="lg:hidden" style={{ height: 0.75, background: "linear-gradient(90deg, #E96832, #38BDF8)" }} />
 
+        {/* 固定エリア: 独り言 + カレンダー・ファイル・アルバム・保存 */}
+        <div className="shrink-0" style={{ padding: "8px 12px 0" }}>
+          {/* 独り言プレビュー — PC/モバイル各モック準拠（固定表示） */}
+          {hitorigotoChannel && hitorigotoPreview.length > 0 && (
+            <div style={{ flexShrink: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", padding: isDesktop ? "6px 8px 4px" : "2px 10px 4px", flexShrink: 0 }}>
+                <span style={{ fontSize: 12, fontWeight: isDesktop ? 650 : 600, color: isDesktop ? "var(--color-foreground)" : "var(--color-muted)", opacity: isDesktop ? 0.7 : 0.75, flex: 1 }}>独り言</span>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                {hitorigotoPreview.map((msg, idx) => {
+                  const textContent = msg.content
+                    .split("\n")
+                    .filter((l: string) => !/^https?:\/\/[^\s]*\/storage\/v1\/object\/public\/chat-files\//.test(l.trim()))
+                    .join("\n")
+                    .trim();
+                  const imageMatch = msg.content.match(/https?:\/\/[^\s]*\/storage\/v1\/object\/public\/chat-files\/[^\s]*\.(jpg|jpeg|png|gif|webp)(\?[^\s]*)?/i);
+                  const imageUrl = imageMatch ? imageMatch[0].split("#")[0] : null;
+                  return (
+                    <Link
+                      key={idx}
+                      href={`/${workspaceSlug}/${hitorigotoChannel.slug}`}
+                      onClick={() => setSidebarOpen(false)}
+                      style={{
+                        display: "flex", alignItems: "center", gap: isDesktop ? 8 : 10,
+                        padding: isDesktop ? "5px 8px" : "6px 10px",
+                        borderBottom: "1px solid var(--color-border)",
+                        textDecoration: "none", color: "inherit",
+                        opacity: 0.85,
+                      }}
+                    >
+                      {imageUrl && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={imageUrl.trim().split("#")[0]}
+                          alt=""
+                          style={{
+                            width: isDesktop ? 28 : 36, height: isDesktop ? 28 : 36,
+                            borderRadius: 4, objectFit: "cover", flexShrink: 0,
+                          }}
+                        />
+                      )}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{
+                          fontSize: isDesktop ? 10 : 12, fontWeight: 600,
+                          color: "var(--color-foreground)", margin: 0,
+                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                        }}>{msg.display_name || "?"}</p>
+                        {textContent ? (
+                          <p style={{
+                            fontSize: isDesktop ? 10.5 : 12, color: "var(--color-muted)", margin: 0,
+                            overflow: "hidden", display: "-webkit-box",
+                            WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
+                          }}>{textContent.slice(0, 70)}</p>
+                        ) : !imageUrl ? (
+                          <p style={{ fontSize: isDesktop ? 10.5 : 12, color: "var(--color-muted)", margin: 0 }}>📎 ファイル</p>
+                        ) : null}
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* PC: カレンダー・ファイル・アルバム・保存へのリンク（固定表示） */}
+          <div className="hidden lg:grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 0, padding: "2px 4px 6px" }}>
+            {[
+              { href: `/${workspaceSlug}/calendar`, label: "カレンダー", icon: "M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" },
+              { href: `/${workspaceSlug}/files`, label: "ファイル", icon: "M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" },
+              { href: `/${workspaceSlug}/albums`, label: "アルバム", icon: "M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" },
+            ].map((item) => (
+              <Link
+                key={item.label}
+                href={item.href}
+                onClick={() => setSidebarOpen(false)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 4,
+                  padding: "4px 8px", borderRadius: 6,
+                  fontSize: 12.5, fontWeight: 500, color: "var(--color-muted)",
+                  textDecoration: "none",
+                }}
+              >
+                <svg style={{ width: 16, height: 16 }} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d={item.icon} />
+                </svg>
+                {item.label}
+              </Link>
+            ))}
+            <button
+              type="button"
+              onClick={() => setShowBookmarkModal(true)}
+              style={{
+                display: "flex", alignItems: "center", gap: 4,
+                padding: "4px 8px", borderRadius: 6,
+                fontSize: 12.5, fontWeight: 500, color: "var(--color-muted)",
+                background: "none", border: "none", cursor: "pointer",
+              }}
+            >
+              <svg style={{ width: 16, height: 16 }} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+              </svg>
+              保存
+            </button>
+          </div>
+        </div>
+
         {/* チャンネル・DM一覧（プルリフレッシュ対応） */}
         <PullToRefresh onRefresh={async () => { await fetchHitorigotoPreview(); }}>
-        <div className="flex-1 overflow-y-auto overflow-x-hidden" style={{ padding: "8px 12px 8px" }}>
+        <div className="flex-1 overflow-y-auto overflow-x-hidden" style={{ padding: "0 12px 8px" }}>
           {/* ステータスチップ: PCのみ均等幅ボタン（モバイルはヘッダー内pill）— モック準拠インラインスタイル */}
           <div className="hidden lg:flex" style={{ gap: 6, padding: "8px 4px 8px", flexShrink: 0 }}>
             <Link
@@ -1032,142 +1138,6 @@ export function Sidebar({
             </Link>
           </div>
 
-
-          {/* 独り言プレビュー — PC/モバイル各モック準拠 */}
-          {hitorigotoChannel && hitorigotoPreview.length > 0 && (
-            <div style={{ flexShrink: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", padding: isDesktop ? "6px 8px 4px" : "2px 10px 4px", flexShrink: 0 }}>
-                <span style={{ fontSize: 12, fontWeight: isDesktop ? 650 : 600, color: isDesktop ? "var(--color-foreground)" : "var(--color-muted)", opacity: isDesktop ? 0.7 : 0.75, flex: 1 }}>独り言</span>
-                <Link
-                  href={`/${workspaceSlug}/${hitorigotoChannel.slug}`}
-                  onClick={() => setSidebarOpen(false)}
-                  style={{ fontSize: 11, color: "var(--color-muted)", opacity: 0.6, background: "none", border: "none", cursor: "pointer", padding: 0, textDecoration: "none" }}
-                >もっと見る</Link>
-              </div>
-              <div style={{ display: "flex", gap: isDesktop ? 6 : 8, padding: isDesktop ? "2px 4px 10px" : "2px 10px 8px", overflowX: "auto", minHeight: isDesktop ? 56 : undefined, flexShrink: 0 }}>
-                {hitorigotoPreview.map((note, i) => {
-                  const ago = (() => {
-                    const diff = Date.now() - new Date(note.created_at).getTime();
-                    const h = Math.floor(diff / 3600000);
-                    if (h < 1) return "今";
-                    if (h < 24) return `${h}h`;
-                    const d = Math.floor(h / 24);
-                    return d < 7 ? `${d}日前` : "1w+";
-                  })();
-                  return (
-                    <Link
-                      key={i}
-                      href={`/${workspaceSlug}/${hitorigotoChannel.slug}`}
-                      onClick={() => setSidebarOpen(false)}
-                      style={{
-                        width: isDesktop ? 160 : "68%", minWidth: isDesktop ? 140 : undefined, maxWidth: isDesktop ? 160 : undefined,
-                        padding: isDesktop ? "6px 8px" : "8px 10px",
-                        borderRadius: isDesktop ? 8 : 12, border: "none", cursor: "pointer",
-                        background: isDesktop ? "#FFFFFF" : "var(--color-sidebar)",
-                        textAlign: "left" as const,
-                        display: "flex", gap: isDesktop ? 6 : 10, flexShrink: 0,
-                        alignItems: isDesktop ? "flex-start" : "center",
-                        height: isDesktop ? undefined : 80, textDecoration: "none",
-                      }}
-                    >
-                      {(() => {
-                        const lines = note.content.split("\n");
-                        const imageUrl = lines.find(l => /^https:\/\/.*supabase.*\/storage\/.*\.(jpg|jpeg|png|gif|webp)/i.test(l.trim()));
-                        const textContent = lines.filter(l => !/^https:\/\/.*supabase.*\/storage\//.test(l.trim())).join(" ").trim();
-                        return (
-                          <div style={{ display: "flex", gap: 8, alignItems: "flex-start", flex: 1, minWidth: 0 }}>
-                            {/* 画像サムネイル（あれば左端） */}
-                            {imageUrl && (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={imageUrl.trim().split("#")[0]} alt="" style={{
-                                width: isDesktop ? 44 : 56, height: isDesktop ? 44 : 56,
-                                objectFit: "cover", borderRadius: 8, flexShrink: 0,
-                              }} loading="lazy" />
-                            )}
-                            {/* 右側: 名前+時刻+テキスト */}
-                            <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" as const, gap: 2 }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                                {note.avatar_url ? (
-                                  // eslint-disable-next-line @next/next/no-img-element
-                                  <img src={note.avatar_url} alt="" style={{
-                                    width: isDesktop ? 16 : 18, height: isDesktop ? 16 : 18,
-                                    borderRadius: "50%", objectFit: "cover" as const, flexShrink: 0,
-                                  }} />
-                                ) : (
-                                  <span style={{
-                                    width: isDesktop ? 16 : 18, height: isDesktop ? 16 : 18,
-                                    borderRadius: "50%", background: "var(--color-muted)",
-                                    display: "flex", alignItems: "center", justifyContent: "center",
-                                    fontSize: 7, fontWeight: 700, color: "#fff", flexShrink: 0,
-                                  }}>
-                                    {note.display_name.charAt(0)}
-                                  </span>
-                                )}
-                                <span style={{ fontSize: isDesktop ? 10 : 11, color: "var(--color-foreground)", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{note.display_name}</span>
-                                <span style={{ fontSize: isDesktop ? 9 : 10, color: "var(--color-muted)", marginLeft: "auto", flexShrink: 0 }}>{ago}</span>
-                              </div>
-                              {textContent ? (
-                                <p style={{
-                                  fontSize: isDesktop ? 10.5 : 12, lineHeight: isDesktop ? 1.35 : 1.4,
-                                  color: isDesktop ? "var(--color-muted)" : "var(--color-foreground)",
-                                  margin: 0,
-                                  overflow: "hidden", display: "-webkit-box",
-                                  WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
-                                }}>{textContent.slice(0, 70)}</p>
-                              ) : !imageUrl ? (
-                                <p style={{ fontSize: isDesktop ? 10.5 : 12, color: "var(--color-muted)", margin: 0 }}>📎 ファイル</p>
-                              ) : null}
-                            </div>
-                          </div>
-                        );
-                      })()}
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* PC: カレンダー・ファイル・アルバム・ブックマークへのリンク */}
-          <div className="hidden lg:grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 0, padding: "2px 4px 6px" }}>
-            {[
-              { href: `/${workspaceSlug}/calendar`, label: "カレンダー", icon: "M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" },
-              { href: `/${workspaceSlug}/files`, label: "ファイル", icon: "M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" },
-              { href: `/${workspaceSlug}/albums`, label: "アルバム", icon: "M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" },
-            ].map((item) => (
-              <Link
-                key={item.label}
-                href={item.href}
-                onClick={() => setSidebarOpen(false)}
-                style={{
-                  display: "flex", alignItems: "center", gap: 4,
-                  padding: "4px 8px", borderRadius: 6,
-                  fontSize: 12.5, fontWeight: 500, color: "var(--color-muted)",
-                  textDecoration: "none",
-                }}
-              >
-                <svg style={{ width: 16, height: 16 }} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d={item.icon} />
-                </svg>
-                {item.label}
-              </Link>
-            ))}
-            <button
-              type="button"
-              onClick={() => setShowBookmarkModal(true)}
-              style={{
-                display: "flex", alignItems: "center", gap: 4,
-                padding: "4px 8px", borderRadius: 6,
-                fontSize: 12.5, fontWeight: 500, color: "var(--color-muted)",
-                background: "none", border: "none", cursor: "pointer",
-              }}
-            >
-              <svg style={{ width: 16, height: 16 }} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-              </svg>
-              保存
-            </button>
-          </div>
 
           {/* チャンネルセクション — ヘッダーは控えめに、＋ボタンのみ */}
           <div className="mt-1 mb-0.5 flex items-center justify-end" style={{ gap: 2 }}>
