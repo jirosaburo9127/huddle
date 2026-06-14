@@ -369,11 +369,17 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
 
   // 宛先ピッカーで個人メンバーを選択 → カーソル位置に @<name> を挿入
   function selectMemberFromPicker(member: MentionMember) {
-    // 表示名内の半角スペースは NBSP に置換して 1 トークン扱いにする
-    const name = member.profiles.display_name.replace(/ /g, " ");
-    insertAtCursor(`@${name} `);
-    setShowMentionPicker(false);
+    const name = member.profiles.display_name.replace(/ /g, "\u00A0");
+    const mentionToken = `@${name}`;
+    // 既に本文に含まれていたら除去（トグル）
+    if (content.includes(mentionToken)) {
+      const cleaned = content.replace(new RegExp(`${mentionToken.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s?`, "g"), "");
+      setContent(cleaned);
+    } else {
+      insertAtCursor(`${mentionToken} `);
+    }
     setPickerQuery("");
+    // ピッカーは閉じない → 続けて複数選択可能
   }
 
   // 宛先ピッカーでブロードキャスト (@here / @All) を選択 → カーソル位置に挿入
@@ -919,30 +925,39 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
                   該当するメンバーがいません
                 </div>
               ) : (
-                pickerCandidates.map((member) => (
-                  <button
-                    key={member.user_id}
-                    type="button"
-                    onClick={() => selectMemberFromPicker(member)}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-sidebar-hover transition-colors"
-                  >
-                    {member.profiles.avatar_url ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
-                        src={member.profiles.avatar_url}
-                        alt={member.profiles.display_name}
-                        className="w-6 h-6 rounded-full object-cover shrink-0"
-                      />
-                    ) : (
-                      <div className="w-6 h-6 rounded-full bg-muted/20 flex items-center justify-center shrink-0">
-                        <span className="text-[10px] font-medium text-muted">
-                          {member.profiles.display_name.charAt(0).toUpperCase()}
-                        </span>
-                      </div>
-                    )}
-                    <span className="truncate text-foreground">{member.profiles.display_name}</span>
-                  </button>
-                ))
+                pickerCandidates.map((member) => {
+                  const nameForCheck = member.profiles.display_name.replace(/ /g, "\u00A0");
+                  const isSelected = content.includes(`@${nameForCheck}`);
+                  return (
+                    <button
+                      key={member.user_id}
+                      type="button"
+                      onClick={() => selectMemberFromPicker(member)}
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-sidebar-hover transition-colors ${isSelected ? "bg-accent/10" : ""}`}
+                    >
+                      {member.profiles.avatar_url ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          src={member.profiles.avatar_url}
+                          alt={member.profiles.display_name}
+                          className="w-6 h-6 rounded-full object-cover shrink-0"
+                        />
+                      ) : (
+                        <div className="w-6 h-6 rounded-full bg-muted/20 flex items-center justify-center shrink-0">
+                          <span className="text-[10px] font-medium text-muted">
+                            {member.profiles.display_name.charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                      )}
+                      <span className="truncate text-foreground flex-1">{member.profiles.display_name}</span>
+                      {isSelected && (
+                        <svg className="w-4 h-4 text-accent shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </button>
+                  );
+                })
               )}
             </div>
           </div>
