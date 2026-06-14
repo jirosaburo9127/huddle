@@ -995,54 +995,73 @@ export function Sidebar({
               <div style={{ display: "flex", alignItems: "center", padding: isDesktop ? "6px 8px 4px" : "2px 10px 4px", flexShrink: 0 }}>
                 <span style={{ fontSize: 12, fontWeight: isDesktop ? 650 : 600, color: isDesktop ? "var(--color-foreground)" : "var(--color-muted)", opacity: isDesktop ? 0.7 : 0.75, flex: 1 }}>独り言</span>
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-                {hitorigotoPreview.map((msg, idx) => {
-                  const textContent = msg.content
-                    .split("\n")
-                    .filter((l: string) => !/^https?:\/\/[^\s]*\/storage\/v1\/object\/public\/chat-files\//.test(l.trim()))
-                    .join("\n")
-                    .trim();
-                  const imageMatch = msg.content.match(/https?:\/\/[^\s]*\/storage\/v1\/object\/public\/chat-files\/[^\s]*\.(jpg|jpeg|png|gif|webp)(\?[^\s]*)?/i);
-                  const imageUrl = imageMatch ? imageMatch[0].split("#")[0] : null;
+              <div style={{ display: "flex", gap: isDesktop ? 6 : 8, padding: isDesktop ? "2px 4px 10px" : "2px 10px 8px", overflowX: "auto", minHeight: isDesktop ? 56 : undefined, flexShrink: 0 }}>
+                {hitorigotoPreview.map((note, i) => {
+                  const lines = note.content.split("\n");
+                  const imageUrl = lines.find((l: string) => /^https:\/\/.*supabase.*\/storage\/.*\.(jpg|jpeg|png|gif|webp)/i.test(l.trim()));
+                  const textContent = lines.filter((l: string) => !/^https:\/\/.*supabase.*\/storage\//.test(l.trim())).join(" ").trim();
+                  const ago = (() => {
+                    const diff = Date.now() - new Date(note.created_at).getTime();
+                    const h = Math.floor(diff / 3600000);
+                    if (h < 1) return "今";
+                    if (h < 24) return `${h}h`;
+                    const d = Math.floor(h / 24);
+                    return d < 7 ? `${d}日前` : "1w+";
+                  })();
                   return (
                     <Link
-                      key={idx}
+                      key={i}
                       href={`/${workspaceSlug}/${hitorigotoChannel.slug}`}
                       onClick={() => setSidebarOpen(false)}
                       style={{
-                        display: "flex", alignItems: "center", gap: isDesktop ? 8 : 10,
-                        padding: isDesktop ? "5px 8px" : "6px 10px",
-                        borderBottom: "1px solid var(--color-border)",
-                        textDecoration: "none", color: "inherit",
-                        opacity: 0.85,
+                        width: isDesktop ? 160 : "68%", minWidth: isDesktop ? 140 : undefined, maxWidth: isDesktop ? 160 : undefined,
+                        padding: isDesktop ? "6px 8px" : "8px 10px",
+                        borderRadius: isDesktop ? 8 : 12, border: "none", cursor: "pointer",
+                        background: isDesktop ? "#FFFFFF" : "var(--color-sidebar)",
+                        textAlign: "left" as const,
+                        display: "flex", gap: isDesktop ? 6 : 10, flexShrink: 0,
+                        alignItems: isDesktop ? "flex-start" : "center",
+                        height: isDesktop ? undefined : 80, textDecoration: "none",
                       }}
                     >
-                      {imageUrl && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={imageUrl.trim().split("#")[0]}
-                          alt=""
-                          style={{
-                            width: isDesktop ? 28 : 36, height: isDesktop ? 28 : 36,
-                            borderRadius: 4, objectFit: "cover", flexShrink: 0,
-                          }}
-                        />
-                      )}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{
-                          fontSize: isDesktop ? 10 : 12, fontWeight: 600,
-                          color: "var(--color-foreground)", margin: 0,
-                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                        }}>{msg.display_name || "?"}</p>
-                        {textContent ? (
-                          <p style={{
-                            fontSize: isDesktop ? 10.5 : 12, color: "var(--color-muted)", margin: 0,
-                            overflow: "hidden", display: "-webkit-box",
-                            WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
-                          }}>{textContent.slice(0, 70)}</p>
-                        ) : !imageUrl ? (
-                          <p style={{ fontSize: isDesktop ? 10.5 : 12, color: "var(--color-muted)", margin: 0 }}>📎 ファイル</p>
-                        ) : null}
+                      <div style={{ display: "flex", gap: 8, alignItems: "flex-start", flex: 1, minWidth: 0 }}>
+                        {imageUrl && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={imageUrl.trim().split("#")[0]} alt="" style={{
+                            width: isDesktop ? 44 : 56, height: isDesktop ? 44 : 56,
+                            objectFit: "cover", borderRadius: 8, flexShrink: 0,
+                          }} loading="lazy" />
+                        )}
+                        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" as const, gap: 2 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                            {note.avatar_url ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={note.avatar_url} alt="" style={{
+                                width: isDesktop ? 16 : 18, height: isDesktop ? 16 : 18,
+                                borderRadius: "50%", objectFit: "cover" as const, flexShrink: 0,
+                              }} />
+                            ) : (
+                              <span style={{
+                                width: isDesktop ? 16 : 18, height: isDesktop ? 16 : 18,
+                                borderRadius: "50%", background: "var(--color-muted)",
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                fontSize: 7, fontWeight: 700, color: "#fff", flexShrink: 0,
+                              }}>{note.display_name.charAt(0)}</span>
+                            )}
+                            <span style={{ fontSize: isDesktop ? 10 : 11, color: "var(--color-foreground)", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{note.display_name}</span>
+                            <span style={{ fontSize: isDesktop ? 9 : 10, color: "var(--color-muted)", marginLeft: "auto", flexShrink: 0 }}>{ago}</span>
+                          </div>
+                          {textContent ? (
+                            <p style={{
+                              fontSize: isDesktop ? 10.5 : 12, lineHeight: isDesktop ? 1.35 : 1.4,
+                              color: isDesktop ? "var(--color-muted)" : "var(--color-foreground)",
+                              margin: 0, overflow: "hidden", display: "-webkit-box",
+                              WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
+                            }}>{textContent.slice(0, 70)}</p>
+                          ) : !imageUrl ? (
+                            <p style={{ fontSize: isDesktop ? 10.5 : 12, color: "var(--color-muted)", margin: 0 }}>📎 ファイル</p>
+                          ) : null}
+                        </div>
                       </div>
                     </Link>
                   );
@@ -1091,13 +1110,9 @@ export function Sidebar({
               保存
             </button>
           </div>
-        </div>
 
-        {/* チャンネル・DM一覧（プルリフレッシュ対応） */}
-        <PullToRefresh onRefresh={async () => { await fetchHitorigotoPreview(); }}>
-        <div className="flex-1 overflow-y-auto overflow-x-hidden" style={{ padding: "0 12px 8px" }}>
-          {/* ステータスチップ: PCのみ均等幅ボタン（モバイルはヘッダー内pill）— モック準拠インラインスタイル */}
-          <div className="hidden lg:flex" style={{ gap: 6, padding: "8px 4px 8px", flexShrink: 0 }}>
+          {/* PC: 進行中・決定チップ（固定表示） */}
+          <div className="hidden lg:flex" style={{ gap: 6, padding: "4px 4px 6px", flexShrink: 0 }}>
             <Link
               href={`/${workspaceSlug}/in-progress`}
               onClick={() => setSidebarOpen(false)}
@@ -1137,8 +1152,11 @@ export function Sidebar({
               }}>{decisionUnreadCount}</span>
             </Link>
           </div>
+        </div>
 
-
+        {/* チャンネル・DM一覧（プルリフレッシュ対応） */}
+        <PullToRefresh onRefresh={async () => { await fetchHitorigotoPreview(); }}>
+        <div className="flex-1 overflow-y-auto overflow-x-hidden" style={{ padding: "0 12px 8px" }}>
           {/* チャンネルセクション — ヘッダーは控えめに、＋ボタンのみ */}
           <div className="mt-1 mb-0.5 flex items-center justify-end" style={{ gap: 2 }}>
             <button
