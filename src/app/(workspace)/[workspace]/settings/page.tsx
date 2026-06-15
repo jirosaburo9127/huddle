@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useParams } from "next/navigation";
 import { ThemeSelector } from "@/components/theme-selector";
 import { signOut } from "@/lib/actions";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
@@ -8,20 +9,38 @@ import { createClient } from "@/lib/supabase/client";
 
 export default function SettingsPage() {
   const setSidebarOpen = useMobileNavStore((s) => s.setSidebarOpen);
+  const params = useParams<{ workspace: string }>();
   const supabase = createClient();
 
   const [currentEmail, setCurrentEmail] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [emailSaving, setEmailSaving] = useState(false);
   const [emailMsg, setEmailMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [archivedChannels, setArchivedChannels] = useState<Array<{ id: string; name: string }>>([]);
 
-  // メールアドレス取得
+  // メールアドレス + アーカイブ済みチャンネル取得
   useEffect(() => {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user?.email) setCurrentEmail(user.email);
+      // ワークスペースID取得 → アーカイブ済みチャンネル
+      const { data: ws } = await supabase
+        .from("workspaces")
+        .select("id")
+        .eq("slug", params.workspace)
+        .maybeSingle();
+      if (ws) {
+        const { data } = await supabase
+          .from("channels")
+          .select("id, name")
+          .eq("workspace_id", ws.id)
+          .eq("is_archived", true)
+          .eq("is_dm", false)
+          .order("name");
+        if (data) setArchivedChannels(data);
+      }
     })();
-  }, [supabase]);
+  }, [supabase, params.workspace]);
 
   return (
     <div className="flex flex-col h-full">
@@ -46,6 +65,37 @@ export default function SettingsPage() {
           <h2 className="text-sm font-semibold text-foreground mb-3">テーマ</h2>
           <ThemeSelector />
         </section>
+
+        {/* アーカイブ済みチャンネル */}
+        {archivedChannels.length > 0 && (
+          <section>
+            <h2 className="text-sm font-semibold text-foreground mb-3">アーカイブ済みチャンネル</h2>
+            <div className="space-y-1">
+              {archivedChannels.map((ch) => (
+                <div key={ch.id} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.03] border border-border/50">
+                  <span className="text-sm text-muted flex-1 truncate"># {ch.name}</span>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const { error } = await supabase.rpc("set_channel_archived", {
+                        p_channel_id: ch.id,
+                        p_archived: false,
+                      });
+                      if (error) {
+                        alert("解除に失敗しました: " + error.message);
+                        return;
+                      }
+                      setArchivedChannels((prev) => prev.filter((c) => c.id !== ch.id));
+                    }}
+                    className="shrink-0 px-3 py-1 text-xs font-medium text-accent border border-accent/30 rounded-lg hover:bg-accent/10 transition-colors"
+                  >
+                    解除
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* アカウント */}
         <section>
