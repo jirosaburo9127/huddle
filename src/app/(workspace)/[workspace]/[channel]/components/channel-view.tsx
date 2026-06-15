@@ -2069,6 +2069,28 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                       </button>
                       <button
                         role="menuitem"
+                        onClick={async () => {
+                          setShowOverflowMenu(false);
+                          if (!confirm("このチャンネルをアーカイブしますか？\nサイドバーから非表示になりますが、データは保持されます。")) return;
+                          const { error } = await supabase.rpc("set_channel_archived", {
+                            p_channel_id: channel.id,
+                            p_archived: true,
+                          });
+                          if (error) {
+                            alert("アーカイブに失敗しました: " + error.message);
+                            return;
+                          }
+                          window.location.href = `/${workspaceSlug}`;
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-sidebar-hover transition-colors"
+                      >
+                        <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                        </svg>
+                        アーカイブ
+                      </button>
+                      <button
+                        role="menuitem"
                         onClick={() => {
                           setShowOverflowMenu(false);
                           setShowDeleteChannel(true);
