@@ -1126,7 +1126,7 @@ export function Sidebar({
                 style={{
                   display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
                   padding: "6px 2px", borderRadius: 8,
-                  fontSize: 10.5, fontWeight: 500, color: "var(--color-muted)",
+                  fontSize: 9, fontWeight: 500, color: "var(--color-muted)",
                   textDecoration: "none",
                 }}
               >
@@ -1142,7 +1142,7 @@ export function Sidebar({
               style={{
                 display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
                 padding: "6px 2px", borderRadius: 8,
-                fontSize: 10.5, fontWeight: 500, color: "var(--color-muted)",
+                fontSize: 9, fontWeight: 500, color: "var(--color-muted)",
                 background: "none", border: "none", cursor: "pointer",
               }}
             >
