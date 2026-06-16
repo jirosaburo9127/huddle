@@ -869,62 +869,61 @@ export const MessageItem = memo(function MessageItem({
               )}
               <span style={{ fontSize: 10, color: "var(--color-muted)" }}>{time}</span>
             </div>
+            {/* PC: ホバーアクションバー（DM用、吹き出し直下） */}
+            {!isEditing && (
+              <div className="hidden lg:flex mt-1 transition-opacity items-center gap-0.5 opacity-0 group-hover:opacity-100" style={{ justifyContent: isOwn ? "flex-end" : "flex-start" }}>
+                {onReact && (
+                  <div className="relative">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setEmojiPickerLocation((v) => v === "action" ? null : "action"); }}
+                      className="flex items-center gap-1 px-1.5 py-0.5 text-[12px] text-muted hover:text-accent rounded transition-colors"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </button>
+                    {emojiPickerLocation === "action" && (
+                      <EmojiPicker
+                        onSelect={handleEmojiSelect}
+                        onClose={() => setEmojiPickerLocation(null)}
+                        position="above"
+                      />
+                    )}
+                  </div>
+                )}
+                {onReply && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onReply(message); }}
+                    className="flex items-center gap-1 px-1.5 py-0.5 text-[12px] text-muted hover:text-accent rounded transition-colors"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                    </svg>
+                  </button>
+                )}
+                {isOwn && (
+                  <>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setIsEditing(true); setEditContent(message.content); }}
+                      className="flex items-center gap-1 px-1.5 py-0.5 text-[12px] text-muted hover:text-accent rounded transition-colors"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setIsDeleting(true); }}
+                      className="flex items-center gap-1 px-1.5 py-0.5 text-[12px] text-muted hover:text-mention rounded transition-colors"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
           </div>
-
-          {/* PC: ホバーアクションバー（DM用） */}
-          {!isEditing && (
-            <div className="hidden lg:flex absolute -top-3 right-4 z-10 transition-opacity items-center gap-0.5 bg-surface/95 backdrop-blur-sm border border-border/60 rounded-lg px-1 py-0.5 shadow-lg opacity-0 group-hover:opacity-100">
-              {onReact && (
-                <div className="relative">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setEmojiPickerLocation((v) => v === "action" ? null : "action"); }}
-                    className="flex items-center gap-1 px-2 py-0.5 text-[13px] text-muted hover:text-accent border border-transparent hover:border-border/50 rounded transition-colors"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </button>
-                  {emojiPickerLocation === "action" && (
-                    <EmojiPicker
-                      onSelect={handleEmojiSelect}
-                      onClose={() => setEmojiPickerLocation(null)}
-                      position="above"
-                    />
-                  )}
-                </div>
-              )}
-              {onReply && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); onReply(message); }}
-                  className="flex items-center gap-1 px-2 py-0.5 text-[13px] text-muted hover:text-accent border border-transparent hover:border-border/50 rounded transition-colors"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                  </svg>
-                </button>
-              )}
-              {isOwn && (
-                <>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setIsEditing(true); setEditContent(message.content); }}
-                    className="flex items-center gap-1 px-2 py-0.5 text-[13px] text-muted hover:text-accent border border-transparent hover:border-border/50 rounded transition-colors"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setIsDeleting(true); }}
-                    className="flex items-center gap-1 px-2 py-0.5 text-[13px] text-muted hover:text-mention border border-transparent hover:border-border/50 rounded transition-colors"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
-                </>
-              )}
-            </div>
-          )}
         </div>
 
         {/* モバイルアクションシート（DM用） */}
