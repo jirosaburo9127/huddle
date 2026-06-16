@@ -1055,7 +1055,9 @@ export const MessageItem = memo(function MessageItem({
 
         {lightboxState && (
           <ImageLightbox
-            url={lightboxState.urls[lightboxState.index]}
+            mediaList={lightboxState.urls.map((u) => ({ url: u }))}
+            currentIndex={lightboxState.index}
+            onIndexChange={(i) => setLightboxState({ ...lightboxState, index: i })}
             onClose={() => setLightboxState(null)}
           />
         )}
