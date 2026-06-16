@@ -426,7 +426,7 @@ export function ImageLightbox(props: Props) {
 
       {/* インデックス表示（連続閲覧時のみ） */}
       {usingList && mediaList && mediaList.length > 1 && (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 px-3 py-1 rounded-full bg-black/60 border border-white/20 text-white text-xs">
+        <div className="absolute bottom-20 lg:bottom-4 left-1/2 -translate-x-1/2 z-10 px-3 py-1.5 rounded-full bg-black/60 border border-white/20 text-white text-sm font-medium">
           {currentIndex + 1} / {mediaList.length}
         </div>
       )}
