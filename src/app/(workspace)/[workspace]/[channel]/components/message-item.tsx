@@ -436,13 +436,8 @@ function ReactionBadges({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                if (typeof window !== "undefined" && window.innerWidth >= 1024) {
-                  // PC: クリックでトグル
-                  onReact?.(emoji);
-                } else {
-                  // モバイル: タップで誰がリアクションしたかモーダル表示
-                  handleTap(emoji, names, reacted);
-                }
+                // PC/モバイル共通: タップで誰がリアクションしたかモーダル表示
+                handleTap(emoji, names, reacted);
               }}
               onContextMenu={(e) => e.preventDefault()}
               className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm cursor-pointer transition-colors select-none ${
@@ -540,11 +535,11 @@ function ReactionBadges({
       {/* 長押し: リアクターモーダル */}
       {longPressNames && (
         <div
-          className="fixed inset-0 z-[60] flex items-end lg:hidden"
+          className="fixed inset-0 z-[60] flex items-end sm:items-center sm:justify-center"
           onClick={() => setLongPressNames(null)}
         >
           <div className="absolute inset-0 bg-black/40" />
-          <div className="relative w-full rounded-t-2xl bg-surface border-t border-border px-5 pt-4 pb-20 animate-slide-up" onClick={(e) => e.stopPropagation()}>
+          <div className="relative w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl bg-surface border-t sm:border border-border px-5 pt-4 pb-20 sm:pb-5 animate-slide-up" onClick={(e) => e.stopPropagation()}>
             <div className="w-10 h-1 rounded-full bg-muted/30 mx-auto mb-4" />
             <div className="flex items-center gap-2 mb-3">
               {longPressNames.emoji.length <= 2 ? (
