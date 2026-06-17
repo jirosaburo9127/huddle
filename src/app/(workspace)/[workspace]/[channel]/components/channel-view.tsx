@@ -906,9 +906,8 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
           if (!fadeTimer) {
             fadeTimer = setTimeout(() => {
               setUnreadLineState("fading");
-              // CSS トランジション分だけ待ってから DOM から消す
-              setTimeout(() => setUnreadLineState("hidden"), 600);
-            }, 3000);
+              setTimeout(() => setUnreadLineState("hidden"), 400);
+            }, 1000);
           }
         } else {
           if (fadeTimer) {
