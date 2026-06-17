@@ -840,15 +840,52 @@ export const MessageItem = memo(function MessageItem({
               background: isOwn ? "rgba(56,189,248,0.12)" : "var(--color-sidebar)",
               fontSize: 14.5, lineHeight: 1.6, color: "var(--color-foreground)",
             }}>
-              <MessageContent
-                messageId={message.id}
-                content={message.content}
-                imageError={imageError}
-                onImageError={() => setImageError(true)}
-                onImageClick={(urls, index) => setLightboxState({ urls, index })}
-                onVideoThumbnailBackfilled={onVideoThumbnailBackfilled}
-                memberNames={memberNames}
-              />
+              {isEditing ? (
+                <div>
+                  <textarea
+                    ref={editTextareaRef}
+                    value={editContent}
+                    onChange={(e) => setEditContent(e.target.value)}
+                    className="w-full resize-none rounded-lg border border-border bg-input-bg px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none"
+                    style={{ minHeight: 60 }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") { setIsEditing(false); }
+                      if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                        e.preventDefault();
+                        if (editContent.trim()) {
+                          onEdit(message.id, editContent.trim());
+                          setIsEditing(false);
+                        }
+                      }
+                    }}
+                  />
+                  <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+                    <button
+                      onClick={() => {
+                        if (editContent.trim()) {
+                          onEdit(message.id, editContent.trim());
+                          setIsEditing(false);
+                        }
+                      }}
+                      className="px-3 py-1 text-xs font-medium bg-accent text-white rounded-lg hover:bg-accent-hover transition-colors"
+                    >保存</button>
+                    <button
+                      onClick={() => setIsEditing(false)}
+                      className="px-3 py-1 text-xs text-muted hover:text-foreground rounded-lg transition-colors"
+                    >キャンセル</button>
+                  </div>
+                </div>
+              ) : (
+                <MessageContent
+                  messageId={message.id}
+                  content={message.content}
+                  imageError={imageError}
+                  onImageError={() => setImageError(true)}
+                  onImageClick={(urls, index) => setLightboxState({ urls, index })}
+                  onVideoThumbnailBackfilled={onVideoThumbnailBackfilled}
+                  memberNames={memberNames}
+                />
+              )}
             </div>
             {/* リアクションバッジ */}
             {groupedReactions.length > 0 && !isEditing && (
