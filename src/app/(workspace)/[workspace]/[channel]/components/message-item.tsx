@@ -46,6 +46,7 @@ type Props = {
   hasPoll?: boolean;
   hasEvent?: boolean;
   readCount?: number; // -1: 非表示（他人の投稿）、0以上: 既読数
+  readByNames?: string[]; // 既読者の表示名リスト
   memberCount?: number; // 自分以外のメンバー数
   // メンションハイライト用: workspace 全メンバーの display_name 配列
   // 渡せば本文中の @<name> を厳密マッチで span 化する
@@ -592,6 +593,7 @@ export const MessageItem = memo(function MessageItem({
   hasPoll,
   hasEvent,
   readCount = -1,
+  readByNames = [],
   memberCount = 0,
   memberNames,
   isDm,
@@ -618,6 +620,7 @@ export const MessageItem = memo(function MessageItem({
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [showReadBy, setShowReadBy] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [emojiPickerLocation, setEmojiPickerLocation] = useState<"action" | "inline" | null>(null);
   const [imageError, setImageError] = useState(false);
@@ -897,7 +900,7 @@ export const MessageItem = memo(function MessageItem({
             {/* 時刻 + 既読 */}
             <div style={{ display: "flex", justifyContent: isOwn ? "flex-end" : "flex-start", gap: 4, marginTop: 4 }}>
               {isOwn && readCount >= 0 && readCount > 0 && (
-                <span style={{ fontSize: 10, color: "var(--color-muted)" }}>既読</span>
+                <button type="button" onClick={(e) => { e.stopPropagation(); setShowReadBy(true); }} style={{ fontSize: 10, color: "var(--color-muted)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>既読</button>
               )}
               <span style={{ fontSize: 10, color: "var(--color-muted)" }}>{time}</span>
             </div>
@@ -1416,16 +1419,16 @@ export const MessageItem = memo(function MessageItem({
             />
           )}
 
-          {/* 既読表示（LINE方式: 自分の投稿にのみ表示） */}
-          {readCount >= 0 && !isEditing && (
+          {/* 既読表示（LINE方式: 自分の投稿にのみ表示、タップで既読者表示） */}
+          {readCount >= 0 && !isEditing && readCount > 0 && (
             <div className="mt-1 text-right">
-              <span className="text-[11px] text-muted/70">
-                {readCount > 0
-                  ? memberCount <= 1
-                    ? "既読"
-                    : `既読 ${readCount}`
-                  : ""}
-              </span>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setShowReadBy(true); }}
+                className="text-[11px] text-muted/70 hover:text-accent transition-colors bg-transparent border-none cursor-pointer p-0"
+              >
+                {memberCount <= 1 ? "既読" : `既読 ${readCount}`}
+              </button>
             </div>
           )}
 
@@ -1751,6 +1754,30 @@ export const MessageItem = memo(function MessageItem({
           onClose={() => setLightboxState(null)}
           contextLabel={channelSlug ? `#${channelSlug}` : undefined}
         />
+      )}
+
+      {/* 既読者モーダル */}
+      {showReadBy && readByNames.length > 0 && (
+        <div
+          className="fixed inset-0 z-[60] flex items-end sm:items-center sm:justify-center"
+          onClick={() => setShowReadBy(false)}
+        >
+          <div className="absolute inset-0 bg-black/40" />
+          <div
+            className="relative w-full sm:max-w-xs sm:rounded-2xl rounded-t-2xl bg-surface border-t sm:border border-border px-5 pt-4 pb-20 sm:pb-5 animate-slide-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-10 h-1 rounded-full bg-muted/30 mx-auto mb-4 sm:hidden" />
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-base font-semibold text-foreground">既読 {readByNames.length}</span>
+            </div>
+            <div className="space-y-2.5">
+              {readByNames.map((name) => (
+                <div key={name} className="text-sm text-foreground">{name}</div>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

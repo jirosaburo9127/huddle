@@ -174,7 +174,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
   const [unreadLineState, setUnreadLineState] = useState<"visible" | "fading" | "hidden">("visible");
 
   // 既読状態: チャンネルメンバーの last_read_at を取得して既読数を計算
-  const [memberReadTimes, setMemberReadTimes] = useState<Array<{ user_id: string; last_read_at: string | null }>>([]);
+  const [memberReadTimes, setMemberReadTimes] = useState<Array<{ user_id: string; last_read_at: string | null; display_name?: string }>>([]);
   const memberCountForRead = memberReadTimes.filter((m) => m.user_id !== currentUserId).length;
   // メンション表示用の workspace メンバー名リスト (display_name 配列)
   // メッセージ本文の @<name> を厳密にマッチさせるために使う
@@ -219,9 +219,14 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
     async function fetchReadTimes() {
       const { data } = await supabase
         .from("channel_members")
-        .select("user_id, last_read_at")
+        .select("user_id, last_read_at, profiles(display_name)")
         .eq("channel_id", channel.id);
-      if (!cancelled && data) setMemberReadTimes(data);
+      if (!cancelled && data) {
+        setMemberReadTimes(data.map((m: Record<string, unknown>) => {
+          const p = m.profiles as { display_name: string } | null;
+          return { user_id: m.user_id as string, last_read_at: m.last_read_at as string | null, display_name: p?.display_name || undefined };
+        }));
+      }
     }
     fetchReadTimes();
     // 10秒ごとに既読状態を更新
@@ -271,6 +276,15 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
     return memberReadTimes.filter(
       (m) => m.user_id !== currentUserId && m.last_read_at && new Date(m.last_read_at).getTime() >= msgTime
     ).length;
+  }, [memberReadTimes, currentUserId]);
+
+  // 既読者の名前リストを返す
+  const getReadByNames = useCallback((message: MessageWithProfile): string[] => {
+    if (message.user_id !== currentUserId) return [];
+    const msgTime = new Date(message.created_at).getTime();
+    return memberReadTimes
+      .filter((m) => m.user_id !== currentUserId && m.last_read_at && new Date(m.last_read_at).getTime() >= msgTime)
+      .map((m) => m.display_name || "不明");
   }, [memberReadTimes, currentUserId]);
 
   // ミュート状態のみ取得 (myLastReadAt の設定は上の既読化 effect に一元化)
@@ -2295,6 +2309,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                         hasPoll={pollMessageIds.has(message.id)}
                         hasEvent={eventMessageIds.has(message.id)}
                         readCount={getReadCount(message)}
+                        readByNames={getReadByNames(message)}
                         memberCount={memberCountForRead}
                         memberNames={workspaceMemberNames}
                         isDm={channel.is_dm}
