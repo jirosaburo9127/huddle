@@ -11,18 +11,19 @@ type Props = {
   task: Task | null; // null = 新規作成
   channels: ChannelOption[];
   currentUserId: string;
+  defaultStatus?: "todo" | "in_progress" | "done";
   onClose: () => void;
   onSaved: () => void;
 };
 
-export function TaskModal({ task, channels, currentUserId, onClose, onSaved }: Props) {
+export function TaskModal({ task, channels, currentUserId, defaultStatus, onClose, onSaved }: Props) {
   const supabase = createClient();
   const isEdit = !!task;
 
   const [title, setTitle] = useState(task?.title || "");
   const [description, setDescription] = useState(task?.description || "");
   const [channelId, setChannelId] = useState(task?.channel_id || (channels.length > 0 ? channels[0].id : ""));
-  const [status, setStatus] = useState(task?.status || "todo");
+  const [status, setStatus] = useState(task?.status || defaultStatus || "todo");
   const [dueDate, setDueDate] = useState(task?.due_date || "");
   const [assigneeIds, setAssigneeIds] = useState<Set<string>>(new Set(task?.assignees.map((a) => a.user_id) || []));
   const [members, setMembers] = useState<MemberOption[]>([]);

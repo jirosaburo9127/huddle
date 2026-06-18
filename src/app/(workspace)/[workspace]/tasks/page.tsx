@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
-import { TaskCard } from "./components/task-card";
 import { TaskModal } from "./components/task-modal";
 
 export type Task = {
@@ -24,10 +23,15 @@ export type Task = {
 };
 
 const COLUMNS = [
-  { key: "todo" as const, label: "未着手", color: "var(--color-muted)" },
-  { key: "in_progress" as const, label: "進行中", color: "var(--color-sky)" },
-  { key: "done" as const, label: "完了", color: "#22c55e" },
+  { key: "todo" as const, label: "ToDo", color: "#3B82F6", bg: "rgba(59,130,246,0.06)", border: "rgba(59,130,246,0.25)" },
+  { key: "in_progress" as const, label: "進行中", color: "#F59E0B", bg: "rgba(245,158,11,0.06)", border: "rgba(245,158,11,0.25)" },
+  { key: "done" as const, label: "完了", color: "#22C55E", bg: "rgba(34,197,94,0.06)", border: "rgba(34,197,94,0.25)" },
 ];
+
+function formatDue(d: string): string {
+  const date = new Date(d + "T00:00:00");
+  return `${date.getMonth() + 1}/${date.getDate()}`;
+}
 
 export default function TasksPage() {
   const params = useParams<{ workspace: string }>();
@@ -40,11 +44,10 @@ export default function TasksPage() {
   const [loading, setLoading] = useState(true);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [showCreate, setShowCreate] = useState(false);
-  const [activeTab, setActiveTab] = useState<"todo" | "in_progress" | "done">("todo");
-  const [filterChannel, setFilterChannel] = useState<string>("");
-  const [filterMine, setFilterMine] = useState(false);
-  const [showDone, setShowDone] = useState(false);
+  const [createStatus, setCreateStatus] = useState<Task["status"]>("todo");
+  const [dragTaskId, setDragTaskId] = useState<string | null>(null);
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<Task["status"]>("todo");
 
   useEffect(() => { setSidebarOpen(false); }, [setSidebarOpen]);
 
@@ -60,27 +63,18 @@ export default function TasksPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || cancelled) return;
       setCurrentUserId(user.id);
-
-      // チャンネル一覧
       const { data: ws } = await supabase.from("workspaces").select("id").eq("slug", params.workspace).maybeSingle();
       if (!ws || cancelled) return;
-      const { data: chData } = await supabase
-        .from("channel_members")
-        .select("channels(id, name, slug, workspace_id)")
-        .eq("user_id", user.id);
+      const { data: chData } = await supabase.from("channel_members").select("channels(id, name, slug, workspace_id)").eq("user_id", user.id);
       if (chData && !cancelled) {
         type ChWithWs = { id: string; name: string; slug: string; workspace_id: string };
         const chs: Array<{ id: string; name: string; slug: string }> = [];
         for (const r of chData) {
           const ch = (r as Record<string, unknown>).channels as ChWithWs | null;
-          if (ch && ch.workspace_id === ws.id) {
-            chs.push({ id: ch.id, name: ch.name, slug: ch.slug });
-          }
+          if (ch && ch.workspace_id === ws.id) chs.push({ id: ch.id, name: ch.name, slug: ch.slug });
         }
         setChannels(chs);
       }
-
-      // タスク取得
       const { data: taskData } = await supabase.rpc("get_my_tasks", { p_user_id: user.id });
       if (!cancelled && taskData && Array.isArray(taskData)) setTasks(taskData as Task[]);
       if (!cancelled) setLoading(false);
@@ -88,54 +82,20 @@ export default function TasksPage() {
     return () => { cancelled = true; };
   }, [params.workspace, supabase]);
 
-  // フィルター適用
-  const filteredTasks = useMemo(() => {
-    let result = tasks;
-    if (filterChannel) result = result.filter((t) => t.channel_id === filterChannel);
-    if (filterMine && currentUserId) result = result.filter((t) => t.assignees.some((a) => a.user_id === currentUserId));
-    return result;
-  }, [tasks, filterChannel, filterMine, currentUserId]);
-
   const tasksByStatus = useMemo(() => ({
-    todo: filteredTasks.filter((t) => t.status === "todo"),
-    in_progress: filteredTasks.filter((t) => t.status === "in_progress"),
-    done: filteredTasks.filter((t) => t.status === "done"),
-  }), [filteredTasks]);
-
-  // ドラッグ&ドロップ
-  const [dragTaskId, setDragTaskId] = useState<string | null>(null);
-
-  function handleDragStart(taskId: string) {
-    setDragTaskId(taskId);
-  }
+    todo: tasks.filter((t) => t.status === "todo"),
+    in_progress: tasks.filter((t) => t.status === "in_progress"),
+    done: tasks.filter((t) => t.status === "done"),
+  }), [tasks]);
 
   async function handleDrop(newStatus: string) {
     setDragOverCol(null);
     if (!dragTaskId) return;
     const task = tasks.find((t) => t.id === dragTaskId);
     if (!task || task.status === newStatus) { setDragTaskId(null); return; }
-
-    // 楽観的更新
     setTasks((prev) => prev.map((t) => t.id === dragTaskId ? { ...t, status: newStatus as Task["status"] } : t));
     setDragTaskId(null);
-
-    const { error } = await supabase
-      .from("tasks")
-      .update({ status: newStatus, updated_at: new Date().toISOString() })
-      .eq("id", dragTaskId);
-    if (error) {
-      // ロールバック
-      setTasks((prev) => prev.map((t) => t.id === dragTaskId ? { ...t, status: task.status } : t));
-    }
-  }
-
-  // スマホ: タップでステータス変更
-  async function cycleStatus(task: Task) {
-    const order: Task["status"][] = ["todo", "in_progress", "done"];
-    const idx = order.indexOf(task.status);
-    const next = order[(idx + 1) % order.length];
-    setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, status: next } : t));
-    await supabase.from("tasks").update({ status: next, updated_at: new Date().toISOString() }).eq("id", task.id);
+    await supabase.from("tasks").update({ status: newStatus, updated_at: new Date().toISOString() }).eq("id", dragTaskId);
   }
 
   const [isDesktop, setIsDesktop] = useState(false);
@@ -146,6 +106,63 @@ export default function TasksPage() {
     return () => window.removeEventListener("resize", check);
   }, []);
 
+  const today = new Date().toISOString().slice(0, 10);
+
+  function renderCard(task: Task) {
+    const isOverdue = task.due_date && task.due_date < today && task.status !== "done";
+    return (
+      <div
+        key={task.id}
+        draggable={isDesktop}
+        onDragStart={() => setDragTaskId(task.id)}
+        onClick={() => setEditingTask(task)}
+        className="bg-surface rounded-lg border border-border/60 p-3 cursor-pointer hover:shadow-md transition-shadow"
+        style={{ touchAction: "manipulation" }}
+      >
+        <p className={`text-[13px] font-medium leading-snug mb-2 ${task.status === "done" ? "line-through text-muted" : "text-foreground"}`}>
+          {task.title}
+        </p>
+
+        {/* チャンネル + 期限 */}
+        <div className="flex items-center gap-2 flex-wrap mb-2">
+          <span className="inline-flex items-center gap-1 text-[10px] text-muted bg-sidebar rounded px-1.5 py-0.5">
+            {task.channel.icon_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={task.channel.icon_url} alt="" className="w-3 h-3 rounded-sm object-cover" />
+            ) : "#"}
+            {task.channel.name}
+          </span>
+          {task.due_date && (
+            <span className={`inline-flex items-center gap-1 text-[10px] rounded px-1.5 py-0.5 font-medium ${
+              isOverdue ? "bg-mention/10 text-mention" : "bg-sidebar text-muted"
+            }`}>
+              📅 {formatDue(task.due_date)}
+            </span>
+          )}
+        </div>
+
+        {/* 担当者 */}
+        {task.assignees.length > 0 && (
+          <div className="flex items-center gap-1">
+            {task.assignees.slice(0, 4).map((a) => (
+              a.avatar_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img key={a.user_id} src={a.avatar_url} alt={a.display_name} title={a.display_name} className="w-6 h-6 rounded-full object-cover border-2 border-surface" />
+              ) : (
+                <span key={a.user_id} title={a.display_name} className="w-6 h-6 rounded-full bg-muted/20 flex items-center justify-center text-[9px] font-bold text-muted border-2 border-surface">
+                  {a.display_name.charAt(0)}
+                </span>
+              )
+            ))}
+            {task.assignees.length > 4 && (
+              <span className="text-[10px] text-muted ml-0.5">+{task.assignees.length - 4}</span>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -155,102 +172,57 @@ export default function TasksPage() {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-background">
       {/* ヘッダー */}
-      <header className="flex items-center justify-between px-4 py-3 border-b border-border bg-header shrink-0">
-        <div className="flex items-center gap-2">
-          <span className="text-lg">📋</span>
-          <h1 className="text-base font-bold text-foreground">タスク</h1>
-          <span className="text-xs bg-accent/10 text-accent rounded-full px-2 py-0.5">
-            {tasks.filter((t) => t.status !== "done").length}
-          </span>
-        </div>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="text-xs bg-accent text-white px-3 py-1.5 rounded-lg hover:bg-accent-hover transition-colors"
-        >
-          ＋ 新規タスク
-        </button>
+      <header className="flex items-center justify-between px-4 lg:px-6 py-3 border-b border-border bg-surface shrink-0">
+        <h1 className="text-lg font-bold text-foreground">📋 タスクボード</h1>
       </header>
 
-      {/* フィルター */}
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-border/50 shrink-0 overflow-x-auto">
-        <select
-          value={filterChannel}
-          onChange={(e) => setFilterChannel(e.target.value)}
-          className="rounded-lg border border-border bg-input-bg px-2 py-1 text-xs text-foreground focus:outline-none"
-        >
-          <option value="">全チャンネル</option>
-          {channels.map((ch) => (
-            <option key={ch.id} value={ch.id}>#{ch.name}</option>
-          ))}
-        </select>
-        <button
-          onClick={() => setFilterMine((v) => !v)}
-          className={`rounded-lg px-2 py-1 text-xs border transition-colors ${
-            filterMine ? "border-accent bg-accent/10 text-accent" : "border-border text-muted"
-          }`}
-        >
-          自分の担当
-        </button>
-      </div>
-
-      {/* PC: 3カラムカンバン / スマホ: タブ切り替え */}
+      {/* PC: 横スクロールカンバン / スマホ: タブ切り替え */}
       <div className="flex-1 overflow-hidden">
         {isDesktop ? (
-          /* PC: 3カラム横並び */
           <div className="flex h-full gap-4 p-4 overflow-x-auto">
             {COLUMNS.map((col) => {
-              if (col.key === "done" && !showDone) {
-                return (
-                  <div key={col.key} className="w-60 shrink-0 flex flex-col">
-                    <button
-                      onClick={() => setShowDone(true)}
-                      className="flex items-center gap-2 px-3 py-2 text-sm text-muted hover:text-foreground transition-colors"
-                    >
-                      <span style={{ color: col.color }}>●</span>
-                      {col.label}（{tasksByStatus.done.length}）
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                      </svg>
-                    </button>
-                  </div>
-                );
-              }
               const colTasks = tasksByStatus[col.key];
               return (
                 <div
                   key={col.key}
-                  className={`w-72 shrink-0 flex flex-col rounded-xl transition-colors ${
-                    dragOverCol === col.key ? "bg-accent/5" : "bg-sidebar/50"
-                  }`}
+                  className="w-72 shrink-0 flex flex-col rounded-xl overflow-hidden transition-colors"
+                  style={{
+                    background: dragOverCol === col.key ? col.bg : col.bg,
+                    border: `2px solid ${dragOverCol === col.key ? col.color : col.border}`,
+                  }}
                   onDragOver={(e) => { e.preventDefault(); setDragOverCol(col.key); }}
                   onDragLeave={() => setDragOverCol(null)}
                   onDrop={(e) => { e.preventDefault(); handleDrop(col.key); }}
                 >
-                  <div className="flex items-center gap-2 px-3 py-2 shrink-0">
-                    <span style={{ color: col.color, fontSize: 10 }}>●</span>
-                    <span className="text-sm font-semibold text-foreground">{col.label}</span>
-                    <span className="text-xs text-muted">{colTasks.length}</span>
-                    {col.key === "done" && (
-                      <button onClick={() => setShowDone(false)} className="ml-auto text-muted hover:text-foreground">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    )}
+                  {/* カラムヘッダー */}
+                  <div className="flex items-center justify-between px-3 py-2.5 shrink-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold" style={{ color: col.color }}>{col.label}</span>
+                      <span className="text-xs text-muted bg-surface/80 rounded-full px-1.5 py-0.5 font-medium">{colTasks.length}</span>
+                    </div>
+                    <button
+                      onClick={() => { setCreateStatus(col.key); setShowCreate(true); }}
+                      className="text-muted hover:text-foreground transition-colors"
+                      title="タスクを追加"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                      </svg>
+                    </button>
                   </div>
+
+                  {/* カードリスト */}
                   <div className="flex-1 overflow-y-auto px-2 pb-2 space-y-2">
-                    {colTasks.map((task) => (
-                      <TaskCard
-                        key={task.id}
-                        task={task}
-                        onClick={() => setEditingTask(task)}
-                        onDragStart={() => handleDragStart(task.id)}
-                      />
-                    ))}
+                    {colTasks.map(renderCard)}
                     {colTasks.length === 0 && (
-                      <div className="text-xs text-muted text-center py-6">タスクなし</div>
+                      <button
+                        onClick={() => { setCreateStatus(col.key); setShowCreate(true); }}
+                        className="w-full py-8 text-xs text-muted hover:text-accent text-center transition-colors"
+                      >
+                        + タスクを追加
+                      </button>
                     )}
                   </div>
                 </div>
@@ -258,72 +230,56 @@ export default function TasksPage() {
             })}
           </div>
         ) : (
-          /* スマホ: タブ切り替え */
+          /* スマホ: タブ */
           <div className="flex flex-col h-full">
-            <div className="flex border-b border-border shrink-0">
+            <div className="flex shrink-0 border-b border-border">
               {COLUMNS.map((col) => (
                 <button
                   key={col.key}
                   onClick={() => setActiveTab(col.key)}
-                  className={`flex-1 py-2.5 text-sm font-medium text-center transition-colors relative ${
-                    activeTab === col.key ? "text-foreground" : "text-muted"
-                  }`}
+                  className="flex-1 py-3 text-center relative"
                 >
-                  {col.label}（{tasksByStatus[col.key].length}）
+                  <span className={`text-sm font-medium ${activeTab === col.key ? "text-foreground" : "text-muted"}`}>
+                    {col.label} {tasksByStatus[col.key].length > 0 && <span className="text-xs">({tasksByStatus[col.key].length})</span>}
+                  </span>
                   {activeTab === col.key && (
                     <span className="absolute bottom-0 left-1/4 right-1/4 h-0.5 rounded-full" style={{ background: col.color }} />
                   )}
                 </button>
               ))}
             </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-2">
-              {tasksByStatus[activeTab].map((task) => (
-                <div key={task.id} className="flex gap-2">
-                  <TaskCard
-                    task={task}
-                    onClick={() => setEditingTask(task)}
-                  />
-                  <button
-                    onClick={() => cycleStatus(task)}
-                    className="shrink-0 w-10 flex items-center justify-center text-muted hover:text-accent transition-colors"
-                    title="ステータス変更"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                </div>
-              ))}
+            <div className="flex-1 overflow-y-auto p-3 space-y-2">
+              {tasksByStatus[activeTab].map(renderCard)}
               {tasksByStatus[activeTab].length === 0 && (
-                <div className="text-center text-muted py-12">
-                  <p className="text-sm">タスクなし</p>
+                <div className="text-center py-12">
+                  <p className="text-sm text-muted mb-3">タスクなし</p>
+                  <button
+                    onClick={() => { setCreateStatus(activeTab); setShowCreate(true); }}
+                    className="text-sm text-accent font-medium"
+                  >
+                    + タスクを追加
+                  </button>
                 </div>
               )}
             </div>
+            {/* スマホ FAB */}
+            <button
+              onClick={() => { setCreateStatus(activeTab); setShowCreate(true); }}
+              className="fixed bottom-20 right-4 w-12 h-12 rounded-full bg-accent text-white shadow-lg flex items-center justify-center lg:hidden z-30 active:scale-90 transition-transform"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+            </button>
           </div>
         )}
       </div>
 
-      {/* 作成モーダル */}
       {showCreate && currentUserId && (
-        <TaskModal
-          task={null}
-          channels={channels}
-          currentUserId={currentUserId}
-          onClose={() => setShowCreate(false)}
-          onSaved={fetchTasks}
-        />
+        <TaskModal task={null} channels={channels} currentUserId={currentUserId} defaultStatus={createStatus} onClose={() => setShowCreate(false)} onSaved={fetchTasks} />
       )}
-
-      {/* 編集モーダル */}
       {editingTask && currentUserId && (
-        <TaskModal
-          task={editingTask}
-          channels={channels}
-          currentUserId={currentUserId}
-          onClose={() => setEditingTask(null)}
-          onSaved={fetchTasks}
-        />
+        <TaskModal task={editingTask} channels={channels} currentUserId={currentUserId} onClose={() => setEditingTask(null)} onSaved={fetchTasks} />
       )}
     </div>
   );
