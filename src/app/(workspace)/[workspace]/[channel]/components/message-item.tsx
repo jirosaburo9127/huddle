@@ -423,10 +423,17 @@ function ReactionBadges({
     return () => window.removeEventListener("resize", check);
   }, []);
 
-  // モバイル: タップで誰がリアクションしたかモーダル表示
-  function handleTap(emoji: string, names: string[], reacted: boolean) {
-    setLongPressNames({ emoji, names, reacted });
+  // タップで誰がリアクションしたかモーダル表示
+  function handleTap(emoji: string, _names: string[], reacted: boolean) {
+    setLongPressNames({ emoji, names: _names, reacted });
   }
+
+  // モーダル表示中、reactions propsから最新のnamesを取得
+  const liveReactorNames = useMemo(() => {
+    if (!longPressNames) return [];
+    const match = reactions.find((r) => r.emoji === longPressNames.emoji);
+    return match?.names ?? longPressNames.names;
+  }, [longPressNames, reactions]);
 
   return (
     <>
@@ -551,9 +558,13 @@ function ReactionBadges({
               <span className="text-base font-semibold text-foreground">リアクションした人</span>
             </div>
             <div className="space-y-2.5 mb-4">
-              {longPressNames.names.map((name) => (
-                <div key={name} className="text-sm text-foreground">{name}</div>
-              ))}
+              {liveReactorNames.length > 0 ? (
+                liveReactorNames.map((name) => (
+                  <div key={name} className="text-sm text-foreground">{name}</div>
+                ))
+              ) : (
+                <div className="text-sm text-muted">読み込み中...</div>
+              )}
             </div>
             {onReact && (
               <button
