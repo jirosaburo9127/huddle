@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { ImageLightbox } from "@/components/image-lightbox";
 
 type Props = {
   channelId: string;
@@ -51,8 +52,36 @@ export function ChannelNote({ channelId, onClose }: Props) {
   const [isSaving, setIsSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [lightboxState, setLightboxState] = useState<{ urls: string[]; index: number } | null>(null);
   const supabase = createClient();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // 画像ペースト処理
+  const handlePaste = useCallback(async (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of Array.from(items)) {
+      if (item.type.startsWith("image/")) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (!file) return;
+        setUploading(true);
+        const ext = file.type.split("/")[1] || "png";
+        const path = `note-images/${channelId}/${crypto.randomUUID()}.${ext}`;
+        const { error: uploadErr } = await supabase.storage
+          .from("chat-files")
+          .upload(path, file, { contentType: file.type });
+        setUploading(false);
+        if (uploadErr) {
+          alert("画像のアップロードに失敗しました: " + uploadErr.message);
+          return;
+        }
+        const { data: urlData } = supabase.storage.from("chat-files").getPublicUrl(path);
+        setEditContent((prev) => prev + (prev ? "\n" : "") + urlData.publicUrl);
+        return;
+      }
+    }
+  }, [channelId, supabase]);
 
   // 固定メモの取得
   useEffect(() => {
@@ -151,8 +180,9 @@ export function ChannelNote({ channelId, onClose }: Props) {
                 const newText = e.target.value;
                 setEditContent(imageLines.length > 0 ? newText + "\n" + imageLines.join("\n") : newText);
               }}
+              onPaste={handlePaste}
               className="w-full min-h-[120px] resize-y rounded-lg border border-border bg-input-bg px-3 py-2 text-sm leading-relaxed text-foreground focus:border-accent focus:outline-none"
-              placeholder="このチャンネルの目的、よく使うリンク、約束ごとなど"
+              placeholder="このチャンネルの目的、よく使うリンク、約束ごとなど（画像のペーストも可）"
             />
             {/* 画像サムネイルプレビュー */}
             {editContent.split("\n").filter((l) => /^https?:\/\/[^\s]*\/storage\/v1\/object\/public\/chat-files\/.*\.(jpg|jpeg|png|gif|webp)/i.test(l.trim())).length > 0 && (
@@ -232,10 +262,36 @@ export function ChannelNote({ channelId, onClose }: Props) {
         ) : (
           <div>
             {content ? (
-              <div
-                className="text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words [&_pre]:whitespace-pre [&_pre]:my-2"
-                dangerouslySetInnerHTML={{ __html: renderMarkdownPreview(content) }}
-              />
+              <div className="text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words [&_pre]:whitespace-pre [&_pre]:my-2">
+                {(() => {
+                  const imageRegex = /^https?:\/\/[^\s]*\/storage\/v1\/object\/public\/chat-files\/[^\s]*\.(jpg|jpeg|png|gif|webp)(\?[^\s]*)?$/i;
+                  const lines = content.split("\n");
+                  const imageUrls = lines.filter((l) => imageRegex.test(l.trim())).map((l) => l.trim());
+                  const textParts = lines.filter((l) => !imageRegex.test(l.trim())).join("\n");
+                  return (
+                    <>
+                      {textParts && (
+                        <div dangerouslySetInnerHTML={{ __html: renderMarkdownPreview(textParts) }} />
+                      )}
+                      {imageUrls.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {imageUrls.map((url, i) => (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              key={i}
+                              src={url}
+                              alt=""
+                              className="rounded-lg max-w-full cursor-pointer hover:opacity-90 transition-opacity"
+                              style={{ maxHeight: 300, objectFit: "contain" }}
+                              onClick={() => setLightboxState({ urls: imageUrls, index: i })}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
             ) : (
               <div className="text-muted text-sm text-center py-8">
                 <p>固定メモはまだありません</p>
@@ -254,6 +310,16 @@ export function ChannelNote({ channelId, onClose }: Props) {
           </div>
         )}
       </div>
+
+      {/* 画像ライトボックス */}
+      {lightboxState && (
+        <ImageLightbox
+          mediaList={lightboxState.urls.map((u) => ({ url: u }))}
+          currentIndex={lightboxState.index}
+          onIndexChange={(i) => setLightboxState({ ...lightboxState, index: i })}
+          onClose={() => setLightboxState(null)}
+        />
+      )}
     </div>
   );
 }
