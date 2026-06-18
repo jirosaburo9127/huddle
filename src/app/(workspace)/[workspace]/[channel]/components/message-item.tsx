@@ -1642,8 +1642,8 @@ export const MessageItem = memo(function MessageItem({
                   <span className="text-xs text-foreground">編集</span>
                 </button>
               )}
-              {/* 削除 */}
-              {isOwn && (
+              {/* 削除（自分の投稿 or bot投稿は誰でも削除可） */}
+              {(isOwn || isBot) && (
                 <button
                   onClick={() => { setShowActions(false); setIsDeleting(true); }}
                   className="flex flex-col items-center gap-2 py-3 rounded-lg hover:bg-sidebar-hover transition-colors"
