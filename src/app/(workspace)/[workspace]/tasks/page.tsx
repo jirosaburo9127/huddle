@@ -116,7 +116,7 @@ export default function TasksPage() {
         draggable={isDesktop}
         onDragStart={() => setDragTaskId(task.id)}
         onClick={() => setEditingTask(task)}
-        className="bg-surface rounded-lg border border-border/60 p-3 cursor-pointer hover:shadow-md transition-shadow"
+        className="bg-surface border-b border-border/40 px-3 py-3 cursor-pointer hover:bg-sidebar-hover transition-colors"
         style={{ touchAction: "manipulation" }}
       >
         <p className={`text-[13px] font-medium leading-snug mb-2 ${task.status === "done" ? "line-through text-muted" : "text-foreground"}`}>
@@ -125,7 +125,7 @@ export default function TasksPage() {
 
         {/* チャンネル + 期限 */}
         <div className="flex items-center gap-2 flex-wrap mb-2">
-          <span className="inline-flex items-center gap-1 text-[10px] text-muted bg-sidebar rounded px-1.5 py-0.5">
+          <span className="inline-flex items-center gap-1 text-[10px] text-muted">
             {task.channel.icon_url ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={task.channel.icon_url} alt="" className="w-3 h-3 rounded-sm object-cover" />
@@ -133,8 +133,8 @@ export default function TasksPage() {
             {task.channel.name}
           </span>
           {task.due_date && (
-            <span className={`inline-flex items-center gap-1 text-[10px] rounded px-1.5 py-0.5 font-medium ${
-              isOverdue ? "bg-mention/10 text-mention" : "bg-sidebar text-muted"
+            <span className={`inline-flex items-center gap-1 text-[10px] font-medium ${
+              isOverdue ? "text-mention" : "text-muted"
             }`}>
               📅 {formatDue(task.due_date)}
             </span>
@@ -181,16 +181,16 @@ export default function TasksPage() {
       {/* PC: 横スクロールカンバン / スマホ: タブ切り替え */}
       <div className="flex-1 overflow-hidden">
         {isDesktop ? (
-          <div className="flex h-full gap-4 p-4 overflow-x-auto">
+          <div className="flex h-full gap-0 overflow-x-auto">
             {COLUMNS.map((col) => {
               const colTasks = tasksByStatus[col.key];
               return (
                 <div
                   key={col.key}
-                  className="w-72 shrink-0 flex flex-col rounded-xl overflow-hidden transition-colors"
+                  className="w-72 shrink-0 flex flex-col overflow-hidden transition-colors border-r border-border/30"
                   style={{
-                    background: dragOverCol === col.key ? col.bg : col.bg,
-                    border: `2px solid ${dragOverCol === col.key ? col.color : col.border}`,
+                    background: dragOverCol === col.key ? col.bg : "transparent",
+                    borderTop: `3px solid ${col.color}`,
                   }}
                   onDragOver={(e) => { e.preventDefault(); setDragOverCol(col.key); }}
                   onDragLeave={() => setDragOverCol(null)}
@@ -200,7 +200,7 @@ export default function TasksPage() {
                   <div className="flex items-center justify-between px-3 py-2.5 shrink-0">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-bold" style={{ color: col.color }}>{col.label}</span>
-                      <span className="text-xs text-muted bg-surface/80 rounded-full px-1.5 py-0.5 font-medium">{colTasks.length}</span>
+                      <span className="text-xs text-muted font-medium">{colTasks.length}</span>
                     </div>
                     <button
                       onClick={() => { setCreateStatus(col.key); setShowCreate(true); }}
@@ -214,7 +214,7 @@ export default function TasksPage() {
                   </div>
 
                   {/* カードリスト */}
-                  <div className="flex-1 overflow-y-auto px-2 pb-2 space-y-2">
+                  <div className="flex-1 overflow-y-auto">
                     {colTasks.map(renderCard)}
                     {colTasks.length === 0 && (
                       <button
