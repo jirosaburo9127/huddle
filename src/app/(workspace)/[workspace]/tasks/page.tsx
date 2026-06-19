@@ -187,7 +187,7 @@ export default function TasksPage() {
               return (
                 <div
                   key={col.key}
-                  className="w-72 shrink-0 flex flex-col overflow-hidden transition-colors border-r border-border/30"
+                  className="flex-1 min-w-0 flex flex-col overflow-hidden transition-colors border-r border-border/30 last:border-r-0"
                   style={{
                     background: dragOverCol === col.key ? col.bg : "transparent",
                     borderTop: `3px solid ${col.color}`,
