@@ -7,12 +7,20 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const MODEL = "claude-haiku-4-5-20251001";
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
 Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
   try {
     const authHeader = req.headers.get("Authorization") ?? "";
     const token = authHeader.replace("Bearer ", "");
     if (!token) {
-      return new Response(JSON.stringify({ error: "no token" }), { status: 401, headers: { "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ error: "no token" }), { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } });
     }
 
     // service role client でトークンからユーザーを取得
@@ -22,14 +30,14 @@ Deno.serve(async (req) => {
     const { data: { user }, error: authErr } = await supabaseAuth.auth.getUser(token);
     if (authErr || !user) {
       console.error("[generate-mindmap] auth failed:", authErr?.message);
-      return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: { "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } });
     }
 
     const body = await req.json();
     const channelId = body.channel_id as string;
     const channelName = (body.channel_name as string) || "チャンネル";
     if (!channelId) {
-      return new Response(JSON.stringify({ error: "channel_id required" }), { status: 400, headers: { "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ error: "channel_id required" }), { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } });
     }
 
     // service role で DB 操作
@@ -45,7 +53,7 @@ Deno.serve(async (req) => {
       .eq("user_id", user.id)
       .maybeSingle();
     if (!membership) {
-      return new Response(JSON.stringify({ error: "not a member" }), { status: 403, headers: { "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ error: "not a member" }), { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } });
     }
 
     // 直近100件のメッセージ取得
@@ -60,12 +68,12 @@ Deno.serve(async (req) => {
 
     if (msgErr) {
       console.error("[generate-mindmap] messages fetch error:", msgErr);
-      return new Response(JSON.stringify({ error: "fetch failed" }), { status: 500, headers: { "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ error: "fetch failed" }), { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } });
     }
 
     if (!messages || messages.length === 0) {
       const fallback = [{ id: "root", label: channelName, parent: null, color: null }];
-      return new Response(JSON.stringify({ nodes: fallback }), { headers: { "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ nodes: fallback }), { headers: { "Content-Type": "application/json", ...corsHeaders } });
     }
 
     const messagesText = (messages as Array<{ content: string; created_at: string; profiles: { display_name: string } | null }>)
@@ -113,7 +121,7 @@ Deno.serve(async (req) => {
     if (!aiRes.ok) {
       const errText = await aiRes.text();
       console.error("[generate-mindmap] AI failed:", aiRes.status, errText);
-      return new Response(JSON.stringify({ error: "AI generation failed" }), { status: 500, headers: { "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ error: "AI generation failed" }), { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } });
     }
 
     const aiJson = await aiRes.json() as { content: Array<{ type: string; text?: string }> };
@@ -153,9 +161,9 @@ Deno.serve(async (req) => {
       console.error("[generate-mindmap] upsert error:", upsertErr);
     }
 
-    return new Response(JSON.stringify({ nodes }), { headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ nodes }), { headers: { "Content-Type": "application/json", ...corsHeaders } });
   } catch (e) {
     console.error("[generate-mindmap] unexpected error:", e);
-    return new Response(JSON.stringify({ error: "unexpected error" }), { status: 500, headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ error: "unexpected error" }), { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } });
   }
 });
