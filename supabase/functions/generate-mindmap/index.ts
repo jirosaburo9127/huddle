@@ -11,16 +11,17 @@ Deno.serve(async (req) => {
   try {
     const authHeader = req.headers.get("Authorization") ?? "";
     const token = authHeader.replace("Bearer ", "");
+    if (!token) {
+      return new Response(JSON.stringify({ error: "no token" }), { status: 401, headers: { "Content-Type": "application/json" } });
+    }
 
-    // anon key でユーザー認証
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? SUPABASE_SERVICE_ROLE_KEY;
-    const userClient = createClient(SUPABASE_URL, anonKey, {
+    // service role client でトークンからユーザーを取得
+    const supabaseAuth = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       auth: { persistSession: false },
-      global: { headers: { Authorization: authHeader } },
     });
-    const { data: { user }, error: authErr } = await userClient.auth.getUser(token);
+    const { data: { user }, error: authErr } = await supabaseAuth.auth.getUser(token);
     if (authErr || !user) {
-      console.error("[generate-mindmap] auth failed:", authErr);
+      console.error("[generate-mindmap] auth failed:", authErr?.message);
       return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: { "Content-Type": "application/json" } });
     }
 
