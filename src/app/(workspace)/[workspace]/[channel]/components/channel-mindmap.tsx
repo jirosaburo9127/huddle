@@ -66,15 +66,21 @@ export function ChannelMindmap({ channelId, channelName, onClose }: Props) {
       );
 
       if (!res.ok) {
+        const errBody = await res.text().catch(() => "");
+        // eslint-disable-next-line no-console
+        console.error("[mindmap] generate failed:", res.status, errBody);
         alert("マインドマップの生成に失敗しました");
         return;
       }
 
-      const { nodes: newNodes } = await res.json();
+      const json = await res.json();
+      const newNodes = json?.nodes;
       if (Array.isArray(newNodes) && newNodes.length > 0) {
         setNodes(newNodes);
       }
-    } catch {
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error("[mindmap] error:", err);
       alert("生成中にエラーが発生しました");
     } finally {
       setGenerating(false);

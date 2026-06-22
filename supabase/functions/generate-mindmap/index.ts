@@ -9,46 +9,62 @@ const MODEL = "claude-haiku-4-5-20251001";
 
 Deno.serve(async (req) => {
   try {
-    // Authorization ヘッダーからユーザーを認証
     const authHeader = req.headers.get("Authorization") ?? "";
-    const supabaseUser = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    const token = authHeader.replace("Bearer ", "");
+
+    // anon key でユーザー認証
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? SUPABASE_SERVICE_ROLE_KEY;
+    const userClient = createClient(SUPABASE_URL, anonKey, {
       auth: { persistSession: false },
       global: { headers: { Authorization: authHeader } },
     });
+    const { data: { user }, error: authErr } = await userClient.auth.getUser(token);
+    if (authErr || !user) {
+      console.error("[generate-mindmap] auth failed:", authErr);
+      return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: { "Content-Type": "application/json" } });
+    }
 
-    const { data: { user } } = await supabaseUser.auth.getUser(
-      authHeader.replace("Bearer ", "")
-    );
-    if (!user) return new Response("unauthorized", { status: 401 });
+    const body = await req.json();
+    const channelId = body.channel_id as string;
+    const channelName = (body.channel_name as string) || "チャンネル";
+    if (!channelId) {
+      return new Response(JSON.stringify({ error: "channel_id required" }), { status: 400, headers: { "Content-Type": "application/json" } });
+    }
 
-    const { channel_id, channel_name } = await req.json();
-    if (!channel_id) return new Response("channel_id required", { status: 400 });
-
+    // service role で DB 操作
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       auth: { persistSession: false },
     });
 
-    // チャンネルメンバーか確認
+    // メンバーシップ確認
     const { data: membership } = await supabase
       .from("channel_members")
       .select("user_id")
-      .eq("channel_id", channel_id)
+      .eq("channel_id", channelId)
       .eq("user_id", user.id)
       .maybeSingle();
-    if (!membership) return new Response("not a member", { status: 403 });
+    if (!membership) {
+      return new Response(JSON.stringify({ error: "not a member" }), { status: 403, headers: { "Content-Type": "application/json" } });
+    }
 
     // 直近100件のメッセージ取得
-    const { data: messages } = await supabase
+    const { data: messages, error: msgErr } = await supabase
       .from("messages")
       .select("content, created_at, profiles(display_name)")
-      .eq("channel_id", channel_id)
+      .eq("channel_id", channelId)
       .is("deleted_at", null)
       .is("parent_id", null)
       .order("created_at", { ascending: false })
       .limit(100);
 
+    if (msgErr) {
+      console.error("[generate-mindmap] messages fetch error:", msgErr);
+      return new Response(JSON.stringify({ error: "fetch failed" }), { status: 500, headers: { "Content-Type": "application/json" } });
+    }
+
     if (!messages || messages.length === 0) {
-      return Response.json({ nodes: [{ id: "root", label: channel_name || "チャンネル", parent: null, color: null }] });
+      const fallback = [{ id: "root", label: channelName, parent: null, color: null }];
+      return new Response(JSON.stringify({ nodes: fallback }), { headers: { "Content-Type": "application/json" } });
     }
 
     const messagesText = (messages as Array<{ content: string; created_at: string; profiles: { display_name: string } | null }>)
@@ -88,14 +104,15 @@ Deno.serve(async (req) => {
 - 最大30ノード程度に収める
 - 必ず有効なJSON配列のみを出力すること`,
         messages: [
-          { role: "user", content: `チャンネル名: ${channel_name || "チャンネル"}\n\n会話内容:\n${messagesText}` },
+          { role: "user", content: `チャンネル名: ${channelName}\n\n会話内容:\n${messagesText}` },
         ],
       }),
     });
 
     if (!aiRes.ok) {
-      console.error("[generate-mindmap] AI failed:", aiRes.status);
-      return new Response("AI generation failed", { status: 500 });
+      const errText = await aiRes.text();
+      console.error("[generate-mindmap] AI failed:", aiRes.status, errText);
+      return new Response(JSON.stringify({ error: "AI generation failed" }), { status: 500, headers: { "Content-Type": "application/json" } });
     }
 
     const aiJson = await aiRes.json() as { content: Array<{ type: string; text?: string }> };
@@ -105,7 +122,7 @@ Deno.serve(async (req) => {
       .join("")
       .trim();
 
-    // JSONを抽出（```json ... ``` で囲まれている場合も対応）
+    // JSONを抽出
     let nodesJson: string;
     const codeBlockMatch = rawText.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (codeBlockMatch) {
@@ -117,23 +134,27 @@ Deno.serve(async (req) => {
     let nodes;
     try {
       nodes = JSON.parse(nodesJson);
-    } catch {
-      console.error("[generate-mindmap] JSON parse failed:", nodesJson.slice(0, 200));
-      // フォールバック: ルートノードのみ
-      nodes = [{ id: "root", label: channel_name || "チャンネル", parent: null, color: null }];
+      if (!Array.isArray(nodes)) throw new Error("not array");
+    } catch (e) {
+      console.error("[generate-mindmap] JSON parse failed:", e, nodesJson.slice(0, 300));
+      nodes = [{ id: "root", label: channelName, parent: null, color: null }];
     }
 
     // DBに保存（upsert）
-    await supabase.from("mindmaps").upsert({
-      channel_id,
+    const { error: upsertErr } = await supabase.from("mindmaps").upsert({
+      channel_id: channelId,
       nodes,
       updated_by: user.id,
       updated_at: new Date().toISOString(),
     }, { onConflict: "channel_id" });
 
-    return Response.json({ nodes });
+    if (upsertErr) {
+      console.error("[generate-mindmap] upsert error:", upsertErr);
+    }
+
+    return new Response(JSON.stringify({ nodes }), { headers: { "Content-Type": "application/json" } });
   } catch (e) {
-    console.error("[generate-mindmap] error:", e);
-    return new Response("error", { status: 500 });
+    console.error("[generate-mindmap] unexpected error:", e);
+    return new Response(JSON.stringify({ error: "unexpected error" }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 });
