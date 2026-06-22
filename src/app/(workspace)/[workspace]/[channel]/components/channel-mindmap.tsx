@@ -178,7 +178,7 @@ export function ChannelMindmap({ channelId, channelName, onClose }: Props) {
         </div>
 
         {/* ブランチ: 2列グリッド */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-4xl mx-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 max-w-7xl mx-auto">
           {branches.map((branch, branchIdx) => {
             const colorScheme = BRANCH_COLORS[branchIdx % BRANCH_COLORS.length];
             const children = childrenMap.get(branch.id) || [];
@@ -292,7 +292,7 @@ export function ChannelMindmap({ channelId, channelName, onClose }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-40 bg-background lg:static lg:inset-auto lg:z-auto lg:w-[500px] lg:border-l lg:border-border flex flex-col h-full animate-slide-in-right">
+    <div className="fixed inset-0 z-[50] bg-background flex flex-col h-full animate-slide-in-right">
       <header className="flex items-center justify-between px-4 py-3 lg:py-0 lg:h-14 border-b border-border bg-header shrink-0">
         <h2 className="font-bold text-base flex items-center gap-2">🧠 マインドマップ</h2>
         <div className="flex items-center gap-2">
