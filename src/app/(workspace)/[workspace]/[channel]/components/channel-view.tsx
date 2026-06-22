@@ -15,6 +15,7 @@ import { CreateEventModal } from "./create-event-modal";
 import { EventDisplay } from "./event-display";
 import { DateSeparator } from "./date-separator";
 import { ChannelNote } from "./channel-note";
+import { ChannelMindmap } from "./channel-mindmap";
 import { ChannelMembersModal } from "@/components/channel-members-modal";
 import { ChannelAlbums } from "./channel-albums";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
@@ -94,6 +95,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
   // 独り言カードの相対時間を1分ごとに更新するためのtick
   const [timeTick, setTimeTick] = useState(0);
   const [showNote, setShowNote] = useState(false);
+  const [showMindmap, setShowMindmap] = useState(false);
   const [hasNote, setHasNote] = useState(false);
   const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -1900,6 +1902,21 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                     </button>
                   )}
 
+                  {/* マインドマップ */}
+                  {!channel.is_dm && (
+                    <button
+                      role="menuitem"
+                      onClick={() => {
+                        setShowOverflowMenu(false);
+                        setShowMindmap((v) => !v);
+                      }}
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-sidebar-hover transition-colors ${showMindmap ? "text-accent" : "text-foreground"}`}
+                    >
+                      <span className="w-4 h-4 shrink-0 flex items-center justify-center text-sm">🧠</span>
+                      {showMindmap ? "マインドマップを閉じる" : "マインドマップ"}
+                    </button>
+                  )}
+
                   {/* 写真・動画一覧 */}
                   <Link
                     href={`${pathname}/media`}
@@ -2384,6 +2401,15 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
               setHasNote(noteHasContent);
             }
           }}
+        />
+      )}
+
+      {/* マインドマップ */}
+      {showMindmap && (
+        <ChannelMindmap
+          channelId={channel.id}
+          channelName={channel.name}
+          onClose={() => setShowMindmap(false)}
         />
       )}
 
