@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 type MindmapNode = {
@@ -16,21 +16,27 @@ type Props = {
   onClose: () => void;
 };
 
-const NODE_COLORS = [null, "#3B82F6", "#22C55E", "#F59E0B", "#EF4444", "#8B5CF6"];
+// ブランチごとの配色
+const BRANCH_COLORS = [
+  { bg: "#FEE2E2", border: "#EF4444", text: "#DC2626" },
+  { bg: "#DBEAFE", border: "#3B82F6", text: "#2563EB" },
+  { bg: "#F3E8FF", border: "#8B5CF6", text: "#7C3AED" },
+  { bg: "#FFEDD5", border: "#F97316", text: "#EA580C" },
+  { bg: "#D1FAE5", border: "#10B981", text: "#059669" },
+  { bg: "#FEF3C7", border: "#F59E0B", text: "#D97706" },
+];
 
 export function ChannelMindmap({ channelId, channelName, onClose }: Props) {
   const supabase = createClient();
   const [nodes, setNodes] = useState<MindmapNode[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState("");
-  const [addingParent, setAddingParent] = useState<string | null>(null);
-  const [addLabel, setAddLabel] = useState("");
   const [saving, setSaving] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  // DB からマインドマップを取得
+  // DB から取得
   useEffect(() => {
     (async () => {
       const { data } = await supabase
@@ -51,32 +57,28 @@ export function ChannelMindmap({ channelId, channelName, onClose }: Props) {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
-      if (!token) { alert("認証エラー"); return; }
+      if (!token) { alert("認証エラー"); setGenerating(false); return; }
 
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/generate-mindmap`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`,
-          },
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
           body: JSON.stringify({ channel_id: channelId, channel_name: channelName }),
         }
       );
 
       if (!res.ok) {
-        const errBody = await res.text().catch(() => "");
         // eslint-disable-next-line no-console
-        console.error("[mindmap] generate failed:", res.status, errBody);
+        console.error("[mindmap] generate failed:", res.status, await res.text().catch(() => ""));
         alert("マインドマップの生成に失敗しました");
+        setGenerating(false);
         return;
       }
 
       const json = await res.json();
-      const newNodes = json?.nodes;
-      if (Array.isArray(newNodes) && newNodes.length > 0) {
-        setNodes(newNodes);
+      if (Array.isArray(json?.nodes) && json.nodes.length > 0) {
+        setNodes(json.nodes);
       }
     } catch (err) {
       // eslint-disable-next-line no-console
@@ -87,237 +89,236 @@ export function ChannelMindmap({ channelId, channelName, onClose }: Props) {
     }
   }, [channelId, channelName, supabase]);
 
-  // 初回: データがなければ自動生成
   useEffect(() => {
-    if (!loading && nodes.length === 0) {
-      generate();
-    }
+    if (!loading && nodes.length === 0) generate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading]);
 
-  // DBに保存
+  // DB保存
   const saveNodes = useCallback(async (updated: MindmapNode[]) => {
     setSaving(true);
     const { data: { user } } = await supabase.auth.getUser();
     await supabase.from("mindmaps").upsert({
-      channel_id: channelId,
-      nodes: updated,
-      updated_by: user?.id || null,
-      updated_at: new Date().toISOString(),
+      channel_id: channelId, nodes: updated, updated_by: user?.id || null, updated_at: new Date().toISOString(),
     }, { onConflict: "channel_id" });
     setSaving(false);
   }, [channelId, supabase]);
 
-  // ツリー構造に変換
-  const tree = useMemo(() => {
-    const childrenMap = new Map<string, MindmapNode[]>();
+  // ツリー構造
+  const childrenMap = useMemo(() => {
+    const m = new Map<string, MindmapNode[]>();
     for (const n of nodes) {
-      const parentKey = n.parent ?? "__root__";
-      const list = childrenMap.get(parentKey) || [];
+      const key = n.parent ?? "__root__";
+      const list = m.get(key) || [];
       list.push(n);
-      childrenMap.set(parentKey, list);
+      m.set(key, list);
     }
-    return childrenMap;
+    return m;
   }, [nodes]);
 
-  const roots = tree.get("__root__") || [];
+  const root = (childrenMap.get("__root__") || [])[0];
+  const branches = root ? (childrenMap.get(root.id) || []) : [];
 
   // ノード操作
-  function handleEdit(node: MindmapNode) {
-    setEditingId(node.id);
-    setEditLabel(node.label);
-  }
-
+  function startEdit(node: MindmapNode) { setEditingId(node.id); setEditLabel(node.label); }
   function saveEdit() {
     if (!editingId || !editLabel.trim()) return;
     const updated = nodes.map((n) => n.id === editingId ? { ...n, label: editLabel.trim() } : n);
-    setNodes(updated);
-    setEditingId(null);
-    saveNodes(updated);
+    setNodes(updated); setEditingId(null); saveNodes(updated);
   }
-
-  function addChild() {
-    if (!addingParent || !addLabel.trim()) return;
+  function addChild(parentId: string) {
+    const label = prompt("ノード名を入力");
+    if (!label?.trim()) return;
     const newId = `n-${Date.now()}`;
-    const updated = [...nodes, { id: newId, label: addLabel.trim(), parent: addingParent, color: null }];
-    setNodes(updated);
-    setAddingParent(null);
-    setAddLabel("");
-    saveNodes(updated);
+    const updated = [...nodes, { id: newId, label: label.trim(), parent: parentId, color: null }];
+    setNodes(updated); saveNodes(updated);
   }
-
   function deleteNode(id: string) {
-    if (id === "root") return;
-    // 子ノードも再帰的に削除
+    if (id === root?.id) return;
     const toDelete = new Set<string>();
-    function collect(nodeId: string) {
-      toDelete.add(nodeId);
-      for (const n of nodes) {
-        if (n.parent === nodeId) collect(n.id);
-      }
-    }
+    function collect(nid: string) { toDelete.add(nid); for (const n of nodes) { if (n.parent === nid) collect(n.id); } }
     collect(id);
     const updated = nodes.filter((n) => !toDelete.has(n.id));
-    setNodes(updated);
-    saveNodes(updated);
+    setNodes(updated); saveNodes(updated);
   }
 
-  function cycleColor(id: string) {
-    const node = nodes.find((n) => n.id === id);
-    if (!node) return;
-    const idx = NODE_COLORS.indexOf(node.color);
-    const next = NODE_COLORS[(idx + 1) % NODE_COLORS.length];
-    const updated = nodes.map((n) => n.id === id ? { ...n, color: next } : n);
-    setNodes(updated);
-    saveNodes(updated);
-  }
-
-  function toggleCollapse(id: string) {
-    setCollapsed((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  // ノード描画（再帰）
-  function renderNode(node: MindmapNode, depth: number) {
-    const children = tree.get(node.id) || [];
-    const hasChildren = children.length > 0;
-    const isCollapsed = collapsed.has(node.id);
-    const isEditing = editingId === node.id;
-    const isAdding = addingParent === node.id;
+  // 放射状レイアウトの描画
+  function renderRadialMap() {
+    if (!root) return null;
 
     return (
-      <div key={node.id} style={{ marginLeft: depth > 0 ? (depth === 1 ? 16 : 24) : 0 }}>
-        <div className="flex items-center gap-1.5 group py-1 px-1 rounded hover:bg-sidebar-hover transition-colors" style={{ minHeight: 32 }}>
-          {/* 展開/折りたたみ */}
-          {hasChildren ? (
-            <button onClick={() => toggleCollapse(node.id)} className="w-4 h-4 flex items-center justify-center text-muted shrink-0">
-              <svg className="w-3 h-3" style={{ transform: isCollapsed ? "rotate(-90deg)" : "rotate(0)", transition: "transform 150ms" }} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-          ) : (
-            <span className="w-4 shrink-0" />
-          )}
-
-          {/* カラードット */}
-          <button
-            onClick={() => cycleColor(node.id)}
-            className="w-3 h-3 rounded-full shrink-0 border border-border/50 hover:scale-125 transition-transform"
-            style={{ background: node.color || "var(--color-muted)", opacity: node.color ? 1 : 0.3 }}
-            title="色を変更"
-          />
-
-          {/* ラベル */}
-          {isEditing ? (
-            <input
-              type="text"
-              value={editLabel}
-              onChange={(e) => setEditLabel(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) saveEdit(); if (e.key === "Escape") setEditingId(null); }}
-              onBlur={saveEdit}
-              className="flex-1 text-sm bg-input-bg border border-border rounded px-2 py-0.5 text-foreground focus:border-accent focus:outline-none"
-              autoFocus
-            />
-          ) : (
-            <span
-              className="flex-1 text-sm text-foreground cursor-pointer truncate"
-              style={{ fontWeight: depth === 0 ? 700 : 400 }}
-              onClick={() => hasChildren ? toggleCollapse(node.id) : handleEdit(node)}
-            >
-              {node.label}
-            </span>
-          )}
-
-          {/* アクションボタン（ホバーで表示） */}
-          {!isEditing && (
-            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-              <button onClick={() => { setAddingParent(node.id); setAddLabel(""); }} className="p-0.5 text-muted hover:text-accent" title="子ノード追加">
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                </svg>
-              </button>
-              <button onClick={() => handleEdit(node)} className="p-0.5 text-muted hover:text-accent" title="編集">
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>
-              </button>
-              {node.id !== "root" && (
-                <button onClick={() => deleteNode(node.id)} className="p-0.5 text-muted hover:text-mention" title="削除">
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </button>
+      <div ref={containerRef} className="relative w-full" style={{ minHeight: 600, padding: "40px 20px" }}>
+        {/* 中央ルートノード */}
+        <div className="flex flex-col items-center justify-center mx-auto" style={{ marginBottom: 40 }}>
+          <div
+            className="relative flex items-center justify-center cursor-pointer"
+            style={{
+              width: 140, height: 140, borderRadius: "50%",
+              background: "radial-gradient(circle, #FFF8E1 0%, #FFF3E0 100%)",
+              border: "3px solid #FFB74D",
+              boxShadow: "0 4px 20px rgba(255,183,77,0.2)",
+            }}
+            onClick={() => startEdit(root)}
+          >
+            <div className="text-center px-3">
+              <div className="text-2xl mb-1">💡</div>
+              {editingId === root.id ? (
+                <input
+                  value={editLabel} onChange={(e) => setEditLabel(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) saveEdit(); if (e.key === "Escape") setEditingId(null); }}
+                  onBlur={saveEdit} autoFocus
+                  className="w-full text-center text-sm font-bold bg-transparent border-b border-foreground/30 outline-none"
+                />
+              ) : (
+                <span className="text-sm font-bold text-foreground leading-tight">{root.label}</span>
               )}
             </div>
-          )}
+          </div>
+          <button onClick={() => addChild(root.id)} className="mt-2 text-xs text-muted hover:text-accent transition-colors">+ トピック追加</button>
         </div>
 
-        {/* 子ノード追加入力 */}
-        {isAdding && (
-          <div className="flex items-center gap-2 ml-10 py-1">
-            <input
-              type="text"
-              value={addLabel}
-              onChange={(e) => setAddLabel(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) addChild(); if (e.key === "Escape") setAddingParent(null); }}
-              placeholder="ノード名を入力"
-              className="flex-1 text-sm bg-input-bg border border-border rounded px-2 py-1 text-foreground focus:border-accent focus:outline-none"
-              autoFocus
-            />
-            <button onClick={addChild} className="text-xs text-accent font-medium">追加</button>
-            <button onClick={() => setAddingParent(null)} className="text-xs text-muted">取消</button>
-          </div>
-        )}
+        {/* ブランチ: 2列グリッド */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-4xl mx-auto">
+          {branches.map((branch, branchIdx) => {
+            const colorScheme = BRANCH_COLORS[branchIdx % BRANCH_COLORS.length];
+            const children = childrenMap.get(branch.id) || [];
+            return (
+              <div key={branch.id} className="relative">
+                {/* ブランチの背景ブロブ */}
+                <div
+                  className="absolute -inset-2 rounded-3xl opacity-20 -z-10"
+                  style={{ background: colorScheme.bg }}
+                />
 
-        {/* 子ノード（再帰） */}
-        {!isCollapsed && children.map((child) => renderNode(child, depth + 1))}
+                {/* ブランチヘッダー（第1階層） */}
+                <div className="flex items-center gap-3 mb-3">
+                  <div
+                    className="group flex items-center gap-2 px-4 py-2.5 rounded-xl cursor-pointer transition-shadow hover:shadow-md"
+                    style={{ background: colorScheme.border, color: "#fff", minWidth: 100 }}
+                    onClick={() => startEdit(branch)}
+                  >
+                    {editingId === branch.id ? (
+                      <input
+                        value={editLabel} onChange={(e) => setEditLabel(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) saveEdit(); if (e.key === "Escape") setEditingId(null); }}
+                        onBlur={saveEdit} autoFocus
+                        className="w-full text-sm font-bold bg-transparent border-b border-white/50 outline-none text-white"
+                      />
+                    ) : (
+                      <span className="text-sm font-bold">{branch.label}</span>
+                    )}
+                    <div className="hidden group-hover:flex items-center gap-1 ml-auto shrink-0">
+                      <button onClick={(e) => { e.stopPropagation(); addChild(branch.id); }} className="text-white/70 hover:text-white" title="追加">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); deleteNode(branch.id); }} className="text-white/70 hover:text-white" title="削除">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                      </button>
+                    </div>
+                  </div>
+                  {/* 点線コネクタ */}
+                  <div style={{ width: 30, borderTop: `2px dotted ${colorScheme.border}` }} />
+                </div>
+
+                {/* 子ノード（第2階層） */}
+                <div className="space-y-2 ml-4">
+                  {children.map((child) => {
+                    const grandchildren = childrenMap.get(child.id) || [];
+                    return (
+                      <div key={child.id}>
+                        <div className="flex items-center gap-2">
+                          <div style={{ width: 16, borderTop: `2px dotted ${colorScheme.border}`, opacity: 0.5 }} />
+                          <div
+                            className="group flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all hover:shadow-sm"
+                            style={{ border: `2px solid ${colorScheme.border}`, background: "#fff", minWidth: 80 }}
+                            onClick={() => startEdit(child)}
+                          >
+                            {editingId === child.id ? (
+                              <input
+                                value={editLabel} onChange={(e) => setEditLabel(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) saveEdit(); if (e.key === "Escape") setEditingId(null); }}
+                                onBlur={saveEdit} autoFocus
+                                className="w-full text-xs bg-transparent border-b outline-none" style={{ color: colorScheme.text, borderColor: colorScheme.border }}
+                              />
+                            ) : (
+                              <span className="text-xs font-medium" style={{ color: colorScheme.text }}>{child.label}</span>
+                            )}
+                            <div className="hidden group-hover:flex items-center gap-0.5 ml-auto shrink-0">
+                              <button onClick={(e) => { e.stopPropagation(); addChild(child.id); }} className="text-muted hover:text-accent p-0.5"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg></button>
+                              <button onClick={(e) => { e.stopPropagation(); deleteNode(child.id); }} className="text-muted hover:text-mention p-0.5"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg></button>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 第3階層 */}
+                        {grandchildren.length > 0 && (
+                          <div className="space-y-1 ml-10 mt-1">
+                            {grandchildren.map((gc) => (
+                              <div key={gc.id} className="flex items-center gap-2">
+                                <div style={{ width: 12, borderTop: `1px dotted ${colorScheme.border}`, opacity: 0.3 }} />
+                                <div
+                                  className="group flex items-center gap-1 px-2 py-1 rounded cursor-pointer hover:bg-sidebar-hover transition-colors"
+                                  onClick={() => startEdit(gc)}
+                                >
+                                  <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: colorScheme.border, opacity: 0.5 }} />
+                                  {editingId === gc.id ? (
+                                    <input
+                                      value={editLabel} onChange={(e) => setEditLabel(e.target.value)}
+                                      onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) saveEdit(); if (e.key === "Escape") setEditingId(null); }}
+                                      onBlur={saveEdit} autoFocus
+                                      className="w-full text-[11px] bg-transparent border-b outline-none" style={{ color: colorScheme.text }}
+                                    />
+                                  ) : (
+                                    <span className="text-[11px] text-muted">{gc.label}</span>
+                                  )}
+                                  <button onClick={(e) => { e.stopPropagation(); deleteNode(gc.id); }} className="hidden group-hover:block text-muted hover:text-mention p-0.5 shrink-0">
+                                    <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="fixed inset-0 z-40 bg-background lg:static lg:inset-auto lg:z-auto lg:w-[420px] lg:border-l lg:border-border flex flex-col h-full animate-slide-in-right">
-      {/* ヘッダー */}
+    <div className="fixed inset-0 z-40 bg-background lg:static lg:inset-auto lg:z-auto lg:w-[500px] lg:border-l lg:border-border flex flex-col h-full animate-slide-in-right">
       <header className="flex items-center justify-between px-4 py-3 lg:py-0 lg:h-14 border-b border-border bg-header shrink-0">
-        <h2 className="font-bold text-base flex items-center gap-2">
-          <span>🧠</span>
-          マインドマップ
-        </h2>
+        <h2 className="font-bold text-base flex items-center gap-2">🧠 マインドマップ</h2>
         <div className="flex items-center gap-2">
           {saving && <span className="text-xs text-muted">保存中...</span>}
-          <button
-            onClick={generate}
-            disabled={generating}
-            className="text-xs bg-accent/10 text-accent px-2.5 py-1 rounded-lg hover:bg-accent/20 disabled:opacity-50 transition-colors font-medium"
-          >
+          <button onClick={generate} disabled={generating} className="text-xs bg-accent/10 text-accent px-2.5 py-1 rounded-lg hover:bg-accent/20 disabled:opacity-50 transition-colors font-medium">
             {generating ? "生成中..." : "AI再生成"}
           </button>
-          <button onClick={onClose} className="p-1 text-muted hover:text-foreground rounded transition-colors" title="閉じる">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+          <button onClick={onClose} className="p-1 text-muted hover:text-foreground rounded transition-colors">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
       </header>
 
-      {/* ボディ */}
-      <div className="flex-1 overflow-y-auto px-3 py-3">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">
         {loading || generating ? (
-          <div className="flex flex-col items-center justify-center py-16 gap-3">
+          <div className="flex flex-col items-center justify-center py-20 gap-3">
             <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
             <p className="text-sm text-muted">{generating ? "AIが会話を分析中..." : "読み込み中..."}</p>
           </div>
         ) : nodes.length === 0 ? (
-          <div className="text-center py-16">
+          <div className="text-center py-20">
             <p className="text-sm text-muted mb-3">マインドマップがありません</p>
             <button onClick={generate} className="text-sm text-accent font-medium">AIで生成する</button>
           </div>
         ) : (
-          roots.map((root) => renderNode(root, 0))
+          renderRadialMap()
         )}
       </div>
     </div>
