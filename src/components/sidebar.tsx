@@ -2221,124 +2221,89 @@ function ChannelCategoryList({
     { key: "__uncategorized__", label: UNCATEGORIZED_LABEL, color: null as string | null },
   ], [categories]);
 
+  // カテゴリのカラーマップ
+  const colorMap = useMemo(() => {
+    const m = new Map<string, string | null>();
+    for (const c of categories) m.set(c.slug, c.color ?? null);
+    return m;
+  }, [categories]);
+
   return (
     <div>
-      {sections.map(({ key, label, color }, catIdx) => {
-        const list = grouped.get(key) || [];
-        if (list.length === 0) return null;
-        const isCollapsed = collapsed.has(key);
-        // カテゴリ内の未読合計
-        const unreadTotal = list.reduce(
-          (sum, ch) => sum + (unreadState[ch.id] || 0),
-          0
-        );
+      {/* フラットリスト（RPCの返却順 = 最新メッセージ順） */}
+      {channels.map((channel) => {
+        const href = `/${workspaceSlug}/${channel.slug}`;
+        const isActive = pathname === href;
+        const unreadCount = unreadState[channel.id] || 0;
+        const showUnreadStyle = unreadCount > 0 && !isActive;
+        const cat = channel.id in categoryOverrides ? categoryOverrides[channel.id] : channel.category;
+        const catColor = cat ? colorMap.get(cat) : null;
+        const catLabel = cat ? (labelMap.get(cat) || "") : "";
         return (
-          <div key={key} style={{ marginBottom: 2 }}>
-            {/* カテゴリヘッダー — モック準拠インラインスタイル */}
-            <button
-              type="button"
-              onClick={() => toggleCollapsed(key)}
-              style={{
-                width: "100%", display: "flex", alignItems: "center", gap: 6,
-                padding: "6px 10px 3px", border: "none", background: "none",
-                cursor: "pointer", marginTop: catIdx === 0 ? (isDesktop ? 0 : 2) : (isDesktop ? 10 : 6),
-                position: "relative", zIndex: 2,
-              }}
-            >
-              <svg
+          <Link
+            key={channel.id}
+            href={href}
+            onClick={() => onNavigate(isActive, channel.name)}
+            style={{
+              display: "flex", alignItems: "center", gap: 8,
+              padding: isDesktop ? "0 10px" : "0 10px 0 14px",
+              height: isDesktop ? 36 : 38, borderRadius: 8,
+              border: "none", cursor: "pointer", marginBottom: isDesktop ? 1 : 0,
+              background: (isDesktop && isActive) ? "var(--color-sky-soft)" : "none",
+              position: "relative" as const, zIndex: 1,
+              color: isDesktop
+                ? ((isActive || showUnreadStyle) ? "var(--color-foreground)" : "var(--color-muted)")
+                : "var(--color-foreground)",
+              fontWeight: (isDesktop && isActive) || showUnreadStyle ? 700 : 500,
+              fontSize: isDesktop ? 14 : (showUnreadStyle ? 15.5 : 15),
+              textAlign: "left" as const, textDecoration: "none",
+            }}
+          >
+            {/* カテゴリカラードット */}
+            {catColor ? (
+              <span
+                title={catLabel}
                 style={{
-                  width: 14, height: 14,
-                  color: isDesktop
-                    ? "var(--color-muted)"
-                    : (color ? `${color}B3` : "var(--color-muted)"),
-                  opacity: 0.7, flexShrink: 0,
-                  transition: "transform 150ms",
-                  transform: isCollapsed ? "rotate(-90deg)" : "rotate(0deg)",
+                  width: 6, height: 6, borderRadius: "50%",
+                  background: catColor, flexShrink: 0, opacity: 0.8,
                 }}
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-              </svg>
+              />
+            ) : (
+              <span style={{ width: 6, flexShrink: 0 }} />
+            )}
+            {/* アイコンまたは# */}
+            {channel.icon_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={channel.icon_url}
+                alt=""
+                style={{
+                  width: isDesktop ? 20 : 18, height: isDesktop ? 20 : 18,
+                  borderRadius: 4, objectFit: "cover", flexShrink: 0,
+                  opacity: 1,
+                }}
+              />
+            ) : (
               <span style={{
-                fontSize: isDesktop ? 12 : 15, fontWeight: isDesktop ? 650 : 600,
-                color: "var(--color-foreground)",
-                opacity: isDesktop ? 0.7 : 0.8, flex: 1, textAlign: "left" as const,
-              }}>{label}</span>
-              {isCollapsed && unreadTotal > 0 && (
-                <span style={{
-                  width: isDesktop ? 20 : 16, height: isDesktop ? 20 : 16, borderRadius: "50%",
-                  fontSize: isDesktop ? 10 : 9, fontWeight: 700, color: "#fff",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  background: "var(--color-accent)", opacity: isDesktop ? 1 : 0.85,
-                }}>{unreadTotal > 99 ? "99+" : unreadTotal}</span>
-              )}
-            </button>
-            {/* チャンネル行 — モック準拠インラインスタイル */}
-            {!isCollapsed &&
-              list.map((channel) => {
-                const href = `/${workspaceSlug}/${channel.slug}`;
-                const isActive = pathname === href;
-                const unreadCount = unreadState[channel.id] || 0;
-                const showUnreadStyle = unreadCount > 0 && !isActive;
-                const chMemberIds = channelMembersMap[channel.id] || [];
-                return (
-                  <Link
-                    key={channel.id}
-                    href={href}
-                    onClick={() => onNavigate(isActive, channel.name)}
-                    style={{
-                      display: "flex", alignItems: "center", gap: 10,
-                      padding: isDesktop ? "0 10px" : "0 10px 0 28px",
-                      height: isDesktop ? 36 : 34, borderRadius: 8,
-                      border: "none", cursor: "pointer", marginBottom: isDesktop ? 1 : 0,
-                      background: (isDesktop && isActive) ? "var(--color-sky-soft)" : "none",
-                      position: "relative" as const, zIndex: 1,
-                      color: isDesktop
-                        ? ((isActive || showUnreadStyle) ? "var(--color-foreground)" : "var(--color-muted)")
-                        : "var(--color-foreground)",
-                      fontWeight: (isDesktop && isActive) || showUnreadStyle ? 700 : isDesktop ? 500 : 500,
-                      fontSize: isDesktop ? 14 : (showUnreadStyle ? 15.5 : 15),
-                      textAlign: "left" as const, textDecoration: "none",
-                    }}
-                  >
-                    {channel.icon_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={channel.icon_url}
-                        alt=""
-                        style={{
-                          width: isDesktop ? 20 : 18, height: isDesktop ? 20 : 18,
-                          borderRadius: 4, objectFit: "cover", flexShrink: 0,
-                          opacity: 1,
-                        }}
-                      />
-                    ) : (
-                      <span style={{
-                        fontSize: isDesktop ? 16 : 15,
-                        color: (isDesktop && isActive) ? "var(--color-sky)" : (color || "var(--color-muted)"),
-                        opacity: (isDesktop && isActive) ? 1 : showUnreadStyle ? 0.7 : 0.4,
-                      }}>#</span>
-                    )}
-                    <span style={{
-                      flex: 1, overflow: "hidden", textOverflow: "ellipsis",
-                      whiteSpace: "nowrap" as const,
-                    }}>{channel.name}</span>
-                    {showUnreadStyle && (
-                      <span style={{
-                        width: isDesktop ? 20 : 16, height: isDesktop ? 20 : 16, borderRadius: "50%",
-                        fontSize: isDesktop ? 10 : 9, fontWeight: 700, color: "#fff",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        background: "var(--color-accent)", opacity: isDesktop ? 1 : 0.85,
-                        flexShrink: 0, marginLeft: "auto",
-                      }}>{unreadCount > 99 ? "99+" : unreadCount}</span>
-                    )}
-                  </Link>
-                );
-              })}
-          </div>
+                fontSize: isDesktop ? 16 : 15,
+                color: (isDesktop && isActive) ? "var(--color-sky)" : (catColor || "var(--color-muted)"),
+                opacity: (isDesktop && isActive) ? 1 : showUnreadStyle ? 0.7 : 0.4,
+              }}>#</span>
+            )}
+            <span style={{
+              flex: 1, overflow: "hidden", textOverflow: "ellipsis",
+              whiteSpace: "nowrap" as const,
+            }}>{channel.name}</span>
+            {showUnreadStyle && (
+              <span style={{
+                width: isDesktop ? 20 : 16, height: isDesktop ? 20 : 16, borderRadius: "50%",
+                fontSize: isDesktop ? 10 : 9, fontWeight: 700, color: "#fff",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                background: "var(--color-accent)", opacity: isDesktop ? 1 : 0.85,
+                flexShrink: 0, marginLeft: "auto",
+              }}>{unreadCount > 99 ? "99+" : unreadCount}</span>
+            )}
+          </Link>
         );
       })}
     </div>
