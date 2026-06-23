@@ -142,150 +142,131 @@ export function ChannelMindmap({ channelId, channelName, onClose }: Props) {
     setNodes(updated); saveNodes(updated);
   }
 
-  // 放射状レイアウトの描画
-  function renderRadialMap() {
-    if (!root) return null;
+  // ブランチ描画（左右共通）
+  function renderBranch(branch: MindmapNode, branchIdx: number, side: "left" | "right") {
+    const colorScheme = BRANCH_COLORS[branchIdx % BRANCH_COLORS.length];
+    const children = childrenMap.get(branch.id) || [];
+    const isLeft = side === "left";
 
     return (
-      <div ref={containerRef} className="relative w-full" style={{ minHeight: 600, padding: "40px 20px" }}>
-        {/* 中央ルートノード */}
-        <div className="flex flex-col items-center justify-center mx-auto" style={{ marginBottom: 40 }}>
+      <div key={branch.id} className="relative" style={{ display: "flex", flexDirection: isLeft ? "row-reverse" : "row", alignItems: "flex-start", gap: 12, marginBottom: 24 }}>
+        {/* ブランチノード */}
+        <div style={{ flexShrink: 0 }}>
           <div
-            className="relative flex items-center justify-center cursor-pointer"
+            className="group flex items-center gap-2 px-4 py-2 rounded-xl cursor-pointer transition-shadow hover:shadow-md"
+            style={{ background: colorScheme.border, color: "#fff", whiteSpace: "nowrap" }}
+            onClick={() => startEdit(branch)}
+          >
+            {editingId === branch.id ? (
+              <input value={editLabel} onChange={(e) => setEditLabel(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) saveEdit(); if (e.key === "Escape") setEditingId(null); }}
+                onBlur={saveEdit} autoFocus className="w-24 text-sm font-bold bg-transparent border-b border-white/50 outline-none text-white" />
+            ) : (
+              <span className="text-sm font-bold">{branch.label}</span>
+            )}
+            <div className="hidden group-hover:flex items-center gap-1 shrink-0">
+              <button onClick={(e) => { e.stopPropagation(); addChild(branch.id); }} className="text-white/70 hover:text-white"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg></button>
+              <button onClick={(e) => { e.stopPropagation(); deleteNode(branch.id); }} className="text-white/70 hover:text-white"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg></button>
+            </div>
+          </div>
+        </div>
+
+        {/* 点線コネクタ（中央へ向かう） */}
+        <div style={{ width: 40, borderTop: `2px dotted ${colorScheme.border}`, alignSelf: "center", flexShrink: 0 }} />
+
+        {/* 子ノード群 */}
+        {children.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: isLeft ? "flex-end" : "flex-start" }}>
+            {children.map((child) => {
+              const grandchildren = childrenMap.get(child.id) || [];
+              return (
+                <div key={child.id} style={{ display: "flex", flexDirection: isLeft ? "row-reverse" : "row", alignItems: "flex-start", gap: 8 }}>
+                  <div
+                    className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg cursor-pointer transition-all hover:shadow-sm"
+                    style={{ border: `2px solid ${colorScheme.border}`, background: colorScheme.bg, whiteSpace: "nowrap" }}
+                    onClick={() => startEdit(child)}
+                  >
+                    {editingId === child.id ? (
+                      <input value={editLabel} onChange={(e) => setEditLabel(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) saveEdit(); if (e.key === "Escape") setEditingId(null); }}
+                        onBlur={saveEdit} autoFocus className="w-20 text-xs bg-transparent border-b outline-none" style={{ color: colorScheme.text }} />
+                    ) : (
+                      <span className="text-xs font-medium" style={{ color: colorScheme.text }}>{child.label}</span>
+                    )}
+                    <div className="hidden group-hover:flex items-center gap-0.5 shrink-0">
+                      <button onClick={(e) => { e.stopPropagation(); addChild(child.id); }} className="text-muted hover:text-accent p-0.5"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg></button>
+                      <button onClick={(e) => { e.stopPropagation(); deleteNode(child.id); }} className="text-muted hover:text-mention p-0.5"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg></button>
+                    </div>
+                  </div>
+                  {grandchildren.length > 0 && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 3, paddingTop: 4 }}>
+                      {grandchildren.map((gc) => (
+                        <div key={gc.id} className="group flex items-center gap-1 px-2 py-0.5 rounded cursor-pointer hover:bg-sidebar-hover" style={{ flexDirection: isLeft ? "row-reverse" : "row" }} onClick={() => startEdit(gc)}>
+                          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: colorScheme.border, opacity: 0.5 }} />
+                          {editingId === gc.id ? (
+                            <input value={editLabel} onChange={(e) => setEditLabel(e.target.value)}
+                              onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) saveEdit(); if (e.key === "Escape") setEditingId(null); }}
+                              onBlur={saveEdit} autoFocus className="w-16 text-[11px] bg-transparent border-b outline-none" style={{ color: colorScheme.text }} />
+                          ) : (
+                            <span className="text-[11px] text-muted whitespace-nowrap">{gc.label}</span>
+                          )}
+                          <button onClick={(e) => { e.stopPropagation(); deleteNode(gc.id); }} className="hidden group-hover:block text-muted hover:text-mention p-0.5 shrink-0">
+                            <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // 放射状レイアウト: 左右に分散
+  function renderRadialMap() {
+    if (!root) return null;
+    const leftBranches = branches.filter((_, i) => i % 2 === 0);
+    const rightBranches = branches.filter((_, i) => i % 2 === 1);
+
+    return (
+      <div ref={containerRef} className="relative w-full flex items-start justify-center gap-0" style={{ minHeight: 500, padding: "40px 16px" }}>
+        {/* 左側ブランチ */}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "flex-end", paddingTop: 60 }}>
+          {leftBranches.map((b, i) => renderBranch(b, i * 2, "left"))}
+        </div>
+
+        {/* 中央ルートノード */}
+        <div className="flex flex-col items-center shrink-0" style={{ margin: "0 8px", paddingTop: 20 }}>
+          <div
+            className="flex items-center justify-center cursor-pointer"
             style={{
-              width: 140, height: 140, borderRadius: "50%",
+              width: 120, height: 120, borderRadius: "50%",
               background: "radial-gradient(circle, #FFF8E1 0%, #FFF3E0 100%)",
-              border: "3px solid #FFB74D",
-              boxShadow: "0 4px 20px rgba(255,183,77,0.2)",
+              border: "3px solid #FFB74D", boxShadow: "0 4px 20px rgba(255,183,77,0.15)",
             }}
             onClick={() => startEdit(root)}
           >
-            <div className="text-center px-3">
-              <div className="text-2xl mb-1">💡</div>
+            <div className="text-center px-2">
+              <div className="text-xl mb-0.5">💡</div>
               {editingId === root.id ? (
-                <input
-                  value={editLabel} onChange={(e) => setEditLabel(e.target.value)}
+                <input value={editLabel} onChange={(e) => setEditLabel(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) saveEdit(); if (e.key === "Escape") setEditingId(null); }}
-                  onBlur={saveEdit} autoFocus
-                  className="w-full text-center text-sm font-bold bg-transparent border-b border-foreground/30 outline-none"
-                />
+                  onBlur={saveEdit} autoFocus className="w-full text-center text-xs font-bold bg-transparent border-b border-foreground/30 outline-none" />
               ) : (
-                <span className="text-sm font-bold text-foreground leading-tight">{root.label}</span>
+                <span className="text-xs font-bold text-foreground leading-tight">{root.label}</span>
               )}
             </div>
           </div>
-          <button onClick={() => addChild(root.id)} className="mt-2 text-xs text-muted hover:text-accent transition-colors">+ トピック追加</button>
+          <button onClick={() => addChild(root.id)} className="mt-2 text-[10px] text-muted hover:text-accent transition-colors">+ 追加</button>
         </div>
 
-        {/* ブランチ: 2列グリッド */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 max-w-7xl mx-auto">
-          {branches.map((branch, branchIdx) => {
-            const colorScheme = BRANCH_COLORS[branchIdx % BRANCH_COLORS.length];
-            const children = childrenMap.get(branch.id) || [];
-            return (
-              <div key={branch.id} className="relative">
-                {/* ブランチの背景ブロブ */}
-                <div
-                  className="absolute -inset-2 rounded-3xl opacity-20 -z-10"
-                  style={{ background: colorScheme.bg }}
-                />
-
-                {/* ブランチヘッダー（第1階層） */}
-                <div className="flex items-center gap-3 mb-3">
-                  <div
-                    className="group flex items-center gap-2 px-4 py-2.5 rounded-xl cursor-pointer transition-shadow hover:shadow-md"
-                    style={{ background: colorScheme.border, color: "#fff", minWidth: 100 }}
-                    onClick={() => startEdit(branch)}
-                  >
-                    {editingId === branch.id ? (
-                      <input
-                        value={editLabel} onChange={(e) => setEditLabel(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) saveEdit(); if (e.key === "Escape") setEditingId(null); }}
-                        onBlur={saveEdit} autoFocus
-                        className="w-full text-sm font-bold bg-transparent border-b border-white/50 outline-none text-white"
-                      />
-                    ) : (
-                      <span className="text-sm font-bold">{branch.label}</span>
-                    )}
-                    <div className="hidden group-hover:flex items-center gap-1 ml-auto shrink-0">
-                      <button onClick={(e) => { e.stopPropagation(); addChild(branch.id); }} className="text-white/70 hover:text-white" title="追加">
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
-                      </button>
-                      <button onClick={(e) => { e.stopPropagation(); deleteNode(branch.id); }} className="text-white/70 hover:text-white" title="削除">
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                      </button>
-                    </div>
-                  </div>
-                  {/* 点線コネクタ */}
-                  <div style={{ width: 30, borderTop: `2px dotted ${colorScheme.border}` }} />
-                </div>
-
-                {/* 子ノード（第2階層） */}
-                <div className="space-y-2 ml-4">
-                  {children.map((child) => {
-                    const grandchildren = childrenMap.get(child.id) || [];
-                    return (
-                      <div key={child.id}>
-                        <div className="flex items-center gap-2">
-                          <div style={{ width: 16, borderTop: `2px dotted ${colorScheme.border}`, opacity: 0.5 }} />
-                          <div
-                            className="group flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all hover:shadow-sm"
-                            style={{ border: `2px solid ${colorScheme.border}`, background: "#fff", minWidth: 80 }}
-                            onClick={() => startEdit(child)}
-                          >
-                            {editingId === child.id ? (
-                              <input
-                                value={editLabel} onChange={(e) => setEditLabel(e.target.value)}
-                                onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) saveEdit(); if (e.key === "Escape") setEditingId(null); }}
-                                onBlur={saveEdit} autoFocus
-                                className="w-full text-xs bg-transparent border-b outline-none" style={{ color: colorScheme.text, borderColor: colorScheme.border }}
-                              />
-                            ) : (
-                              <span className="text-xs font-medium" style={{ color: colorScheme.text }}>{child.label}</span>
-                            )}
-                            <div className="hidden group-hover:flex items-center gap-0.5 ml-auto shrink-0">
-                              <button onClick={(e) => { e.stopPropagation(); addChild(child.id); }} className="text-muted hover:text-accent p-0.5"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg></button>
-                              <button onClick={(e) => { e.stopPropagation(); deleteNode(child.id); }} className="text-muted hover:text-mention p-0.5"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg></button>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* 第3階層 */}
-                        {grandchildren.length > 0 && (
-                          <div className="space-y-1 ml-10 mt-1">
-                            {grandchildren.map((gc) => (
-                              <div key={gc.id} className="flex items-center gap-2">
-                                <div style={{ width: 12, borderTop: `1px dotted ${colorScheme.border}`, opacity: 0.3 }} />
-                                <div
-                                  className="group flex items-center gap-1 px-2 py-1 rounded cursor-pointer hover:bg-sidebar-hover transition-colors"
-                                  onClick={() => startEdit(gc)}
-                                >
-                                  <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: colorScheme.border, opacity: 0.5 }} />
-                                  {editingId === gc.id ? (
-                                    <input
-                                      value={editLabel} onChange={(e) => setEditLabel(e.target.value)}
-                                      onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) saveEdit(); if (e.key === "Escape") setEditingId(null); }}
-                                      onBlur={saveEdit} autoFocus
-                                      className="w-full text-[11px] bg-transparent border-b outline-none" style={{ color: colorScheme.text }}
-                                    />
-                                  ) : (
-                                    <span className="text-[11px] text-muted">{gc.label}</span>
-                                  )}
-                                  <button onClick={(e) => { e.stopPropagation(); deleteNode(gc.id); }} className="hidden group-hover:block text-muted hover:text-mention p-0.5 shrink-0">
-                                    <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
+        {/* 右側ブランチ */}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "flex-start", paddingTop: 60 }}>
+          {rightBranches.map((b, i) => renderBranch(b, i * 2 + 1, "right"))}
         </div>
       </div>
     );
