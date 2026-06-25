@@ -280,14 +280,15 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
     ).length;
   }, [memberReadTimes, currentUserId]);
 
-  // 既読者の名前リストを返す
+  // 既読者の名前リストを返す（next-projectでは無効）
   const getReadByNames = useCallback((message: MessageWithProfile): string[] => {
+    if (workspaceSlug === "next-project") return [];
     if (message.user_id !== currentUserId) return [];
     const msgTime = new Date(message.created_at).getTime();
     return memberReadTimes
       .filter((m) => m.user_id !== currentUserId && m.last_read_at && new Date(m.last_read_at).getTime() >= msgTime)
       .map((m) => m.display_name || "不明");
-  }, [memberReadTimes, currentUserId]);
+  }, [memberReadTimes, currentUserId, workspaceSlug]);
 
   // ミュート状態のみ取得 (myLastReadAt の設定は上の既読化 effect に一元化)
   useEffect(() => {
