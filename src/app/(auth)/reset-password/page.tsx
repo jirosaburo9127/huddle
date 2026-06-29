@@ -25,6 +25,8 @@ function ResetPasswordForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  // パスワード更新完了フラグ（完了画面を表示する）
+  const [done, setDone] = useState(false);
 
   const passwordStrength = useMemo(() => validatePassword(password), [password]);
 
@@ -97,13 +99,47 @@ function ResetPasswordForm() {
           .then(() => {});
       }
 
-      // 更新成功 → ログイン画面へ（新パスワードでの再ログインを促す）
-      window.location.href = "/login";
+      // リカバリセッションを破棄して、新パスワードでの再ログインを促す
+      await supabase.auth.signOut({ scope: "local" });
+
+      // 更新成功 → 完了画面を表示
+      setDone(true);
     } catch {
       setError("パスワードの更新に失敗しました");
     } finally {
       setLoading(false);
     }
+  }
+
+  // パスワード更新完了
+  if (done) {
+    return (
+      <div className="flex min-h-full items-center justify-center px-4">
+        <div className="w-full max-w-sm space-y-8">
+          <div className="text-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/icons/logo-transparent.png" alt="" className="w-14 h-14 mx-auto mb-3" />
+            <h1 className="text-3xl font-bold text-accent">Huddle</h1>
+            <p className="mt-2 text-lg font-semibold text-foreground">
+              パスワードがリセットされました
+            </p>
+          </div>
+
+          <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-4 text-sm text-emerald-400 leading-relaxed text-center">
+            新しいパスワードの設定が完了しました。
+            <br />
+            新しいパスワードでログインしてください。
+          </div>
+
+          <Link
+            href="/login"
+            className="block w-full rounded-lg bg-accent py-2 text-center font-medium text-white hover:bg-accent-hover transition-colors"
+          >
+            ログイン画面へ
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   // 検証中
