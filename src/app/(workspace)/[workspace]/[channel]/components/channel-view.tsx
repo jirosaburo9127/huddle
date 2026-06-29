@@ -898,17 +898,6 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
     if (el) el.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
-  // 未読区切り線または最下部にスクロール
-  const scrollToUnreadOrBottom = useCallback(() => {
-    const unreadEl = unreadLineRef.current;
-    if (unreadEl) {
-      // 未読の先頭が画面上部に来るように（= 未読区切り線を上端付近に）
-      unreadEl.scrollIntoView({ behavior: "auto", block: "start" });
-    } else {
-      scrollToBottom();
-    }
-  }, [scrollToBottom]);
-
   // 未読区切り線が画面内に3秒入っていたら自動で消す（fade out）
   useEffect(() => {
     if (unreadLineState !== "visible") return;
@@ -944,63 +933,73 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
     // messages.length に依存: 初回 DOM 構築後・メッセージ追加で ref が付け変わるタイミングで再セット
   }, [unreadLineState, messages.length]);
 
-  // チャンネル切替時: 未読位置または最下部に移動 + ResizeObserver
+  // チャンネルを開いたときの初期スクロール。
+  // 方針: 「この開封でのスクロール目標」を一度だけ確定し、画像/動画の遅延ロードで
+  // 高さが変わっても同じ目標を維持する。途中で目標を未読↔最新に切り替えないことで
+  // 「あっちこっち飛ぶ」現象を防ぐ。
+  //   - 未読がある  → 未読ライン("ここから未読")を画面上端に表示
+  //   - 未読がない  → 最新投稿を表示（通常は最下部、独り言は最上部）
   useEffect(() => {
-    // DOM構築を待ってからスクロール
-    const tryScroll = () => {
-      if (jumpActiveRef.current) return;
-      // requestAnimationFrameでレンダリング完了を待つ
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          scrollToUnreadOrBottom();
-        });
-      });
-    };
-    // 即座 + 複数回試行（画像等の遅延ロードに対応）
-    tryScroll();
-    const timers = [100, 300, 700, 1500, 3000].map((ms) => setTimeout(tryScroll, ms));
-    const waitAndScroll = timers[0]; // cleanup用
-    prevMessageCountRef.current = initialMessages.length;
-
-    // 初期表示中はコンテンツ高さの変化を監視してスクロール位置を維持。
-    // 独り言は画像・動画が多く遅延ロードでレイアウトシフトが続くので、
-    // 通常 3 秒のところを 10 秒に延長する。
-    const armedDurationMs = channel.is_hitorigoto ? 10000 : 3000;
     const container = scrollContainerRef.current;
-    if (!container) return () => clearTimeout(waitAndScroll);
+    if (!container) return;
+
+    // この開封でのスクロール目標。初回の applyTarget で一度だけ確定し、以後変えない。
+    let target: "unread" | "bottom" | null = null;
     let armed = true;
+
     const disarm = () => {
       if (!armed) return;
       armed = false;
       observer.disconnect();
+      clearTimeout(stopTimer);
+      clearTimeout(retryTimer);
+      container.removeEventListener("wheel", disarm);
+      container.removeEventListener("touchmove", disarm);
+      container.removeEventListener("keydown", disarm);
     };
-    const observer = new ResizeObserver(() => {
-      if (armed && !jumpActiveRef.current) {
+
+    const applyTarget = () => {
+      if (!armed || jumpActiveRef.current) return;
+      // 初回だけ目標を確定（未読ラインが描画されていれば未読、無ければ最新）
+      if (target === null) {
+        target = unreadLineRef.current ? "unread" : "bottom";
+      }
+      if (target === "unread") {
         const unreadEl = unreadLineRef.current;
         if (unreadEl) {
           unreadEl.scrollIntoView({ behavior: "auto", block: "start" });
         } else {
-          scrollToBottom();
+          // 未読ラインが消えた（フェードアウト等）→ これ以上追従しない。
+          // ここで最下部へ飛ばすと「未読位置→最新」へジャンプして見えるため何もしない。
+          disarm();
         }
+      } else {
+        // 最新を表示し続ける（画像ロードで高さが伸びても最下部に張り付ける）
+        scrollToBottom();
       }
-    });
+    };
+
+    prevMessageCountRef.current = initialMessages.length;
+
+    // 初回: レイアウト確定後に目標へ移動。早期の遅延ロードに備えた短い再試行を1回だけ。
+    requestAnimationFrame(() => requestAnimationFrame(applyTarget));
+    const retryTimer = setTimeout(applyTarget, 150);
+
+    // コンテンツ高さの変化（画像・動画の遅延ロード）に追従して目標位置を維持する。
+    // 独り言は遅延ロード要素が多くシフトが続くので追従期間を長めにする。
+    const armedDurationMs = channel.is_hitorigoto ? 10000 : 3000;
+    const observer = new ResizeObserver(applyTarget);
     const inner = container.firstElementChild;
     if (inner) observer.observe(inner);
-    // ユーザが手で操作した瞬間に自動スクロール追従を止める
-    // (画像ロード後のレイアウトシフトで勝手にトップ/最下部に戻されないように)
+
+    // ユーザが手で操作した瞬間に自動追従を止める（勝手に位置が戻らないように）
     container.addEventListener("wheel", disarm, { passive: true });
     container.addEventListener("touchmove", disarm, { passive: true });
     container.addEventListener("keydown", disarm);
-    const timer = setTimeout(disarm, armedDurationMs);
-    return () => {
-      timers.forEach(clearTimeout);
-      clearTimeout(timer);
-      container.removeEventListener("wheel", disarm);
-      container.removeEventListener("touchmove", disarm);
-      container.removeEventListener("keydown", disarm);
-      disarm();
-    };
-  }, [channel.id, channel.is_hitorigoto, initialMessages.length, scrollToBottom, scrollToUnreadOrBottom]);
+    const stopTimer = setTimeout(disarm, armedDurationMs);
+
+    return disarm;
+  }, [channel.id, channel.is_hitorigoto, initialMessages.length, scrollToBottom]);
 
   // メッセージ追加時: DOM 更新後に即座に最下部へ
   // ただし「もっと前を読み込む」での prepend は末尾 id が変わらないので除外する。
