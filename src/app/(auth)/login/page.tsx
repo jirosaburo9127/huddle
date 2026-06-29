@@ -349,6 +349,12 @@ function LoginForm() {
         </form>
 
         <p className="text-center text-sm text-muted">
+          <Link href="/forgot-password" className="text-accent hover:underline">
+            パスワードをお忘れですか？
+          </Link>
+        </p>
+
+        <p className="text-center text-sm text-muted">
           アカウントがない場合は{" "}
           <Link href="/signup" className="text-accent hover:underline">
             サインアップ

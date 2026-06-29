@@ -7,7 +7,9 @@ export async function updateSession(request: NextRequest) {
   // 認証不要ページの判定（これらのページではgetUserを呼ばない）
   const isAuthPage =
     request.nextUrl.pathname.startsWith("/login") ||
-    request.nextUrl.pathname.startsWith("/signup");
+    request.nextUrl.pathname.startsWith("/signup") ||
+    request.nextUrl.pathname.startsWith("/forgot-password") ||
+    request.nextUrl.pathname.startsWith("/reset-password");
   const isInvitePage = request.nextUrl.pathname.startsWith("/invite");
   // 共有ダッシュボード（伴走マイスター向け）はログイン不要
   const isSharePage = request.nextUrl.pathname.startsWith("/share/");
@@ -77,6 +79,8 @@ export async function updateSession(request: NextRequest) {
   const RESERVED_ROOT_SEGMENTS = new Set([
     "login",
     "signup",
+    "forgot-password",
+    "reset-password",
     "invite",
     "about",
     "share",

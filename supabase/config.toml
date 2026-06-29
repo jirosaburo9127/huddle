@@ -238,6 +238,11 @@ otp_expiry = 3600
 # subject = "You have been invited"
 # content_path = "./supabase/templates/invite.html"
 
+# パスワード再設定メール（token_hash 方式で別ブラウザ/別端末でも開けるようにする）
+[auth.email.template.recovery]
+subject = "【Huddle】パスワードの再設定"
+content_path = "./supabase/templates/recovery.html"
+
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]
 # enabled = true
