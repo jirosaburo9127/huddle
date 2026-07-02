@@ -133,6 +133,7 @@ export default function CalendarPage() {
   const [editMembers, setEditMembers] = useState<ChannelMember[]>([]);
   const [editSaving, setEditSaving] = useState(false);
   const [editDeleting, setEditDeleting] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   // 外部カレンダー表示モーダル
@@ -450,6 +451,7 @@ export default function CalendarPage() {
   const startEdit = async (ev: CalendarEvent) => {
     setEditingEvent(ev);
     setConfirmDelete(false);
+    setEditError(null);
     setEditTitle(ev.title);
     const d = new Date(ev.start_at);
     const local = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}T${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
@@ -494,6 +496,7 @@ export default function CalendarPage() {
   const saveEdit = async () => {
     if (!editingEvent || !editTitle.trim() || !editStartAt) return;
     setEditSaving(true);
+    setEditError(null);
     const supabase = createClient();
     const dt = new Date(editStartAt);
     const { error: rpcErr } = await supabase.rpc("update_event", {
@@ -506,6 +509,11 @@ export default function CalendarPage() {
     if (rpcErr) {
       // eslint-disable-next-line no-console
       console.error("[calendar] update_event failed:", rpcErr);
+      // 権限エラーは分かりやすい日本語で、それ以外は汎用メッセージ
+      const msg = /not a channel member|not authorized/.test(rpcErr.message)
+        ? "この予定を編集する権限がありません"
+        : "予定の保存に失敗しました。時間をおいて再度お試しください";
+      setEditError(msg);
       setEditSaving(false);
       return;
     }
@@ -528,6 +536,7 @@ export default function CalendarPage() {
   const deleteEvent = async () => {
     if (!editingEvent || editDeleting) return;
     setEditDeleting(true);
+    setEditError(null);
     const supabase = createClient();
     // events_delete RLS で作成者のみに限定されている
     const { error: delErr } = await supabase
@@ -535,7 +544,11 @@ export default function CalendarPage() {
       .delete()
       .eq("id", editingEvent.id);
     if (delErr) {
+      // eslint-disable-next-line no-console
+      console.error("[calendar] delete event failed:", delErr);
+      setEditError("この予定を削除できるのは作成者のみです");
       setEditDeleting(false);
+      setConfirmDelete(false);
       return;
     }
     // チャンネル予定 (message_id あり) の場合のみ、チャンネルタイムライン側のメッセージもソフト削除
@@ -1135,6 +1148,11 @@ export default function CalendarPage() {
                 </div>
               )}
             </div>
+            {editError && (
+              <div className="mt-3 px-3 py-2 text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg">
+                {editError}
+              </div>
+            )}
             <div className="flex items-center gap-2 mt-4">
               {/* 削除: 確認前は赤文字ボタン、確認後は「本当に削除?」の確定ボタン */}
               {!confirmDelete ? (
