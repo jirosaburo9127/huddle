@@ -111,6 +111,9 @@ export function Sidebar({
     if (typeof window === "undefined") return "activity";
     return (localStorage.getItem("huddle:channelSortMode") as "activity" | "category") || "activity";
   });
+  // 新規メッセージ受信時にチャンネルを先頭へ「昇格」させるためのクライアント側活動時刻。
+  // channelId → 最新アクティビティの epoch ms。サーバの last_activity を上書きする。
+  const [activityBump, setActivityBump] = useState<Record<string, number>>({});
   const [catList, setCatList] = useState<WorkspaceCategory[]>(categories);
   const [newCatLabel, setNewCatLabel] = useState("");
   const [newCatColor, setNewCatColor] = useState<string | null>(null);
@@ -381,6 +384,18 @@ export function Sidebar({
   const lastOptimisticReadRef = useRef<Map<string, number>>(new Map());
   const READ_GUARD_MS = 30000;
 
+  // チャンネル並び順をサーバから再取得(router.refresh)する際の連打防止。
+  // 直近の実行から ORDER_REFRESH_GUARD_MS 以内は再実行しない。
+  const lastOrderRefreshRef = useRef(0);
+  const ORDER_REFRESH_GUARD_MS = 4000;
+  const refreshChannelOrder = useCallback(() => {
+    const now = Date.now();
+    if (now - lastOrderRefreshRef.current < ORDER_REFRESH_GUARD_MS) return;
+    lastOrderRefreshRef.current = now;
+    // サーバーコンポーネント(get_workspace_data)を再実行し、最新の活動順を取り込む
+    router.refresh();
+  }, [router]);
+
   // 既読化の責務は ChannelView に移管したので、Sidebar から mark_channel_read は呼ばない。
   // (URL 推測でチャンネル ID を起点に既読化していたが、ChannelView マウントで一元化)
   //
@@ -576,11 +591,14 @@ export function Sidebar({
       if (typeof document === "undefined") return;
       if (document.visibilityState !== "visible") return;
       refetchUnread();
+      // 復帰時にチャンネルの並び順もサーバ最新へ同期(バックグラウンド中の投稿を反映)
+      refreshChannelOrder();
     }
 
     // iOS Capacitor: app-state.ts が appStateChange を受けてディスパッチするイベント
     function onAppResume() {
       refetchUnread();
+      refreshChannelOrder();
     }
 
     // ダッシュボードが既読マークした瞬間にバッジを 0 にする
@@ -669,6 +687,14 @@ export function Sidebar({
             return;
           }
 
+          // このワークスペースのチャンネルなら、自分の投稿を含めて最新順の先頭へ昇格させる
+          if (channelById.has(msg.channel_id)) {
+            const t = Date.parse(msg.created_at) || Date.now();
+            setActivityBump((prev) =>
+              (prev[msg.channel_id] ?? 0) >= t ? prev : { ...prev, [msg.channel_id]: t }
+            );
+          }
+
           if (msg.user_id === currentUserId) return;
           const ch = channelById.get(msg.channel_id);
           if (!ch) {
@@ -752,12 +778,22 @@ export function Sidebar({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showWsSwitcher]);
 
-  // 検索クエリでチャンネルとDMをフィルタリング
+  // チャンネルの実効アクティビティ時刻(ms)。サーバの last_activity を基準に、
+  // クライアント側で受信した新規メッセージ(activityBump)があればそちらを優先する。
+  const channelActivityMs = useCallback((ch: Channel): number => {
+    const serverTs = (ch as Channel & { last_activity?: string | null }).last_activity;
+    const base = serverTs ? Date.parse(serverTs) : Date.parse(ch.created_at);
+    const bumped = activityBump[ch.id] ?? 0;
+    return Math.max(Number.isNaN(base) ? 0 : base, bumped);
+  }, [activityBump]);
+
+  // 検索クエリでフィルタし、常に「最新アクティビティ順」で並べる。
+  // JSの sort は安定なので、同時刻のチャンネルはサーバの返却順(=初期の活動順)を保つ。
   const filteredChannels = useMemo(() => {
-    if (!searchQuery.trim()) return channels;
-    const q = searchQuery.toLowerCase();
-    return channels.filter((ch) => ch.name.toLowerCase().includes(q));
-  }, [channels, searchQuery]);
+    const q = searchQuery.trim().toLowerCase();
+    const base = q ? channels.filter((ch) => ch.name.toLowerCase().includes(q)) : channels;
+    return [...base].sort((a, b) => channelActivityMs(b) - channelActivityMs(a));
+  }, [channels, searchQuery, channelActivityMs]);
 
   const filteredDmChannels = useMemo(() => {
     if (!searchQuery.trim()) return dmChannels;
@@ -1174,7 +1210,7 @@ export function Sidebar({
         </div>
 
         {/* チャンネル・DM一覧（プルリフレッシュ対応） */}
-        <PullToRefresh onRefresh={async () => { await fetchHitorigotoPreview(); }}>
+        <PullToRefresh onRefresh={async () => { await fetchHitorigotoPreview(); refreshChannelOrder(); }}>
         <div className="flex-1 overflow-y-auto overflow-x-hidden" style={{ padding: "0 12px 8px" }}>
           {/* スマホ用: 独り言プレビュー（スクロールエリア内） */}
           {hitorigotoChannel && hitorigotoPreview.length > 0 && (
