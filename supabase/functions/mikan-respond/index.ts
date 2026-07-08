@@ -223,6 +223,104 @@ const PROPOSE_EVENT_TOOL = {
   },
 };
 
+// 予定提案メッセージの投稿 + event_proposals 行の作成をまとめて行う。
+// propose_event ツール経由と、偽提案検知後の「強制再提案」の両方から呼ぶ。
+// 成功時 true。失敗時は先に投稿したメッセージをロールバックして false を返す
+// (リアクションしても登録できない「孤児の📅メッセージ」を残さないため)。
+async function postEventProposal(
+  supabase: ReturnType<typeof createClient>,
+  args: { channelId: string; workspaceId: string; forUserId: string; title: string; startAtIso: string; location: string },
+): Promise<boolean> {
+  const startAt = new Date(args.startAtIso);
+  if (!args.title || isNaN(startAt.getTime())) {
+    console.warn("[mikan] postEventProposal invalid input:", args);
+    return false;
+  }
+  const jaDate = formatDateTimeJa(startAt.toISOString());
+  const locLine = args.location ? `\n📍 ${args.location}` : "";
+  const proposalContent =
+    `📅 予定の登録を提案します\n\n「${args.title}」\n${jaDate}${locLine}\n\nこのメッセージにリアクションすると登録します ✅`;
+
+  const { data: msgData, error: insertErr } = await supabase
+    .from("messages")
+    .insert({ channel_id: args.channelId, user_id: MIKAN_USER_ID, content: proposalContent })
+    .select("id")
+    .maybeSingle();
+  if (insertErr || !msgData) {
+    console.error("[mikan] proposal message insert failed:", insertErr);
+    return false;
+  }
+  const proposalMsgId = (msgData as { id: string }).id;
+
+  const { error: propErr } = await supabase.from("event_proposals").insert({
+    workspace_id: args.workspaceId,
+    channel_id: args.channelId,
+    message_id: proposalMsgId,
+    proposed_by: MIKAN_USER_ID,
+    for_user_id: args.forUserId,
+    title: args.title,
+    starts_at: startAt.toISOString(),
+    location: args.location || null,
+  });
+  if (propErr) {
+    console.error("[mikan] event_proposals insert failed, rolling back message:", propErr);
+    await supabase.from("messages").delete().eq("id", proposalMsgId);
+    return false;
+  }
+  return true;
+}
+
+// 偽提案検知後のリカバリ用。propose_event を tool_choice で強制した再呼び出しを行い、
+// title / start_at_iso / location を取り出す。ツールが返らなければ null。
+async function forceProposeEvent(
+  conversation: Array<{ role: string; content: string }>,
+  lastUserName: string,
+  lastUserContent: string,
+): Promise<{ title: string; startIso: string; location: string } | null> {
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: 1024,
+        tools: [PROPOSE_EVENT_TOOL],
+        tool_choice: { type: "tool", name: "propose_event" },
+        system: [
+          { type: "text", text: SYSTEM_PROMPT_MENTION },
+          { type: "text", text: `現在日時 (JST): ${nowJstString()}` },
+        ],
+        messages: conversation.length > 0 ? conversation : [
+          { role: "user", content: `${lastUserName}: ${lastUserContent}` },
+        ],
+      }),
+    });
+    if (!res.ok) {
+      console.error("[mikan] forced propose api failed:", res.status, await res.text());
+      return null;
+    }
+    const json = await res.json() as { content: ContentBlock[] };
+    const tb = json.content.find(
+      (c): c is Extract<ContentBlock, { type: "tool_use" }> =>
+        c.type === "tool_use" && c.name === "propose_event",
+    );
+    if (!tb) return null;
+    const input = tb.input as { title?: unknown; start_at_iso?: unknown; location?: unknown };
+    const title = typeof input.title === "string" ? input.title.trim() : "";
+    const startIso = typeof input.start_at_iso === "string" ? input.start_at_iso : "";
+    const location = typeof input.location === "string" ? input.location.trim() : "";
+    if (!title || !startIso) return null;
+    return { title, startIso, location };
+  } catch (e) {
+    console.error("[mikan] forced propose error:", e);
+    return null;
+  }
+}
+
 // Anthropic 公式の Web 検索 server tool。
 // API 内部で検索が完結するので、こちらで tool_use の往復処理を書く必要はない。
 // blocked_domains でまとめサイト/SNS を最小限弾き、一次情報優先はプロンプトで誘導する。
@@ -576,9 +674,21 @@ Deno.serve(async (req) => {
           ? "みかん"
           : (m.profiles?.display_name ?? "誰か");
       const isMikan = m.user_id === MIKAN_USER_ID;
+      // みかん自身の過去の「予定提案」メッセージは、履歴上は中立プレースホルダに
+      // 置き換える。テンプレをそのまま見せると、モデルが propose_event ツールを
+      // 呼ばずに地の文で提案フォーマットを模倣してしまい (リアクションしても
+      // event_proposals 行が無く登録されない偽提案)、実害が出ていたため。
+      let content = m.content;
+      if (
+        isMikan &&
+        (content.includes("予定の登録を提案します") ||
+          content.includes("リアクションすると登録します"))
+      ) {
+        content = "(予定の登録を提案しました)";
+      }
       return {
         role: isMikan ? "assistant" : "user",
-        content: isMikan ? m.content : `${name}: ${m.content}`,
+        content: isMikan ? content : `${name}: ${content}`,
       };
     });
 
@@ -966,59 +1076,17 @@ Deno.serve(async (req) => {
       const title = typeof input.title === "string" ? input.title.trim() : "";
       const startIso = typeof input.start_at_iso === "string" ? input.start_at_iso : "";
       const location = typeof input.location === "string" ? input.location.trim() : "";
-      const startAt = new Date(startIso);
 
-      if (!title || isNaN(startAt.getTime())) {
-        console.warn("[mikan] propose_event invalid input:", input);
-      } else {
-        const jaDate = formatDateTimeJa(startAt.toISOString());
-        const locLine = location ? `\n📍 ${location}` : "";
-        const proposalContent =
-          `📅 予定の登録を提案します\n\n「${title}」\n${jaDate}${locLine}\n\nこのメッセージにリアクションすると登録します ✅`;
-
-        const { data: msgData, error: insertErr } = await supabase
-          .from("messages")
-          .insert({
-            channel_id: msg.channel_id,
-            user_id: MIKAN_USER_ID,
-            content: proposalContent,
-          })
-          .select("id")
-          .maybeSingle();
-
-        if (insertErr || !msgData) {
-          console.error("[mikan] proposal message insert failed:", insertErr);
-          return new Response("insert failed", { status: 500 });
-        }
-
-        const { error: propErr } = await supabase.from("event_proposals").insert({
-          workspace_id: ch.workspace_id,
-          channel_id: msg.channel_id,
-          message_id: msgData.id,
-          proposed_by: MIKAN_USER_ID,
-          for_user_id: msg.user_id,
-          title,
-          starts_at: startAt.toISOString(),
-          location: location || null,
-        });
-
-        // event_proposals INSERT に失敗したら、孤児メッセージ (リアクションしても
-        // 登録できない 📅 メッセージ) が残らないように、先に投稿した messages を
-        // 削除してロールバックする。
-        if (propErr) {
-          console.error("[mikan] event_proposals insert failed, rolling back message:", propErr);
-          const { error: rollbackErr } = await supabase
-            .from("messages")
-            .delete()
-            .eq("id", msgData.id);
-          if (rollbackErr) {
-            console.error("[mikan] rollback delete also failed:", rollbackErr);
-          }
-          return new Response("event_proposals insert failed", { status: 500 });
-        }
-
-        return new Response("proposal posted", { status: 200 });
-      }
+      const ok = await postEventProposal(supabase, {
+        channelId: msg.channel_id,
+        workspaceId: ch.workspace_id,
+        forUserId: msg.user_id,
+        title,
+        startAtIso: startIso,
+        location,
+      });
+      if (ok) return new Response("proposal posted", { status: 200 });
+      // 提案作成に失敗 (入力不正/DBエラー) した場合はフォールスルーしてテキスト返信を試みる
     }
 
     // 通常テキスト返信
@@ -1027,6 +1095,30 @@ Deno.serve(async (req) => {
       .map((c) => c.text)
       .join("\n")
       .trim();
+
+    // 偽提案の救済: みかんが propose_event を呼ばず、履歴の提案フォーマットを地の文で
+    // 模倣した場合、そのメッセージにリアクションしても event_proposals 行が無く登録
+    // されない。テキストが提案の体裁なら propose_event を強制した再呼び出しで本物の
+    // 提案に作り直す。作れないなら紛らわしい偽提案テキストは投稿しない。
+    const looksLikeFakeProposal =
+      replyText.includes("リアクションすると登録します") ||
+      replyText.includes("予定の登録を提案します");
+    if (looksLikeFakeProposal) {
+      const forced = await forceProposeEvent(conversation, lastUserName, msg.content);
+      if (forced) {
+        const ok = await postEventProposal(supabase, {
+          channelId: msg.channel_id,
+          workspaceId: ch.workspace_id,
+          forUserId: msg.user_id,
+          title: forced.title,
+          startAtIso: forced.startIso,
+          location: forced.location,
+        });
+        if (ok) return new Response("proposal posted (forced)", { status: 200 });
+      }
+      console.warn("[mikan] suppressed fake proposal text (forced propose unavailable)");
+      return new Response("fake proposal suppressed", { status: 200 });
+    }
 
     if (!replyText) {
       return new Response("empty reply", { status: 200 });
