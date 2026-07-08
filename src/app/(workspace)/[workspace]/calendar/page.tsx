@@ -668,7 +668,7 @@ export default function CalendarPage() {
           <div className="grid grid-cols-7 gap-px bg-surface rounded-xl overflow-hidden border border-border">
             {calendarDays.map((day, idx) => {
               if (day === null) {
-                return <div key={`empty-${idx}`} className="min-h-[3.5rem] lg:min-h-[6rem] bg-sidebar" />;
+                return <div key={`empty-${idx}`} className="min-h-[4.5rem] lg:min-h-[6rem] bg-sidebar" />;
               }
               const dayEvents = eventsByDay.get(day) ?? [];
               const isSelected = selectedDay === day;
@@ -679,7 +679,7 @@ export default function CalendarPage() {
                 <button
                   key={day}
                   onClick={() => setSelectedDay(day)}
-                  className={`min-h-[3.5rem] lg:min-h-[6rem] p-1 lg:p-2 flex flex-col items-center lg:items-start gap-0.5 transition-colors relative ${
+                  className={`min-h-[4.5rem] lg:min-h-[6rem] p-1 lg:p-2 flex flex-col items-center lg:items-start gap-0.5 transition-colors relative ${
                     isSelected
                       ? "bg-blue-400/15"
                       : "bg-sidebar hover:bg-sidebar-hover"
@@ -702,8 +702,10 @@ export default function CalendarPage() {
                   {dayEvents.slice(0, isDesktop ? 3 : 2).map((ev) => (
                     <div
                       key={ev.id}
-                      className="w-full rounded-sm lg:rounded px-0.5 lg:px-1.5 lg:py-0.5 truncate text-[9px] lg:text-[11px] leading-tight bg-blue-500/80 text-white font-medium"
+                      className="w-full rounded-sm lg:rounded px-0.5 lg:px-1.5 lg:py-0.5 truncate text-[10px] lg:text-[11px] leading-tight bg-blue-500/80 text-white font-medium"
+                      title={`${formatTime(ev.start_at)} ${ev.title}`}
                     >
+                      <span className="tabular-nums font-bold mr-0.5 lg:mr-1 opacity-95">{formatTime(ev.start_at)}</span>
                       {ev.title}
                     </div>
                   ))}
