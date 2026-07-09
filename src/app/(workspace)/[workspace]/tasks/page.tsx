@@ -195,18 +195,18 @@ export default function TasksPage() {
       <div
         key={task.id}
         onClick={() => setEditingTask(task)}
-        className="group flex items-center gap-3.5 px-4 py-3.5 cursor-pointer hover:bg-sidebar-hover transition-colors"
+        className="group flex items-center gap-3 px-4 py-3 cursor-pointer active:bg-sidebar-hover lg:hover:bg-sidebar-hover transition-colors"
       >
         {/* ワンタップ完了チェックボックス */}
         <button
           onClick={(e) => { e.stopPropagation(); toggleComplete(task); }}
-          className={`shrink-0 w-[22px] h-[22px] rounded-full border-2 flex items-center justify-center transition-all active:scale-90 ${
-            isDone ? "bg-green-500 border-green-500" : "border-muted/40 group-hover:border-green-500"
+          className={`shrink-0 w-5 h-5 rounded-full border-[1.5px] flex items-center justify-center transition-all active:scale-90 ${
+            isDone ? "bg-green-500 border-green-500" : "border-muted/50 group-hover:border-green-500"
           }`}
           aria-label={isDone ? "未完了に戻す" : "完了にする"}
         >
           {isDone && (
-            <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
+            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" strokeWidth={3.5} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
             </svg>
           )}
@@ -214,20 +214,24 @@ export default function TasksPage() {
 
         {/* タイトル ＋ サブ情報 */}
         <div className="flex-1 min-w-0">
-          <p className={`text-[15px] leading-snug truncate ${isDone ? "line-through text-muted" : "text-foreground"}`}>
+          <p className={`text-[15px] font-semibold leading-tight truncate ${isDone ? "line-through text-muted font-medium" : "text-foreground"}`}>
             {task.title}
           </p>
-          <p className="mt-0.5 text-xs text-muted truncate">
-            {task.status === "in_progress" && <span className="text-amber-500 font-medium">進行中 · </span>}
-            {subParts.join(" · ")}
-          </p>
+          <div className="mt-1 flex items-center gap-1.5 min-w-0">
+            {task.status === "in_progress" && (
+              <span className="shrink-0 text-[11px] font-medium text-amber-600 bg-amber-500/10 rounded px-1.5 py-0.5 leading-none">
+                進行中
+              </span>
+            )}
+            <span className="text-[13px] text-muted truncate">{subParts.join("　·　")}</span>
+          </div>
         </div>
 
-        {/* 期限（右寄せ・強調は期限切れ/今日だけ） */}
+        {/* 期限（右寄せ・淡いピル。強調は期限切れ/今日だけ） */}
         {task.due_date && (
           <span
-            className={`shrink-0 text-xs font-medium tabular-nums ${
-              isOverdue ? "text-red-500" : isToday ? "text-foreground" : "text-muted"
+            className={`shrink-0 text-[13px] font-semibold tabular-nums rounded-md px-2 py-1 leading-none ${
+              isOverdue ? "text-red-500 bg-red-500/10" : isToday ? "text-accent bg-accent/10" : "text-muted bg-foreground/[0.06]"
             }`}
           >
             {isToday ? "今日" : formatDue(task.due_date)}
@@ -362,19 +366,19 @@ export default function TasksPage() {
               <p className="text-xs text-muted/70 mt-2">メッセージの「タスク」ボタンからも作成できます</p>
             </div>
           ) : (
-            <div className="pb-24">
+            <div className="max-w-2xl mx-auto px-3 pt-3 pb-28">
               {BUCKET_ORDER.map((bucket) => {
                 const list = mineGrouped.groups[bucket];
                 if (list.length === 0) return null;
                 return (
-                  <div key={bucket} className="mt-2">
-                    <div className="flex items-baseline gap-2 px-4 pt-3 pb-1.5">
-                      <span className={`text-[11px] font-semibold uppercase tracking-wide ${bucket === "overdue" ? "text-red-500" : "text-muted"}`}>
+                  <div key={bucket} className="mb-5">
+                    <div className="flex items-center gap-2 px-2 mb-2">
+                      <span className={`text-sm font-bold ${bucket === "overdue" ? "text-red-500" : "text-foreground"}`}>
                         {BUCKET_LABEL[bucket]}
                       </span>
-                      <span className="text-[11px] text-muted/70">{list.length}</span>
+                      <span className="text-xs font-medium text-muted bg-foreground/[0.06] rounded-full px-1.5 py-0.5 leading-none">{list.length}</span>
                     </div>
-                    <div className="divide-y divide-border/40 border-y border-border/40 bg-surface">
+                    <div className="rounded-2xl bg-surface border border-border/60 shadow-sm overflow-hidden divide-y divide-border/50">
                       {list.map(renderMineRow)}
                     </div>
                   </div>
@@ -383,19 +387,19 @@ export default function TasksPage() {
 
               {/* 完了（折りたたみ） */}
               {mineGrouped.done.length > 0 && (
-                <div className="mt-4">
+                <div className="mb-5">
                   <button
                     onClick={() => setShowDone((v) => !v)}
-                    className="flex items-center gap-1.5 px-4 py-2 w-full text-muted hover:text-foreground transition-colors"
+                    className="flex items-center gap-1.5 px-2 mb-2 text-muted hover:text-foreground transition-colors"
                   >
-                    <svg className={`w-3 h-3 transition-transform ${showDone ? "rotate-90" : ""}`} fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                    <svg className={`w-3.5 h-3.5 transition-transform ${showDone ? "rotate-90" : ""}`} fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                     </svg>
-                    <span className="text-[11px] font-semibold uppercase tracking-wide">完了</span>
-                    <span className="text-[11px] text-muted/70">{mineGrouped.done.length}</span>
+                    <span className="text-sm font-bold">完了</span>
+                    <span className="text-xs font-medium text-muted bg-foreground/[0.06] rounded-full px-1.5 py-0.5 leading-none">{mineGrouped.done.length}</span>
                   </button>
                   {showDone && (
-                    <div className="divide-y divide-border/40 border-y border-border/40 bg-surface">
+                    <div className="rounded-2xl bg-surface border border-border/60 shadow-sm overflow-hidden divide-y divide-border/50">
                       {mineGrouped.done.map(renderMineRow)}
                     </div>
                   )}
