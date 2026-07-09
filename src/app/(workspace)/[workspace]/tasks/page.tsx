@@ -42,14 +42,14 @@ function ymd(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
-// マイタスクの期限セクション定義
+// マイタスクの期限セクション定義（色は使いすぎない。強調は「期限切れ」だけ赤）
 type DueBucket = "overdue" | "today" | "week" | "later" | "none";
-const BUCKET_META: Record<DueBucket, { label: string; color: string }> = {
-  overdue: { label: "期限切れ", color: "#EF4444" },
-  today: { label: "今日", color: "#F59E0B" },
-  week: { label: "今週", color: "#3B82F6" },
-  later: { label: "それ以降", color: "#8B5CF6" },
-  none: { label: "期限なし", color: "#94A3B8" },
+const BUCKET_LABEL: Record<DueBucket, string> = {
+  overdue: "期限切れ",
+  today: "今日",
+  week: "今週",
+  later: "今後",
+  none: "期限なし",
 };
 const BUCKET_ORDER: DueBucket[] = ["overdue", "today", "week", "later", "none"];
 
@@ -132,8 +132,9 @@ export default function TasksPage() {
     return () => window.removeEventListener("resize", check);
   }, []);
 
-  const today = ymd(new Date());
-  const weekEnd = ymd(new Date(Date.now() + 7 * 86400000));
+  const now = new Date();
+  const today = ymd(now);
+  const weekEnd = ymd(new Date(now.getTime() + 7 * 86400000));
 
   // ワンタップで完了/未完了をトグル（マイタスク行のチェックボックス）
   async function toggleComplete(task: Task) {
@@ -177,79 +178,61 @@ export default function TasksPage() {
 
   function renderMineRow(task: Task) {
     const isOverdue = task.due_date && task.due_date < today && task.status !== "done";
+    const isToday = task.due_date === today && task.status !== "done";
     const isDone = task.status === "done";
     const otherAssignees = task.assignees.filter((a) => a.user_id !== currentUserId);
+
+    // サブ情報を1行に集約（チャンネル名 ＋ 依頼者/担当者）
+    const subParts: string[] = [`#${task.channel.name}`];
+    if (mineFilter === "assigned" && task.created_by !== currentUserId) {
+      subParts.push(`${task.creator.display_name}さんから`);
+    }
+    if (mineFilter === "created" && otherAssignees.length > 0) {
+      subParts.push(`${otherAssignees[0].display_name}${otherAssignees.length > 1 ? ` 他${otherAssignees.length - 1}名` : ""}`);
+    }
+
     return (
       <div
         key={task.id}
         onClick={() => setEditingTask(task)}
-        className="flex items-start gap-3 px-4 py-3 bg-surface border-b border-border/40 cursor-pointer hover:bg-sidebar-hover transition-colors"
+        className="group flex items-center gap-3.5 px-4 py-3.5 cursor-pointer hover:bg-sidebar-hover transition-colors"
       >
         {/* ワンタップ完了チェックボックス */}
         <button
           onClick={(e) => { e.stopPropagation(); toggleComplete(task); }}
-          className={`shrink-0 mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all active:scale-90 ${
-            isDone ? "bg-green-500 border-green-500" : "border-muted/50 hover:border-green-500"
+          className={`shrink-0 w-[22px] h-[22px] rounded-full border-2 flex items-center justify-center transition-all active:scale-90 ${
+            isDone ? "bg-green-500 border-green-500" : "border-muted/40 group-hover:border-green-500"
           }`}
           aria-label={isDone ? "未完了に戻す" : "完了にする"}
         >
           {isDone && (
-            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
+            <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
             </svg>
           )}
         </button>
 
+        {/* タイトル ＋ サブ情報 */}
         <div className="flex-1 min-w-0">
-          <p className={`text-sm leading-snug mb-1 ${isDone ? "line-through text-muted" : "text-foreground"}`}>
+          <p className={`text-[15px] leading-snug truncate ${isDone ? "line-through text-muted" : "text-foreground"}`}>
             {task.title}
           </p>
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* 進行中バッジ */}
-            {task.status === "in_progress" && (
-              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-500">● 進行中</span>
-            )}
-            {/* チャンネル */}
-            <span className="inline-flex items-center gap-1 text-[10px] text-muted">
-              {task.channel.icon_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={task.channel.icon_url} alt="" className="w-3 h-3 rounded-sm object-cover" />
-              ) : "#"}
-              {task.channel.name}
-            </span>
-            {/* 期限 */}
-            {task.due_date && (
-              <span className={`inline-flex items-center gap-1 text-[10px] font-medium ${isOverdue ? "text-red-500" : "text-muted"}`}>
-                📅 {formatDue(task.due_date)}
-              </span>
-            )}
-            {/* 依頼者（担当ビュー時、他人が作成したもの） */}
-            {mineFilter === "assigned" && task.created_by !== currentUserId && (
-              <span className="inline-flex items-center gap-1 text-[10px] text-muted">
-                {task.creator.avatar_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={task.creator.avatar_url} alt="" className="w-3.5 h-3.5 rounded-full object-cover" />
-                ) : null}
-                {task.creator.display_name}から
-              </span>
-            )}
-            {/* 担当者（依頼ビュー時、自分以外の担当） */}
-            {mineFilter === "created" && otherAssignees.length > 0 && (
-              <span className="inline-flex items-center gap-1">
-                {otherAssignees.slice(0, 3).map((a) => (
-                  a.avatar_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img key={a.user_id} src={a.avatar_url} alt={a.display_name} title={a.display_name} className="w-4 h-4 rounded-full object-cover" />
-                  ) : (
-                    <span key={a.user_id} title={a.display_name} className="w-4 h-4 rounded-full bg-muted/20 flex items-center justify-center text-[8px] font-bold text-muted">
-                      {a.display_name.charAt(0)}
-                    </span>
-                  )
-                ))}
-              </span>
-            )}
-          </div>
+          <p className="mt-0.5 text-xs text-muted truncate">
+            {task.status === "in_progress" && <span className="text-amber-500 font-medium">進行中 · </span>}
+            {subParts.join(" · ")}
+          </p>
         </div>
+
+        {/* 期限（右寄せ・強調は期限切れ/今日だけ） */}
+        {task.due_date && (
+          <span
+            className={`shrink-0 text-xs font-medium tabular-nums ${
+              isOverdue ? "text-red-500" : isToday ? "text-foreground" : "text-muted"
+            }`}
+          >
+            {isToday ? "今日" : formatDue(task.due_date)}
+          </span>
+        )}
       </div>
     );
   }
@@ -383,33 +366,39 @@ export default function TasksPage() {
               {BUCKET_ORDER.map((bucket) => {
                 const list = mineGrouped.groups[bucket];
                 if (list.length === 0) return null;
-                const meta = BUCKET_META[bucket];
                 return (
-                  <div key={bucket}>
-                    <div className="flex items-center gap-2 px-4 pt-4 pb-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: meta.color }} />
-                      <span className="text-xs font-bold" style={{ color: meta.color }}>{meta.label}</span>
-                      <span className="text-xs text-muted">{list.length}</span>
+                  <div key={bucket} className="mt-2">
+                    <div className="flex items-baseline gap-2 px-4 pt-3 pb-1.5">
+                      <span className={`text-[11px] font-semibold uppercase tracking-wide ${bucket === "overdue" ? "text-red-500" : "text-muted"}`}>
+                        {BUCKET_LABEL[bucket]}
+                      </span>
+                      <span className="text-[11px] text-muted/70">{list.length}</span>
                     </div>
-                    {list.map(renderMineRow)}
+                    <div className="divide-y divide-border/40 border-y border-border/40 bg-surface">
+                      {list.map(renderMineRow)}
+                    </div>
                   </div>
                 );
               })}
 
               {/* 完了（折りたたみ） */}
               {mineGrouped.done.length > 0 && (
-                <div>
+                <div className="mt-4">
                   <button
                     onClick={() => setShowDone((v) => !v)}
-                    className="flex items-center gap-2 px-4 pt-4 pb-1.5 w-full"
+                    className="flex items-center gap-1.5 px-4 py-2 w-full text-muted hover:text-foreground transition-colors"
                   >
-                    <svg className={`w-3 h-3 text-muted transition-transform ${showDone ? "rotate-90" : ""}`} fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                    <svg className={`w-3 h-3 transition-transform ${showDone ? "rotate-90" : ""}`} fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                     </svg>
-                    <span className="text-xs font-bold text-muted">完了</span>
-                    <span className="text-xs text-muted">{mineGrouped.done.length}</span>
+                    <span className="text-[11px] font-semibold uppercase tracking-wide">完了</span>
+                    <span className="text-[11px] text-muted/70">{mineGrouped.done.length}</span>
                   </button>
-                  {showDone && mineGrouped.done.map(renderMineRow)}
+                  {showDone && (
+                    <div className="divide-y divide-border/40 border-y border-border/40 bg-surface">
+                      {mineGrouped.done.map(renderMineRow)}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
