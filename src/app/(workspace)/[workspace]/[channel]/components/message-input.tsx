@@ -137,7 +137,7 @@ type Props = {
   onSend: (content: string, mentions: MentionPayload, options?: SendOptions) => void | Promise<void>;
   placeholder?: string;
   channelId?: string; // ファイルアップロード用
-  workspaceId?: string; // メンション用
+  workspaceId?: string; // 後方互換のため受け取るだけ（メンション候補は channelId から取得）
   onCreatePoll?: () => void; // 投票作成モーダルを開くコールバック
   onCreateEvent?: () => void; // 予定作成モーダルを開くコールバック
   replyTo?: MessageWithProfile | null; // Chatwork風インライン返信の対象
@@ -168,7 +168,7 @@ function writeDraft(channelId: string | undefined, value: string) {
   }
 }
 
-export function MessageInput({ channelName, onSend, placeholder, channelId, workspaceId, onCreatePoll, onCreateEvent, replyTo, onCancelReply }: Props) {
+export function MessageInput({ channelName, onSend, placeholder, channelId, onCreatePoll, onCreateEvent, replyTo, onCancelReply }: Props) {
   // 初期値は SSR/CSR で一致させるため空文字。マウント後に useEffect で
   // localStorage から下書きを復元する (channel 切替で remount された時も同様)
   const [content, setContent] = useState<string>("");
@@ -302,18 +302,18 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
   };
   const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
 
-  // WSメンバーを取得
+  // メンション候補メンバーを取得（そのチャンネルに参加しているメンバーのみ）
   useEffect(() => {
-    if (!workspaceId) return;
+    if (!channelId) return;
     async function fetchMembers() {
       const supabase = createClient();
       const { data, error } = await supabase
-        .from("workspace_members")
+        .from("channel_members")
         .select("user_id, profiles(id, display_name, avatar_url)")
-        .eq("workspace_id", workspaceId);
+        .eq("channel_id", channelId);
       if (error) {
         // eslint-disable-next-line no-console
-        console.error("[mention] workspace_members fetch failed:", error);
+        console.error("[mention] channel_members fetch failed:", error);
         return;
       }
       if (data) {
@@ -325,7 +325,7 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, work
       }
     }
     fetchMembers();
-  }, [workspaceId]);
+  }, [channelId]);
 
   // メンションフィルタリング
   const filteredMentionMembers = useMemo(() => {
