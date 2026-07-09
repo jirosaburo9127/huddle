@@ -12,6 +12,7 @@ import { HitorigotoPostCard } from "./hitorigoto-post-card";
 import { MessageInput, type MentionPayload } from "./message-input";
 import { CreatePollModal } from "./create-poll-modal";
 import { CreateEventModal } from "./create-event-modal";
+import { TaskModal } from "../../tasks/components/task-modal";
 import { EventDisplay } from "./event-display";
 import { DateSeparator } from "./date-separator";
 import { ChannelNote } from "./channel-note";
@@ -127,6 +128,8 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
   const [showCreatePoll, setShowCreatePoll] = useState(false);
   // 予定作成モーダル
   const [showCreateEvent, setShowCreateEvent] = useState(false);
+  // メッセージからのタスク化モーダル（対象メッセージを保持）
+  const [taskFromMessage, setTaskFromMessage] = useState<MessageWithProfile | null>(null);
   // このチャンネルでイベントが紐づいているメッセージID集合
   const [eventMessageIds, setEventMessageIds] = useState<Set<string>>(new Set());
   // このチャンネルで投票が紐づいているメッセージID集合
@@ -1544,6 +1547,11 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
     }
   }, [supabase, currentUserId, bookmarkedIds]);
 
+  // メッセージからタスク化（モーダルを開く。本文はタイトル初期値になる）
+  const handleCreateTask = useCallback((message: MessageWithProfile) => {
+    setTaskFromMessage(message);
+  }, []);
+
   // メッセージ送信
   async function handleSend(
     content: string,
@@ -2320,6 +2328,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                         onStatus={handleStatus}
                         onUpdateDecisionMeta={handleUpdateDecisionMeta}
                         onBookmark={handleBookmark}
+                        onCreateTask={handleCreateTask}
                         onVideoThumbnailBackfilled={handleVideoThumbnailBackfilled}
                         isBookmarked={bookmarkedIds.has(message.id)}
                         isConsecutive={isConsecutive}
@@ -2388,6 +2397,20 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
             setEventMessageIds((prev) => { const next = new Set(prev); next.add(messageId); return next; });
           }}
           onClose={() => setShowCreateEvent(false)}
+        />
+      )}
+
+      {/* メッセージからのタスク化モーダル */}
+      {taskFromMessage && (
+        <TaskModal
+          task={null}
+          channels={[]}
+          currentUserId={currentUserId}
+          fixedChannel={{ id: channel.id, name: channel.name, slug: channel.slug }}
+          initialTitle={(taskFromMessage.content || "").replace(/\s+/g, " ").trim().slice(0, 80)}
+          messageId={taskFromMessage.id}
+          onClose={() => setTaskFromMessage(null)}
+          onSaved={() => setTaskFromMessage(null)}
         />
       )}
 

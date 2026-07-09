@@ -12,17 +12,21 @@ type Props = {
   channels: ChannelOption[];
   currentUserId: string;
   defaultStatus?: "todo" | "in_progress" | "done";
+  // メッセージからのタスク化: チャンネルを固定し、本文をタイトル初期値にする
+  fixedChannel?: ChannelOption;
+  initialTitle?: string;
+  messageId?: string;
   onClose: () => void;
   onSaved: () => void;
 };
 
-export function TaskModal({ task, channels, currentUserId, defaultStatus, onClose, onSaved }: Props) {
+export function TaskModal({ task, channels, currentUserId, defaultStatus, fixedChannel, initialTitle, messageId, onClose, onSaved }: Props) {
   const supabase = createClient();
   const isEdit = !!task;
 
-  const [title, setTitle] = useState(task?.title || "");
+  const [title, setTitle] = useState(task?.title || initialTitle || "");
   const [description, setDescription] = useState(task?.description || "");
-  const [channelId, setChannelId] = useState(task?.channel_id || (channels.length > 0 ? channels[0].id : ""));
+  const [channelId, setChannelId] = useState(task?.channel_id || fixedChannel?.id || (channels.length > 0 ? channels[0].id : ""));
   const [status, setStatus] = useState(task?.status || defaultStatus || "todo");
   const [dueDate, setDueDate] = useState(task?.due_date || "");
   const [assigneeIds, setAssigneeIds] = useState<Set<string>>(new Set(task?.assignees.map((a) => a.user_id) || []));
@@ -66,11 +70,17 @@ export function TaskModal({ task, channels, currentUserId, defaultStatus, onClos
         .eq("id", task.id);
       if (error) { alert("更新に失敗しました: " + error.message); setSaving(false); return; }
 
-      // 担当者を差し替え
-      await supabase.from("task_assignees").delete().eq("task_id", task.id);
-      if (assigneeIds.size > 0) {
+      // 担当者を差分更新する（全削除→全再INSERTだとアサイン通知が毎回飛ぶため、
+      // 増えた担当者だけ INSERT / 減った担当者だけ DELETE する）
+      const prevIds = new Set(task.assignees.map((a) => a.user_id));
+      const added = Array.from(assigneeIds).filter((id) => !prevIds.has(id));
+      const removed = Array.from(prevIds).filter((id) => !assigneeIds.has(id));
+      if (removed.length > 0) {
+        await supabase.from("task_assignees").delete().eq("task_id", task.id).in("user_id", removed);
+      }
+      if (added.length > 0) {
         await supabase.from("task_assignees").insert(
-          Array.from(assigneeIds).map((uid) => ({ task_id: task.id, user_id: uid }))
+          added.map((uid) => ({ task_id: task.id, user_id: uid }))
         );
       }
     } else {
@@ -84,6 +94,7 @@ export function TaskModal({ task, channels, currentUserId, defaultStatus, onClos
           status,
           due_date: dueDate || null,
           created_by: currentUserId,
+          message_id: messageId || null,
         })
         .select("id")
         .single();
@@ -153,8 +164,8 @@ export function TaskModal({ task, channels, currentUserId, defaultStatus, onClos
             />
           </div>
 
-          {/* チャンネル */}
-          {!isEdit && (
+          {/* チャンネル選択（新規作成 & チャンネル未固定のときのみ） */}
+          {!isEdit && !fixedChannel && (
             <div>
               <label className="block text-xs text-muted mb-1">チャンネル</label>
               <select
@@ -166,6 +177,14 @@ export function TaskModal({ task, channels, currentUserId, defaultStatus, onClos
                   <option key={ch.id} value={ch.id}>#{ch.name}</option>
                 ))}
               </select>
+            </div>
+          )}
+
+          {/* メッセージからのタスク化: 保存先チャンネルを明示（固定） */}
+          {!isEdit && fixedChannel && (
+            <div className="flex items-center gap-1.5 text-xs text-muted">
+              <span>保存先:</span>
+              <span className="font-medium text-foreground">#{fixedChannel.name}</span>
             </div>
           )}
 

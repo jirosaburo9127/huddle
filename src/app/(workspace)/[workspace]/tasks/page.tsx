@@ -14,6 +14,7 @@ export type Task = {
   due_date: string | null;
   sort_order: number;
   channel_id: string;
+  message_id: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -33,6 +34,25 @@ function formatDue(d: string): string {
   return `${date.getMonth() + 1}/${date.getDate()}`;
 }
 
+// YYYY-MM-DD をローカル基準で返す
+function ymd(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+// マイタスクの期限セクション定義
+type DueBucket = "overdue" | "today" | "week" | "later" | "none";
+const BUCKET_META: Record<DueBucket, { label: string; color: string }> = {
+  overdue: { label: "期限切れ", color: "#EF4444" },
+  today: { label: "今日", color: "#F59E0B" },
+  week: { label: "今週", color: "#3B82F6" },
+  later: { label: "それ以降", color: "#8B5CF6" },
+  none: { label: "期限なし", color: "#94A3B8" },
+};
+const BUCKET_ORDER: DueBucket[] = ["overdue", "today", "week", "later", "none"];
+
 export default function TasksPage() {
   const params = useParams<{ workspace: string }>();
   const setSidebarOpen = useMobileNavStore((s) => s.setSidebarOpen);
@@ -48,6 +68,12 @@ export default function TasksPage() {
   const [dragTaskId, setDragTaskId] = useState<string | null>(null);
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Task["status"]>("todo");
+  // 表示モード: マイタスク（自分中心）/ ボード（チーム全体のカンバン）
+  const [view, setView] = useState<"mine" | "board">("mine");
+  // マイタスクのフィルタ: 担当（自分がアサイン）/ 依頼（自分が作成）
+  const [mineFilter, setMineFilter] = useState<"assigned" | "created">("assigned");
+  // 完了セクションを開くか
+  const [showDone, setShowDone] = useState(false);
 
   useEffect(() => { setSidebarOpen(false); }, [setSidebarOpen]);
 
@@ -106,7 +132,127 @@ export default function TasksPage() {
     return () => window.removeEventListener("resize", check);
   }, []);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = ymd(new Date());
+  const weekEnd = ymd(new Date(Date.now() + 7 * 86400000));
+
+  // ワンタップで完了/未完了をトグル（マイタスク行のチェックボックス）
+  async function toggleComplete(task: Task) {
+    const nextStatus: Task["status"] = task.status === "done" ? "todo" : "done";
+    setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, status: nextStatus } : t)));
+    const { error } = await supabase
+      .from("tasks")
+      .update({ status: nextStatus, updated_at: new Date().toISOString() })
+      .eq("id", task.id);
+    if (error) {
+      setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, status: task.status } : t)));
+    }
+  }
+
+  // マイタスク: 担当（自分アサイン）/ 依頼（自分作成）でフィルタ
+  const mineTasks = useMemo(() => {
+    if (!currentUserId) return [];
+    return tasks.filter((t) =>
+      mineFilter === "assigned"
+        ? t.assignees.some((a) => a.user_id === currentUserId)
+        : t.created_by === currentUserId
+    );
+  }, [tasks, mineFilter, currentUserId]);
+
+  // 期限でバケット分け（完了は別枠）
+  const mineGrouped = useMemo(() => {
+    const groups: Record<DueBucket, Task[]> = { overdue: [], today: [], week: [], later: [], none: [] };
+    const done: Task[] = [];
+    for (const t of mineTasks) {
+      if (t.status === "done") { done.push(t); continue; }
+      if (!t.due_date) { groups.none.push(t); continue; }
+      if (t.due_date < today) groups.overdue.push(t);
+      else if (t.due_date === today) groups.today.push(t);
+      else if (t.due_date <= weekEnd) groups.week.push(t);
+      else groups.later.push(t);
+    }
+    return { groups, done };
+  }, [mineTasks, today, weekEnd]);
+
+  const mineActiveCount = BUCKET_ORDER.reduce((n, b) => n + mineGrouped.groups[b].length, 0);
+
+  function renderMineRow(task: Task) {
+    const isOverdue = task.due_date && task.due_date < today && task.status !== "done";
+    const isDone = task.status === "done";
+    const otherAssignees = task.assignees.filter((a) => a.user_id !== currentUserId);
+    return (
+      <div
+        key={task.id}
+        onClick={() => setEditingTask(task)}
+        className="flex items-start gap-3 px-4 py-3 bg-surface border-b border-border/40 cursor-pointer hover:bg-sidebar-hover transition-colors"
+      >
+        {/* ワンタップ完了チェックボックス */}
+        <button
+          onClick={(e) => { e.stopPropagation(); toggleComplete(task); }}
+          className={`shrink-0 mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all active:scale-90 ${
+            isDone ? "bg-green-500 border-green-500" : "border-muted/50 hover:border-green-500"
+          }`}
+          aria-label={isDone ? "未完了に戻す" : "完了にする"}
+        >
+          {isDone && (
+            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          )}
+        </button>
+
+        <div className="flex-1 min-w-0">
+          <p className={`text-sm leading-snug mb-1 ${isDone ? "line-through text-muted" : "text-foreground"}`}>
+            {task.title}
+          </p>
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* 進行中バッジ */}
+            {task.status === "in_progress" && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-500">● 進行中</span>
+            )}
+            {/* チャンネル */}
+            <span className="inline-flex items-center gap-1 text-[10px] text-muted">
+              {task.channel.icon_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={task.channel.icon_url} alt="" className="w-3 h-3 rounded-sm object-cover" />
+              ) : "#"}
+              {task.channel.name}
+            </span>
+            {/* 期限 */}
+            {task.due_date && (
+              <span className={`inline-flex items-center gap-1 text-[10px] font-medium ${isOverdue ? "text-red-500" : "text-muted"}`}>
+                📅 {formatDue(task.due_date)}
+              </span>
+            )}
+            {/* 依頼者（担当ビュー時、他人が作成したもの） */}
+            {mineFilter === "assigned" && task.created_by !== currentUserId && (
+              <span className="inline-flex items-center gap-1 text-[10px] text-muted">
+                {task.creator.avatar_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={task.creator.avatar_url} alt="" className="w-3.5 h-3.5 rounded-full object-cover" />
+                ) : null}
+                {task.creator.display_name}から
+              </span>
+            )}
+            {/* 担当者（依頼ビュー時、自分以外の担当） */}
+            {mineFilter === "created" && otherAssignees.length > 0 && (
+              <span className="inline-flex items-center gap-1">
+                {otherAssignees.slice(0, 3).map((a) => (
+                  a.avatar_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img key={a.user_id} src={a.avatar_url} alt={a.display_name} title={a.display_name} className="w-4 h-4 rounded-full object-cover" />
+                  ) : (
+                    <span key={a.user_id} title={a.display_name} className="w-4 h-4 rounded-full bg-muted/20 flex items-center justify-center text-[8px] font-bold text-muted">
+                      {a.display_name.charAt(0)}
+                    </span>
+                  )
+                ))}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   function renderCard(task: Task) {
     const isOverdue = task.due_date && task.due_date < today && task.status !== "done";
@@ -175,10 +321,104 @@ export default function TasksPage() {
     <div className="flex flex-col h-full bg-background">
       {/* ヘッダー */}
       <header className="flex items-center justify-between px-4 lg:px-6 py-3 border-b border-border bg-surface shrink-0">
-        <h1 className="text-lg font-bold text-foreground">📋 タスクボード</h1>
+        <div className="flex items-center gap-3 min-w-0">
+          <h1 className="text-lg font-bold text-foreground shrink-0">📋 タスク</h1>
+          {/* 表示切替: マイタスク / ボード */}
+          <div className="flex items-center gap-0.5 rounded-lg bg-input-bg p-0.5">
+            {([["mine", "マイタスク"], ["board", "ボード"]] as const).map(([val, label]) => (
+              <button
+                key={val}
+                onClick={() => setView(val)}
+                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                  view === val ? "bg-surface text-foreground shadow-sm" : "text-muted hover:text-foreground"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <button
+          onClick={() => { setCreateStatus("todo"); setShowCreate(true); }}
+          className="shrink-0 inline-flex items-center gap-1 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+          新規
+        </button>
       </header>
 
-      {/* PC: 横スクロールカンバン / スマホ: タブ切り替え */}
+      {/* マイタスク: 自分中心の期限別リスト */}
+      {view === "mine" && (
+        <div className="flex-1 overflow-y-auto">
+          {/* フィルタ: 担当 / 依頼 */}
+          <div className="flex sticky top-0 z-10 bg-background border-b border-border">
+            {([["assigned", "担当"], ["created", "依頼した"]] as const).map(([val, label]) => (
+              <button
+                key={val}
+                onClick={() => setMineFilter(val)}
+                className="flex-1 py-2.5 text-center relative"
+              >
+                <span className={`text-sm font-medium ${mineFilter === val ? "text-foreground" : "text-muted"}`}>
+                  {label}
+                </span>
+                {mineFilter === val && (
+                  <span className="absolute bottom-0 left-1/4 right-1/4 h-0.5 rounded-full bg-accent" />
+                )}
+              </button>
+            ))}
+          </div>
+
+          {mineActiveCount === 0 && mineGrouped.done.length === 0 ? (
+            <div className="text-center py-16 px-6">
+              <p className="text-4xl mb-3">🌱</p>
+              <p className="text-sm text-muted">
+                {mineFilter === "assigned" ? "あなたに割り当てられたタスクはありません" : "あなたが依頼したタスクはありません"}
+              </p>
+              <p className="text-xs text-muted/70 mt-2">メッセージの「タスク」ボタンからも作成できます</p>
+            </div>
+          ) : (
+            <div className="pb-24">
+              {BUCKET_ORDER.map((bucket) => {
+                const list = mineGrouped.groups[bucket];
+                if (list.length === 0) return null;
+                const meta = BUCKET_META[bucket];
+                return (
+                  <div key={bucket}>
+                    <div className="flex items-center gap-2 px-4 pt-4 pb-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: meta.color }} />
+                      <span className="text-xs font-bold" style={{ color: meta.color }}>{meta.label}</span>
+                      <span className="text-xs text-muted">{list.length}</span>
+                    </div>
+                    {list.map(renderMineRow)}
+                  </div>
+                );
+              })}
+
+              {/* 完了（折りたたみ） */}
+              {mineGrouped.done.length > 0 && (
+                <div>
+                  <button
+                    onClick={() => setShowDone((v) => !v)}
+                    className="flex items-center gap-2 px-4 pt-4 pb-1.5 w-full"
+                  >
+                    <svg className={`w-3 h-3 text-muted transition-transform ${showDone ? "rotate-90" : ""}`} fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                    <span className="text-xs font-bold text-muted">完了</span>
+                    <span className="text-xs text-muted">{mineGrouped.done.length}</span>
+                  </button>
+                  {showDone && mineGrouped.done.map(renderMineRow)}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ボード: チーム全体のカンバン（従来） */}
+      {view === "board" && (
       <div className="flex-1 overflow-hidden">
         {isDesktop ? (
           <div className="flex h-full gap-0 overflow-x-auto">
@@ -274,6 +514,7 @@ export default function TasksPage() {
           </div>
         )}
       </div>
+      )}
 
       {showCreate && currentUserId && (
         <TaskModal task={null} channels={channels} currentUserId={currentUserId} defaultStatus={createStatus} onClose={() => setShowCreate(false)} onSaved={fetchTasks} />

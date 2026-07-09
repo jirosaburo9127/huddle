@@ -40,6 +40,7 @@ type Props = {
     due: string | null
   ) => Promise<void>;
   onBookmark?: (messageId: string) => Promise<void>;
+  onCreateTask?: (message: MessageWithProfile) => void;
   onVideoThumbnailBackfilled?: (messageId: string, oldUrl: string, newUrl: string) => Promise<void>;
   isBookmarked?: boolean;
   isConsecutive?: boolean;
@@ -598,6 +599,7 @@ export const MessageItem = memo(function MessageItem({
   onStatus,
   onUpdateDecisionMeta,
   onBookmark,
+  onCreateTask,
   onVideoThumbnailBackfilled,
   isBookmarked,
   isConsecutive,
@@ -1478,6 +1480,18 @@ export const MessageItem = memo(function MessageItem({
                 {message.status === "in_progress" ? "進行中" : "進行中"}
               </button>
             )}
+            {/* タスクにする */}
+            {onCreateTask && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onCreateTask(message); }}
+                className="flex items-center gap-1 px-2.5 py-1 text-[13px] font-medium border rounded-md transition-all active:scale-90 text-muted hover:text-emerald-500 border-transparent hover:border-emerald-500/30 hover:bg-emerald-500/5"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                </svg>
+                タスク
+              </button>
+            )}
             <div className="w-px h-4 bg-border/50 mx-0.5" />
             {onReact && (
               <div className="relative">
@@ -1609,6 +1623,20 @@ export const MessageItem = memo(function MessageItem({
                   <span className={`text-xs ${message.status === "in_progress" ? "text-blue-400 font-semibold" : "text-foreground"}`}>
                     進行中
                   </span>
+                </button>
+              )}
+              {/* タスクにする（モバイル） */}
+              {onCreateTask && (
+                <button
+                  onClick={() => { setShowActions(false); onCreateTask(message); }}
+                  className="flex flex-col items-center gap-2 py-3 rounded-lg hover:bg-sidebar-hover active:scale-90 transition-all"
+                >
+                  <span className="w-12 h-12 rounded-full border-2 border-muted/40 flex items-center justify-center">
+                    <svg className="w-5 h-5 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                    </svg>
+                  </span>
+                  <span className="text-xs text-foreground">タスク</span>
                 </button>
               )}
               {/* リアクション（タップでアクションモーダルを閉じ、絵文字ピッカーを別で開く） */}
