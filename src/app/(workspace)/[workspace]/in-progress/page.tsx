@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
@@ -48,6 +48,32 @@ const FILTER_OPTIONS: { value: StatusFilter; label: string }[] = [
   { value: "all", label: "全て" },
 ];
 
+// 1回に取得する件数（この単位で古い側へページングする）
+const PAGE_SIZE = 200;
+
+type StatusRow = {
+  id: string; content: string; created_at: string;
+  status: "in_progress" | "done" | null; channels: unknown; profiles: unknown;
+};
+
+function rowsToItems(data: StatusRow[]): StatusItem[] {
+  return data.map((row) => {
+    const ch = Array.isArray(row.channels) ? row.channels[0] : (row.channels as { id: string; name: string; slug: string });
+    const p = Array.isArray(row.profiles) ? row.profiles[0] : (row.profiles as { display_name: string; avatar_url: string | null });
+    return {
+      id: row.id,
+      content: row.content,
+      created_at: row.created_at,
+      status: row.status,
+      channel_id: ch?.id || "",
+      channel_name: ch?.name || "",
+      channel_slug: ch?.slug || "",
+      sender_name: p?.display_name || "メンバー",
+      sender_avatar: p?.avatar_url || null,
+    };
+  });
+}
+
 export default function InProgressPage() {
   const setSidebarOpen = useMobileNavStore((s) => s.setSidebarOpen);
   // モバイルでマウント時にサイドバーを閉じて本ページを見せる
@@ -55,6 +81,10 @@ export default function InProgressPage() {
   const params = useParams<{ workspace: string }>();
   const [items, setItems] = useState<StatusItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  // 次に「もっと読み込む」で取得する境界（この時刻より厳密に古いものを取る）
+  const [oldestCursor, setOldestCursor] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("in_progress");
   // タブに併記する全体件数 (フィルタ適用前の生カウント)
   const [statusCounts, setStatusCounts] = useState<{ in_progress: number; done: number }>({
@@ -80,66 +110,72 @@ export default function InProgressPage() {
     saveChannelOrder(orderScope, newOrder);
   }
 
+  // 1ページ分を取得。before を渡すとそれより古いメッセージを取る。
+  const fetchPage = useCallback(async (before: string | null): Promise<StatusRow[] | null> => {
+    const supabase = createClient();
+    const { data: ws } = await supabase
+      .from("workspaces")
+      .select("id")
+      .eq("slug", params.workspace)
+      .maybeSingle();
+    if (!ws) return null;
+
+    let q = supabase
+      .from("messages")
+      .select(
+        "id, content, created_at, status, channels!inner(id, name, slug, workspace_id, is_dm), profiles!inner(display_name, avatar_url)",
+      )
+      .is("deleted_at", null)
+      .eq("channels.workspace_id", ws.id)
+      .eq("channels.is_dm", false)
+      .order("created_at", { ascending: false })
+      .limit(PAGE_SIZE);
+
+    if (statusFilter === "all") {
+      q = q.in("status", ["in_progress", "done"]);
+    } else {
+      q = q.eq("status", statusFilter);
+    }
+    if (before) q = q.lt("created_at", before);
+
+    const { data } = await q;
+    return (data ?? []) as StatusRow[];
+  }, [params.workspace, statusFilter]);
+
+  // 初回ロード（ワークスペース or フィルタが変わったら最初から取り直す）
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
+    setItems([]);
+    setHasMore(false);
+    setOldestCursor(null);
     (async () => {
-      setLoading(true);
-      const supabase = createClient();
-      const { data: ws } = await supabase
-        .from("workspaces")
-        .select("id")
-        .eq("slug", params.workspace)
-        .maybeSingle();
-      if (!ws) {
-        if (!cancelled) setLoading(false);
-        return;
-      }
-
-      let q = supabase
-        .from("messages")
-        .select(
-          "id, content, created_at, status, channels!inner(id, name, slug, workspace_id, is_dm), profiles!inner(display_name, avatar_url)",
-        )
-        .is("deleted_at", null)
-        .eq("channels.workspace_id", ws.id)
-        .eq("channels.is_dm", false)
-        .order("created_at", { ascending: false })
-        .limit(100);
-
-      if (statusFilter === "all") {
-        q = q.in("status", ["in_progress", "done"]);
-      } else {
-        q = q.eq("status", statusFilter);
-      }
-
-      const { data } = await q;
-
+      const rows = await fetchPage(null);
       if (cancelled) return;
-      if (data) {
-        setItems(
-          data.map((row: { id: string; content: string; created_at: string; status: "in_progress" | "done" | null; channels: unknown; profiles: unknown }) => {
-            const ch = Array.isArray(row.channels) ? row.channels[0] : (row.channels as { id: string; name: string; slug: string });
-            const p = Array.isArray(row.profiles) ? row.profiles[0] : (row.profiles as { display_name: string; avatar_url: string | null });
-            return {
-              id: row.id,
-              content: row.content,
-              created_at: row.created_at,
-              status: row.status,
-              channel_id: ch?.id || "",
-              channel_name: ch?.name || "",
-              channel_slug: ch?.slug || "",
-              sender_name: p?.display_name || "メンバー",
-              sender_avatar: p?.avatar_url || null,
-            };
-          }),
-        );
-      } else {
-        setItems([]);
-      }
+      if (rows === null) { setItems([]); setLoading(false); return; }
+      setItems(rowsToItems(rows));
+      setHasMore(rows.length === PAGE_SIZE);
+      setOldestCursor(rows.length > 0 ? rows[rows.length - 1].created_at : null);
       setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [params.workspace, statusFilter]);
+  }, [fetchPage]);
+
+  // もっと読み込む（境界より古い側だけ取るので重複しない）
+  async function loadMore() {
+    if (loadingMore || !hasMore || !oldestCursor) return;
+    setLoadingMore(true);
+    try {
+      const rows = await fetchPage(oldestCursor);
+      if (rows === null) return;
+      setItems((prev) => [...prev, ...rowsToItems(rows)]);
+      setHasMore(rows.length === PAGE_SIZE);
+      if (rows.length > 0) setOldestCursor(rows[rows.length - 1].created_at);
+      else setHasMore(false);
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   // タブ表示用の各ステータス件数 (statusFilter とは独立)
   useEffect(() => {
@@ -424,6 +460,18 @@ export default function InProgressPage() {
                   </div>
                 );
               })
+            )}
+
+            {!loading && hasMore && (
+              <div className="flex justify-center py-5">
+                <button
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                  className="text-sm font-medium text-accent hover:text-accent-hover disabled:opacity-50 transition-colors px-4 py-2 rounded-lg border border-border hover:bg-sidebar-hover"
+                >
+                  {loadingMore ? "読み込み中..." : "もっと読み込む"}
+                </button>
+              </div>
             )}
           </div>
         </div>

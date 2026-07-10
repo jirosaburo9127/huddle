@@ -71,7 +71,10 @@ export default async function DashboardPage({
     .eq("channels.workspace_id", workspace.id)
     .eq("channels.is_dm", false)
     .order("created_at", { ascending: false })
-    .limit(100);
+    // 決定事項は低ボリュームだが、固定 limit だと総数が増えたとき古い決定が
+    // 一覧から消える（ファイル一覧で起きた事象）。当面は上限を大きく取って回避。
+    // 将来ここが 500 に迫るならクライアント化してページングすること。
+    .limit(500);
 
   const decisions: Decision[] = (decisionsRaw || []).map(
     (row: {
