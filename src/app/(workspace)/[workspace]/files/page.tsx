@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
@@ -27,6 +27,40 @@ const VIDEO_EXT = /\.(mp4|mov|webm|m4v)(\?.*)?$/i;
 const PDF_EXT = /\.pdf(\?.*)?$/i;
 
 const extractFileName = extractDisplayFileName;
+
+// 1回に取得するメッセージ件数（この単位で古い側へページングする）
+const PAGE_SIZE = 200;
+
+type FileRow = {
+  id: string; content: string; created_at: string;
+  channels: unknown; profiles: unknown;
+};
+
+// messages 行を FileItem[] に展開（1メッセージに複数URLがあり得る）
+function rowsToFiles(rows: FileRow[]): FileItem[] {
+  const files: FileItem[] = [];
+  for (const row of rows) {
+    const ch = Array.isArray(row.channels) ? row.channels[0] : (row.channels as { name: string; slug: string });
+    const p = Array.isArray(row.profiles) ? row.profiles[0] : (row.profiles as { display_name: string; avatar_url: string | null });
+    const rawUrls = row.content.match(STORAGE_URL_RE) || [];
+    for (const rawUrl of rawUrls) {
+      const url = rawUrl.trim();
+      files.push({
+        id: `${row.id}-${url.slice(-8)}`,
+        message_id: row.id,
+        content: url,
+        created_at: row.created_at,
+        channel_name: ch?.name || "",
+        channel_slug: ch?.slug || "",
+        sender_name: p?.display_name || "メンバー",
+        sender_avatar: p?.avatar_url || null,
+        fileName: extractFileName(url),
+        fileType: getFileType(url),
+      });
+    }
+  }
+  return files;
+}
 
 function getFileType(url: string): FileItem["fileType"] {
   // URL全体とファイル名の両方で拡張子を探す
@@ -60,6 +94,10 @@ export default function FilesPage() {
   const params = useParams<{ workspace: string }>();
   const [items, setItems] = useState<FileItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  // 次に「もっと読み込む」で取得する境界（この時刻より厳密に古いメッセージを取る）
+  const [oldestCursor, setOldestCursor] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const tabsRef = useHorizontalOnlyScroll();
   const [filter, setFilter] = useState<"all" | FileItem["fileType"]>("all");
@@ -71,69 +109,50 @@ export default function FilesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // 1ページ分（PAGE_SIZE件）を取得。before を渡すとそれより古いメッセージを取る。
+  // 返り値: 取得した messages 行（新しい順）
+  const fetchPage = useCallback(async (before: string | null): Promise<FileRow[] | null> => {
+    const supabase = createClient();
+    // has_file 生成列+部分インデックス (055 migration) を使って高速取得
+    let q = supabase
+      .from("messages")
+      .select(
+        "id, content, created_at, channels!inner(name, slug, is_dm, workspaces!inner(slug)), profiles!inner(display_name, avatar_url)"
+      )
+      .is("deleted_at", null)
+      .eq("has_file", true)
+      .eq("channels.is_dm", false)
+      .eq("channels.workspaces.slug", params.workspace)
+      .order("created_at", { ascending: false })
+      .limit(PAGE_SIZE);
+    if (before) q = q.lt("created_at", before);
+    const { data, error } = await q;
+    if (error) {
+      // eslint-disable-next-line no-console
+      console.error("[files] fetch error:", error);
+      return null;
+    }
+    return (data ?? []) as FileRow[];
+  }, [params.workspace]);
+
+  // 初回ロード（ワークスペースが変わったら最初から取り直す）
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setItems([]);
+    setHasMore(false);
+    setOldestCursor(null);
     // 15秒経っても返ってこないなら強制的に諦める
     const hardTimeout = setTimeout(() => {
-      if (!cancelled) {
-        cancelled = true;
-        setItems([]);
-        setLoading(false);
-      }
+      if (!cancelled) { cancelled = true; setItems([]); setLoading(false); }
     }, 15000);
     (async () => {
       try {
-        const supabase = createClient();
-        // has_file 生成列+部分インデックス (055 migration) を使って高速取得
-        const { data, error } = await supabase
-          .from("messages")
-          .select(
-            "id, content, created_at, channels!inner(name, slug, is_dm, workspaces!inner(slug)), profiles!inner(display_name, avatar_url)"
-          )
-          .is("deleted_at", null)
-          .eq("has_file", true)
-          .eq("channels.is_dm", false)
-          .eq("channels.workspaces.slug", params.workspace)
-          .order("created_at", { ascending: false })
-          .limit(100);
-
-        if (cancelled) return;
-
-        if (error) {
-          // eslint-disable-next-line no-console
-          console.error("[files] fetch error:", error);
-          setItems([]);
-          return;
-        }
-
-        if (data) {
-          const files: FileItem[] = [];
-          for (const row of data as Array<{
-            id: string; content: string; created_at: string;
-            channels: unknown; profiles: unknown;
-          }>) {
-            const ch = Array.isArray(row.channels) ? row.channels[0] : (row.channels as { name: string; slug: string });
-            const p = Array.isArray(row.profiles) ? row.profiles[0] : (row.profiles as { display_name: string; avatar_url: string | null });
-            const rawUrls = row.content.match(STORAGE_URL_RE) || [];
-            for (const rawUrl of rawUrls) {
-              const url = rawUrl.trim();
-              files.push({
-                id: `${row.id}-${url.slice(-8)}`,
-                message_id: row.id,
-                content: url,
-                created_at: row.created_at,
-                channel_name: ch?.name || "",
-                channel_slug: ch?.slug || "",
-                sender_name: p?.display_name || "メンバー",
-                sender_avatar: p?.avatar_url || null,
-                fileName: extractFileName(url),
-                fileType: getFileType(url),
-              });
-            }
-          }
-          setItems(files);
-        }
+        const rows = await fetchPage(null);
+        if (cancelled || rows === null) { if (!cancelled) setItems([]); return; }
+        setItems(rowsToFiles(rows));
+        setHasMore(rows.length === PAGE_SIZE);
+        setOldestCursor(rows.length > 0 ? rows[rows.length - 1].created_at : null);
       } catch (err) {
         if (cancelled) return;
         // eslint-disable-next-line no-console
@@ -144,11 +163,24 @@ export default function FilesPage() {
         clearTimeout(hardTimeout);
       }
     })();
-    return () => {
-      cancelled = true;
-      clearTimeout(hardTimeout);
-    };
-  }, [params.workspace]);
+    return () => { cancelled = true; clearTimeout(hardTimeout); };
+  }, [params.workspace, fetchPage]);
+
+  // もっと読み込む（境界より古いメッセージを追加取得。厳密に古い側だけ取るので重複しない）
+  async function loadMore() {
+    if (loadingMore || !hasMore || !oldestCursor) return;
+    setLoadingMore(true);
+    try {
+      const rows = await fetchPage(oldestCursor);
+      if (rows === null) return;
+      setItems((prev) => [...prev, ...rowsToFiles(rows)]);
+      setHasMore(rows.length === PAGE_SIZE);
+      if (rows.length > 0) setOldestCursor(rows[rows.length - 1].created_at);
+      else setHasMore(false);
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   const filtered = useMemo(() => {
     const byType = filter === "all" ? items : items.filter((f) => f.fileType === filter);
@@ -320,6 +352,19 @@ export default function FilesPage() {
             ))
           )}
           </div>
+
+          {/* もっと読み込む（古いファイルを追加取得） */}
+          {!loading && hasMore && (
+            <div className="flex justify-center py-5">
+              <button
+                onClick={loadMore}
+                disabled={loadingMore}
+                className="text-sm font-medium text-accent hover:text-accent-hover disabled:opacity-50 transition-colors px-4 py-2 rounded-lg border border-border hover:bg-sidebar-hover"
+              >
+                {loadingMore ? "読み込み中..." : "もっと読み込む"}
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
