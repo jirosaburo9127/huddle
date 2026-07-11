@@ -748,17 +748,20 @@ export const MessageItem = memo(function MessageItem({
     );
   }
 
-  // 投票締切・決定登録・メンバー加入のシステムメッセージ — 控えめなセンタリング表示
+  // 投票締切・決定登録・メンバー加入のシステムメッセージ —
+  // 枠線なしのタイムライン風。細いラインで挟み、色は絵文字に持たせる。
   if (
     message.system_event === "poll_closed" ||
     message.system_event === "decision_marked" ||
     message.system_event === "member_joined"
   ) {
     return (
-      <div className="flex justify-center my-2">
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-accent/30 bg-accent/5 text-xs text-accent">
-          <span className="truncate max-w-xs">{message.content}</span>
-        </div>
+      <div className="flex items-center justify-center gap-3 my-4 px-6">
+        <span className="h-px w-10 shrink-0 bg-border/60" />
+        <span className="text-[11px] font-medium tracking-wide text-muted truncate min-w-0">
+          {message.content}
+        </span>
+        <span className="h-px w-10 shrink-0 bg-border/60" />
       </div>
     );
   }
