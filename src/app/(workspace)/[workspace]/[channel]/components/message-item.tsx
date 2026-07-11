@@ -755,11 +755,13 @@ export const MessageItem = memo(function MessageItem({
     message.system_event === "decision_marked" ||
     message.system_event === "member_joined"
   ) {
+    // 先頭の絵文字(🟢 / ✅ 等)は外してテキストのみのミニマル表示にする
+    const label = message.content.replace(/^\s*\p{Extended_Pictographic}️?\s*/u, "");
     return (
       <div className="flex items-center justify-center gap-3 my-4 px-6">
         <span className="h-px w-10 shrink-0 bg-border/60" />
         <span className="text-[11px] font-medium tracking-wide text-muted truncate min-w-0">
-          {message.content}
+          {label}
         </span>
         <span className="h-px w-10 shrink-0 bg-border/60" />
       </div>
