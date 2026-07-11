@@ -37,6 +37,51 @@ function cacheProfiles(messages: MessageWithProfile[]) {
   }
 }
 
+/**
+ * 招待URLをユーザーに届ける。
+ * iOS/Android(Capacitor)ではネイティブ共有シート、Webではクリップボード
+ * (execCommandフォールバック付き)。いずれも失敗した場合は URL をそのまま
+ * 提示して手動コピーできるようにする。
+ * ※以前は生の navigator.clipboard だけで、iOS WebView で失敗し
+ *   「生成に失敗しました」と誤表示されていた。
+ */
+async function deliverInviteUrl(url: string): Promise<void> {
+  // ネイティブ: 共有シート(LINE/メール等に送れる)
+  try {
+    const { Capacitor } = await import("@capacitor/core");
+    if (Capacitor?.isNativePlatform?.() && Capacitor?.isPluginAvailable?.("Share")) {
+      const { Share } = await import("@capacitor/share");
+      await Share.share({ title: "チャンネル招待", text: "Huddleのチャンネルに参加してください", url });
+      return;
+    }
+  } catch {
+    // 共有シートを開けない/キャンセル時はコピーにフォールバック
+  }
+  // Web: クリップボード + execCommand フォールバック
+  try {
+    await navigator.clipboard.writeText(url);
+    alert("チャンネル招待リンクをコピーしました");
+    return;
+  } catch {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = url;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      if (ok) { alert("チャンネル招待リンクをコピーしました"); return; }
+    } catch {
+      // 最後の手段へ
+    }
+  }
+  // どれも失敗: URLをそのまま提示(手動コピー用)
+  window.prompt("以下の招待リンクをコピーして共有してください", url);
+}
+
 type Props = {
   channel: Channel;
   initialMessages: MessageWithProfile[];
@@ -1945,6 +1990,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                         role="menuitem"
                         onClick={async () => {
                           setShowOverflowMenu(false);
+                          let url: string;
                           try {
                             const { data, error } = await supabase
                               .from("channel_invitations")
@@ -1955,16 +2001,17 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                               })
                               .select("token")
                               .single();
-                            if (error) {
-                              alert("招待リンクの生成に失敗しました: " + error.message);
+                            if (error || !data) {
+                              alert("招待リンクの生成に失敗しました" + (error ? ": " + error.message : ""));
                               return;
                             }
-                            const url = `${window.location.origin}/invite/channel/${data.token}`;
-                            await navigator.clipboard.writeText(url);
-                            alert("チャンネル招待リンクをコピーしました");
-                          } catch {
-                            alert("招待リンクの生成に失敗しました");
+                            url = `${window.location.origin}/invite/channel/${data.token}`;
+                          } catch (e) {
+                            alert("招待リンクの生成に失敗しました" + (e instanceof Error ? ": " + e.message : ""));
+                            return;
                           }
+                          // 生成は成功。届け方(共有/コピー)は別処理で堅牢に。
+                          await deliverInviteUrl(url);
                         }}
                         className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-sidebar-hover transition-colors whitespace-nowrap"
                       >
