@@ -1008,23 +1008,13 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
 
     const applyTarget = () => {
       if (!armed || jumpActiveRef.current) return;
-      // 初回だけ目標を確定（未読ラインが描画されていれば未読、無ければ最新）
-      if (target === null) {
-        target = unreadLineRef.current ? "unread" : "bottom";
-      }
-      if (target === "unread") {
-        const unreadEl = unreadLineRef.current;
-        if (unreadEl) {
-          unreadEl.scrollIntoView({ behavior: "auto", block: "start" });
-        } else {
-          // 未読ラインが消えた（フェードアウト等）→ これ以上追従しない。
-          // ここで最下部へ飛ばすと「未読位置→最新」へジャンプして見えるため何もしない。
-          disarm();
-        }
-      } else {
-        // 最新を表示し続ける（画像ロードで高さが伸びても最下部に張り付ける）
-        scrollToBottom();
-      }
+      // チャンネルを開いたら常に最下部（最新）を表示する。
+      // 以前は未読ライン("ここから未読")へ自動スクロールしていたが、
+      // 画像ロードのたびに上へ引っ張られ「変な位置にスクロールアップされる」と
+      // 感じられたため廃止。未読の区切り線はインライン表示のまま残る。
+      if (target === null) target = "bottom";
+      // 最新を表示し続ける（画像ロードで高さが伸びても最下部に張り付ける）
+      scrollToBottom();
     };
 
     prevMessageCountRef.current = initialMessages.length;
