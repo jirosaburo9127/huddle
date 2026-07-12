@@ -7,6 +7,7 @@ import { SplashDismisser } from "@/components/splash-dismisser";
 import { NativeAppDetector } from "@/components/native-app-detector";
 import { AppResumeHandler } from "@/components/app-resume-handler";
 import { PushTapHandler } from "@/components/push-tap-handler";
+import { AppUpdateBanner } from "@/components/app-update-banner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -67,6 +68,7 @@ export default function RootLayout({
         <NativeAppDetector />
         <AppResumeHandler />
         <PushTapHandler />
+        <AppUpdateBanner />
         {children}
       </body>
     </html>
