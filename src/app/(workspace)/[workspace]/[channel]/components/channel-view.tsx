@@ -1027,32 +1027,37 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
     if (!container) return;
 
     let pinning = true;
+    let raf = 0;
+    let lastH = -1;
 
     const cleanup = () => {
       if (!pinning) return;
       pinning = false;
-      observer.disconnect();
-      clearTimeout(t1);
-      clearTimeout(t2);
+      if (raf) cancelAnimationFrame(raf);
       clearTimeout(safety);
       container.removeEventListener("scroll", onScroll);
     };
 
-    // 最新の端へ貼り付ける
-    const pin = () => {
-      if (!pinning || jumpActiveRef.current) return;
-      scrollToBottom();
-    };
-
     // ユーザーが自分で「最新の端」から離れたら追従を終了する。
     // 自前の scrollToBottom は端(距離≈0)に置くので誤検知しない。
-    // 画像ロード等の高さ変化では scrollTop が変わらず scroll イベントも出ない。
     const onScroll = () => {
       if (!pinning) return;
       const away = channel.is_hitorigoto
         ? container.scrollTop > 120
         : container.scrollHeight - container.scrollTop - container.clientHeight > 120;
       if (away) { dbg(`user-scroll離脱 top=${container.scrollTop} h=${container.scrollHeight} → pin停止`); cleanup(); }
+    };
+
+    // 毎フレーム scrollHeight を監視し、変化したら最下部へ貼り直す。
+    // ResizeObserver は DOM 構造次第で高さ変化を拾えない（syncMissedMessages 等の
+    // 遅延描画で高さが激増しても発火しない）ことがあるため rAF 監視にする。
+    const tick = () => {
+      if (!pinning) return;
+      if (!jumpActiveRef.current) {
+        const h = container.scrollHeight;
+        if (h !== lastH) { lastH = h; scrollToBottom(); }
+      }
+      raf = requestAnimationFrame(tick);
     };
 
     prevMessageCountRef.current = initialMessages.length;
@@ -1065,20 +1070,11 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
       setTimeout(() => { if (container) dbg(`sample top=${container.scrollTop} h=${container.scrollHeight} clientH=${container.clientHeight}`); }, ms)
     );
 
-    // 初回の複数回トライ（レイアウト確定・早期の遅延ロードに備える）
-    requestAnimationFrame(() => requestAnimationFrame(pin));
-    const t1 = setTimeout(pin, 150);
-    const t2 = setTimeout(pin, 600);
-
-    // 高さの変化（画像・動画のロード）に追従して端に貼り付け続ける
-    const observer = new ResizeObserver(pin);
-    const inner = container.firstElementChild;
-    if (inner) observer.observe(inner);
-
     container.addEventListener("scroll", onScroll, { passive: true });
+    raf = requestAnimationFrame(tick);
 
     // 安全弁: 一定時間で追従を終了（無限に貼り付き続けないように）
-    const safety = setTimeout(cleanup, 15000);
+    const safety = setTimeout(cleanup, 12000);
 
     return () => { cleanup(); sampleTimers.forEach(clearTimeout); };
   }, [channel.id, channel.is_hitorigoto, initialMessages.length, scrollToBottom]);
