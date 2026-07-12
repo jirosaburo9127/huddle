@@ -982,61 +982,61 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
   }, [unreadLineState, messages.length]);
 
   // チャンネルを開いたときの初期スクロール。
-  // 方針: 「この開封でのスクロール目標」を一度だけ確定し、画像/動画の遅延ロードで
-  // 高さが変わっても同じ目標を維持する。途中で目標を未読↔最新に切り替えないことで
-  // 「あっちこっち飛ぶ」現象を防ぐ。
-  //   - 未読がある  → 未読ライン("ここから未読")を画面上端に表示
-  //   - 未読がない  → 最新投稿を表示（通常は最下部、独り言は最上部）
+  // 方針: 常に「最新の投稿」を表示する（通常チャンネルは最下部、独り言は最上部）。
+  // 画像/動画が遅延ロードして高さが伸びても、ユーザーが自分でスクロールするまでは
+  // 最新の端に貼り付け続ける。追従を時間で打ち切らないので「中途半端な位置で止まる」
+  // ことがない。未読の区切り線("ここから未読")はインライン表示のまま残る。
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
 
-    // この開封でのスクロール目標。初回の applyTarget で一度だけ確定し、以後変えない。
-    let target: "unread" | "bottom" | null = null;
-    let armed = true;
+    let pinning = true;
 
-    const disarm = () => {
-      if (!armed) return;
-      armed = false;
+    const cleanup = () => {
+      if (!pinning) return;
+      pinning = false;
       observer.disconnect();
-      clearTimeout(stopTimer);
-      clearTimeout(retryTimer);
-      container.removeEventListener("wheel", disarm);
-      container.removeEventListener("touchmove", disarm);
-      container.removeEventListener("keydown", disarm);
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(safety);
+      container.removeEventListener("scroll", onScroll);
     };
 
-    const applyTarget = () => {
-      if (!armed || jumpActiveRef.current) return;
-      // チャンネルを開いたら常に最下部（最新）を表示する。
-      // 以前は未読ライン("ここから未読")へ自動スクロールしていたが、
-      // 画像ロードのたびに上へ引っ張られ「変な位置にスクロールアップされる」と
-      // 感じられたため廃止。未読の区切り線はインライン表示のまま残る。
-      if (target === null) target = "bottom";
-      // 最新を表示し続ける（画像ロードで高さが伸びても最下部に張り付ける）
+    // 最新の端へ貼り付ける
+    const pin = () => {
+      if (!pinning || jumpActiveRef.current) return;
       scrollToBottom();
+    };
+
+    // ユーザーが自分で「最新の端」から離れたら追従を終了する。
+    // 自前の scrollToBottom は端(距離≈0)に置くので誤検知しない。
+    // 画像ロード等の高さ変化では scrollTop が変わらず scroll イベントも出ない。
+    const onScroll = () => {
+      if (!pinning) return;
+      const away = channel.is_hitorigoto
+        ? container.scrollTop > 120
+        : container.scrollHeight - container.scrollTop - container.clientHeight > 120;
+      if (away) cleanup();
     };
 
     prevMessageCountRef.current = initialMessages.length;
 
-    // 初回: レイアウト確定後に目標へ移動。早期の遅延ロードに備えた短い再試行を1回だけ。
-    requestAnimationFrame(() => requestAnimationFrame(applyTarget));
-    const retryTimer = setTimeout(applyTarget, 150);
+    // 初回の複数回トライ（レイアウト確定・早期の遅延ロードに備える）
+    requestAnimationFrame(() => requestAnimationFrame(pin));
+    const t1 = setTimeout(pin, 150);
+    const t2 = setTimeout(pin, 600);
 
-    // コンテンツ高さの変化（画像・動画の遅延ロード）に追従して目標位置を維持する。
-    // 独り言は遅延ロード要素が多くシフトが続くので追従期間を長めにする。
-    const armedDurationMs = channel.is_hitorigoto ? 10000 : 3000;
-    const observer = new ResizeObserver(applyTarget);
+    // 高さの変化（画像・動画のロード）に追従して端に貼り付け続ける
+    const observer = new ResizeObserver(pin);
     const inner = container.firstElementChild;
     if (inner) observer.observe(inner);
 
-    // ユーザが手で操作した瞬間に自動追従を止める（勝手に位置が戻らないように）
-    container.addEventListener("wheel", disarm, { passive: true });
-    container.addEventListener("touchmove", disarm, { passive: true });
-    container.addEventListener("keydown", disarm);
-    const stopTimer = setTimeout(disarm, armedDurationMs);
+    container.addEventListener("scroll", onScroll, { passive: true });
 
-    return disarm;
+    // 安全弁: 一定時間で追従を終了（無限に貼り付き続けないように）
+    const safety = setTimeout(cleanup, 15000);
+
+    return cleanup;
   }, [channel.id, channel.is_hitorigoto, initialMessages.length, scrollToBottom]);
 
   // メッセージ追加時: DOM 更新後に即座に最下部へ
