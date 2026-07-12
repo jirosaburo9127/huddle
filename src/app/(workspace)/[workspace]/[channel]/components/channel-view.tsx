@@ -37,39 +37,6 @@ function cacheProfiles(messages: MessageWithProfile[]) {
   }
 }
 
-// ===== 一時デバッグ: スクロール挙動の可視化（原因特定後に削除する） =====
-export const SCROLL_DBG: string[] = [];
-export let scrollDbgT0 = 0;
-export function setScrollDbgT0() { scrollDbgT0 = (typeof performance !== "undefined" ? performance.now() : 0); }
-export function dbg(msg: string) {
-  const t = scrollDbgT0 ? Math.round(performance.now() - scrollDbgT0) : 0;
-  SCROLL_DBG.push(`${String(t).padStart(4)} ${msg}`);
-  if (SCROLL_DBG.length > 18) SCROLL_DBG.shift();
-  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("huddle:scrollDbg"));
-}
-function ScrollDbgOverlay() {
-  const [, force] = useState(0);
-  useEffect(() => {
-    const h = () => force((n) => n + 1);
-    window.addEventListener("huddle:scrollDbg", h);
-    return () => window.removeEventListener("huddle:scrollDbg", h);
-  }, []);
-  return (
-    <div
-      style={{
-        position: "fixed", top: "calc(env(safe-area-inset-top) + 4px)", left: 4, right: 4,
-        zIndex: 9999, maxHeight: "45vh", overflow: "auto",
-        background: "rgba(0,0,0,0.82)", color: "#7CFC00", fontSize: 10, lineHeight: 1.35,
-        fontFamily: "monospace", padding: "6px 8px", borderRadius: 6, whiteSpace: "pre-wrap",
-        pointerEvents: "none",
-      }}
-    >
-      {SCROLL_DBG.join("\n")}
-    </div>
-  );
-}
-// ===================================================================
-
 /**
  * 招待URLをユーザーに届ける。
  * iOS/Android(Capacitor)ではネイティブ共有シート、Webではクリップボード
@@ -443,7 +410,6 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
       container.scrollTop + offsetTop - (container.clientHeight - elRect.height) / 2;
 
     container.scrollTo({ top: Math.max(0, targetTop), behavior });
-    dbg(`ALIGN msg=${messageId.slice(0, 4)} → top=${Math.round(Math.max(0, targetTop))}`);
     return true;
   }, []);
 
@@ -596,7 +562,6 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
   // メッセージジャンプの共通ロジック（DB追加取得 + DOM待ちリトライ + ハイライト）
   // 同一チャンネル内のCustomEvent駆動と、別チャンネルからの ?m= URL駆動の両方で使う
   const executeJump = useCallback((targetId: string, opts?: { cleanupUrl?: boolean }) => {
-    dbg(`JUMP fired msg=${targetId.slice(0, 4)} url=${opts?.cleanupUrl ? "?m=" : "event"}`);
     // ジャンプ進行中フラグを立てる（既存の自動スクロールを抑止）
     jumpActiveRef.current = true;
 
@@ -892,7 +857,6 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
     } else {
       el.scrollTop = el.scrollHeight;
     }
-    dbg(`scrollToBottom → top=${el.scrollTop} h=${el.scrollHeight}`);
   }, [channel.is_hitorigoto]);
 
   // スクロール位置を監視して「最新へ」ボタンの表示/非表示を切り替え
@@ -1029,6 +993,11 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
     let pinning = true;
     let raf = 0;
     let lastH = -1;
+    let established = false; // 最初の貼り付けが済んだか
+    let lastTop = container.scrollTop;
+    let selfUntil = 0; // この時刻まではスクロールイベントを自前扱いにする
+
+    const now = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
 
     const cleanup = () => {
       if (!pinning) return;
@@ -1039,36 +1008,38 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
     };
 
     // ユーザーが自分で「最新の端」から離れたら追従を終了する。
-    // 自前の scrollToBottom は端(距離≈0)に置くので誤検知しない。
+    // - 最初の貼り付け(established)が済むまでは判定しない（マウント直後の
+    //   scrollTop=0 のイベントで誤って止めないため）
+    // - 自前の scrollToBottom 由来のイベント(selfUntil 以内)は無視
+    // - 通常は「上へ動いた(scrollTop 減)」、独り言は「下へ動いた(scrollTop 増)」で離脱と判定
     const onScroll = () => {
-      if (!pinning) return;
-      const away = channel.is_hitorigoto
-        ? container.scrollTop > 120
-        : container.scrollHeight - container.scrollTop - container.clientHeight > 120;
-      if (away) { dbg(`user-scroll離脱 top=${container.scrollTop} h=${container.scrollHeight} → pin停止`); cleanup(); }
+      if (!pinning || !established) return;
+      const top = container.scrollTop;
+      if (now() < selfUntil) { lastTop = top; return; }
+      const userLeft = channel.is_hitorigoto ? top > lastTop + 40 : top < lastTop - 40;
+      lastTop = top;
+      if (userLeft) cleanup();
     };
 
-    // 毎フレーム scrollHeight を監視し、変化したら最下部へ貼り直す。
+    // 毎フレーム scrollHeight を監視し、変化したら最新の端へ貼り直す。
     // ResizeObserver は DOM 構造次第で高さ変化を拾えない（syncMissedMessages 等の
     // 遅延描画で高さが激増しても発火しない）ことがあるため rAF 監視にする。
     const tick = () => {
       if (!pinning) return;
       if (!jumpActiveRef.current) {
         const h = container.scrollHeight;
-        if (h !== lastH) { lastH = h; scrollToBottom(); }
+        if (h !== lastH || !established) {
+          lastH = h;
+          selfUntil = now() + 150; // 直後の scroll イベントは自前扱い
+          scrollToBottom();
+          lastTop = container.scrollTop;
+          established = true;
+        }
       }
       raf = requestAnimationFrame(tick);
     };
 
     prevMessageCountRef.current = initialMessages.length;
-
-    // --- デバッグ: 開封からの scrollTop 軌跡をサンプリング ---
-    setScrollDbgT0();
-    SCROLL_DBG.length = 0;
-    dbg(`OPEN ch=${channel.slug} m=${searchParams?.get("m") || "-"}`);
-    const sampleTimers = [50, 200, 400, 700, 1000, 1400, 1900, 2600].map((ms) =>
-      setTimeout(() => { if (container) dbg(`sample top=${container.scrollTop} h=${container.scrollHeight} clientH=${container.clientHeight}`); }, ms)
-    );
 
     container.addEventListener("scroll", onScroll, { passive: true });
     raf = requestAnimationFrame(tick);
@@ -1076,7 +1047,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
     // 安全弁: 一定時間で追従を終了（無限に貼り付き続けないように）
     const safety = setTimeout(cleanup, 12000);
 
-    return () => { cleanup(); sampleTimers.forEach(clearTimeout); };
+    return cleanup;
   }, [channel.id, channel.is_hitorigoto, initialMessages.length, scrollToBottom]);
 
   // メッセージ追加時: DOM 更新後に即座に最下部へ
@@ -1784,7 +1755,6 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
         }
       }}
     >
-      <ScrollDbgOverlay />
       {/* ドラッグ中のフルサイズオーバーレイ */}
       {isDraggingFiles && (
         <div className="absolute inset-0 z-[60] flex items-center justify-center bg-accent/10 backdrop-blur-sm pointer-events-none">
