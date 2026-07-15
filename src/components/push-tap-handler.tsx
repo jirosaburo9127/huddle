@@ -32,7 +32,18 @@ export function PushTapHandler() {
             const url = data?.url;
             if (!url || typeof window === "undefined") return;
 
-            // 1) SPA ナビ
+            // ワークスペースを跨ぐ遷移は SPA ナビだと表示が切り替わらないことがある
+            // （URL は変わるが別ワークスペースのレイアウト/状態が更新されず、
+            //   開いていたチャンネルのままになる）。跨ぐ時は確実にハードナビで遷移する。
+            const firstSeg = (p: string) => p.split("?")[0].split("#")[0].split("/").filter(Boolean)[0] || "";
+            const targetWs = firstSeg(url);
+            const currentWs = firstSeg(window.location.pathname);
+            if (targetWs && targetWs !== currentWs) {
+              window.location.href = url;
+              return;
+            }
+
+            // 1) SPA ナビ（同一ワークスペース内）
             try {
               router.push(url);
             } catch {
