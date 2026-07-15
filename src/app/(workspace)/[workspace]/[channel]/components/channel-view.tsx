@@ -990,6 +990,14 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
     const container = scrollContainerRef.current;
     if (!container) return;
 
+    // 特定メッセージ指定(?m=)付きで開いた時（検索/通知からのジャンプ）は、
+    // 最下部への追従を一切しない。スクロールはジャンプ処理に完全に委ねる。
+    // （searchParams を deps に入れると ?m= 削除後に再実行され最下部へ飛ぶため、
+    //   ここでは window.location から初回マウント時点の値だけを見る）
+    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("m")) {
+      return;
+    }
+
     let pinning = true;
     let raf = 0;
     let lastH = -1;
