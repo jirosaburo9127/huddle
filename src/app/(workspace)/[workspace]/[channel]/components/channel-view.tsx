@@ -1026,15 +1026,16 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
     // 遅延描画で高さが激増しても発火しない）ことがあるため rAF 監視にする。
     const tick = () => {
       if (!pinning) return;
-      if (!jumpActiveRef.current) {
-        const h = container.scrollHeight;
-        if (h !== lastH || !established) {
-          lastH = h;
-          selfUntil = now() + 150; // 直後の scroll イベントは自前扱い
-          scrollToBottom();
-          lastTop = container.scrollTop;
-          established = true;
-        }
+      // 検索/通知から特定メッセージへジャンプ中は、最下部追従を完全に停止する。
+      // （スキップだけだとジャンプ完了後に追従が再開して最新へ飛んでしまう）
+      if (jumpActiveRef.current) { cleanup(); return; }
+      const h = container.scrollHeight;
+      if (h !== lastH || !established) {
+        lastH = h;
+        selfUntil = now() + 150; // 直後の scroll イベントは自前扱い
+        scrollToBottom();
+        lastTop = container.scrollTop;
+        established = true;
       }
       raf = requestAnimationFrame(tick);
     };
