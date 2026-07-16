@@ -49,7 +49,18 @@ export function PushTapHandler() {
             const targetWs = firstSeg(url);
             const currentWs = firstSeg(window.location.pathname);
             if (targetWs && targetWs !== currentWs) {
-              window.location.href = url;
+              // 絶対URLにして複数手段で遷移を試みる
+              const dest = new URL(url, window.location.origin).href;
+              try { window.location.assign(dest); } catch { /* noop */ }
+              // ★一時デバッグ: 1秒後にまだ遷移していなければ失敗として報告し、別手段を試す
+              setTimeout(() => {
+                const nowWs = firstSeg(window.location.pathname);
+                if (nowWs !== targetWs) {
+                  try { alert(`[push v2] ハードナビ効かず\ndest=${dest}\n現在path=${window.location.pathname}\nreplace/reloadを試します`); } catch {}
+                  try { window.location.href = dest; } catch {}
+                  try { window.location.replace(dest); } catch {}
+                }
+              }, 1000);
               return;
             }
 
