@@ -30,6 +30,16 @@ export function PushTapHandler() {
           (action) => {
             const data = action.notification.data as { url?: string } | undefined;
             const url = data?.url;
+
+            // ★一時デバッグ: タップ時の状態を可視化（原因特定後に削除）
+            {
+              const seg = (p: string) => p.split("?")[0].split("#")[0].split("/").filter(Boolean)[0] || "(なし)";
+              const cur = typeof window !== "undefined" ? seg(window.location.pathname) : "?";
+              try {
+                alert(`[push v2] タップ受信\nurl=${url ?? "なし"}\n遷移先WS=${url ? seg(url) : "-"}\n現在WS=${cur}\nデータ全体=${JSON.stringify(data)}`);
+              } catch { /* noop */ }
+            }
+
             if (!url || typeof window === "undefined") return;
 
             // ワークスペースを跨ぐ遷移は SPA ナビだと表示が切り替わらないことがある
