@@ -30,60 +30,40 @@ export function PushTapHandler() {
           (action) => {
             const data = action.notification.data as { url?: string } | undefined;
             const url = data?.url;
-
-            // ★一時デバッグ: タップ時の状態を可視化（原因特定後に削除）
-            {
-              const seg = (p: string) => p.split("?")[0].split("#")[0].split("/").filter(Boolean)[0] || "(なし)";
-              const cur = typeof window !== "undefined" ? seg(window.location.pathname) : "?";
-              try {
-                alert(`[push v2] タップ受信\nurl=${url ?? "なし"}\n遷移先WS=${url ? seg(url) : "-"}\n現在WS=${cur}\nデータ全体=${JSON.stringify(data)}`);
-              } catch { /* noop */ }
-            }
-
             if (!url || typeof window === "undefined") return;
 
-            // ワークスペースを跨ぐ遷移は SPA ナビだと表示が切り替わらないことがある
-            // （URL は変わるが別ワークスペースのレイアウト/状態が更新されず、
-            //   開いていたチャンネルのままになる）。跨ぐ時は確実にハードナビで遷移する。
+            // WKWebView(Capacitor)では相対パスの window.location では遷移しないため、
+            // 必ず絶対URLにする。
+            const dest = new URL(url, window.location.origin).href;
             const firstSeg = (p: string) => p.split("?")[0].split("#")[0].split("/").filter(Boolean)[0] || "";
             const targetWs = firstSeg(url);
             const currentWs = firstSeg(window.location.pathname);
+
+            // ワークスペースを跨ぐ遷移は SPA ナビだと表示が切り替わらない
+            // （URLは変わるが別WSのレイアウト/状態が更新されず開いていたチャンネルのまま）。
+            // 跨ぐ時は絶対URLへハードナビして確実に切り替える。
             if (targetWs && targetWs !== currentWs) {
-              // 絶対URLにして複数手段で遷移を試みる
-              const dest = new URL(url, window.location.origin).href;
-              try { window.location.assign(dest); } catch { /* noop */ }
-              // ★一時デバッグ: 1秒後にまだ遷移していなければ失敗として報告し、別手段を試す
-              setTimeout(() => {
-                const nowWs = firstSeg(window.location.pathname);
-                if (nowWs !== targetWs) {
-                  try { alert(`[push v2] ハードナビ効かず\ndest=${dest}\n現在path=${window.location.pathname}\nreplace/reloadを試します`); } catch {}
-                  try { window.location.href = dest; } catch {}
-                  try { window.location.replace(dest); } catch {}
-                }
-              }, 1000);
+              window.location.assign(dest);
               return;
             }
 
-            // 1) SPA ナビ（同一ワークスペース内）
+            // 同一ワークスペース内は SPA ナビ（速い・チラつかない）
             try {
               router.push(url);
             } catch {
-              // router が使えないタイミングなら即ハードナビ
-              window.location.href = url;
+              window.location.assign(dest);
               return;
             }
 
-            // 2) フォールバック: 1.2 秒経っても遷移していなければハードナビ
-            //    pathname だけでなく search (クエリ文字列) も含めて比較する
-            //    （?m=<id> 付き URL で同一チャンネルだと pathname が同じでも遷移が必要）
+            // フォールバック: 1.2秒経っても遷移していなければハードナビ（絶対URL）
+            // ?m=<id> 付きで同一チャンネルだと pathname が同じでも遷移が必要なので
+            // search も含めて比較する。
             setTimeout(() => {
               try {
-                const parsed = new URL(url, window.location.origin);
+                const parsed = new URL(dest);
                 const current = window.location.pathname + window.location.search;
                 const expected = parsed.pathname + parsed.search;
-                if (current !== expected) {
-                  window.location.href = url;
-                }
+                if (current !== expected) window.location.assign(dest);
               } catch {
                 /* noop */
               }
