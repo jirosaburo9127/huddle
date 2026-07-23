@@ -156,16 +156,22 @@ export function CreateAlbumModal({ workspaceId, currentUserId, channels, addToAl
         const fileType = isImageFile(file.name) ? "image" : "video";
 
         if (isVideoFile(file)) {
-          const thumbnail = await generateVideoThumbnailFile(file);
-          if (thumbnail) {
-            const thumbPath = `${uploadChannelId}/thumbs/${crypto.randomUUID()}-${thumbnail.name}`;
-            const { error: thumbErr } = await supabase.storage
-              .from("chat-files")
-              .upload(thumbPath, thumbnail, { contentType: thumbnail.type });
-            if (!thumbErr) {
-              const { data: thumbUrlData } = supabase.storage.from("chat-files").getPublicUrl(thumbPath);
-              publicUrl = `${publicUrl}#thumb=${encodeURIComponent(thumbUrlData.publicUrl)}`;
+          // サムネイル生成は補助機能。長尺動画ではデコードに失敗することがあるが、
+          // 動画本体は既にアップロード済みなので、失敗しても登録は続行する（非致命化）。
+          try {
+            const thumbnail = await generateVideoThumbnailFile(file);
+            if (thumbnail) {
+              const thumbPath = `${uploadChannelId}/thumbs/${crypto.randomUUID()}-${thumbnail.name}`;
+              const { error: thumbErr } = await supabase.storage
+                .from("chat-files")
+                .upload(thumbPath, thumbnail, { contentType: thumbnail.type });
+              if (!thumbErr) {
+                const { data: thumbUrlData } = supabase.storage.from("chat-files").getPublicUrl(thumbPath);
+                publicUrl = `${publicUrl}#thumb=${encodeURIComponent(thumbUrlData.publicUrl)}`;
+              }
             }
+          } catch {
+            // サムネイル生成失敗は無視（動画本体はアップロード済み）
           }
         }
 
@@ -235,7 +241,8 @@ export function CreateAlbumModal({ workspaceId, currentUserId, channels, addToAl
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error("[album] handleSubmit unexpected error:", err);
-      alert("アップロード中にエラーが発生しました");
+      const detail = err instanceof Error ? err.message : String(err);
+      alert("アップロード中にエラーが発生しました: " + (detail || "不明なエラー"));
     } finally {
       setUploading(false);
     }
