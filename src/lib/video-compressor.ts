@@ -58,13 +58,21 @@ export async function pickAndCompressVideos(): Promise<File[]> {
     handler.postMessage({ requestId });
   });
 
-  // ネイティブの一時ファイルを base64 を介さず Blob 化（大容量でもメモリ効率が良い）
+  // 圧縮済みファイルを Filesystem 経由で読む。
+  // convertFileSrc + fetch は WKWebView のクロススキーム/CSP(connect-src)で "Load failed" に
+  // なるため、Capacitor ブリッジ経由の Filesystem.readFile を使う（CSP非依存）。
+  const { Filesystem } = await import("@capacitor/filesystem");
   const files: File[] = [];
   for (const p of paths) {
-    const src = Capacitor.convertFileSrc(p);
-    const blob = await fetch(src).then((r) => r.blob());
+    const readPath = p.startsWith("file://") ? p : `file://${p}`;
+    const res = await Filesystem.readFile({ path: readPath });
+    const base64 = typeof res.data === "string" ? res.data : "";
+    // base64 -> Uint8Array
+    const bin = atob(base64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
     const name = `video_${Math.random().toString(36).slice(2)}.mp4`;
-    files.push(new File([blob], name, { type: "video/mp4" }));
+    files.push(new File([bytes], name, { type: "video/mp4" }));
   }
   return files;
 }
