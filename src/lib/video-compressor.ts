@@ -1,48 +1,76 @@
-import { registerPlugin, Capacitor } from "@capacitor/core";
+import { Capacitor } from "@capacitor/core";
 
-// ネイティブ側 VideoCompressorPlugin.swift の戻り値
-interface CompressResult {
-  path: string; // 圧縮後ファイルのネイティブパス
-  size: number; // バイト
-  duration: number; // 秒
-  name: string; // ファイル名（video_xxxx.mp4）
+// このアプリのネイティブ機能は AppDelegate の WKScriptMessageHandler 方式で提供される
+// （標準のCapacitorプラグイン自動登録はアプリ直下クラスでは効かないため）。
+// compressVideo: 動画ピッカーを開き、選んだ動画を 1080p/H.264/MP4 に圧縮して
+// window.webkit.messageHandlers.compressVideo.postMessage({requestId}) で起動、
+// 結果は CustomEvent('huddle:nativeVideoCompress') {requestId, paths[], error} で返る。
+
+interface CompressEventDetail {
+  requestId: string;
+  paths?: string[];
+  error?: string;
 }
 
-interface VideoCompressorPlugin {
-  // 動画を1本選ばせて 1080p / H.264 / MP4 に圧縮し、そのパスを返す
-  pickAndCompress(): Promise<CompressResult>;
+interface WebkitBridge {
+  webkit?: { messageHandlers?: { compressVideo?: { postMessage: (msg: unknown) => void } } };
 }
 
-const VideoCompressor = registerPlugin<VideoCompressorPlugin>("VideoCompressor");
+function getHandler() {
+  if (typeof window === "undefined") return undefined;
+  return (window as unknown as WebkitBridge).webkit?.messageHandlers?.compressVideo;
+}
 
 /**
- * ネイティブ動画圧縮が使えるか（iOSアプリ かつ プラグインが同梱されたビルド）。
- * ボタンの出し分けに使う。新プラグイン未同梱の旧ビルドでは false になり、ボタンは出さない。
+ * ネイティブ動画圧縮が使えるか（iOSアプリ かつ compressVideo ハンドラ同梱ビルド）。
+ * 未同梱の旧ビルドでは false になり、圧縮ボタンは出さない。
  */
 export function isNativeVideoCompressAvailable(): boolean {
   return (
     Capacitor.isNativePlatform() &&
     Capacitor.getPlatform() === "ios" &&
-    Capacitor.isPluginAvailable("VideoCompressor")
+    !!getHandler()
   );
 }
 
 /**
- * ネイティブの動画ピッカーを開き、選択された動画を圧縮した File を返す。
- * ユーザーがキャンセルした場合は null。
+ * ネイティブ動画ピッカーを開き、選択された動画を圧縮した File 配列を返す。
+ * キャンセル時は空配列。
  */
-export async function pickAndCompressVideo(): Promise<File | null> {
-  let res: CompressResult;
-  try {
-    res = await VideoCompressor.pickAndCompress();
-  } catch (e) {
-    const msg = String((e as { message?: string })?.message ?? e);
-    if (msg.includes("cancelled")) return null; // キャンセルは正常系
-    throw e;
-  }
+export async function pickAndCompressVideos(): Promise<File[]> {
+  const handler = getHandler();
+  if (!handler) throw new Error("compressVideo handler が利用できません");
+
+  const requestId = `vc_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
+  const paths: string[] = await new Promise<string[]>((resolve, reject) => {
+    const onResult = (e: Event) => {
+      const detail = (e as CustomEvent<CompressEventDetail>).detail;
+      if (!detail || detail.requestId !== requestId) return;
+      window.removeEventListener("huddle:nativeVideoCompress", onResult);
+      if (detail.error && detail.error !== "cancelled") {
+        reject(new Error(detail.error));
+        return;
+      }
+      resolve(detail.paths || []);
+    };
+    window.addEventListener("huddle:nativeVideoCompress", onResult);
+    handler.postMessage({ requestId });
+  });
 
   // ネイティブの一時ファイルを base64 を介さず Blob 化（大容量でもメモリ効率が良い）
-  const src = Capacitor.convertFileSrc(res.path);
-  const blob = await fetch(src).then((r) => r.blob());
-  return new File([blob], res.name || "video.mp4", { type: "video/mp4" });
+  const files: File[] = [];
+  for (const p of paths) {
+    const src = Capacitor.convertFileSrc(p);
+    const blob = await fetch(src).then((r) => r.blob());
+    const name = `video_${Math.random().toString(36).slice(2)}.mp4`;
+    files.push(new File([blob], name, { type: "video/mp4" }));
+  }
+  return files;
+}
+
+/** 単数版（チャット投稿用）。キャンセルは null。 */
+export async function pickAndCompressVideo(): Promise<File | null> {
+  const files = await pickAndCompressVideos();
+  return files[0] ?? null;
 }

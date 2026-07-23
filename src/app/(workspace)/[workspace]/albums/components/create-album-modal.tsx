@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { generateVideoThumbnailFile } from "@/lib/video-thumbnail-generator";
+import { isNativeVideoCompressAvailable, pickAndCompressVideos } from "@/lib/video-compressor";
 
 type Props = {
   workspaceId: string;
@@ -70,6 +71,21 @@ export function CreateAlbumModal({ workspaceId, currentUserId, channels, addToAl
   const [previews, setPreviews] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
+  // ネイティブ動画圧縮ボタンの出し分け（compressVideoハンドラ同梱ビルドでのみ true）
+  const [videoCompressAvailable, setVideoCompressAvailable] = useState(false);
+  useEffect(() => {
+    setVideoCompressAvailable(isNativeVideoCompressAvailable());
+  }, []);
+
+  // ネイティブ：動画を選んで端末側で1080p圧縮してから追加
+  const handleCompressedVideos = async () => {
+    try {
+      const compressed = await pickAndCompressVideos();
+      if (compressed.length > 0) handleFiles(compressed);
+    } catch (e) {
+      alert("動画の圧縮に失敗しました: " + (e instanceof Error ? e.message : String(e)));
+    }
+  };
 
   const handleFiles = useCallback((newFiles: FileList | File[]) => {
     const arr = Array.from(newFiles);
@@ -338,6 +354,15 @@ export function CreateAlbumModal({ workspaceId, currentUserId, channels, addToAl
             >
               📷 写真・動画を選択
             </button>
+            {videoCompressAvailable && (
+              <button
+                type="button"
+                onClick={handleCompressedVideos}
+                className="mt-2 w-full rounded-xl border border-accent/40 py-2.5 text-center text-sm text-accent hover:bg-accent/5 transition-colors"
+              >
+                🎬 動画を圧縮して追加（軽くして送る）
+              </button>
+            )}
           </div>
 
           {/* プレビュー */}
