@@ -9,6 +9,8 @@ import { PollDisplay } from "./poll-display";
 import { EventDisplay } from "./event-display";
 import { ImageLightbox } from "@/components/image-lightbox";
 import { VideoThumbnail } from "@/components/video-thumbnail";
+import { openFileViewer } from "@/components/file-viewer";
+import { downloadFileWithName } from "@/lib/file-download";
 import { useReactorNames } from "@/lib/use-reactor-names";
 import {
   appendFileMetadataToUrl,
@@ -325,8 +327,8 @@ function MessageContent({
                   webkit.messageHandlers.playVideo.postMessage(url);
                   return;
                 }
-                // PC/Web: 別タブで再生（インライン再生したいなら lightbox 化を後で検討）
-                window.open(url, "_blank");
+                // PC/Web: アプリ内ビューアでその場再生
+                openFileViewer(url, fileName);
               }}
               className="block mt-1 max-w-full sm:max-w-sm rounded-2xl overflow-hidden bg-black/80 hover:opacity-95 transition-opacity"
             >
@@ -352,38 +354,26 @@ function MessageContent({
             key={i}
             className="flex items-center mt-1 rounded-xl bg-white/[0.03] border border-border/50 max-w-full overflow-hidden"
           >
-            {/* プレビュー（新しいタブで開く） */}
-            <a
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="flex items-center gap-2 px-3 py-2 hover:bg-sidebar-hover rounded-l-xl transition-colors min-w-0 flex-1 overflow-hidden"
+            {/* プレビュー（アプリ内ビューアでその場表示） */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                openFileViewer(url, fileName);
+              }}
+              className="flex items-center gap-2 px-3 py-2 hover:bg-sidebar-hover rounded-l-xl transition-colors min-w-0 flex-1 overflow-hidden text-left"
             >
             <svg className="w-5 h-5 text-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
             </svg>
             <span className="text-sm text-accent truncate">{fileName}</span>
-            </a>
-            {/* ダウンロードボタン */}
+            </button>
+            {/* ダウンロードボタン（元のファイル名を維持） */}
             <button
               type="button"
-              onClick={async (e) => {
+              onClick={(e) => {
                 e.stopPropagation();
-                try {
-                  const res = await fetch(url);
-                  const blob = await res.blob();
-                  const blobUrl = URL.createObjectURL(blob);
-                  const a = document.createElement("a");
-                  a.href = blobUrl;
-                  a.download = fileName;
-                  document.body.appendChild(a);
-                  a.click();
-                  document.body.removeChild(a);
-                  URL.revokeObjectURL(blobUrl);
-                } catch {
-                  window.open(url, "_blank");
-                }
+                downloadFileWithName(url, fileName);
               }}
               className="px-2 py-2 hover:bg-sidebar-hover rounded-r-xl transition-colors border-l border-border/50"
               title="ダウンロード"

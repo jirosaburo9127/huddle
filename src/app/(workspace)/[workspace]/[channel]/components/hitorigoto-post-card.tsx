@@ -6,6 +6,8 @@ import type { MessageWithProfile } from "@/lib/supabase/types";
 import { PollDisplay } from "./poll-display";
 import { ImageLightbox } from "@/components/image-lightbox";
 import { VideoThumbnail } from "@/components/video-thumbnail";
+import { openFileViewer } from "@/components/file-viewer";
+import { downloadFileWithName } from "@/lib/file-download";
 import { extractDisplayFileName, stripFileUrlFragment } from "@/lib/file-name";
 
 type Props = {
@@ -194,7 +196,7 @@ function HitorigotoPostCardInner({
                     if (webkit?.messageHandlers?.playVideo) {
                       webkit.messageHandlers.playVideo.postMessage(url);
                     } else {
-                      window.open(url, "_blank");
+                      openFileViewer(url, extractDisplayFileName(url));
                     }
                   }}
                 >
@@ -216,37 +218,32 @@ function HitorigotoPostCardInner({
                   </div>
                 </button>
               ) : (
-                <a
-                  key={i}
-                  href={url}
-                  download={extractDisplayFileName(url)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    try {
-                      const { Capacitor } = await import("@capacitor/core");
-                      if (Capacitor.isNativePlatform()) return;
-                      e.preventDefault();
-                      const fileName = extractDisplayFileName(url);
-                      const res = await fetch(url);
-                      const blob = await res.blob();
-                      const blobUrl = URL.createObjectURL(blob);
-                      const a = document.createElement("a");
-                      a.href = blobUrl;
-                      a.download = fileName;
-                      document.body.appendChild(a);
-                      a.click();
-                      document.body.removeChild(a);
-                      URL.revokeObjectURL(blobUrl);
-                    } catch {
-                      // 失敗時は標準のリンク動作にフォールバック
-                    }
-                  }}
-                  className="text-sm text-accent underline break-all block"
-                >
-                  {extractDisplayFileName(url)}
-                </a>
+                <span key={i} className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openFileViewer(url, extractDisplayFileName(url));
+                    }}
+                    className="text-sm text-accent underline break-all text-left min-w-0 flex-1"
+                  >
+                    {extractDisplayFileName(url)}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      downloadFileWithName(url, extractDisplayFileName(url));
+                    }}
+                    className="shrink-0 p-1 text-muted hover:text-accent transition-colors"
+                    title="ダウンロード"
+                    aria-label="ダウンロード"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                  </button>
+                </span>
               )
             )}
             </div>

@@ -6,6 +6,8 @@ import Link from "next/link";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
 import { createClient } from "@/lib/supabase/client";
 import { extractDisplayFileName } from "@/lib/file-name";
+import { openFileViewer } from "@/components/file-viewer";
+import { downloadFileWithName } from "@/lib/file-download";
 import { useHorizontalOnlyScroll } from "@/lib/use-horizontal-only-scroll";
 
 type FileItem = {
@@ -336,17 +338,27 @@ export default function FilesPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                     </svg>
                   </Link>
-                  <a
-                    href={file.content}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button
+                    type="button"
+                    onClick={() => openFileViewer(file.content, file.fileName)}
+                    className="p-2 text-muted hover:text-accent rounded-lg hover:bg-accent/10 transition-colors"
+                    title="プレビュー"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => downloadFileWithName(file.content, file.fileName)}
                     className="p-2 text-muted hover:text-accent rounded-lg hover:bg-accent/10 transition-colors"
                     title="ダウンロード"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                     </svg>
-                  </a>
+                  </button>
                 </div>
               </div>
             ))

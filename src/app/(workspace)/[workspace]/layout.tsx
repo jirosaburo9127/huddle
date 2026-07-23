@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { WorkspaceShell } from "@/components/sidebar-loader";
+import { FileViewerHost } from "@/components/file-viewer";
 
 // サイドバーのスケルトンUI（データ取得中に表示）
 function SidebarSkeleton() {
@@ -52,6 +53,7 @@ export default async function WorkspaceLayout({
           </WorkspaceShell>
         </Suspense>
       </div>
+      <FileViewerHost />
     </div>
   );
 }

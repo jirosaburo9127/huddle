@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { AlbumItem, AlbumSummary } from "@/lib/supabase/types";
 import { ImageLightbox, type MediaItem } from "@/components/image-lightbox";
 import { VideoThumbnail } from "@/components/video-thumbnail";
+import { openFileViewer } from "@/components/file-viewer";
 
 type Props = {
   album: AlbumSummary;
@@ -122,7 +123,7 @@ export function AlbumDetailModal({ album, currentUserId, onClose, onAddItems }: 
                         if (webkit?.messageHandlers?.playVideo) {
                           webkit.messageHandlers.playVideo.postMessage(item.url);
                         } else {
-                          window.open(item.url, "_blank");
+                          openFileViewer(item.url, item.file_name || "動画");
                         }
                       } else {
                         handleImageClick(item.url);
