@@ -759,21 +759,27 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, onCr
       let thumbnailUrl: string | null = null;
       const isVideo = file.type.startsWith("video/") || /\.(mp4|mov|webm|m4v)$/i.test(file.name);
       if (isVideo) {
-        const nativeThumbnail = await generateNativeVideoThumbnailDataUrl(urlData.publicUrl);
-        const thumbnail = nativeThumbnail
-          ? dataUrlToFile(nativeThumbnail)
-          : await generateVideoThumbnailFile(file);
-        if (thumbnail) {
-          const thumbPath = `${channelId || "general"}/thumbs/${crypto.randomUUID()}-${sanitizeFileName(thumbnail.name)}`;
-          const { error: thumbErr } = await supabase.storage
-            .from("chat-files")
-            .upload(thumbPath, thumbnail, { contentType: thumbnail.type });
-          if (!thumbErr) {
-            const { data: thumbUrlData } = supabase.storage
+        // サムネイル生成は「あれば嬉しい」補助機能。長尺動画ではデコード/再取得に失敗する
+        // ことがあるが、動画本体は既にアップロード済みなので、失敗しても添付は続行する（非致命化）。
+        try {
+          const nativeThumbnail = await generateNativeVideoThumbnailDataUrl(urlData.publicUrl);
+          const thumbnail = nativeThumbnail
+            ? dataUrlToFile(nativeThumbnail)
+            : await generateVideoThumbnailFile(file);
+          if (thumbnail) {
+            const thumbPath = `${channelId || "general"}/thumbs/${crypto.randomUUID()}-${sanitizeFileName(thumbnail.name)}`;
+            const { error: thumbErr } = await supabase.storage
               .from("chat-files")
-              .getPublicUrl(thumbPath);
-            thumbnailUrl = thumbUrlData.publicUrl;
+              .upload(thumbPath, thumbnail, { contentType: thumbnail.type });
+            if (!thumbErr) {
+              const { data: thumbUrlData } = supabase.storage
+                .from("chat-files")
+                .getPublicUrl(thumbPath);
+              thumbnailUrl = thumbUrlData.publicUrl;
+            }
           }
+        } catch {
+          // サムネイル生成失敗は無視（動画本体はアップロード済み）
         }
       }
 
@@ -796,7 +802,10 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, onCr
         },
       ]);
     } catch (err) {
-      setUploadError(err instanceof Error ? err.message : "アップロードに失敗しました");
+      // 原因切り分けのためファイルサイズと実際のエラー内容を出す
+      const sizeMb = Math.round(file.size / 1024 / 1024);
+      const detail = err instanceof Error ? err.message : String(err);
+      setUploadError(`アップロード失敗（${sizeMb}MB）: ${detail || "不明なエラー"}`);
     } finally {
       setUploading(false);
     }
