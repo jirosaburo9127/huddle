@@ -805,7 +805,10 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, onCr
       // 原因切り分けのためファイルサイズと実際のエラー内容を出す
       const sizeMb = Math.round(file.size / 1024 / 1024);
       const detail = err instanceof Error ? err.message : String(err);
-      setUploadError(`アップロード失敗（${sizeMb}MB）: ${detail || "不明なエラー"}`);
+      const msg = `アップロード失敗（${sizeMb}MB）: ${detail || "不明なエラー"}`;
+      setUploadError(msg);
+      // 【診断・一時】実機で真因を確実に見るため alert 表示（原因特定後に削除）
+      try { if (isNativeApp) window.alert("【診断v3・upload】" + msg); } catch { /* noop */ }
     } finally {
       setUploading(false);
     }
@@ -827,11 +830,15 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, onCr
     try {
       setUploadError(null);
       file = await pickAndCompressVideo();
-    } catch {
-      setUploadError("動画の読み込み・圧縮に失敗しました");
+    } catch (e) {
+      const detail = e instanceof Error ? e.message : String(e);
+      setUploadError("動画の圧縮に失敗しました: " + detail);
+      try { window.alert("【診断v3・compress】" + detail); } catch { /* noop */ }
       return;
     }
     if (!file) return; // キャンセル
+    // 【診断・一時】圧縮後サイズを確認（原因特定後に削除）
+    try { window.alert(`【診断v3・圧縮完了】${Math.round(file.size / 1024 / 1024)}MB / ${file.type}`); } catch { /* noop */ }
     await uploadFile(file);
   }
 
