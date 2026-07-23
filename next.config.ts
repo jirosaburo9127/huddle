@@ -56,6 +56,10 @@ const nextConfig: NextConfig = {
               // pwnedpasswords.com は漏洩パスワードチェック (k-anonymity API)
               "connect-src 'self' https://emfngqketrieioxusuhg.supabase.co wss://emfngqketrieioxusuhg.supabase.co https://cdn.jsdelivr.net https://api.pwnedpasswords.com",
               "img-src 'self' https://emfngqketrieioxusuhg.supabase.co data: blob:",
+              // アプリ内ファイルビューア: Supabaseの動画/音声をインライン再生
+              "media-src 'self' https://emfngqketrieioxusuhg.supabase.co data: blob:",
+              // アプリ内ファイルビューア: SupabaseのPDF/テキストをiframeで表示
+              "frame-src 'self' https://emfngqketrieioxusuhg.supabase.co data: blob:",
               "style-src 'self' 'unsafe-inline'",
               "font-src 'self' https://fonts.gstatic.com",
               "object-src 'none'",
