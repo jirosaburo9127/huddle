@@ -14,9 +14,9 @@ import type { MessageWithProfile } from "@/lib/supabase/types";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
 import { VideoThumbnail } from "@/components/video-thumbnail";
 
-// ファイルサイズ上限: 50MB（Supabase Free プランの Global file size limit が 50MB 固定のため）
-// Pro プラン移行時は Dashboard の「Global file size limit」を上げた後、こことバケット側 file_size_limit も再設定する
-const MAX_FILE_SIZE = 50 * 1024 * 1024;
+// ファイルサイズ上限: 200MB（Supabase Pro プラン。Global file size limit とバケット側 file_size_limit も 200MB に設定済み）
+// 変更時は Dashboard の「Global file size limit」→ バケット file_size_limit → この定数の3箇所を揃える
+const MAX_FILE_SIZE = 200 * 1024 * 1024;
 
 // 許可するMIMEタイプ
 // SVG はスクリプト埋め込み可能で XSS ベクトルなので除外する
@@ -683,7 +683,7 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, onCr
 
     // ファイルサイズチェック
     if (file.size > MAX_FILE_SIZE) {
-      setUploadError("ファイルサイズは50MB以下にしてください");
+      setUploadError("ファイルサイズは200MB以下にしてください");
       return;
     }
 

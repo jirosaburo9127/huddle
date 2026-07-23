@@ -126,9 +126,9 @@ export function CreateAlbumModal({ workspaceId, currentUserId, channels, addToAl
         setProgress(Math.round(((i) / files.length) * 100));
         let file = files[i];
 
-        // 50MBチェック
-        if (file.size > 50 * 1024 * 1024) {
-          alert(`「${file.name}」は50MBを超えているためスキップします`);
+        // 200MBチェック
+        if (file.size > 200 * 1024 * 1024) {
+          alert(`「${file.name}」は200MBを超えているためスキップします`);
           continue;
         }
 
