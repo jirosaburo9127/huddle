@@ -11,6 +11,9 @@ import { Capacitor } from "@capacitor/core";
 // ============================================================
 const LATEST_IOS_BUILD = 19;
 
+// 更新バナーの表示ON/OFF。一旦非表示にする場合は false。戻す時は true に。
+const BANNER_ENABLED = false;
+
 // TestFlight アプリを開く URL スキーム
 const TESTFLIGHT_URL = "itms-beta://";
 
@@ -25,6 +28,7 @@ export function AppUpdateBanner() {
 
   const check = useCallback(async () => {
     try {
+      if (!BANNER_ENABLED) return;
       if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "ios") return;
       const { App } = await import("@capacitor/app");
       const info = await App.getInfo();
