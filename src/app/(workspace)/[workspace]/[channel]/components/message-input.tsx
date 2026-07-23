@@ -13,10 +13,12 @@ import {
 import type { MessageWithProfile } from "@/lib/supabase/types";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
 import { VideoThumbnail } from "@/components/video-thumbnail";
+import { isNativeVideoCompressAvailable, pickAndCompressVideo } from "@/lib/video-compressor";
 
-// ファイルサイズ上限: 200MB（Supabase Pro プラン。Global file size limit とバケット側 file_size_limit も 200MB に設定済み）
+// ファイルサイズ上限: 500MB（Supabase Pro プラン。Global file size limit とバケット側 file_size_limit も 500MB に設定）
 // 変更時は Dashboard の「Global file size limit」→ バケット file_size_limit → この定数の3箇所を揃える
-const MAX_FILE_SIZE = 200 * 1024 * 1024;
+// 動画はネイティブアプリで 1080p/H.264 に圧縮してから送るため、長尺でもこの範囲に収まりやすい
+const MAX_FILE_SIZE = 500 * 1024 * 1024;
 
 // 許可するMIMEタイプ
 // SVG はスクリプト埋め込み可能で XSS ベクトルなので除外する
@@ -217,11 +219,14 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, onCr
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null);
   const [isNativeApp, setIsNativeApp] = useState(false);
+  // ネイティブ動画圧縮ボタンの出し分け（新プラグイン同梱ビルドでのみ true）
+  const [videoCompressAvailable, setVideoCompressAvailable] = useState(false);
 
   useEffect(() => {
     import("@capacitor/core").then(({ Capacitor }) => {
       setIsNativeApp(Capacitor.isNativePlatform());
     }).catch(() => {});
+    setVideoCompressAvailable(isNativeVideoCompressAvailable());
   }, []);
 
   // マウント時およびチャンネル切替時に下書きを localStorage から復元する。
@@ -683,7 +688,7 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, onCr
 
     // ファイルサイズチェック
     if (file.size > MAX_FILE_SIZE) {
-      setUploadError("ファイルサイズは200MB以下にしてください");
+      setUploadError("ファイルサイズは500MB以下にしてください");
       return;
     }
 
@@ -790,6 +795,20 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, onCr
       await uploadFile(file);
     }
     if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  // ネイティブ（iOSアプリ）: 動画を選択 → 端末側で1080p/H.264に圧縮 → 通常のアップロード経路へ
+  async function handleNativeVideoAttach() {
+    let file: File | null;
+    try {
+      setUploadError(null);
+      file = await pickAndCompressVideo();
+    } catch {
+      setUploadError("動画の読み込み・圧縮に失敗しました");
+      return;
+    }
+    if (!file) return; // キャンセル
+    await uploadFile(file);
   }
 
   // クリップボードからのペースト (スクショ貼り付け等)
@@ -1033,6 +1052,21 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, onCr
               </svg>
             )}
           </button>
+
+          {/* 動画を圧縮して添付（iOSアプリ・新プラグイン同梱ビルドのみ） */}
+          {videoCompressAvailable && (
+            <button
+              type="button"
+              onClick={handleNativeVideoAttach}
+              disabled={uploading}
+              className="shrink-0 rounded-lg w-10 h-10 flex items-center justify-center text-muted hover:text-accent disabled:opacity-50 transition-colors"
+              title="動画を圧縮して送信"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
+              </svg>
+            </button>
+          )}
 
           {/* 宛先追加ボタン */}
           <button
