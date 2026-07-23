@@ -9,7 +9,7 @@ import { Capacitor } from "@capacitor/core";
 // 古いビルドを使っているユーザーに「最新版に更新して」バナーが出る。
 // （App Store Connect のビルド番号 = CFBundleVersion と一致させる）
 // ============================================================
-const LATEST_IOS_BUILD = 18;
+const LATEST_IOS_BUILD = 19;
 
 // TestFlight アプリを開く URL スキーム
 const TESTFLIGHT_URL = "itms-beta://";
