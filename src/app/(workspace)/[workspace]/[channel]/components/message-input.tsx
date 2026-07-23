@@ -178,6 +178,8 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, onCr
   const [sendAsDecision, setSendAsDecision] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  // web版で動画を選んだ時の案内（アプリからの送信を促す。送信自体は止めない）
+  const [uploadNotice, setUploadNotice] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -686,9 +688,22 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, onCr
       }
     }
 
+    // web版は動画を圧縮できないため、アプリからの送信を案内する（送信は止めない）
+    const isVideoFile =
+      file.type.startsWith("video/") || /\.(mp4|mov|webm|m4v)$/i.test(file.name);
+    setUploadNotice(
+      isVideoFile && !isNativeApp
+        ? "動画はアプリから送ると自動で圧縮されて軽く送れます📱"
+        : null
+    );
+
     // ファイルサイズチェック
     if (file.size > MAX_FILE_SIZE) {
-      setUploadError("ファイルサイズは500MB以下にしてください");
+      setUploadError(
+        isVideoFile && !isNativeApp
+          ? "この動画は大きすぎます。アプリから送ると自動で圧縮して送れます📱"
+          : "ファイルサイズは500MB以下にしてください"
+      );
       return;
     }
 
@@ -895,6 +910,21 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, onCr
           <button
             onClick={() => setUploadError(null)}
             className="text-red-400 hover:text-red-300 ml-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
+
+      {uploadNotice && (
+        <div className="mb-2 rounded-lg bg-accent/10 px-3 py-2 text-sm text-accent flex items-center justify-between">
+          <span>{uploadNotice}</span>
+          <button
+            onClick={() => setUploadNotice(null)}
+            className="text-accent hover:opacity-70 ml-2"
+            aria-label="閉じる"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
