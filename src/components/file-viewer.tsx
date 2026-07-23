@@ -17,6 +17,15 @@ interface ViewerReq {
 const EVENT = "huddle:openFileViewer";
 
 export function openFileViewer(url: string, name: string) {
+  // アプリ(iOS): ネイティブ QuickLook で開く（多ページPDF/docx等をアプリ内スクロール表示）
+  const handler = (window as unknown as {
+    webkit?: { messageHandlers?: { previewFile?: { postMessage: (m: unknown) => void } } };
+  }).webkit?.messageHandlers?.previewFile;
+  if (handler) {
+    handler.postMessage({ url: stripFileUrlFragment(url), name });
+    return;
+  }
+  // PC/Web: 画面内モーダルビューア
   window.dispatchEvent(new CustomEvent<ViewerReq>(EVENT, { detail: { url, name } }));
 }
 
