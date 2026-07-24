@@ -13,7 +13,7 @@ import {
 import type { MessageWithProfile } from "@/lib/supabase/types";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
 import { VideoThumbnail } from "@/components/video-thumbnail";
-import { isNativeVideoCompressAvailable, pickAndCompressVideo } from "@/lib/video-compressor";
+import { isNativeVideoCompressAvailable, pickCompressAndUploadVideos } from "@/lib/video-compressor";
 
 // ファイルサイズ上限: 500MB（Supabase Pro プラン。Global file size limit とバケット側 file_size_limit も 500MB に設定）
 // 変更時は Dashboard の「Global file size limit」→ バケット file_size_limit → この定数の3箇所を揃える
@@ -824,17 +824,56 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, onCr
 
   // ネイティブ（iOSアプリ）: 動画を選択 → 端末側で1080p/H.264に圧縮 → 通常のアップロード経路へ
   async function handleNativeVideoAttach() {
-    let file: File | null;
     try {
       setUploadError(null);
-      file = await pickAndCompressVideo();
+      const supabase = createClient();
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess.session?.access_token;
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+      if (!token || !supabaseUrl) {
+        setUploadError("認証情報が取得できませんでした");
+        return;
+      }
+      setUploading(true);
+      // ネイティブが圧縮＋ディスクから直接アップロードし、公開URLを返す（JSはファイルを持たない）
+      const urls = await pickCompressAndUploadVideos({
+        supabaseUrl,
+        bucket: "chat-files",
+        prefix: channelId || "general",
+        token,
+      });
+      for (const publicUrl of urls) {
+        // サムネイル生成（ネイティブ、非致命）
+        let thumbnailUrl: string | null = null;
+        try {
+          const nativeThumb = await generateNativeVideoThumbnailDataUrl(publicUrl);
+          if (nativeThumb) {
+            const thumb = dataUrlToFile(nativeThumb);
+            if (thumb) {
+              const thumbPath = `${channelId || "general"}/thumbs/${crypto.randomUUID()}-${sanitizeFileName(thumb.name)}`;
+              const { error: thumbErr } = await supabase.storage
+                .from("chat-files")
+                .upload(thumbPath, thumb, { contentType: thumb.type });
+              if (!thumbErr) {
+                thumbnailUrl = supabase.storage.from("chat-files").getPublicUrl(thumbPath).data.publicUrl;
+              }
+            }
+          }
+        } catch {
+          // サムネイル失敗は無視
+        }
+        const name = "動画.mp4";
+        const urlWithName = appendFileMetadataToUrl(publicUrl, { name, thumb: thumbnailUrl });
+        setPendingAttachments((prev) => [
+          ...prev,
+          { url: urlWithName, name, type: "video/mp4", isImage: false, isVideo: true },
+        ]);
+      }
     } catch (e) {
-      const detail = e instanceof Error ? e.message : String(e);
-      setUploadError("動画の圧縮に失敗しました: " + detail);
-      return;
+      setUploadError("動画の送信に失敗しました: " + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setUploading(false);
     }
-    if (!file) return; // キャンセル
-    await uploadFile(file);
   }
 
   // クリップボードからのペースト (スクショ貼り付け等)

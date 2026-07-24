@@ -2,8 +2,9 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { generateVideoThumbnailFile } from "@/lib/video-thumbnail-generator";
-import { isNativeVideoCompressAvailable, pickAndCompressVideos } from "@/lib/video-compressor";
+import { generateVideoThumbnailFile, generateNativeVideoThumbnailDataUrl, dataUrlToFile } from "@/lib/video-thumbnail-generator";
+import { appendFileMetadataToUrl } from "@/lib/file-name";
+import { isNativeVideoCompressAvailable, pickCompressAndUploadVideos } from "@/lib/video-compressor";
 
 type Props = {
   workspaceId: string;
@@ -73,17 +74,31 @@ export function CreateAlbumModal({ workspaceId, currentUserId, channels, addToAl
   const [progress, setProgress] = useState(0);
   // ネイティブ動画圧縮ボタンの出し分け（compressVideoハンドラ同梱ビルドでのみ true）
   const [videoCompressAvailable, setVideoCompressAvailable] = useState(false);
+  // ネイティブ圧縮＋直接アップロード済みの動画URL（handleSubmit で album_items に登録）
+  const [preUploadedVideos, setPreUploadedVideos] = useState<string[]>([]);
   useEffect(() => {
     setVideoCompressAvailable(isNativeVideoCompressAvailable());
   }, []);
 
-  // ネイティブ：動画を選んで端末側で1080p圧縮してから追加
+  // ネイティブ：動画を選んで端末側で1080p圧縮し、ディスクから直接Supabaseへアップロード
   const handleCompressedVideos = async () => {
     try {
-      const compressed = await pickAndCompressVideos();
-      if (compressed.length > 0) handleFiles(compressed);
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess.session?.access_token;
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+      if (!token || !supabaseUrl) {
+        alert("認証情報が取得できませんでした");
+        return;
+      }
+      const urls = await pickCompressAndUploadVideos({
+        supabaseUrl,
+        bucket: "chat-files",
+        prefix: channelId,
+        token,
+      });
+      if (urls.length > 0) setPreUploadedVideos((prev) => [...prev, ...urls]);
     } catch (e) {
-      alert("動画の圧縮に失敗しました: " + (e instanceof Error ? e.message : String(e)));
+      alert("動画の圧縮・アップロードに失敗しました: " + (e instanceof Error ? e.message : String(e)));
     }
   };
 
@@ -103,7 +118,7 @@ export function CreateAlbumModal({ workspaceId, currentUserId, channels, addToAl
 
   const handleSubmit = async () => {
     if (!addToAlbumId && !title.trim()) return;
-    if (files.length === 0) return;
+    if (files.length === 0 && preUploadedVideos.length === 0) return;
     setUploading(true);
 
     try {
@@ -204,6 +219,37 @@ export function CreateAlbumModal({ workspaceId, currentUserId, channels, addToAl
           continue;
         }
         uploadedCount++;
+      }
+
+      // ネイティブ圧縮＋アップロード済みの動画を album_items に登録
+      for (const videoUrl of preUploadedVideos) {
+        let publicUrl = videoUrl;
+        try {
+          const nativeThumb = await generateNativeVideoThumbnailDataUrl(videoUrl);
+          if (nativeThumb) {
+            const thumb = dataUrlToFile(nativeThumb);
+            if (thumb) {
+              const thumbPath = `${uploadChannelId}/thumbs/${crypto.randomUUID()}-${thumb.name}`;
+              const { error: thumbErr } = await supabase.storage
+                .from("chat-files")
+                .upload(thumbPath, thumb, { contentType: thumb.type });
+              if (!thumbErr) {
+                const { data: thumbUrlData } = supabase.storage.from("chat-files").getPublicUrl(thumbPath);
+                publicUrl = appendFileMetadataToUrl(videoUrl, { name: "動画.mp4", thumb: thumbUrlData.publicUrl });
+              }
+            }
+          }
+        } catch {
+          // サムネイル失敗は無視
+        }
+        const { error: itemErr } = await supabase.from("album_items").insert({
+          album_id: albumId,
+          url: publicUrl,
+          file_type: "video",
+          file_name: "動画.mp4",
+          added_by: currentUserId,
+        });
+        if (!itemErr) uploadedCount++;
       }
 
       // カバー画像を設定（最初の画像）
@@ -384,6 +430,24 @@ export function CreateAlbumModal({ workspaceId, currentUserId, channels, addToAl
                       if (previews[i]) URL.revokeObjectURL(previews[i]);
                       setPreviews((prev) => prev.filter((_, j) => j !== i));
                     }}
+                    className="absolute top-0.5 right-0.5 w-5 h-5 bg-black/50 rounded-full flex items-center justify-center text-white text-[10px]"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* 圧縮アップロード済み動画 */}
+          {preUploadedVideos.length > 0 && (
+            <div className="grid grid-cols-4 gap-1.5">
+              {preUploadedVideos.map((_, i) => (
+                <div key={`v${i}`} className="aspect-square bg-black/80 rounded-lg overflow-hidden relative flex items-center justify-center">
+                  <span className="text-white text-lg">🎬</span>
+                  <span className="absolute bottom-0.5 left-0 right-0 text-center text-[9px] text-white/80">圧縮済み</span>
+                  <button
+                    onClick={() => setPreUploadedVideos((prev) => prev.filter((_, j) => j !== i))}
                     className="absolute top-0.5 right-0.5 w-5 h-5 bg-black/50 rounded-full flex items-center justify-center text-white text-[10px]"
                   >
                     ✕

@@ -1,19 +1,17 @@
 import { Capacitor } from "@capacitor/core";
 
-// このアプリのネイティブ機能は AppDelegate の WKScriptMessageHandler 方式で提供される
-// （標準のCapacitorプラグイン自動登録はアプリ直下クラスでは効かないため）。
-// compressVideo: 動画ピッカーを開き、選んだ動画を 1080p/H.264/MP4 に圧縮して
-// window.webkit.messageHandlers.compressVideo.postMessage({requestId}) で起動、
-// 結果は CustomEvent('huddle:nativeVideoCompress') {requestId, paths[], error} で返る。
+// 動画圧縮は AppDelegate の WKScriptMessageHandler `compressVideo` で提供。
+// 動画ピッカー→1080p/H.264圧縮→**ディスクから直接Supabaseへストリーミングアップロード**（URLSession）。
+// 巨大ファイルもWKWebViewのメモリに載せずに送れる。結果は公開URL配列で返る。
 
 interface CompressEventDetail {
   requestId: string;
-  paths?: string[];
+  paths?: string[]; // upload指定時は公開URL配列
   error?: string;
 }
 
 interface WebkitBridge {
-  webkit?: { messageHandlers?: { compressVideo?: { postMessage: (msg: unknown) => void } } };
+  webkit?: { messageHandlers?: { compressVideo?: { postMessage: (m: unknown) => void } } };
 }
 
 function getHandler() {
@@ -21,10 +19,7 @@ function getHandler() {
   return (window as unknown as WebkitBridge).webkit?.messageHandlers?.compressVideo;
 }
 
-/**
- * ネイティブ動画圧縮が使えるか（iOSアプリ かつ compressVideo ハンドラ同梱ビルド）。
- * 未同梱の旧ビルドでは false になり、圧縮ボタンは出さない。
- */
+/** ネイティブ動画圧縮が使えるか（iOSアプリ かつ compressVideo ハンドラ同梱ビルド）。 */
 export function isNativeVideoCompressAvailable(): boolean {
   return (
     Capacitor.isNativePlatform() &&
@@ -33,17 +28,25 @@ export function isNativeVideoCompressAvailable(): boolean {
   );
 }
 
+export interface VideoUploadParams {
+  supabaseUrl: string; // 例: https://xxx.supabase.co
+  bucket: string; // 例: chat-files
+  prefix: string; // 保存パスの接頭辞（channelId 等）
+  token: string; // ユーザーのアクセストークン(JWT)
+}
+
 /**
- * ネイティブ動画ピッカーを開き、選択された動画を圧縮した File 配列を返す。
+ * 動画を選び、1080p圧縮してディスクから直接Supabaseへアップロードし、**公開URL配列**を返す。
+ * JS側はファイルの中身を一切メモリに持たないため、巨大な動画でも安定して送れる。
  * キャンセル時は空配列。
  */
-export async function pickAndCompressVideos(): Promise<File[]> {
+export async function pickCompressAndUploadVideos(params: VideoUploadParams): Promise<string[]> {
   const handler = getHandler();
   if (!handler) throw new Error("compressVideo handler が利用できません");
 
   const requestId = `vc_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
-  const paths: string[] = await new Promise<string[]>((resolve, reject) => {
+  const urls: string[] = await new Promise<string[]>((resolve, reject) => {
     const onResult = (e: Event) => {
       const detail = (e as CustomEvent<CompressEventDetail>).detail;
       if (!detail || detail.requestId !== requestId) return;
@@ -55,40 +58,17 @@ export async function pickAndCompressVideos(): Promise<File[]> {
       resolve(detail.paths || []);
     };
     window.addEventListener("huddle:nativeVideoCompress", onResult);
-    handler.postMessage({ requestId });
+    handler.postMessage({
+      requestId,
+      upload: {
+        url: params.supabaseUrl,
+        bucket: params.bucket,
+        prefix: params.prefix,
+        token: params.token,
+      },
+    });
   });
 
-  try { window.alert(`【診断v4】paths=${paths.length}\n${paths[0] || "(なし)"}`); } catch { /* noop */ }
-
-  // 圧縮済みファイルを Filesystem 経由で読む。
-  // convertFileSrc + fetch は WKWebView のクロススキーム/CSP(connect-src)で "Load failed" に
-  // なるため、Capacitor ブリッジ経由の Filesystem.readFile を使う（CSP非依存）。
-  const { Filesystem } = await import("@capacitor/filesystem");
-  const files: File[] = [];
-  for (const p of paths) {
-    const readPath = p.startsWith("file://") ? p : `file://${p}`;
-    let res: { data: string | Blob };
-    try {
-      res = await Filesystem.readFile({ path: readPath });
-    } catch (e) {
-      try { window.alert(`【診断v4】readFile失敗\n${e instanceof Error ? e.message : String(e)}`); } catch { /* noop */ }
-      throw e;
-    }
-    const base64 = typeof res.data === "string" ? res.data : "";
-    try { window.alert(`【診断v4】readOK data型=${typeof res.data} base64長=${base64.length}`); } catch { /* noop */ }
-    // base64 -> Uint8Array
-    const bin = atob(base64);
-    const bytes = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    const name = `video_${Math.random().toString(36).slice(2)}.mp4`;
-    files.push(new File([bytes], name, { type: "video/mp4" }));
-  }
-  try { window.alert(`【診断v4】files=${files.length} size=${Math.round((files[0]?.size ?? 0) / 1024 / 1024)}MB`); } catch { /* noop */ }
-  return files;
-}
-
-/** 単数版（チャット投稿用）。キャンセルは null。 */
-export async function pickAndCompressVideo(): Promise<File | null> {
-  const files = await pickAndCompressVideos();
-  return files[0] ?? null;
+  // アップロード対応ビルドのみ http(s) の公開URLが返る（旧ビルドはローカルパスなので除外）
+  return urls.filter((u) => /^https?:\/\//.test(u));
 }
