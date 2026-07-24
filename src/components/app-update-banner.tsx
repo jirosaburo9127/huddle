@@ -9,7 +9,7 @@ import { Capacitor } from "@capacitor/core";
 // 古いビルドを使っているユーザーに「最新版に更新して」バナーが出る。
 // （App Store Connect のビルド番号 = CFBundleVersion と一致させる）
 // ============================================================
-const LATEST_IOS_BUILD = 20;
+const LATEST_IOS_BUILD = 21;
 
 // 更新バナーの表示ON/OFF。一旦非表示にする場合は false。戻す時は true に。
 const BANNER_ENABLED = false;
