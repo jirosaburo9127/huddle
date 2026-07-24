@@ -46,6 +46,10 @@ export async function pickCompressAndUploadVideos(params: VideoUploadParams): Pr
 
   const requestId = `vc_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
+  // 進捗オーバーレイの表示ON（VideoUploadProgressHost が拾う）
+  window.dispatchEvent(new CustomEvent("huddle:videoUploadState", { detail: { active: true } }));
+
+  try {
   const urls: string[] = await new Promise<string[]>((resolve, reject) => {
     const onResult = (e: Event) => {
       const detail = (e as CustomEvent<CompressEventDetail>).detail;
@@ -71,4 +75,8 @@ export async function pickCompressAndUploadVideos(params: VideoUploadParams): Pr
 
   // アップロード対応ビルドのみ http(s) の公開URLが返る（旧ビルドはローカルパスなので除外）
   return urls.filter((u) => /^https?:\/\//.test(u));
+  } finally {
+    // 進捗オーバーレイの表示OFF
+    window.dispatchEvent(new CustomEvent("huddle:videoUploadState", { detail: { active: false } }));
+  }
 }
