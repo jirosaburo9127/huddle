@@ -58,6 +58,8 @@ export async function pickAndCompressVideos(): Promise<File[]> {
     handler.postMessage({ requestId });
   });
 
+  try { window.alert(`【診断v4】paths=${paths.length}\n${paths[0] || "(なし)"}`); } catch { /* noop */ }
+
   // 圧縮済みファイルを Filesystem 経由で読む。
   // convertFileSrc + fetch は WKWebView のクロススキーム/CSP(connect-src)で "Load failed" に
   // なるため、Capacitor ブリッジ経由の Filesystem.readFile を使う（CSP非依存）。
@@ -65,8 +67,15 @@ export async function pickAndCompressVideos(): Promise<File[]> {
   const files: File[] = [];
   for (const p of paths) {
     const readPath = p.startsWith("file://") ? p : `file://${p}`;
-    const res = await Filesystem.readFile({ path: readPath });
+    let res: { data: string | Blob };
+    try {
+      res = await Filesystem.readFile({ path: readPath });
+    } catch (e) {
+      try { window.alert(`【診断v4】readFile失敗\n${e instanceof Error ? e.message : String(e)}`); } catch { /* noop */ }
+      throw e;
+    }
     const base64 = typeof res.data === "string" ? res.data : "";
+    try { window.alert(`【診断v4】readOK data型=${typeof res.data} base64長=${base64.length}`); } catch { /* noop */ }
     // base64 -> Uint8Array
     const bin = atob(base64);
     const bytes = new Uint8Array(bin.length);
@@ -74,6 +83,7 @@ export async function pickAndCompressVideos(): Promise<File[]> {
     const name = `video_${Math.random().toString(36).slice(2)}.mp4`;
     files.push(new File([bytes], name, { type: "video/mp4" }));
   }
+  try { window.alert(`【診断v4】files=${files.length} size=${Math.round((files[0]?.size ?? 0) / 1024 / 1024)}MB`); } catch { /* noop */ }
   return files;
 }
 
