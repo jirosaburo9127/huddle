@@ -347,14 +347,14 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
           key={m.user_id}
           src={m.avatar_url}
           alt={m.display_name || "メンバー"}
-          className="w-5 h-5 rounded-full object-cover shrink-0"
+          className="w-4 h-4 lg:w-5 lg:h-5 rounded-full object-cover shrink-0"
         />
       ) : (
         <div
           key={m.user_id}
-          className="w-5 h-5 rounded-full bg-muted/20 flex items-center justify-center shrink-0"
+          className="w-4 h-4 lg:w-5 lg:h-5 rounded-full bg-muted/20 flex items-center justify-center shrink-0"
         >
-          <span className="text-[9px] font-medium text-accent">
+          <span className="text-[8px] lg:text-[9px] font-medium text-accent">
             {(m.display_name || "?").charAt(0).toUpperCase()}
           </span>
         </div>
@@ -2235,7 +2235,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
         {!channel.is_dm && !channel.is_hitorigoto && memberReadTimes.length > 0 && (
           <button
             onClick={() => setShowMembersModal(true)}
-            className="lg:hidden flex items-center gap-1 pl-[46px] pr-3 sm:pl-[50px] sm:pr-4 py-0 -mt-2 bg-surface border-b border-border shrink-0 overflow-x-auto [&::-webkit-scrollbar]:hidden hover:bg-sidebar-hover/40 transition-colors"
+            className="lg:hidden flex items-center gap-1 pl-[46px] pr-3 sm:pl-[50px] sm:pr-4 pt-0 pb-1.5 -mt-3 bg-surface border-b border-border shrink-0 overflow-x-auto [&::-webkit-scrollbar]:hidden hover:bg-sidebar-hover/40 transition-colors"
             aria-label={`参加メンバー ${memberReadTimes.length}人`}
             title={`参加メンバー ${memberReadTimes.length}人`}
           >
