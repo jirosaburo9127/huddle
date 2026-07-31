@@ -2235,7 +2235,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
         {!channel.is_dm && !channel.is_hitorigoto && memberReadTimes.length > 0 && (
           <button
             onClick={() => setShowMembersModal(true)}
-            className="lg:hidden flex items-center justify-end gap-1 px-3 sm:px-4 py-0.5 bg-surface border-b border-border shrink-0 overflow-x-auto [&::-webkit-scrollbar]:hidden hover:bg-sidebar-hover/40 transition-colors"
+            className="lg:hidden flex items-center gap-1 pl-[46px] pr-3 sm:pl-[50px] sm:pr-4 py-0 -mt-2 bg-surface border-b border-border shrink-0 overflow-x-auto [&::-webkit-scrollbar]:hidden hover:bg-sidebar-hover/40 transition-colors"
             aria-label={`参加メンバー ${memberReadTimes.length}人`}
             title={`参加メンバー ${memberReadTimes.length}人`}
           >
