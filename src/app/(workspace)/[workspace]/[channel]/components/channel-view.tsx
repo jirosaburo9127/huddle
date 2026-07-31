@@ -1843,47 +1843,6 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
             )}
           </div>
           <div className="flex items-center shrink-0 ml-auto lg:pr-2">
-            {/* 参加メンバーを一目で表示（DM・独り言では非表示）。
-                先頭数名のアバターを少し重ねて並べ、タップでメンバー一覧モーダルを開く。
-                データは memberReadTimes（channel_members を10秒ごとに取得）を流用。 */}
-            {!channel.is_dm && !channel.is_hitorigoto && memberReadTimes.length > 0 && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowMembersModal(true);
-                }}
-                className="flex items-center mr-1 hover:opacity-80 transition-opacity"
-                aria-label={`参加メンバー ${memberReadTimes.length}人`}
-                title={`参加メンバー ${memberReadTimes.length}人`}
-              >
-                <div className="flex items-center">
-                  {memberReadTimes.slice(0, 5).map((m, i) =>
-                    m.avatar_url ? (
-                      <img
-                        key={m.user_id}
-                        src={m.avatar_url}
-                        alt={m.display_name || "メンバー"}
-                        className="w-[22px] h-[22px] rounded-full object-cover ring-2 ring-surface"
-                        style={{ marginLeft: i === 0 ? 0 : -6, zIndex: 5 - i }}
-                      />
-                    ) : (
-                      <div
-                        key={m.user_id}
-                        className="w-[22px] h-[22px] rounded-full bg-muted/20 flex items-center justify-center ring-2 ring-surface"
-                        style={{ marginLeft: i === 0 ? 0 : -6, zIndex: 5 - i }}
-                      >
-                        <span className="text-[10px] font-medium text-accent">
-                          {(m.display_name || "?").charAt(0).toUpperCase()}
-                        </span>
-                      </div>
-                    )
-                  )}
-                </div>
-                {memberReadTimes.length > 5 && (
-                  <span className="ml-1 text-xs font-medium text-muted">+{memberReadTimes.length - 5}</span>
-                )}
-              </button>
-            )}
             {/* 全ての操作は ⋯ メニューに集約（タイトルが長くても崩れない） */}
             <div className="relative" ref={overflowMenuRef}>
               <button
@@ -2234,6 +2193,38 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
             </div>
           </div>
         </header>
+
+        {/* 参加メンバーを一目で（ヘッダー下・小アイコン横並び）。多い時は横スクロール。タップでメンバー一覧。
+            データは memberReadTimes（channel_members を10秒ごとに取得）を流用。DM・独り言では非表示。 */}
+        {!channel.is_dm && !channel.is_hitorigoto && memberReadTimes.length > 0 && (
+          <button
+            onClick={() => setShowMembersModal(true)}
+            className="flex items-center gap-1 px-3 sm:px-4 lg:px-9 py-1.5 bg-surface border-b border-border shrink-0 overflow-x-auto [&::-webkit-scrollbar]:hidden hover:bg-sidebar-hover/40 transition-colors"
+            aria-label={`参加メンバー ${memberReadTimes.length}人`}
+            title={`参加メンバー ${memberReadTimes.length}人`}
+          >
+            {memberReadTimes.map((m) =>
+              m.avatar_url ? (
+                <img
+                  key={m.user_id}
+                  src={m.avatar_url}
+                  alt={m.display_name || "メンバー"}
+                  className="w-5 h-5 rounded-full object-cover shrink-0"
+                />
+              ) : (
+                <div
+                  key={m.user_id}
+                  className="w-5 h-5 rounded-full bg-muted/20 flex items-center justify-center shrink-0"
+                >
+                  <span className="text-[9px] font-medium text-accent">
+                    {(m.display_name || "?").charAt(0).toUpperCase()}
+                  </span>
+                </div>
+              )
+            )}
+            <span className="ml-1 text-[11px] text-muted shrink-0">{memberReadTimes.length}人</span>
+          </button>
+        )}
 
         {/* 検索結果に戻るバー */}
         {searchParams?.get("from") === "search" && (
