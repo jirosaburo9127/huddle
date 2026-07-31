@@ -224,7 +224,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
   const [unreadLineState, setUnreadLineState] = useState<"visible" | "fading" | "hidden">("visible");
 
   // 既読状態: チャンネルメンバーの last_read_at を取得して既読数を計算
-  const [memberReadTimes, setMemberReadTimes] = useState<Array<{ user_id: string; last_read_at: string | null; display_name?: string }>>([]);
+  const [memberReadTimes, setMemberReadTimes] = useState<Array<{ user_id: string; last_read_at: string | null; display_name?: string; avatar_url?: string | null }>>([]);
   const memberCountForRead = memberReadTimes.filter((m) => m.user_id !== currentUserId).length;
   // メンション表示用の workspace メンバー名リスト (display_name 配列)
   // メッセージ本文の @<name> を厳密にマッチさせるために使う
@@ -269,12 +269,13 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
     async function fetchReadTimes() {
       const { data } = await supabase
         .from("channel_members")
-        .select("user_id, last_read_at, profiles(display_name)")
+        .select("user_id, last_read_at, profiles(id, display_name, avatar_url)")
         .eq("channel_id", channel.id);
       if (!cancelled && data) {
         setMemberReadTimes(data.map((m: Record<string, unknown>) => {
-          const p = m.profiles as { display_name: string } | null;
-          return { user_id: m.user_id as string, last_read_at: m.last_read_at as string | null, display_name: p?.display_name || undefined };
+          const raw = m.profiles as { display_name: string; avatar_url: string | null } | { display_name: string; avatar_url: string | null }[] | null;
+          const p = Array.isArray(raw) ? raw[0] : raw;
+          return { user_id: m.user_id as string, last_read_at: m.last_read_at as string | null, display_name: p?.display_name || undefined, avatar_url: p?.avatar_url ?? null };
         }));
       }
     }
@@ -1842,16 +1843,45 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
             )}
           </div>
           <div className="flex items-center shrink-0 ml-auto lg:pr-2">
-            {/* モバイル: メンバー管理ボタン（DMでは非表示） */}
-            {!channel.is_dm && (
+            {/* 参加メンバーを一目で表示（DM・独り言では非表示）。
+                先頭数名のアバターを少し重ねて並べ、タップでメンバー一覧モーダルを開く。
+                データは memberReadTimes（channel_members を10秒ごとに取得）を流用。 */}
+            {!channel.is_dm && !channel.is_hitorigoto && memberReadTimes.length > 0 && (
               <button
-                onClick={() => setShowMembersModal(true)}
-                className="lg:hidden p-1.5 text-muted hover:text-foreground rounded-lg transition-colors"
-                aria-label="メンバー管理"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowMembersModal(true);
+                }}
+                className="flex items-center mr-1 hover:opacity-80 transition-opacity"
+                aria-label={`参加メンバー ${memberReadTimes.length}人`}
+                title={`参加メンバー ${memberReadTimes.length}人`}
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
-                </svg>
+                <div className="flex items-center">
+                  {memberReadTimes.slice(0, 5).map((m, i) =>
+                    m.avatar_url ? (
+                      <img
+                        key={m.user_id}
+                        src={m.avatar_url}
+                        alt={m.display_name || "メンバー"}
+                        className="w-[22px] h-[22px] rounded-full object-cover ring-2 ring-surface"
+                        style={{ marginLeft: i === 0 ? 0 : -6, zIndex: 5 - i }}
+                      />
+                    ) : (
+                      <div
+                        key={m.user_id}
+                        className="w-[22px] h-[22px] rounded-full bg-muted/20 flex items-center justify-center ring-2 ring-surface"
+                        style={{ marginLeft: i === 0 ? 0 : -6, zIndex: 5 - i }}
+                      >
+                        <span className="text-[10px] font-medium text-accent">
+                          {(m.display_name || "?").charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                    )
+                  )}
+                </div>
+                {memberReadTimes.length > 5 && (
+                  <span className="ml-1 text-xs font-medium text-muted">+{memberReadTimes.length - 5}</span>
+                )}
               </button>
             )}
             {/* 全ての操作は ⋯ メニューに集約（タイトルが長くても崩れない） */}
