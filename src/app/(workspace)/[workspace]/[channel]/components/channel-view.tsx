@@ -339,6 +339,28 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
       .map((m) => m.display_name || "不明");
   }, [memberReadTimes, currentUserId, workspaceSlug]);
 
+  // 参加メンバーのアバター群（PCヘッダー名の横・モバイルのヘッダー下帯で共用）
+  const renderMemberAvatars = () =>
+    memberReadTimes.map((m) =>
+      m.avatar_url ? (
+        <img
+          key={m.user_id}
+          src={m.avatar_url}
+          alt={m.display_name || "メンバー"}
+          className="w-5 h-5 rounded-full object-cover shrink-0"
+        />
+      ) : (
+        <div
+          key={m.user_id}
+          className="w-5 h-5 rounded-full bg-muted/20 flex items-center justify-center shrink-0"
+        >
+          <span className="text-[9px] font-medium text-accent">
+            {(m.display_name || "?").charAt(0).toUpperCase()}
+          </span>
+        </div>
+      )
+    );
+
   // ミュート状態のみ取得 (myLastReadAt の設定は上の既読化 effect に一元化)
   useEffect(() => {
     (async () => {
@@ -1841,6 +1863,20 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                 {channel.topic}
               </span>
             )}
+            {/* PC: 参加メンバーをヘッダー名の横に横並び（多い時は横スクロール）。タップでメンバー一覧 */}
+            {!channel.is_dm && !channel.is_hitorigoto && memberReadTimes.length > 0 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowMembersModal(true);
+                }}
+                className="hidden lg:flex items-center gap-1 shrink-0 ml-3 max-w-[45%] overflow-x-auto [&::-webkit-scrollbar]:hidden hover:opacity-80 transition-opacity"
+                aria-label={`参加メンバー ${memberReadTimes.length}人`}
+                title={`参加メンバー ${memberReadTimes.length}人`}
+              >
+                {renderMemberAvatars()}
+              </button>
+            )}
           </div>
           <div className="flex items-center shrink-0 ml-auto lg:pr-2">
             {/* 全ての操作は ⋯ メニューに集約（タイトルが長くても崩れない） */}
@@ -2194,34 +2230,16 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
           </div>
         </header>
 
-        {/* 参加メンバーを一目で（ヘッダー下・小アイコン横並び）。多い時は横スクロール。タップでメンバー一覧。
-            データは memberReadTimes（channel_members を10秒ごとに取得）を流用。DM・独り言では非表示。 */}
+        {/* モバイル: 参加メンバーをヘッダー下に右寄せで横並び（間隔は詰めてヘッダー名寄り）。
+            多い時は横スクロール。タップでメンバー一覧。PCはヘッダー名の横に表示するのでここは lg:hidden。 */}
         {!channel.is_dm && !channel.is_hitorigoto && memberReadTimes.length > 0 && (
           <button
             onClick={() => setShowMembersModal(true)}
-            className="flex items-center gap-1 px-3 sm:px-4 lg:px-9 py-1.5 bg-surface border-b border-border shrink-0 overflow-x-auto [&::-webkit-scrollbar]:hidden hover:bg-sidebar-hover/40 transition-colors"
+            className="lg:hidden flex items-center justify-end gap-1 px-3 sm:px-4 py-0.5 bg-surface border-b border-border shrink-0 overflow-x-auto [&::-webkit-scrollbar]:hidden hover:bg-sidebar-hover/40 transition-colors"
             aria-label={`参加メンバー ${memberReadTimes.length}人`}
             title={`参加メンバー ${memberReadTimes.length}人`}
           >
-            {memberReadTimes.map((m) =>
-              m.avatar_url ? (
-                <img
-                  key={m.user_id}
-                  src={m.avatar_url}
-                  alt={m.display_name || "メンバー"}
-                  className="w-5 h-5 rounded-full object-cover shrink-0"
-                />
-              ) : (
-                <div
-                  key={m.user_id}
-                  className="w-5 h-5 rounded-full bg-muted/20 flex items-center justify-center shrink-0"
-                >
-                  <span className="text-[9px] font-medium text-accent">
-                    {(m.display_name || "?").charAt(0).toUpperCase()}
-                  </span>
-                </div>
-              )
-            )}
+            {renderMemberAvatars()}
             <span className="ml-1 text-[11px] text-muted shrink-0">{memberReadTimes.length}人</span>
           </button>
         )}
