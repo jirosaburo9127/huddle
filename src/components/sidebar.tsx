@@ -669,7 +669,7 @@ export function Sidebar({
           schema: "public",
           table: "messages",
         },
-        (payload: RealtimePostgresInsertPayload<Message>) => {
+        async (payload: RealtimePostgresInsertPayload<Message>) => {
           const msg = payload.new;
 
           // 決定登録のシステムメッセージ → 決定事項バッジを再取得
@@ -713,9 +713,7 @@ export function Sidebar({
             return;
           }
 
-          // 表示中チャンネル → ChannelView 側の Realtime ハンドラが mark_channel_read を実行し
-          // huddle:channelRead イベントで通知してくる。Sidebar はバッジを即時に消すだけ。
-          // (RPC を二重に呼ばないことで責務分離を維持し、ChannelView を唯一の既読源にする)
+          // 表示中チャンネル → バッジを即時に消すだけ。通知は出さない（見ているので）。
           if (msg.channel_id === currentChannelId) {
             setUnreadState((prev) => {
               if (!prev[msg.channel_id]) return prev;
@@ -724,16 +722,24 @@ export function Sidebar({
               return next;
             });
             lastOptimisticReadRef.current.set(msg.channel_id, Date.now());
-          } else {
-            // 未読カウント増加。返信もメインフィードに表示されるため、サーバの get_unread_counts と
-            // 一致させて（parent_id を除外せず）返信も1件として数える。
-            setUnreadState((prev) => ({
-              ...prev,
-              [msg.channel_id]: (prev[msg.channel_id] || 0) + 1,
-            }));
+            return;
           }
 
-          // ブラウザ通知 — 返信含むすべてのメッセージで通知（LINE方式）
+          // 見ていないチャンネル: 「自分に関係するメッセージ」だけバッジ＋通知する。
+          // 対象 = @自分 / @all / 自分への返信 / DM。一般の雑談はバッジも通知も出さない。
+          // ※リアクションはメッセージではないので5秒ポーリング(get_unread_counts)で拾う。
+          const { data: relevant } = await supabase.rpc("is_message_relevant_to_user", {
+            p_message_id: msg.id,
+            p_user_id: currentUserId,
+          });
+          if (!relevant) return;
+
+          setUnreadState((prev) => ({
+            ...prev,
+            [msg.channel_id]: (prev[msg.channel_id] || 0) + 1,
+          }));
+
+          // ブラウザ通知
           const senderName = memberNameById.get(msg.user_id) || "メンバー";
           let channelLabel = ch.name;
           if (ch.is_dm) {

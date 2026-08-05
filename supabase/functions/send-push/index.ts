@@ -314,18 +314,50 @@ Deno.serve(async (req) => {
         ? `/${workspaceSlug}/${channel.slug}?m=${record.id}`
         : "/";
 
-    // 受信者: チャンネルメンバー全員（送信者除外）— LINE方式
-    // スレッド返信・通常メッセージ・投票・決定事項すべて同一ロジック
+    // 受信者: 「自分に関係する」ユーザーだけに絞る（従来のLINE方式=全員通知をやめる）。
+    // 対象 = @自分 / @all(mention_type=channel,here) / 自分への返信(親の著者+スレッド参加者) / DM。
+    // ※リアクションはメッセージではないため、このメッセージwebhookでは扱わない（別途）。
     const recipientIdsSet = new Set<string>();
-    {
-      const { data: members } = await supabase
-        .from("channel_members")
-        .select("user_id")
-        .eq("channel_id", record.channel_id)
-        .neq("user_id", record.user_id);
-      for (const m of members || []) {
-        recipientIdsSet.add(m.user_id);
+
+    // チャンネルメンバー（送信者除外）— @all判定と所属確認に使う
+    const { data: memberRows } = await supabase
+      .from("channel_members")
+      .select("user_id")
+      .eq("channel_id", record.channel_id)
+      .neq("user_id", record.user_id);
+    const memberIds = new Set<string>((memberRows || []).map((m) => m.user_id));
+
+    if (channel.is_dm) {
+      // DM: 相手全員に通知
+      for (const id of memberIds) recipientIdsSet.add(id);
+    } else {
+      // メンション（@自分 / @all）
+      const { data: mnRows } = await supabase
+        .from("mentions")
+        .select("mentioned_user_id, mention_type")
+        .eq("message_id", record.id);
+      let broadcast = false;
+      for (const mn of mnRows || []) {
+        if (mn.mention_type === "channel" || mn.mention_type === "here") broadcast = true;
+        else if (mn.mentioned_user_id) recipientIdsSet.add(mn.mentioned_user_id);
       }
+      if (broadcast) for (const id of memberIds) recipientIdsSet.add(id);
+
+      // 自分への返信: 親メッセージの著者 + これまでのスレッド参加者
+      if (record.parent_id) {
+        const { data: parent } = await supabase
+          .from("messages").select("user_id").eq("id", record.parent_id).maybeSingle();
+        if (parent?.user_id) recipientIdsSet.add(parent.user_id);
+        const { data: threadMsgs } = await supabase
+          .from("messages").select("user_id").eq("parent_id", record.parent_id);
+        for (const tm of threadMsgs || []) recipientIdsSet.add(tm.user_id);
+      }
+    }
+
+    // 送信者を除外し、チャンネルメンバーに限定する
+    recipientIdsSet.delete(record.user_id);
+    for (const id of [...recipientIdsSet]) {
+      if (!memberIds.has(id)) recipientIdsSet.delete(id);
     }
 
     if (recipientIdsSet.size === 0) {
