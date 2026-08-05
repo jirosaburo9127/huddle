@@ -671,7 +671,6 @@ export function Sidebar({
         },
         (payload: RealtimePostgresInsertPayload<Message>) => {
           const msg = payload.new;
-          const isReply = !!msg.parent_id;
 
           // 決定登録のシステムメッセージ → 決定事項バッジを再取得
           if (msg.system_event === "decision_marked") {
@@ -726,13 +725,12 @@ export function Sidebar({
             });
             lastOptimisticReadRef.current.set(msg.channel_id, Date.now());
           } else {
-            // 未読カウント増加（返信メッセージはサーバー側 get_unread_counts と一致させるためスキップ）
-            if (!isReply) {
-              setUnreadState((prev) => ({
-                ...prev,
-                [msg.channel_id]: (prev[msg.channel_id] || 0) + 1,
-              }));
-            }
+            // 未読カウント増加。返信もメインフィードに表示されるため、サーバの get_unread_counts と
+            // 一致させて（parent_id を除外せず）返信も1件として数える。
+            setUnreadState((prev) => ({
+              ...prev,
+              [msg.channel_id]: (prev[msg.channel_id] || 0) + 1,
+            }));
           }
 
           // ブラウザ通知 — 返信含むすべてのメッセージで通知（LINE方式）
