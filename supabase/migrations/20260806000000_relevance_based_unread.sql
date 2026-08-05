@@ -1,7 +1,8 @@
 -- 未読バッジ／通知を「自分に関係するものだけ」に作り替える。
--- 通常チャンネルの未読 = 自分への返信 / @自分 / @all(mention_type='channel') / 自分の投稿へのリアクション。
+-- 通常チャンネルの未読 = 自分への返信 / @自分 / @all(mention_type='channel')。
 -- DMチャンネルは全メッセージが対象（DM自体が自分宛のため）。
 -- 一般の雑談メッセージはバッジを付けない（従来は全メッセージをカウントしていた）。
+-- リアクションはチャンネルバッジに含めない（幽霊バッジ回避。アクティビティ/ベルで拾う）。
 
 -- 1メッセージが自分に関係するか判定（クライアントのRealtimeハンドラから使う）
 CREATE OR REPLACE FUNCTION public.is_message_relevant_to_user(p_message_id uuid, p_user_id uuid)
@@ -54,39 +55,28 @@ BEGIN
   IF auth.uid() IS NOT NULL AND p_user_id IS DISTINCT FROM auth.uid() THEN
     RAISE EXCEPTION 'unauthorized: p_user_id must match auth.uid()';
   END IF;
+  -- 注: リアクションはチャンネルバッジに含めない（「新着メッセージが無いのにバッジ＝幽霊バッジ」に
+  -- なり分かりづらいため）。自分へのリアクションはアクティビティ(ベル)側で拾う。
   RETURN QUERY
   WITH mem AS (
     SELECT cm.channel_id AS ch, COALESCE(cm.last_read_at, cm.joined_at) AS since, c.is_dm
     FROM channel_members cm
     JOIN channels c ON c.id = cm.channel_id
     WHERE cm.user_id = p_user_id
-  ),
-  items AS (
-    -- 関連メッセージ（DMは全部 / それ以外は 返信to me・@me・@all）
-    SELECT mem.ch AS ch, m.id AS item_id
-    FROM mem
-    JOIN messages m ON m.channel_id = mem.ch
-      AND m.created_at > mem.since
-      AND m.deleted_at IS NULL
-      AND m.user_id <> p_user_id
-    WHERE mem.is_dm
-       OR (m.parent_id IS NOT NULL AND EXISTS (
-             SELECT 1 FROM messages pm WHERE pm.id = m.parent_id AND pm.user_id = p_user_id))
-       OR EXISTS (
-             SELECT 1 FROM mentions mn WHERE mn.message_id = m.id
-               AND (mn.mentioned_user_id = p_user_id OR mn.mention_type = 'channel'))
-    UNION ALL
-    -- 自分の投稿へのリアクション
-    SELECT mem.ch AS ch, r.id AS item_id
-    FROM mem
-    JOIN messages m ON m.channel_id = mem.ch AND m.user_id = p_user_id AND m.deleted_at IS NULL
-    JOIN reactions r ON r.message_id = m.id
-      AND r.user_id <> p_user_id
-      AND r.created_at > mem.since
   )
-  SELECT items.ch, COUNT(*)::bigint
-  FROM items
-  GROUP BY items.ch
+  SELECT mem.ch, COUNT(*)::bigint
+  FROM mem
+  JOIN messages m ON m.channel_id = mem.ch
+    AND m.created_at > mem.since
+    AND m.deleted_at IS NULL
+    AND m.user_id <> p_user_id
+  WHERE mem.is_dm
+     OR (m.parent_id IS NOT NULL AND EXISTS (
+           SELECT 1 FROM messages pm WHERE pm.id = m.parent_id AND pm.user_id = p_user_id))
+     OR EXISTS (
+           SELECT 1 FROM mentions mn WHERE mn.message_id = m.id
+             AND (mn.mentioned_user_id = p_user_id OR mn.mention_type = 'channel'))
+  GROUP BY mem.ch
   HAVING COUNT(*) > 0;
 END;
 $function$;
