@@ -725,21 +725,19 @@ export function Sidebar({
             return;
           }
 
-          // 見ていないチャンネル: 「自分に関係するメッセージ」だけバッジ＋通知する。
-          // 対象 = @自分 / @all / 自分への返信 / DM。一般の雑談はバッジも通知も出さない。
-          // ※リアクションはメッセージではないので5秒ポーリング(get_unread_counts)で拾う。
+          // バッジ: 「自分に関係するメッセージ」(返信/@自分/@all/DM)のときだけ付ける。
           const { data: relevant } = await supabase.rpc("is_message_relevant_to_user", {
             p_message_id: msg.id,
             p_user_id: currentUserId,
           });
-          if (!relevant) return;
+          if (relevant) {
+            setUnreadState((prev) => ({
+              ...prev,
+              [msg.channel_id]: (prev[msg.channel_id] || 0) + 1,
+            }));
+          }
 
-          setUnreadState((prev) => ({
-            ...prev,
-            [msg.channel_id]: (prev[msg.channel_id] || 0) + 1,
-          }));
-
-          // ブラウザ通知
+          // ブラウザ通知: 要望により、自分宛でなくてもメンションが無くても全メッセージで出す。
           const senderName = memberNameById.get(msg.user_id) || "メンバー";
           let channelLabel = ch.name;
           if (ch.is_dm) {
