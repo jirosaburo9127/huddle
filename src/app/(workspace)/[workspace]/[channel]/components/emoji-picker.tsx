@@ -17,7 +17,7 @@ export const EMOJI_LIST: EmojiGroup[] = [
   { kind: "emoji", category: "よく使う", emojis: ["👍", "❤️", "😂", "🎉", "🔥", "👀", "💯", "✅", "🚀"] },
   { kind: "emoji", category: "表情", emojis: ["😊", "😄", "🤔", "😮", "😢", "😡", "🥳", "😎"] },
   { kind: "emoji", category: "ジェスチャー", emojis: ["👏", "🙌", "🤝", "💪", "✌️", "🫡", "👋", "🙏"] },
-  { kind: "text", category: "テキスト", emojis: ["完了しました！", "了解しました！", "確認中です", "対応いたします", "ありがとうございます！", "お疲れ様です！", "禿同", "かしこ", "m9", "それな", "あざます", "orz"] },
+  { kind: "text", category: "テキスト", emojis: ["承知いたしました！", "よろしくお願いいたします！", "完了しました！", "了解しました！", "確認中です", "対応いたします", "ありがとうございます！", "お疲れ様です！", "禿同", "かしこ", "m9", "それな", "あざます", "orz"] },
 ];
 
 export function EmojiPicker({ onSelect, onClose, position = "below" }: Props) {
