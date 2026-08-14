@@ -1408,6 +1408,22 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
     );
   }, [supabase]);
 
+  // 会話を整理（複数選択して一括削除）モード
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+  const exitSelection = useCallback(() => {
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  }, []);
+
   // メッセージ削除（ソフトデリート）
   const handleDelete = useCallback(async (messageId: string) => {
     setMessages((prev) =>
@@ -1436,6 +1452,23 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
       }
     }
   }, [supabase]);
+
+  // 会話整理: 選択したメッセージを一括で soft-delete
+  const bulkDelete = useCallback(async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    if (!confirm(`選択した ${ids.length} 件のメッセージを削除しますか？`)) return;
+    const idSet = new Set(ids);
+    // 楽観的に削除表示 → RPCで一括soft-delete
+    setMessages((prev) =>
+      prev.map((m) => (idSet.has(m.id) ? { ...m, deleted_at: new Date().toISOString() } : m))
+    );
+    exitSelection();
+    const { error } = await supabase.rpc("soft_delete_messages", { p_message_ids: ids });
+    if (error) {
+      alert("削除に失敗しました: " + error.message);
+    }
+  }, [selectedIds, supabase, exitSelection]);
 
   // リアクション追加/削除（トグル）
   // 依存配列に messages を入れないことで、メッセージ追加のたびに
@@ -1942,6 +1975,22 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                     </button>
                   )}
 
+                  {/* 会話を整理（複数選択して一括削除） */}
+                  <button
+                    role="menuitem"
+                    onClick={() => {
+                      setShowOverflowMenu(false);
+                      setSelectedIds(new Set());
+                      setSelectionMode(true);
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-sidebar-hover transition-colors text-foreground"
+                  >
+                    <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    会話を整理
+                  </button>
+
                   {/* ミュートトグル */}
                   <button
                     role="menuitem"
@@ -2394,23 +2443,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                     new Date(prev.created_at).getTime() <= lastReadTime;
                   const showUnreadLine = isNewForMe && prevTreatedAsSeen && unreadLineState !== "hidden";
 
-                  return (
-                    <div key={message.id}>
-                      {showUnreadLine && (
-                        <div
-                          ref={unreadLineRef}
-                          className={`flex items-center gap-2 my-5 px-2 transition-opacity duration-500 ${
-                            unreadLineState === "fading" ? "opacity-0" : "opacity-100"
-                          }`}
-                        >
-                          <div className="flex-1 border-t-2 border-accent" />
-                          <span className="text-[11px] font-bold text-white bg-accent rounded-full px-2.5 py-0.5 shrink-0">ここから未読</span>
-                          <div className="flex-1 border-t-2 border-accent" />
-                        </div>
-                      )}
-                      {showDateSeparator && (
-                        <DateSeparator date={message.created_at} />
-                      )}
+                  const messageItemEl = (
                       <MessageItem
                         message={message}
                         parentMessage={parentMessage}
@@ -2436,6 +2469,45 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                         memberNames={workspaceMemberNames}
                         isDm={channel.is_dm}
                       />
+                  );
+
+                  return (
+                    <div key={message.id}>
+                      {showUnreadLine && (
+                        <div
+                          ref={unreadLineRef}
+                          className={`flex items-center gap-2 my-5 px-2 transition-opacity duration-500 ${
+                            unreadLineState === "fading" ? "opacity-0" : "opacity-100"
+                          }`}
+                        >
+                          <div className="flex-1 border-t-2 border-accent" />
+                          <span className="text-[11px] font-bold text-white bg-accent rounded-full px-2.5 py-0.5 shrink-0">ここから未読</span>
+                          <div className="flex-1 border-t-2 border-accent" />
+                        </div>
+                      )}
+                      {showDateSeparator && (
+                        <DateSeparator date={message.created_at} />
+                      )}
+                      {selectionMode ? (
+                        <div
+                          onClick={() => toggleSelect(message.id)}
+                          className={`flex items-start gap-2 rounded-lg cursor-pointer px-1 -mx-1 ${
+                            selectedIds.has(message.id) ? "bg-accent/10" : "hover:bg-sidebar-hover"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            readOnly
+                            checked={selectedIds.has(message.id)}
+                            className="mt-3 shrink-0 w-4 h-4 accent-accent pointer-events-none"
+                          />
+                          <div className="flex-1 min-w-0 pointer-events-none select-none">
+                            {messageItemEl}
+                          </div>
+                        </div>
+                      ) : (
+                        messageItemEl
+                      )}
                     </div>
                   );
                 });
@@ -2443,6 +2515,28 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
             </div>
           )}
         </div>
+
+        {/* 会話整理: 選択中の一括削除バー */}
+        {selectionMode && (
+          <div className="absolute bottom-0 left-0 right-0 z-30 bg-surface border-t border-border px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex items-center gap-3">
+            <span className="text-sm font-medium flex-1">{selectedIds.size}件を選択中</span>
+            <button
+              type="button"
+              onClick={exitSelection}
+              className="px-4 py-2 text-sm rounded-lg text-muted hover:bg-sidebar-hover transition-colors"
+            >
+              キャンセル
+            </button>
+            <button
+              type="button"
+              onClick={bulkDelete}
+              disabled={selectedIds.size === 0}
+              className="px-4 py-2 text-sm font-semibold rounded-lg text-white bg-mention disabled:opacity-40 transition-colors"
+            >
+              選択を削除
+            </button>
+          </div>
+        )}
 
         {/* 最新へスクロールボタン */}
         {showScrollToBottom && (
