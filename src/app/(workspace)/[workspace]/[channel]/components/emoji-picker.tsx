@@ -1,6 +1,12 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  loadReactionPrefs,
+  saveReactionPrefs,
+  getCachedReactionPrefs,
+  type ReactionPrefs,
+} from "@/lib/reaction-prefs";
 
 type Props = {
   onSelect: (emoji: string) => void;
@@ -25,6 +31,21 @@ export function EmojiPicker({ onSelect, onClose, position = "below" }: Props) {
   // マウント時にビューポートから溢れていないかチェックし、必要なら水平方向へオフセットする
   const [xOffset, setXOffset] = useState(0);
 
+  // ユーザー個別のリアクション設定（追加した自分用候補 / 非表示にしたプリセット）
+  const [prefs, setPrefs] = useState<ReactionPrefs>(() => getCachedReactionPrefs());
+  const [editing, setEditing] = useState(false);
+  const [newReaction, setNewReaction] = useState("");
+
+  useEffect(() => {
+    let alive = true;
+    loadReactionPrefs().then((p) => {
+      if (alive) setPrefs(p);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   // 外側クリックで閉じる
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -43,7 +64,6 @@ export function EmojiPicker({ onSelect, onClose, position = "below" }: Props) {
   }, [onClose]);
 
   // マウント直後に画面内に収まるよう水平位置を補正（左右どちらにはみ出しても対応）
-  // DOM 測定後の補正なので useLayoutEffect でペイント前に反映し、ちらつきを防ぐ。
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -53,10 +73,40 @@ export function EmojiPicker({ onSelect, onClose, position = "below" }: Props) {
     if (rect.left < margin) dx = margin - rect.left;
     else if (rect.right > window.innerWidth - margin)
       dx = window.innerWidth - margin - rect.right;
-    // setState in effect は意図的（DOM 測定→state→再レンダーが目的）
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (dx !== 0) setXOffset(dx);
   }, []);
+
+  function persist(next: ReactionPrefs) {
+    setPrefs(next);
+    saveReactionPrefs(next);
+  }
+
+  function removeReaction(emoji: string, isCustom: boolean) {
+    if (isCustom) {
+      persist({ ...prefs, custom: prefs.custom.filter((e) => e !== emoji) });
+    } else {
+      // プリセットは「非表示」に追加（他人には影響しない）
+      persist({ ...prefs, hidden: prefs.hidden.includes(emoji) ? prefs.hidden : [...prefs.hidden, emoji] });
+    }
+  }
+
+  function addReaction() {
+    const v = newReaction.trim();
+    if (!v) return;
+    if (!prefs.custom.includes(v)) {
+      persist({ custom: [...prefs.custom, v], hidden: prefs.hidden.filter((h) => h !== v) });
+    }
+    setNewReaction("");
+  }
+
+  // 表示するグループ: マイリアクション(custom) + プリセット(非表示を除外)
+  const customGroup: EmojiGroup = { kind: "text", category: "マイリアクション", emojis: prefs.custom };
+  const presetGroups = EMOJI_LIST
+    .map((g) => ({ ...g, emojis: g.emojis.filter((e) => !prefs.hidden.includes(e)) }))
+    .filter((g) => g.emojis.length > 0);
+  const groups: EmojiGroup[] =
+    prefs.custom.length > 0 || editing ? [customGroup, ...presetGroups] : presetGroups;
 
   return (
     <div
@@ -66,40 +116,83 @@ export function EmojiPicker({ onSelect, onClose, position = "below" }: Props) {
         position === "above" ? "bottom-full mb-2" : "top-full mt-2"
       }`}
     >
-      {EMOJI_LIST.map((group, gi) => (
-        <div key={group.category}>
-          <p
-            className={`text-[11px] text-muted font-medium mb-1 ${gi === 0 ? "" : "mt-2"}`}
+      {/* ヘッダー: 編集トグル */}
+      <div className="flex items-center justify-between mb-1">
+        <p className="text-[11px] text-muted font-medium">リアクション</p>
+        <button
+          type="button"
+          onClick={() => setEditing((v) => !v)}
+          className="text-[11px] font-medium text-accent px-1.5 py-0.5 rounded hover:bg-white/[0.06] transition-colors"
+        >
+          {editing ? "完了" : "編集"}
+        </button>
+      </div>
+
+      {editing && (
+        <div className="flex gap-1 mb-2">
+          <input
+            value={newReaction}
+            onChange={(e) => setNewReaction(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                addReaction();
+              }
+            }}
+            placeholder="絵文字や短文を追加"
+            maxLength={40}
+            className="flex-1 min-w-0 px-2 py-1.5 rounded-lg bg-white/[0.04] border border-border/50 text-xs text-foreground outline-none focus:border-accent"
+          />
+          <button
+            type="button"
+            onClick={addReaction}
+            className="px-2.5 py-1.5 rounded-lg bg-accent text-white text-xs font-medium shrink-0"
           >
+            追加
+          </button>
+        </div>
+      )}
+
+      {groups.map((group, gi) => (
+        <div key={group.category}>
+          <p className={`text-[11px] text-muted font-medium mb-1 ${gi === 0 ? "" : "mt-2"}`}>
             {group.category}
           </p>
-          {group.kind === "text" ? (
-            <div className="flex flex-wrap gap-1">
-              {group.emojis.map((emoji) => (
-                <button
-                  key={emoji}
-                  type="button"
-                  onClick={() => onSelect(emoji)}
-                  className="px-2.5 py-1.5 rounded-lg border border-border/50 bg-white/[0.03] hover:bg-white/[0.06] cursor-pointer text-xs font-medium text-foreground transition-colors"
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="grid grid-cols-8 gap-1">
-              {group.emojis.map((emoji) => (
-                <button
-                  key={emoji}
-                  type="button"
-                  onClick={() => onSelect(emoji)}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/[0.06] cursor-pointer text-base transition-colors"
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
-          )}
+          <div className={group.kind === "text" ? "flex flex-wrap gap-1" : "grid grid-cols-8 gap-1"}>
+            {group.emojis.map((emoji) => {
+              const isCustom = prefs.custom.includes(emoji);
+              const chipClass =
+                group.kind === "text"
+                  ? "px-2.5 py-1.5 rounded-lg border border-border/50 bg-white/[0.03] text-xs font-medium text-foreground"
+                  : "w-8 h-8 flex items-center justify-center rounded-lg text-base";
+              return (
+                <span key={emoji} className="relative inline-flex">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!editing) onSelect(emoji);
+                    }}
+                    className={`${chipClass} ${editing ? "opacity-90" : "hover:bg-white/[0.06] cursor-pointer"} transition-colors`}
+                  >
+                    {emoji}
+                  </button>
+                  {editing && (
+                    <button
+                      type="button"
+                      onClick={() => removeReaction(emoji, isCustom)}
+                      aria-label="削除"
+                      className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-mention text-white text-[11px] leading-none flex items-center justify-center shadow"
+                    >
+                      ×
+                    </button>
+                  )}
+                </span>
+              );
+            })}
+            {editing && group.category === "マイリアクション" && group.emojis.length === 0 && (
+              <span className="text-[11px] text-muted py-1">上の欄から自分用の候補を追加できます</span>
+            )}
+          </div>
         </div>
       ))}
     </div>
