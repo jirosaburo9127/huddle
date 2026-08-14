@@ -615,6 +615,9 @@ export const MessageItem = memo(function MessageItem({
   const initial = (profile?.display_name || "?")[0].toUpperCase();
   // bot 投稿（みかん等）はメッセージ全体を薄いオレンジで区別する
   const isBot = !!profile?.is_bot;
+  // 会話整理のため、チャンネルメンバーなら誰でもメッセージを削除できる。
+  // （このコンポーネントは自分が参加しているチャンネルでのみ描画される。実権限は soft_delete_messages RPC で担保）
+  const canDelete = true;
   // オンライン判定: last_seen_atが5分以内
   const isOnline = profile?.last_seen_at
     ? Date.now() - new Date(profile.last_seen_at).getTime() < 5 * 60 * 1000
@@ -1021,7 +1024,7 @@ export const MessageItem = memo(function MessageItem({
                     <span style={{ fontSize: 12, color: "var(--color-foreground)" }}>編集</span>
                   </button>
                 )}
-                {(isOwn || isBot) && (
+                {canDelete && (
                   <button
                     onClick={() => { setShowActions(false); setIsDeleting(true); }}
                     style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "12px 0", borderRadius: 8, border: "none", background: "none", cursor: "pointer" }}
@@ -1546,7 +1549,7 @@ export const MessageItem = memo(function MessageItem({
                 </button>
               </>
             )}
-            {(isOwn || isBot) && (
+            {canDelete && (
               <button
                 onClick={(e) => { e.stopPropagation(); setIsDeleting(true); }}
                 className="flex items-center gap-1 px-2 py-0.5 text-[13px] text-muted hover:text-mention border border-transparent hover:border-border/50 rounded transition-colors"
@@ -1677,7 +1680,7 @@ export const MessageItem = memo(function MessageItem({
                 </button>
               )}
               {/* 削除（自分の投稿 or bot投稿は誰でも削除可） */}
-              {(isOwn || isBot) && (
+              {canDelete && (
                 <button
                   onClick={() => { setShowActions(false); setIsDeleting(true); }}
                   className="flex flex-col items-center gap-2 py-3 rounded-lg hover:bg-sidebar-hover transition-colors"

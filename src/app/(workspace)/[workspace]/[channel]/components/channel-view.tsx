@@ -1418,10 +1418,10 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
       )
     );
 
-    const { error } = await supabase
-      .from("messages")
-      .update({ deleted_at: new Date().toISOString() })
-      .eq("id", messageId);
+    // メンバーなら誰でも削除できるよう、権限を担保した専用RPCで soft-delete する
+    const { error } = await supabase.rpc("soft_delete_messages", {
+      p_message_ids: [messageId],
+    });
 
     if (error) {
       const { data } = await supabase
