@@ -18,6 +18,12 @@ export default function SettingsPage() {
   const [emailMsg, setEmailMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [archivedChannels, setArchivedChannels] = useState<Array<{ id: string; name: string }>>([]);
 
+  // パスワード変更用
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwMsg, setPwMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
   // メールアドレス + アーカイブ済みチャンネル取得
   useEffect(() => {
     (async () => {
@@ -136,6 +142,64 @@ export default function SettingsPage() {
             {emailMsg && (
               <div className={`rounded-lg px-3 py-2 text-sm ${emailMsg.type === "error" ? "bg-red-500/10 text-red-400" : "bg-green-500/10 text-green-400"}`}>
                 {emailMsg.text}
+              </div>
+            )}
+          </div>
+
+          {/* パスワード変更 */}
+          <div className="mb-4 space-y-2">
+            <label className="text-xs text-muted">パスワード</label>
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => { setNewPassword(e.target.value); setPwMsg(null); }}
+              placeholder="新しいパスワード（8文字以上）"
+              autoComplete="new-password"
+              className="w-full rounded-lg border border-border bg-input-bg px-3 py-2 text-sm text-foreground placeholder-muted focus:border-accent focus:outline-none"
+            />
+            <div className="flex gap-2">
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => { setConfirmPassword(e.target.value); setPwMsg(null); }}
+                placeholder="確認のためもう一度"
+                autoComplete="new-password"
+                className="flex-1 rounded-lg border border-border bg-input-bg px-3 py-2 text-sm text-foreground placeholder-muted focus:border-accent focus:outline-none"
+              />
+              <button
+                type="button"
+                disabled={pwSaving || !newPassword || !confirmPassword}
+                onClick={async () => {
+                  // 入力チェック（Supabaseのデフォルト最小は6だが、8以上を推奨）
+                  if (newPassword.length < 8) {
+                    setPwMsg({ type: "error", text: "パスワードは8文字以上にしてください。" });
+                    return;
+                  }
+                  if (newPassword !== confirmPassword) {
+                    setPwMsg({ type: "error", text: "確認用パスワードが一致しません。" });
+                    return;
+                  }
+                  setPwSaving(true);
+                  setPwMsg(null);
+                  // ログイン中セッションで自分のパスワードを更新
+                  const { error } = await supabase.auth.updateUser({ password: newPassword });
+                  if (error) {
+                    setPwMsg({ type: "error", text: "変更に失敗しました: " + error.message });
+                  } else {
+                    setPwMsg({ type: "success", text: "パスワードを変更しました。" });
+                    setNewPassword("");
+                    setConfirmPassword("");
+                  }
+                  setPwSaving(false);
+                }}
+                className="shrink-0 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50 transition-colors"
+              >
+                {pwSaving ? "変更中..." : "変更"}
+              </button>
+            </div>
+            {pwMsg && (
+              <div className={`rounded-lg px-3 py-2 text-sm ${pwMsg.type === "error" ? "bg-red-500/10 text-red-400" : "bg-green-500/10 text-green-400"}`}>
+                {pwMsg.text}
               </div>
             )}
           </div>
