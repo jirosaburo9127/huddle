@@ -1835,7 +1835,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
         </div>
       )}
       {/* チャンネルエリア */}
-      <div className="flex flex-col h-full flex-1 min-w-0 bg-surface">
+      <div className="relative flex flex-col h-full flex-1 min-w-0 bg-surface">
         {/* チャンネルヘッダー */}
         <header
           onClick={handleHeaderTap}

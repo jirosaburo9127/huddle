@@ -4,7 +4,7 @@ import { memo, useState, useRef, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { MessageWithProfile, Reaction } from "@/lib/supabase/types";
-import { EmojiPicker, EMOJI_LIST } from "./emoji-picker";
+import { EmojiPicker, MobileReactionSheet } from "./emoji-picker";
 import { PollDisplay } from "./poll-display";
 import { EventDisplay } from "./event-display";
 import { ImageLightbox } from "@/components/image-lightbox";
@@ -477,48 +477,11 @@ function ReactionBadges({
               </svg>
             </button>
             {showQuickPicker && !isDesktop && (
-              <>
-                {/* モバイル: 画面下からスライドアップ（LINE方式） */}
-                <div className="fixed inset-0 z-[60] flex items-end" onClick={() => setShowQuickPicker(false)}>
-                  <div className="absolute inset-0 bg-black/40" />
-                  <div className="relative w-full animate-slide-up" onClick={(e) => e.stopPropagation()}>
-                    <div className="w-full rounded-t-2xl bg-surface border-t border-border shadow-xl p-4 pb-20">
-                      {EMOJI_LIST.map((group) => (
-                        <div key={group.category} className="mb-3">
-                          <p className="text-[11px] text-muted font-medium mb-1.5">{group.category}</p>
-                          {group.kind === "text" ? (
-                            <div className="flex flex-wrap gap-1.5">
-                              {group.emojis.map((emoji) => (
-                                <button
-                                  key={emoji}
-                                  type="button"
-                                  onClick={() => { setShowQuickPicker(false); onReact(emoji); }}
-                                  className="px-3 py-2 rounded-xl border border-border/50 bg-white/[0.03] hover:bg-white/[0.06] text-sm font-medium text-foreground transition-colors"
-                                >
-                                  {emoji}
-                                </button>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="grid grid-cols-8 gap-1.5">
-                              {group.emojis.map((emoji) => (
-                                <button
-                                  key={emoji}
-                                  type="button"
-                                  onClick={() => { setShowQuickPicker(false); onReact(emoji); }}
-                                  className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-white/[0.06] text-xl transition-colors"
-                                >
-                                  {emoji}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </>
+              /* モバイル: 画面下からスライドアップ（編集UI付き・個別カスタマイズ対応） */
+              <MobileReactionSheet
+                onSelect={(em) => { setShowQuickPicker(false); onReact(em); }}
+                onClose={() => setShowQuickPicker(false)}
+              />
             )}
             {showQuickPicker && isDesktop && onReact && (
               /* PC: 上方向に表示（モバイルでは一切マウントしない） */
@@ -1056,47 +1019,12 @@ export const MessageItem = memo(function MessageItem({
           </div>
         )}
 
-        {/* モバイル絵文字ピッカー（DM用） */}
+        {/* モバイル絵文字ピッカー（DM用・編集UI付き） */}
         {mobileEmojiOpen && onReact && (
-          <div className="fixed inset-0 z-[60] flex items-end lg:hidden" onClick={() => setMobileEmojiOpen(false)}>
-            <div className="absolute inset-0 bg-black/40" />
-            <div className="relative w-full animate-slide-up" onClick={(e) => e.stopPropagation()}>
-              <div className="w-full rounded-t-2xl bg-surface border-t border-border shadow-xl p-4 pb-20">
-                {EMOJI_LIST.map((group) => (
-                  <div key={group.category} className="mb-3">
-                    <p style={{ fontSize: 11, color: "var(--color-muted)", fontWeight: 500, marginBottom: 6 }}>{group.category}</p>
-                    {group.kind === "text" ? (
-                      <div className="flex flex-wrap gap-1.5">
-                        {group.emojis.map((emoji) => (
-                          <button
-                            key={emoji}
-                            type="button"
-                            onClick={() => { setMobileEmojiOpen(false); onReact(message.id, emoji); }}
-                            style={{ padding: "8px 12px", borderRadius: 12, border: "1px solid var(--color-border)", background: "none", fontSize: 14, fontWeight: 500, color: "var(--color-foreground)", cursor: "pointer" }}
-                          >
-                            {emoji}
-                          </button>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-8 gap-1.5">
-                        {group.emojis.map((emoji) => (
-                          <button
-                            key={emoji}
-                            type="button"
-                            onClick={() => { setMobileEmojiOpen(false); onReact(message.id, emoji); }}
-                            style={{ fontSize: 24, padding: 4, background: "none", border: "none", cursor: "pointer", borderRadius: 8 }}
-                          >
-                            {emoji}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          <MobileReactionSheet
+            onSelect={(emoji) => { setMobileEmojiOpen(false); onReact(message.id, emoji); }}
+            onClose={() => setMobileEmojiOpen(false)}
+          />
         )}
 
         {lightboxState && (
@@ -1733,47 +1661,12 @@ export const MessageItem = memo(function MessageItem({
         </div>
       )}
 
-      {/* モバイル: アクションモーダルから開く絵文字ピッカー（下からスライド） */}
+      {/* モバイル: アクションモーダルから開く絵文字ピッカー（下からスライド・編集UI付き） */}
       {mobileEmojiOpen && onReact && (
-        <div className="fixed inset-0 z-[60] flex items-end lg:hidden" onClick={() => setMobileEmojiOpen(false)}>
-          <div className="absolute inset-0 bg-black/40" />
-          <div className="relative w-full animate-slide-up" onClick={(e) => e.stopPropagation()}>
-            <div className="w-full rounded-t-2xl bg-surface border-t border-border shadow-xl p-4 pb-20">
-              {EMOJI_LIST.map((group) => (
-                <div key={group.category} className="mb-3">
-                  <p className="text-[11px] text-muted font-medium mb-1.5">{group.category}</p>
-                  {group.kind === "text" ? (
-                    <div className="flex flex-wrap gap-1.5">
-                      {group.emojis.map((emoji) => (
-                        <button
-                          key={emoji}
-                          type="button"
-                          onClick={() => { setMobileEmojiOpen(false); onReact(message.id, emoji); }}
-                          className="px-3 py-2 rounded-xl border border-border/50 bg-white/[0.03] hover:bg-white/[0.06] text-sm font-medium text-foreground transition-colors"
-                        >
-                          {emoji}
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-8 gap-1.5">
-                      {group.emojis.map((emoji) => (
-                        <button
-                          key={emoji}
-                          type="button"
-                          onClick={() => { setMobileEmojiOpen(false); onReact(message.id, emoji); }}
-                          className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-white/[0.06] text-xl transition-colors"
-                        >
-                          {emoji}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+        <MobileReactionSheet
+          onSelect={(emoji) => { setMobileEmojiOpen(false); onReact(message.id, emoji); }}
+          onClose={() => setMobileEmojiOpen(false)}
+        />
       )}
 
       {lightboxState && (
