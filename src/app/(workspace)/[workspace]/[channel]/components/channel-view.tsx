@@ -2491,7 +2491,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                       {selectionMode ? (
                         <div
                           onClick={() => toggleSelect(message.id)}
-                          className={`flex items-start gap-2 rounded-lg cursor-pointer px-1 -mx-1 ${
+                          className={`flex items-start gap-2 rounded-lg cursor-pointer pl-3 pr-2 lg:pl-4 ${
                             selectedIds.has(message.id) ? "bg-accent/10" : "hover:bg-sidebar-hover"
                           }`}
                         >
@@ -2499,7 +2499,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                             type="checkbox"
                             readOnly
                             checked={selectedIds.has(message.id)}
-                            className="mt-3 shrink-0 w-4 h-4 accent-accent pointer-events-none"
+                            className="mt-4 shrink-0 w-5 h-5 accent-accent pointer-events-none"
                           />
                           <div className="flex-1 min-w-0 pointer-events-none select-none">
                             {messageItemEl}
