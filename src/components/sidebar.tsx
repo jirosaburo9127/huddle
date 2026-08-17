@@ -725,12 +725,10 @@ export function Sidebar({
             return;
           }
 
-          // バッジ: 「自分に関係するメッセージ」(返信/@自分/@all/DM)のときだけ付ける。
-          const { data: relevant } = await supabase.rpc("is_message_relevant_to_user", {
-            p_message_id: msg.id,
-            p_user_id: currentUserId,
-          });
-          if (relevant) {
+          // バッジ: 通常メッセージのみ加算する（システムイベント=投票/決定/メンバー参加/アルバム更新は
+          // 除外。DB の get_unread_counts と条件を揃える）。自分宛かどうかは問わない（要望により全投稿で表示）。
+          // 自分の投稿は697行・表示中チャンネルは717行で既に除外済み。
+          if (!msg.system_event) {
             setUnreadState((prev) => ({
               ...prev,
               [msg.channel_id]: (prev[msg.channel_id] || 0) + 1,
