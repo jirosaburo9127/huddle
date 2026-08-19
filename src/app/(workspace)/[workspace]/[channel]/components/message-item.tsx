@@ -324,7 +324,9 @@ function MessageContent({
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const webkit = (window as any).webkit;
                 if (webkit?.messageHandlers?.playVideo) {
-                  webkit.messageHandlers.playVideo.postMessage(url);
+                  // フラグメント(#name=...&thumb=...)は再生に不要。付けたまま AVPlayer に渡すと
+                  // 再生に失敗する（特に thumb に長いURLが入るネイティブ圧縮動画）ため除去して渡す。
+                  webkit.messageHandlers.playVideo.postMessage(stripFileUrlFragment(url));
                   return;
                 }
                 // PC/Web: アプリ内ビューアでその場再生

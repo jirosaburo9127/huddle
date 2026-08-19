@@ -194,7 +194,8 @@ function HitorigotoPostCardInner({
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     const webkit = (window as any).webkit;
                     if (webkit?.messageHandlers?.playVideo) {
-                      webkit.messageHandlers.playVideo.postMessage(url);
+                      // フラグメント(#name=...&thumb=...)は再生に不要。AVPlayer には除去して渡す。
+                      webkit.messageHandlers.playVideo.postMessage(stripFileUrlFragment(url));
                     } else {
                       openFileViewer(url, extractDisplayFileName(url));
                     }
