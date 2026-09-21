@@ -367,34 +367,43 @@ export function CreateAlbumModal({ workspaceId, currentUserId, channels, addToAl
           <div>
             <button
               onClick={() => {
-                const input = document.createElement("input");
-                input.type = "file";
-                input.multiple = true;
-                // accept を指定しない → iOS がドキュメントピッカーを使用し
-                // multiple 選択の完了ボタンが正常に動作する
-                input.style.position = "fixed";
-                input.style.top = "0";
-                input.style.left = "0";
-                input.style.opacity = "0.01";
-                input.style.width = "1px";
-                input.style.height = "1px";
-                document.body.appendChild(input);
-                const cleanup = () => {
-                  if (input.parentNode) input.parentNode.removeChild(input);
-                };
-                input.addEventListener("change", () => {
-                  if (input.files && input.files.length > 0) {
-                    // 画像・動画のみフィルタ
-                    const filtered = Array.from(input.files).filter(
-                      (f) => f.type.startsWith("image/") || f.type.startsWith("video/") || isImageFile(f.name) || isVideoFile(f)
-                    );
-                    if (filtered.length > 0) handleFiles(filtered);
-                  }
-                  cleanup();
-                });
-                input.addEventListener("cancel", cleanup);
-                setTimeout(() => cleanup(), 120000);
-                input.click();
+                // 診断用: ここは元々 try/catch が無く、動的 input 生成や
+                // click() が例外を投げた場合に「ボタンを押しても何も起きない」
+                // という無言の失敗になっていた（原因調査用に一時追加、2026-09-21）。
+                try {
+                  const input = document.createElement("input");
+                  input.type = "file";
+                  input.multiple = true;
+                  // accept を指定しない → iOS がドキュメントピッカーを使用し
+                  // multiple 選択の完了ボタンが正常に動作する
+                  input.style.position = "fixed";
+                  input.style.top = "0";
+                  input.style.left = "0";
+                  input.style.opacity = "0.01";
+                  input.style.width = "1px";
+                  input.style.height = "1px";
+                  document.body.appendChild(input);
+                  const cleanup = () => {
+                    if (input.parentNode) input.parentNode.removeChild(input);
+                  };
+                  input.addEventListener("change", () => {
+                    if (input.files && input.files.length > 0) {
+                      // 画像・動画のみフィルタ
+                      const filtered = Array.from(input.files).filter(
+                        (f) => f.type.startsWith("image/") || f.type.startsWith("video/") || isImageFile(f.name) || isVideoFile(f)
+                      );
+                      if (filtered.length > 0) handleFiles(filtered);
+                    }
+                    cleanup();
+                  });
+                  input.addEventListener("cancel", cleanup);
+                  setTimeout(() => cleanup(), 120000);
+                  input.click();
+                } catch (e) {
+                  // eslint-disable-next-line no-console
+                  console.error("[album][diagnostic] file picker trigger failed:", e);
+                  alert("写真・動画選択の起動に失敗しました（診断用ログ）: " + (e instanceof Error ? e.message : String(e)));
+                }
               }}
               className="w-full rounded-xl border-2 border-dashed border-border py-8 text-center text-sm text-muted hover:border-accent hover:text-accent transition-colors"
             >
