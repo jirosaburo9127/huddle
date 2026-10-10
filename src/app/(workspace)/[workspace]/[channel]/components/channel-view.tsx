@@ -1884,12 +1884,9 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                 </h1>
               </>
             ) : (
-              <>
-                <span className="shrink-0 w-8 h-8 rounded-[10px] bg-[var(--home-accent)] text-[var(--home-on-accent)] font-black flex items-center justify-center">#</span>
-                <h1 className="font-bold text-base sm:text-lg lg:text-[18px] lg:font-[720] truncate min-w-0">
-                  {channel.name}
-                </h1>
-              </>
+              <h1 className="font-bold text-base sm:text-lg lg:text-[18px] lg:font-[720] truncate min-w-0">
+                {channel.name}
+              </h1>
             )}
             {channel.topic && (
               <span className="ml-2 text-[13px] text-muted/65 truncate hidden lg:inline">
