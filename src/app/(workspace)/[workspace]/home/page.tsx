@@ -1,3 +1,4 @@
+import { stripSystemEmoji } from "@/lib/system-post-icons";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthUser } from "@/lib/supabase/auth";
 import { redirect } from "next/navigation";
@@ -378,7 +379,7 @@ export default async function HomePage({
     railItems.push({
       key: `decision-${m.id}`,
       label: "決定事項",
-      title: m.content.replace(/\s+/g, " ").trim(),
+      title: stripSystemEmoji(m.content).replace(/\s+/g, " ").trim(),
       sub: m.isDm ? m.channelName : `# ${m.channelName}`,
       person: m.sender,
       href: `/${workspaceSlug}/${m.channelSlug}`,

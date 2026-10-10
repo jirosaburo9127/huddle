@@ -1,5 +1,6 @@
 "use client";
 
+import { replaceSystemEmojiInHtml, stripSystemEmoji } from "@/lib/system-post-icons";
 import { HuddleMark } from "@/components/huddle-mark";
 import { memo, useState, useRef, useEffect, useMemo } from "react";
 import Link from "next/link";
@@ -266,7 +267,7 @@ function MessageContent({
       {textContent && (
         <div
           className="text-[15.5px] font-[450] leading-[1.7] text-foreground whitespace-pre-wrap break-words [&_pre]:whitespace-pre [&_pre]:my-2 max-w-[780px]"
-          dangerouslySetInnerHTML={{ __html: parseMarkdown(textContent, memberNames) }}
+          dangerouslySetInnerHTML={{ __html: replaceSystemEmojiInHtml(content, parseMarkdown(textContent, memberNames)) }}
         />
       )}
       {/* 画像: 1枚なら単独表示、2枚以上は X 風の横スライドカルーセル */}
@@ -1257,7 +1258,7 @@ export const MessageItem = memo(function MessageItem({
                           ? "(削除されたメッセージ)"
                           : isStorageFileUrl(parentMessage.content)
                             ? `添付: ${extractFileName(parentMessage.content.trim())}`
-                            : parentMessage.content.replace(/\s+/g, " ").trim()}
+                            : stripSystemEmoji(parentMessage.content).replace(/\s+/g, " ").trim()}
                       </div>
                     </>
                   ) : (

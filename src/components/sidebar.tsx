@@ -1,5 +1,6 @@
 "use client";
 
+import { stripSystemEmoji } from "@/lib/system-post-icons";
 import { UiIcon } from "@/components/ui-icon";
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
@@ -567,7 +568,7 @@ export function Sidebar({
         const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
         next[row.channel_id] = {
           sender: profile?.display_name || "",
-          text: row.content.replace(/https?:\/\/\S+/g, "添付").replace(/\s+/g, " ").trim(),
+          text: stripSystemEmoji(row.content).replace(/https?:\/\/\S+/g, "添付").replace(/\s+/g, " ").trim(),
           at: row.created_at,
         };
       }

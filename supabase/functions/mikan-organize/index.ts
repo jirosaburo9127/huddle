@@ -7,6 +7,13 @@
 //   - channel_id 指定: そのチャンネルだけ（チャンネル画面の「整理」）
 //   - workspace_id 指定: 自分が参加している通常チャンネル全部（ホームのみかんボタン）
 //
+// 何を拾うか (mode):
+//   - "my_tasks":    押した本人がやるべきタスクだけ（頼まれた／自分でやると言った）
+//   - "week_events": これから7日間に始まる予定だけ
+//   - "all" (既定):  会話に出てくるタスク・予定すべて
+// my_tasks / week_events では、すでに登録済みの「自分のタスク」「7日間の予定」も一緒に返す
+// （AI は使わず DB から。確認の画面で並べて見せるため）。
+//
 // 起点はユーザーがボタンを押したときだけ。投稿のたびに自動で動く見守りモードは
 // 過去に廃止しており（mikan-respond 冒頭のコメント参照）、ここでも持ち込まない。
 //
@@ -155,6 +162,8 @@ Deno.serve(async (req) => {
 
     const channelId = typeof body.channel_id === "string" ? body.channel_id : "";
     const workspaceId = typeof body.workspace_id === "string" ? body.workspace_id : "";
+    const mode: "my_tasks" | "week_events" | "all" =
+      body.mode === "my_tasks" || body.mode === "week_events" ? body.mode : "all";
     if (!channelId && !workspaceId) return json({ error: "channel_id or workspace_id required" }, 400);
 
     // 読んでよいチャンネル = 本人が参加しているもの。全体のときは DM・独り言・アーカイブ済みを除く
@@ -175,7 +184,9 @@ Deno.serve(async (req) => {
       .map((m) => (Array.isArray(m.channels) ? m.channels[0] : m.channels))
       .filter((c): c is ChannelRow => !!c && (!!channelId || (!c.is_dm && !c.is_hitorigoto && !c.is_archived)));
     if (channelId && channels.length === 0) return json({ error: "not a member" }, 403);
-    if (channels.length === 0) return json({ tasks: [], events: [], scanned: 0 });
+    if (channels.length === 0) {
+      return json({ tasks: [], events: [], existing_tasks: [], existing_events: [], scanned: 0, channels: 0 });
+    }
 
     const channelIds = channels.map((c) => c.id);
     const channelNames = new Map(channels.map((c) => [c.id, c.name]));
@@ -185,7 +196,9 @@ Deno.serve(async (req) => {
     const since = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000).toISOString();
     const nowIso = new Date().toISOString();
 
-    const [messagesRes, membersRes, tasksRes, eventsRes] = await Promise.all([
+    const weekEndIso = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+    const [messagesRes, membersRes, tasksRes, eventsRes, meRes, myTasksRes] = await Promise.all([
       supabase
         .from("messages")
         .select("id, content, created_at, user_id, channel_id, profiles(display_name)")
@@ -201,8 +214,45 @@ Deno.serve(async (req) => {
         .select("channel_id, user_id, profiles(display_name)")
         .in("channel_id", channelIds),
       supabase.from("tasks").select("title, channel_id").in("channel_id", channelIds).neq("status", "done"),
-      supabase.from("events").select("title, start_at, channel_id").in("channel_id", channelIds).gte("start_at", nowIso),
+      supabase
+        .from("events")
+        .select("title, start_at, location, channel_id")
+        .in("channel_id", channelIds)
+        .gte("start_at", nowIso)
+        .order("start_at", { ascending: true }),
+      supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle(),
+      mode === "my_tasks"
+        ? supabase
+            .from("tasks")
+            .select("title, due_date, channel_id, task_assignees!inner(user_id)")
+            .in("channel_id", channelIds)
+            .neq("status", "done")
+            .eq("task_assignees.user_id", user.id)
+            .order("due_date", { ascending: true, nullsFirst: false })
+        : Promise.resolve({ data: [], error: null }),
     ]);
+    const myName = (meRes.data as { display_name?: string } | null)?.display_name || "";
+
+    // 登録済みのもの（確認画面でそのまま見せる）
+    const existingTasks =
+      mode === "my_tasks"
+        ? ((myTasksRes.data || []) as Array<{ title: string; due_date: string | null; channel_id: string }>).map((t) => ({
+            title: t.title,
+            due_date: t.due_date,
+            channel_name: channelNames.get(t.channel_id) || "",
+          }))
+        : [];
+    const existingEvents =
+      mode === "week_events"
+        ? ((eventsRes.data || []) as Array<{ title: string; start_at: string; location: string | null; channel_id: string }>)
+            .filter((e) => e.start_at < weekEndIso)
+            .map((e) => ({
+              title: e.title,
+              start_at: e.start_at,
+              location: e.location,
+              channel_name: channelNames.get(e.channel_id) || "",
+            }))
+        : [];
 
     if (messagesRes.error) {
       console.error("[mikan-organize] messages fetch error:", messagesRes.error);
@@ -229,7 +279,7 @@ Deno.serve(async (req) => {
       );
     }
     if (rows.length === 0) {
-      return json({ tasks: [], events: [], scanned: 0 });
+      return json({ tasks: [], events: [], existing_tasks: existingTasks, existing_events: existingEvents, scanned: 0, channels: 0 });
     }
 
     // 担当者は「その発言があったチャンネルのメンバー」からだけ選ぶ
@@ -284,6 +334,18 @@ Deno.serve(async (req) => {
       .map((id) => `${multi ? `#${channelNames.get(id)}: ` : ""}${(membersByChannel.get(id) || []).map((m) => m.name).join(" / ")}`)
       .join("\n");
 
+    // 何を拾うかの絞り込み。会話の後ろに置いて、最後に読ませる
+    const modeNote =
+      mode === "my_tasks"
+        ? `\n\n今回の依頼: 「${myName}」さん本人がやるべきタスクだけを報告する。` +
+          `対象は、${myName}さんが名指しで頼まれたものと、${myName}さん自身が「やります」と言ったものだけ。` +
+          `他の人が担当のもの、誰の担当か会話から読み取れないものは報告しない。` +
+          `assignee_names には必ず「${myName}」を入れる。予定は報告しない（events は空配列）。`
+        : mode === "week_events"
+          ? `\n\n今回の依頼: 開始日時が今から7日以内（${toJst(nowIso)} 〜 ${toJst(weekEndIso)}）の予定候補だけを報告する。` +
+            `タスクは報告しない（tasks は空配列）。`
+          : "";
+
     const aiRes = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -312,7 +374,8 @@ Deno.serve(async (req) => {
               `メンバー一覧${multi ? " (チャンネルごと)" : ""}:\n${memberLines}\n\n` +
               `カレンダー (1行が1週間・月曜始まり):\n${calendarLines.join("\n")}\n\n` +
               `登録済み:\n${registered.length > 0 ? registered.join("\n") : "(なし)"}\n\n` +
-              `会話 (番号 ${multi ? "#チャンネル " : ""}日時 発言者: 本文):\n${conversation}`,
+              `会話 (番号 ${multi ? "#チャンネル " : ""}日時 発言者: 本文):\n${conversation}` +
+              modeNote,
           },
         ],
       }),
@@ -379,7 +442,29 @@ Deno.serve(async (req) => {
       return [{ title, start_at: start.toISOString(), location, ...target }];
     });
 
-    return json({ tasks, events, scanned: rows.length, channels: activeChannelIds.length, diag });
+    // 絞り込みは AI 任せにせず、ここでも機械的にかける
+    const finalTasks =
+      mode === "week_events"
+        ? []
+        : mode === "my_tasks"
+          ? tasks.filter((t) => t.assignees.some((a) => a.user_id === user.id))
+          : tasks;
+    const finalEvents =
+      mode === "my_tasks"
+        ? []
+        : mode === "week_events"
+          ? events.filter((e) => e.start_at >= nowIso && e.start_at < weekEndIso)
+          : events;
+
+    return json({
+      tasks: finalTasks,
+      events: finalEvents,
+      existing_tasks: existingTasks,
+      existing_events: existingEvents,
+      scanned: rows.length,
+      channels: activeChannelIds.length,
+      diag,
+    });
   } catch (e) {
     console.error("[mikan-organize] unexpected:", e);
     return json({ error: "unexpected error" }, 500);

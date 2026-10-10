@@ -26,6 +26,12 @@ type EventCandidate = {
   source: Source;
 };
 
+type ExistingTask = { title: string; due_date: string | null; channel_name: string };
+type ExistingEvent = { title: string; start_at: string; location: string | null; channel_name: string };
+
+// 何を確認するか。ホームでは最初に選んでもらい、選んでから AI が会話を読む
+type Mode = "my_tasks" | "week_events" | "all";
+
 type Props = {
   /** どこの会話を読むか。チャンネル1つ、または自分が参加しているチャンネル全部 */
   scope: { channelId: string; channelName: string } | { workspaceId: string };
@@ -58,7 +64,13 @@ export function MikanOrganizeModal({ scope, currentUserId, onEventCreated, onReg
   const isAll = "workspaceId" in scope;
   // 依存配列に入れるため、対象を文字列にしておく
   const scopeKey = isAll ? `ws:${scope.workspaceId}` : `ch:${scope.channelId}`;
-  const [phase, setPhase] = useState<"loading" | "ready" | "saving" | "done" | "error">("loading");
+  // ホーム（全チャンネル）は選択画面から始める。チャンネル画面の「整理」はそのチャンネルを全部拾う
+  const [mode, setMode] = useState<Mode | null>(isAll ? null : "all");
+  const [phase, setPhase] = useState<"menu" | "loading" | "ready" | "saving" | "done" | "error">(
+    isAll ? "menu" : "loading"
+  );
+  const [existingTasks, setExistingTasks] = useState<ExistingTask[]>([]);
+  const [existingEvents, setExistingEvents] = useState<ExistingEvent[]>([]);
   const [errorMessage, setErrorMessage] = useState("");
   const [tasks, setTasks] = useState<TaskCandidate[]>([]);
   const [events, setEvents] = useState<EventCandidate[]>([]);
@@ -72,6 +84,7 @@ export function MikanOrganizeModal({ scope, currentUserId, onEventCreated, onReg
   });
 
   useEffect(() => {
+    if (!mode) return;
     let cancelled = false;
     (async () => {
       try {
@@ -83,9 +96,10 @@ export function MikanOrganizeModal({ scope, currentUserId, onEventCreated, onReg
         const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/mikan-organize`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify(
-            scopeKey.startsWith("ws:") ? { workspace_id: scopeKey.slice(3) } : { channel_id: scopeKey.slice(3) }
-          ),
+          body: JSON.stringify({
+            ...(scopeKey.startsWith("ws:") ? { workspace_id: scopeKey.slice(3) } : { channel_id: scopeKey.slice(3) }),
+            mode,
+          }),
         });
         if (!res.ok) {
           console.error("[mikan-organize] request failed:", res.status, await res.text());
@@ -99,12 +113,16 @@ export function MikanOrganizeModal({ scope, currentUserId, onEventCreated, onReg
           events: EventCandidate[];
           scanned: number;
           channels?: number;
+          existing_tasks?: ExistingTask[];
+          existing_events?: ExistingEvent[];
         };
         if (cancelled) return;
         setTasks(json.tasks || []);
         setEvents(json.events || []);
         setScanned(json.scanned || 0);
         setChannelCount(json.channels || 0);
+        setExistingTasks(json.existing_tasks || []);
+        setExistingEvents(json.existing_events || []);
         // 最初は全部にチェックを入れておき、要らないものだけ外してもらう
         setChecked(
           new Set([...(json.tasks || []).map((_, i) => `task-${i}`), ...(json.events || []).map((_, i) => `event-${i}`)])
@@ -119,7 +137,22 @@ export function MikanOrganizeModal({ scope, currentUserId, onEventCreated, onReg
     return () => {
       cancelled = true;
     };
-  }, [scopeKey, supabase]);
+  }, [scopeKey, mode, supabase]);
+
+  function choose(next: Mode) {
+    setTasks([]);
+    setEvents([]);
+    setExistingTasks([]);
+    setExistingEvents([]);
+    setChecked(new Set());
+    setPhase("loading");
+    setMode(next);
+  }
+
+  function backToMenu() {
+    setMode(null);
+    setPhase("menu");
+  }
 
   function toggle(key: string) {
     setChecked((prev) => {
@@ -210,6 +243,18 @@ export function MikanOrganizeModal({ scope, currentUserId, onEventCreated, onReg
   }
 
   const total = tasks.length + events.length;
+  const existingTotal = existingTasks.length + existingEvents.length;
+  const loadingLabel =
+    mode === "my_tasks" ? "あなたのタスクを探しています" : mode === "week_events" ? "これから7日間の予定を探しています" : "やることと、日時の決まった予定を探しています";
+  const subtitle = !isAll
+    ? `# ${scope.channelName} の最近の会話から`
+    : mode === "my_tasks"
+      ? "あなたのタスク（登録済み＋会話から）"
+      : mode === "week_events"
+        ? "これから7日間の予定（登録済み＋会話から）"
+        : mode === "all"
+          ? "参加しているチャンネル全体の、この1週間の会話から"
+          : "何を確認しますか？";
   const checkbox = "mt-0.5 h-[18px] w-[18px] shrink-0 accent-accent";
   const row = "flex items-start gap-3 rounded-xl border border-border px-3 py-2.5 cursor-pointer";
 
@@ -227,9 +272,7 @@ export function MikanOrganizeModal({ scope, currentUserId, onEventCreated, onReg
               <HuddleMark size={18} />
               みかんに整理してもらう
             </h3>
-            <p className="mt-0.5 truncate text-xs text-muted">
-              {isAll ? "参加しているチャンネル全体の、この1週間の会話から" : `# ${scope.channelName} の最近の会話から`}
-            </p>
+            <p className="mt-0.5 truncate text-xs text-muted">{subtitle}</p>
           </div>
           <button onClick={onClose} className="p-1.5 text-muted hover:text-foreground" aria-label="閉じる">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -239,13 +282,58 @@ export function MikanOrganizeModal({ scope, currentUserId, onEventCreated, onReg
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4">
+          {phase === "menu" && (
+            <div className="space-y-2.5">
+              <button
+                type="button"
+                onClick={() => choose("my_tasks")}
+                className="flex w-full items-center gap-3 rounded-2xl border border-border px-4 py-3.5 text-left hover:bg-sidebar-hover transition-colors"
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--home-accent-soft)] text-accent">
+                  <UiIcon name="checkSquare" size={20} />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-bold text-foreground">自分のタスクを確認する</span>
+                  <span className="mt-0.5 block text-xs text-muted">
+                    登録済みのタスクと、会話の中であなたが頼まれたこと・やると言ったこと
+                  </span>
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => choose("week_events")}
+                className="flex w-full items-center gap-3 rounded-2xl border border-border px-4 py-3.5 text-left hover:bg-sidebar-hover transition-colors"
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--home-accent-soft)] text-accent">
+                  <UiIcon name="calendar" size={20} />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-bold text-foreground">今週の予定を確認する</span>
+                  <span className="mt-0.5 block text-xs text-muted">
+                    これから7日間の登録済みの予定と、会話に出てきたまだ登録していない予定
+                  </span>
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => choose("all")}
+                className="w-full px-4 py-2 text-center text-xs text-muted underline underline-offset-2"
+              >
+                チーム全体のやること・予定をまとめて拾う
+              </button>
+              <p className="pt-1 text-[11px] leading-relaxed text-muted">
+                選ぶと、みかんがあなたの参加しているチャンネルのこの1週間の会話を読みます。数秒〜十数秒かかります。
+              </p>
+            </div>
+          )}
+
           {phase === "loading" && (
             <div className="py-10 text-center">
               <p className="flex justify-center animate-pulse">
                 <HuddleMark size={36} />
               </p>
               <p className="mt-3 text-sm font-bold text-foreground">会話を読んでいます…</p>
-              <p className="mt-1 text-xs text-muted">やることと、日時の決まった予定を探しています</p>
+              <p className="mt-1 text-xs text-muted">{loadingLabel}</p>
             </div>
           )}
 
@@ -256,12 +344,45 @@ export function MikanOrganizeModal({ scope, currentUserId, onEventCreated, onReg
             </div>
           )}
 
+          {(phase === "ready" || phase === "saving") && existingTotal > 0 && (
+            <section className="mb-5">
+              <h4 className="text-[13px] font-extrabold text-foreground">
+                登録済み（{existingTotal}件）
+              </h4>
+              <ul className="mt-2 divide-y divide-border rounded-xl border border-border">
+                {existingTasks.map((task, i) => (
+                  <li key={`et-${i}`} className="px-3 py-2.5">
+                    <p className="text-sm font-bold text-foreground break-words">{task.title}</p>
+                    <p className="mt-0.5 text-xs text-muted">
+                      # {task.channel_name} ・ 期限: {task.due_date ? formatDueJa(task.due_date) : "なし"}
+                    </p>
+                  </li>
+                ))}
+                {existingEvents.map((event, i) => (
+                  <li key={`ee-${i}`} className="px-3 py-2.5">
+                    <p className="text-sm font-bold text-foreground break-words">{event.title}</p>
+                    <p className="mt-0.5 text-xs text-muted">
+                      # {event.channel_name} ・ {formatDateTimeJa(event.start_at)}
+                      {event.location ? ` ・ ${event.location}` : ""}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
           {(phase === "ready" || phase === "saving") && total === 0 && (
             <div className="py-10 text-center">
               <p className="flex justify-center text-muted">
                 <UiIcon name="checkCircle" size={30} />
               </p>
-              <p className="mt-2 text-sm font-bold text-foreground">新しく登録するものは見つかりませんでした</p>
+              <p className="mt-2 text-sm font-bold text-foreground">
+                {mode === "my_tasks"
+                  ? "会話の中に、まだ登録していないあなたのタスクはありませんでした"
+                  : mode === "week_events"
+                    ? "会話の中に、まだ登録していない予定はありませんでした"
+                    : "新しく登録するものは見つかりませんでした"}
+              </p>
               <p className="mt-1 text-xs text-muted">
                 {isAll
                   ? `この1週間の ${channelCount} チャンネル・${scanned} 件の投稿を確認しました`
@@ -272,14 +393,15 @@ export function MikanOrganizeModal({ scope, currentUserId, onEventCreated, onReg
 
           {(phase === "ready" || phase === "saving") && total > 0 && (
             <>
-              <p className="text-xs text-muted">
+              <h4 className="text-[13px] font-extrabold text-foreground">会話から見つけた、まだ登録していないもの（{total}件）</h4>
+              <p className="mt-1 text-xs text-muted">
                 {isAll ? `${channelCount} チャンネル・` : ""}
-                {scanned} 件の投稿から {total} 件見つけました。登録するものにチェックを入れてください。
+                {scanned} 件の投稿を読みました。登録するものにチェックを入れてください。
               </p>
 
               {tasks.length > 0 && (
                 <section className="mt-4">
-                  <h4 className="text-[13px] font-extrabold text-foreground">やること</h4>
+                  <h4 className="text-xs font-bold text-muted">やること</h4>
                   <div className="mt-2 space-y-2">
                     {tasks.map((task, i) => (
                       <label key={`task-${i}`} className={row}>
@@ -311,7 +433,7 @@ export function MikanOrganizeModal({ scope, currentUserId, onEventCreated, onReg
 
               {events.length > 0 && (
                 <section className="mt-4">
-                  <h4 className="text-[13px] font-extrabold text-foreground">予定</h4>
+                  <h4 className="text-xs font-bold text-muted">予定</h4>
                   <div className="mt-2 space-y-2">
                     {events.map((event, i) => (
                       <label key={`event-${i}`} className={row}>
@@ -380,9 +502,16 @@ export function MikanOrganizeModal({ scope, currentUserId, onEventCreated, onReg
               </button>
             </>
           ) : (
-            <button onClick={onClose} className="rounded-lg bg-accent px-4 py-2 text-sm font-bold">
-              閉じる
-            </button>
+            <>
+              {isAll && phase !== "menu" && phase !== "loading" && (
+                <button onClick={backToMenu} className="px-4 py-2 text-sm text-muted">
+                  ほかを確認する
+                </button>
+              )}
+              <button onClick={onClose} className="rounded-lg bg-accent px-4 py-2 text-sm font-bold">
+                閉じる
+              </button>
+            </>
           )}
         </div>
       </div>

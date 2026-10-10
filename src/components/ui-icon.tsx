@@ -1,6 +1,6 @@
 // 画面の目印に使う線画アイコン。アプリ内では絵文字を使わず、これか文字で表す
 // （リアクションの絵文字だけは別）。
-const PATHS = {
+export const UI_ICON_PATHS = {
   paperclip:
     "M18.4 10.6l-7.1 7.1a4 4 0 01-5.7-5.7l7.8-7.8a2.7 2.7 0 013.8 3.8l-7.4 7.4a1.3 1.3 0 01-1.9-1.9l6.7-6.7",
   calendar:
@@ -20,7 +20,7 @@ const PATHS = {
   crown: "M4 8l3.5 4L12 6l4.5 6L20 8l-1.5 9.5h-13L4 8z",
 } as const;
 
-export type UiIconName = keyof typeof PATHS;
+export type UiIconName = keyof typeof UI_ICON_PATHS;
 
 export function UiIcon({ name, size = 16, className = "" }: { name: UiIconName; size?: number; className?: string }) {
   return (
@@ -33,7 +33,7 @@ export function UiIcon({ name, size = 16, className = "" }: { name: UiIconName; 
       viewBox="0 0 24 24"
       aria-hidden="true"
     >
-      <path strokeLinecap="round" strokeLinejoin="round" d={PATHS[name]} />
+      <path strokeLinecap="round" strokeLinejoin="round" d={UI_ICON_PATHS[name]} />
     </svg>
   );
 }

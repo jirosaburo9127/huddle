@@ -10,6 +10,7 @@ import { extractDisplayFileName } from "@/lib/file-name";
 import { TaskModal } from "../tasks/components/task-modal";
 import { MikanOrganizeModal } from "../[channel]/components/mikan-organize-modal";
 import { HuddleMark } from "@/components/huddle-mark";
+import { isSystemPost, leadingSystemIcon, stripSystemEmoji } from "@/lib/system-post-icons";
 
 export type HomePerson = { name: string; avatarUrl: string | null };
 
@@ -145,32 +146,49 @@ function MessageBody({ text, myName }: { text: string; myName: string }) {
   // URL はリンクに、@メンションは色付きにする。表示名は空白を含むことがあるので、自分の名前は丸ごと拾う
   const escaped = myName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const mention = myName ? `@${escaped}|@[^\\s@]+` : "@[^\\s@]+";
-  const parts = text.split(new RegExp(`(https?:\\/\\/[^\\s<]+|${mention})`, "g"));
+  const pattern = new RegExp(`(https?:\\/\\/[^\\s<]+|${mention})`, "g");
+  // 予定・アルバムの自動投稿は、行頭の目印（絵文字）を線画アイコンに差し替える
+  const system = isSystemPost(text);
+  function renderInline(source: string, keyPrefix: string) {
+    return source.split(pattern).map((part, i) => {
+      const key = `${keyPrefix}-${i}`;
+      if (/^https?:\/\//.test(part)) {
+        return (
+          <a
+            key={key}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[var(--home-accent-ink)] underline underline-offset-2 break-all"
+          >
+            {part}
+          </a>
+        );
+      }
+      if (part.startsWith("@")) {
+        return (
+          <span key={key} className="font-bold text-[var(--home-accent-ink)]">
+            {part}
+          </span>
+        );
+      }
+      return part;
+    });
+  }
   return (
     <p className="mt-2.5 text-[15px] leading-7 text-foreground whitespace-pre-wrap break-words line-clamp-6">
-      {parts.map((part, i) => {
-        if (/^https?:\/\//.test(part)) {
-          return (
-            <a
-              key={i}
-              href={part}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[var(--home-accent-ink)] underline underline-offset-2 break-all"
-            >
-              {part}
-            </a>
-          );
-        }
-        if (part.startsWith("@")) {
-          return (
-            <span key={i} className="font-bold text-[var(--home-accent-ink)]">
-              {part}
-            </span>
-          );
-        }
-        return part;
-      })}
+      {system
+        ? text.split("\n").map((line, i) => {
+            const mark = leadingSystemIcon(line);
+            return (
+              <span key={i}>
+                {i > 0 && "\n"}
+                {mark && <UiIcon name={mark.icon} size={15} className="inline-block align-[-2px] mr-1 text-muted" />}
+                {renderInline(mark ? mark.rest : line, `l${i}`)}
+              </span>
+            );
+          })
+        : renderInline(text, "t")}
     </p>
   );
 }
@@ -452,7 +470,7 @@ export function HomeView({
         </h2>
         <ul className="mt-1">
           {shownMessages.map((message) => {
-            const { text, files } = splitContent(message.content);
+            const { text, files } = splitContent(stripSystemEmoji(message.content));
             const replyKey = `waiting:${message.id}`;
             const isReplying = replyingId === replyKey;
             return (
