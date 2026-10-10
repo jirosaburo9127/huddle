@@ -2369,7 +2369,7 @@ function ChannelCategoryList({
     const isActive = pathname === href;
     const unreadCount = unreadState[channel.id] || 0;
     const showUnreadStyle = unreadCount > 0 && !isActive;
-    // モバイル: 名前＋最新メッセージの2行。未読は太字と黄色のバッジで示す
+    // モバイル: 小さめのアイコン＋名前＋最新メッセージの2行。未読は黄色のアイコンとバッジで示す
     if (!isDesktop) {
       const preview = previews[channel.id];
       return (
@@ -2379,19 +2379,31 @@ function ChannelCategoryList({
           onClick={() => onNavigate(isActive, channel.name)}
           style={{
             display: "flex", alignItems: "center", gap: 12,
-            padding: "8px 8px 8px 14px", minHeight: 58,
+            padding: "8px 8px 8px 12px", minHeight: 58,
             textDecoration: "none", color: "var(--color-foreground)",
             position: "relative" as const, zIndex: 1,
           }}
         >
+          {channel.icon_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={channel.icon_url} alt="" style={{ width: 34, height: 34, borderRadius: 10, objectFit: "cover", flexShrink: 0 }} />
+          ) : (
+            <span
+              style={{
+                width: 34, height: 34, borderRadius: 10, flexShrink: 0,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 15, fontWeight: 800,
+                background: showUnreadStyle ? "var(--home-accent)" : "var(--color-input-bg)",
+                color: showUnreadStyle ? "var(--home-on-accent)" : (catColor || "var(--color-muted)"),
+              }}
+            >
+              #
+            </span>
+          )}
           <span style={{ flex: 1, minWidth: 0 }}>
             <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
               {sortMode === "activity" && catColor && (
                 <span style={{ width: 6, height: 6, borderRadius: "50%", background: catColor, flexShrink: 0 }} />
-              )}
-              {channel.icon_url && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={channel.icon_url} alt="" style={{ width: 18, height: 18, borderRadius: 4, objectFit: "cover", flexShrink: 0 }} />
               )}
               <span style={{ fontSize: 15.5, fontWeight: showUnreadStyle ? 800 : 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
                 {channel.name}
