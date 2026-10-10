@@ -127,21 +127,35 @@ function splitContent(content: string): { text: string; files: string[] } {
 }
 
 function MessageBody({ text, myName }: { text: string; myName: string }) {
-  // @メンションだけ色を付ける。表示名は空白を含むことがあるので、自分の名前は丸ごと拾う
+  // URL はリンクに、@メンションは色付きにする。表示名は空白を含むことがあるので、自分の名前は丸ごと拾う
   const escaped = myName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const pattern = myName ? new RegExp(`(@${escaped}|@[^\\s@]+)`, "g") : /(@[^\s@]+)/g;
-  const parts = text.split(pattern);
+  const mention = myName ? `@${escaped}|@[^\\s@]+` : "@[^\\s@]+";
+  const parts = text.split(new RegExp(`(https?:\\/\\/[^\\s<]+|${mention})`, "g"));
   return (
     <p className="mt-2.5 text-[15px] leading-7 text-foreground whitespace-pre-wrap break-words line-clamp-6">
-      {parts.map((part, i) =>
-        part.startsWith("@") ? (
-          <span key={i} className="font-bold text-[var(--home-accent-ink)]">
-            {part}
-          </span>
-        ) : (
-          part
-        )
-      )}
+      {parts.map((part, i) => {
+        if (/^https?:\/\//.test(part)) {
+          return (
+            <a
+              key={i}
+              href={part}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[var(--home-accent-ink)] underline underline-offset-2 break-all"
+            >
+              {part}
+            </a>
+          );
+        }
+        if (part.startsWith("@")) {
+          return (
+            <span key={i} className="font-bold text-[var(--home-accent-ink)]">
+              {part}
+            </span>
+          );
+        }
+        return part;
+      })}
     </p>
   );
 }
@@ -388,6 +402,8 @@ export function HomeView({ workspaceId, workspaceSlug, currentUserId, me, messag
     }
     const isReplying = replyingId === message.id;
     const channelHref = `/${workspaceSlug}/${message.channelSlug}`;
+    // チャンネル内のこの投稿の位置へ直接飛ぶリンク
+    const messageHref = `${channelHref}?m=${message.id}`;
     return (
       <article key={message.id} className={`${cardClass} px-4 pt-3.5`}>
         {(message.isMention || message.isDecision) && (
@@ -411,14 +427,21 @@ export function HomeView({ workspaceId, workspaceSlug, currentUserId, me, messag
               {message.sender.name}
               {message.isMention && <span className="font-normal text-muted"> さんからあなたへ</span>}
             </p>
-            <Link href={channelHref} className="mt-0.5 inline-block text-xs font-bold text-[var(--home-accent-ink)]">
+            <Link href={messageHref} className="mt-0.5 inline-block text-xs font-bold text-[var(--home-accent-ink)]">
               {message.isDm ? "ダイレクトメッセージ" : `# ${message.channelName}`}
             </Link>
           </div>
-          <span className="shrink-0 flex items-center gap-1.5 pt-0.5 text-[11.5px] text-muted">
-            {message.isUnread && <span className="w-2 h-2 rounded-full bg-[var(--home-accent)]" aria-label="未読" />}
+          <Link
+            href={messageHref}
+            className="shrink-0 flex items-center gap-1 pt-0.5 text-[11.5px] text-muted"
+            aria-label="この投稿をチャンネルで開く"
+          >
+            {message.isUnread && <span className="w-2 h-2 rounded-full bg-[var(--home-accent)]" aria-hidden="true" />}
             {now ? formatTime(message.createdAt, now) : ""}
-          </span>
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d={ICON.chevron} />
+            </svg>
+          </Link>
         </div>
 
         {text && <MessageBody text={text} myName={me.name} />}
@@ -426,7 +449,7 @@ export function HomeView({ workspaceId, workspaceSlug, currentUserId, me, messag
         {files.map((url) => (
           <Link
             key={url}
-            href={channelHref}
+            href={messageHref}
             className="mt-2.5 flex items-center gap-3 rounded-xl border border-border px-3 py-2.5"
           >
             <span className="w-9 h-9 shrink-0 rounded-[10px] bg-[var(--home-accent-soft)] flex items-center justify-center text-base">
