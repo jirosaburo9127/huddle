@@ -8,7 +8,6 @@ import { createClient } from "@/lib/supabase/client";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
 import { extractDisplayFileName } from "@/lib/file-name";
 import { TaskModal } from "../tasks/components/task-modal";
-import { MikanOrganizeModal } from "../[channel]/components/mikan-organize-modal";
 import { HuddleMark } from "@/components/huddle-mark";
 import { isSystemPost, leadingSystemIcon, stripSystemEmoji } from "@/lib/system-post-icons";
 
@@ -221,7 +220,6 @@ export function HomeView({
   const [sending, setSending] = useState(false);
   const [pickerId, setPickerId] = useState<string | null>(null);
   const [taskSource, setTaskSource] = useState<HomeMessage | null>(null);
-  const [showMikan, setShowMikan] = useState(false);
   // リアクションだけは押した瞬間に反映したいので手元に持つ。
   // サーバーから取り直すたびに丸ごと置き換える（マージしない）。
   const [reactions, setReactions] = useState<Record<string, HomeReaction[]>>({});
@@ -913,26 +911,6 @@ export function HomeView({
         )}
         </div>
       </div>
-
-      {/* みかん: 右下でふよふよ浮いているボタン。押すと参加チャンネル全体からタスク・予定を拾う。
-          スマホは下タブの上、PCは画面右下 */}
-      <button
-        type="button"
-        onClick={() => setShowMikan(true)}
-        className="fixed right-4 bottom-[calc(76px+env(safe-area-inset-bottom,0px))] lg:right-8 lg:bottom-8 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-surface border border-border shadow-lg animate-mikan-float"
-        aria-label="みかんに、参加しているチャンネル全体からタスクと予定を拾ってもらう"
-        title="みかんに整理してもらう"
-      >
-        <HuddleMark size={28} />
-      </button>
-      {showMikan && (
-        <MikanOrganizeModal
-          scope={{ workspaceId }}
-          currentUserId={currentUserId}
-          onRegistered={() => router.refresh()}
-          onClose={() => setShowMikan(false)}
-        />
-      )}
 
       {/* メッセージからのタスク化（チャンネル画面と同じモーダル） */}
       {taskSource && (

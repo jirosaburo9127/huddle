@@ -1,3 +1,4 @@
+import { MikanFab } from "@/components/mikan/mikan-fab";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthUser } from "@/lib/supabase/auth";
 import { redirect } from "next/navigation";
@@ -123,7 +124,17 @@ export async function WorkspaceShell({ workspaceSlug, children }: WorkspaceShell
         isMaster={isMaster}
       />
       <KeyboardShortcuts workspaceId={result.workspace.id} workspaceSlug={workspaceSlug}>
-        <MainPane>{children}</MainPane>
+        <MainPane>
+          {children}
+          {/* みかんのボタンは本文の枠の中に置く。スマホでは本文の枠が最前面(z-50)にあり、外に置くと
+              隠れてしまうため。枠の中なら、画面内のモーダルが開いたときはその下に回る */}
+          <MikanFab
+            workspaceId={result.workspace.id}
+            workspaceSlug={workspaceSlug}
+            currentUserId={user.id}
+            channels={(result.channels || []).map((c) => ({ id: c.id, slug: c.slug, name: c.name }))}
+          />
+        </MainPane>
       </KeyboardShortcuts>
       <MobileDetailTransition />
       <BottomTabBar

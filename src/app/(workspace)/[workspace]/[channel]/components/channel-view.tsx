@@ -13,7 +13,6 @@ import { HitorigotoPostCard } from "./hitorigoto-post-card";
 import { MessageInput, type MentionPayload } from "./message-input";
 import { CreatePollModal } from "./create-poll-modal";
 import { CreateEventModal } from "./create-event-modal";
-import { MikanOrganizeModal } from "./mikan-organize-modal";
 import { HuddleMark } from "@/components/huddle-mark";
 import { TaskModal } from "../../tasks/components/task-modal";
 import { EventDisplay } from "./event-display";
@@ -176,11 +175,20 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
   const [showCreatePoll, setShowCreatePoll] = useState(false);
   // 予定作成モーダル
   const [showCreateEvent, setShowCreateEvent] = useState(false);
-  const [showMikanOrganize, setShowMikanOrganize] = useState(false);
   // メッセージからのタスク化モーダル（対象メッセージを保持）
   const [taskFromMessage, setTaskFromMessage] = useState<MessageWithProfile | null>(null);
   // このチャンネルでイベントが紐づいているメッセージID集合
   const [eventMessageIds, setEventMessageIds] = useState<Set<string>>(new Set());
+  // みかん（全画面共通のボタン）から予定が登録されたら、その投稿に予定カードを出す
+  useEffect(() => {
+    const onEventCreated = (e: Event) => {
+      const messageId = (e as CustomEvent<{ messageId?: string }>).detail?.messageId;
+      if (!messageId) return;
+      setEventMessageIds((prev) => new Set(prev).add(messageId));
+    };
+    window.addEventListener("huddle:eventCreated", onEventCreated);
+    return () => window.removeEventListener("huddle:eventCreated", onEventCreated);
+  }, []);
   // このチャンネルで投票が紐づいているメッセージID集合
   const [pollMessageIds, setPollMessageIds] = useState<Set<string>>(new Set());
   // このタブが自分で送信して既に楽観的反映済みのメッセージID集合。
@@ -1912,21 +1920,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
               </button>
             )}
           </div>
-          <div className="flex items-center gap-1 shrink-0 ml-auto lg:pr-2">
-            {/* みかんに整理してもらう: 会話からタスク・予定の候補を拾う（押したときだけ動く） */}
-            {!channel.is_dm && !channel.is_hitorigoto && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowMikanOrganize(true);
-                }}
-                className="flex items-center gap-1 rounded-full border border-border bg-surface px-2.5 py-1 text-xs font-bold text-foreground hover:bg-sidebar-hover transition-colors"
-                title="会話からタスクと予定を拾う"
-              >
-                <HuddleMark size={13} />
-                整理
-              </button>
-            )}
+          <div className="flex items-center shrink-0 ml-auto lg:pr-2">
             {/* 全ての操作は ⋯ メニューに集約（タイトルが長くても崩れない） */}
             <div className="relative" ref={overflowMenuRef}>
               <button
@@ -2602,18 +2596,6 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
             setEventMessageIds((prev) => { const next = new Set(prev); next.add(messageId); return next; });
           }}
           onClose={() => setShowCreateEvent(false)}
-        />
-      )}
-
-      {/* みかんに整理してもらうモーダル */}
-      {showMikanOrganize && (
-        <MikanOrganizeModal
-          scope={{ channelId: channel.id, channelName: channel.name }}
-          currentUserId={currentUserId}
-          onEventCreated={(messageId) => {
-            setEventMessageIds((prev) => { const next = new Set(prev); next.add(messageId); return next; });
-          }}
-          onClose={() => setShowMikanOrganize(false)}
         />
       )}
 

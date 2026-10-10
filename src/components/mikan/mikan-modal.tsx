@@ -32,13 +32,21 @@ type ExistingEvent = { title: string; start_at: string; location: string | null;
 // 何を確認するか。ホームでは最初に選んでもらい、選んでから AI が会話を読む
 type Mode = "my_tasks" | "week_events" | "all";
 
+// いま開いている画面。メニューの並び（その画面で一番使いそうなものを先頭に）を決める
+export type MikanContext = "home" | "channel" | "tasks" | "calendar" | "other";
+
+// メニューで選んだ内容: どこを読むか（今のチャンネルだけ／参加チャンネル全部）と、何を拾うか
+type Choice = { scope: "channel" | "workspace"; mode: Mode };
+
 type Props = {
-  /** どこの会話を読むか。チャンネル1つ、または自分が参加しているチャンネル全部 */
-  scope: { channelId: string; channelName: string } | { workspaceId: string };
+  workspaceId: string;
+  /** いま開いているチャンネル（通常チャンネルを開いているときだけ） */
+  channel: { id: string; name: string } | null;
+  context: MikanContext;
   currentUserId: string;
-  /** 予定を登録したとき、その予定カード用メッセージの ID を親に伝える（チャンネル画面用） */
+  /** 予定を登録したとき、その予定カード用メッセージの ID を知らせる */
   onEventCreated?: (messageId: string) => void;
-  /** 1件でも登録したら呼ぶ（ホームの取り直し用） */
+  /** 1件でも登録したら呼ぶ（画面の取り直し用） */
   onRegistered?: () => void;
   onClose: () => void;
 };
@@ -58,17 +66,15 @@ function formatDueJa(date: string): string {
   return `${d.getMonth() + 1}月${d.getDate()}日(${DAY_NAMES[d.getDay()]})まで`;
 }
 
-/** みかんがチャンネルの会話から拾ったタスク・予定の候補を、選んで登録するモーダル */
-export function MikanOrganizeModal({ scope, currentUserId, onEventCreated, onRegistered, onClose }: Props) {
+/** みかん: 何を確認するか選んでもらい、会話から拾ったタスク・予定の候補を選んで登録するモーダル */
+export function MikanModal({ workspaceId, channel, context, currentUserId, onEventCreated, onRegistered, onClose }: Props) {
   const supabase = useMemo(() => createClient(), []);
-  const isAll = "workspaceId" in scope;
-  // 依存配列に入れるため、対象を文字列にしておく
-  const scopeKey = isAll ? `ws:${scope.workspaceId}` : `ch:${scope.channelId}`;
-  // ホーム（全チャンネル）は選択画面から始める。チャンネル画面の「整理」はそのチャンネルを全部拾う
-  const [mode, setMode] = useState<Mode | null>(isAll ? null : "all");
-  const [phase, setPhase] = useState<"menu" | "loading" | "ready" | "saving" | "done" | "error">(
-    isAll ? "menu" : "loading"
-  );
+  // 必ず選択画面から始め、選んでから AI が会話を読む
+  const [choice, setChoice] = useState<Choice | null>(null);
+  const mode = choice?.mode ?? null;
+  // 参加チャンネル全部を読んでいるか（候補にチャンネル名を添えるかどうか等に使う）
+  const isAll = choice?.scope !== "channel";
+  const [phase, setPhase] = useState<"menu" | "loading" | "ready" | "saving" | "done" | "error">("menu");
   const [existingTasks, setExistingTasks] = useState<ExistingTask[]>([]);
   const [existingEvents, setExistingEvents] = useState<ExistingEvent[]>([]);
   const [errorMessage, setErrorMessage] = useState("");
@@ -84,7 +90,7 @@ export function MikanOrganizeModal({ scope, currentUserId, onEventCreated, onReg
   });
 
   useEffect(() => {
-    if (!mode) return;
+    if (!choice) return;
     let cancelled = false;
     (async () => {
       try {
@@ -97,8 +103,8 @@ export function MikanOrganizeModal({ scope, currentUserId, onEventCreated, onReg
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify({
-            ...(scopeKey.startsWith("ws:") ? { workspace_id: scopeKey.slice(3) } : { channel_id: scopeKey.slice(3) }),
-            mode,
+            ...(choice.scope === "channel" && channel ? { channel_id: channel.id } : { workspace_id: workspaceId }),
+            mode: choice.mode,
           }),
         });
         if (!res.ok) {
@@ -137,20 +143,22 @@ export function MikanOrganizeModal({ scope, currentUserId, onEventCreated, onReg
     return () => {
       cancelled = true;
     };
-  }, [scopeKey, mode, supabase]);
+    // channel は親が毎回作り直すオブジェクトなので、ID だけを依存に入れる
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [choice, workspaceId, channel?.id, supabase]);
 
-  function choose(next: Mode) {
+  function choose(next: Choice) {
     setTasks([]);
     setEvents([]);
     setExistingTasks([]);
     setExistingEvents([]);
     setChecked(new Set());
     setPhase("loading");
-    setMode(next);
+    setChoice(next);
   }
 
   function backToMenu() {
-    setMode(null);
+    setChoice(null);
     setPhase("menu");
   }
 
@@ -246,15 +254,49 @@ export function MikanOrganizeModal({ scope, currentUserId, onEventCreated, onReg
   const existingTotal = existingTasks.length + existingEvents.length;
   const loadingLabel =
     mode === "my_tasks" ? "あなたのタスクを探しています" : mode === "week_events" ? "これから7日間の予定を探しています" : "やることと、日時の決まった予定を探しています";
-  const subtitle = !isAll
-    ? `# ${scope.channelName} の最近の会話から`
-    : mode === "my_tasks"
-      ? "あなたのタスク（登録済み＋会話から）"
-      : mode === "week_events"
-        ? "これから7日間の予定（登録済み＋会話から）"
-        : mode === "all"
-          ? "参加しているチャンネル全体の、この1週間の会話から"
-          : "何を確認しますか？";
+  const subtitle = !choice
+    ? "何を確認しますか？"
+    : choice.scope === "channel"
+      ? `# ${channel?.name ?? ""} の最近の会話から`
+      : mode === "my_tasks"
+        ? "あなたのタスク（登録済み＋会話から）"
+        : mode === "week_events"
+          ? "これから7日間の予定（登録済み＋会話から）"
+          : "参加しているチャンネル全体の、この1週間の会話から";
+
+  // メニュー。いまの画面で一番使いそうなものを先頭に置く
+  type MenuItem = { key: string; choice: Choice; icon: "checkSquare" | "calendar" | "inbox"; title: string; desc: string };
+  const myTasksItem: MenuItem = {
+    key: "my_tasks",
+    choice: { scope: "workspace", mode: "my_tasks" },
+    icon: "checkSquare",
+    title: "自分のタスクを確認する",
+    desc: "登録済みのタスクと、会話の中であなたが頼まれたこと・やると言ったこと",
+  };
+  const weekEventsItem: MenuItem = {
+    key: "week_events",
+    choice: { scope: "workspace", mode: "week_events" },
+    icon: "calendar",
+    title: "今週の予定を確認する",
+    desc: "これから7日間の登録済みの予定と、会話に出てきたまだ登録していない予定",
+  };
+  const channelItem: MenuItem | null = channel
+    ? {
+        key: "channel",
+        choice: { scope: "channel", mode: "all" },
+        icon: "inbox",
+        title: "このチャンネルのやること・予定を拾う",
+        desc: `# ${channel.name} の直近2週間の会話から、まだ登録していないものを探す`,
+      }
+    : null;
+  const menuItems: MenuItem[] = (
+    context === "channel"
+      ? [channelItem, myTasksItem, weekEventsItem]
+      : context === "calendar"
+        ? [weekEventsItem, myTasksItem, channelItem]
+        : [myTasksItem, weekEventsItem, channelItem]
+  ).filter((item): item is MenuItem => !!item);
+
   const checkbox = "mt-0.5 h-[18px] w-[18px] shrink-0 accent-accent";
   const row = "flex items-start gap-3 rounded-xl border border-border px-3 py-2.5 cursor-pointer";
 
@@ -284,45 +326,33 @@ export function MikanOrganizeModal({ scope, currentUserId, onEventCreated, onReg
         <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4">
           {phase === "menu" && (
             <div className="space-y-2.5">
-              <button
-                type="button"
-                onClick={() => choose("my_tasks")}
-                className="flex w-full items-center gap-3 rounded-2xl border border-border px-4 py-3.5 text-left hover:bg-sidebar-hover transition-colors"
-              >
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--home-accent-soft)] text-accent">
-                  <UiIcon name="checkSquare" size={20} />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-bold text-foreground">自分のタスクを確認する</span>
-                  <span className="mt-0.5 block text-xs text-muted">
-                    登録済みのタスクと、会話の中であなたが頼まれたこと・やると言ったこと
+              {menuItems.map((item, i) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => choose(item.choice)}
+                  className={`flex w-full items-center gap-3 rounded-2xl border px-4 py-3.5 text-left hover:bg-sidebar-hover transition-colors ${
+                    i === 0 ? "border-[var(--home-accent)]" : "border-border"
+                  }`}
+                >
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--home-accent-soft)] text-accent">
+                    <UiIcon name={item.icon} size={20} />
                   </span>
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => choose("week_events")}
-                className="flex w-full items-center gap-3 rounded-2xl border border-border px-4 py-3.5 text-left hover:bg-sidebar-hover transition-colors"
-              >
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--home-accent-soft)] text-accent">
-                  <UiIcon name="calendar" size={20} />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-bold text-foreground">今週の予定を確認する</span>
-                  <span className="mt-0.5 block text-xs text-muted">
-                    これから7日間の登録済みの予定と、会話に出てきたまだ登録していない予定
+                  <span className="min-w-0">
+                    <span className="block text-sm font-bold text-foreground">{item.title}</span>
+                    <span className="mt-0.5 block text-xs text-muted">{item.desc}</span>
                   </span>
-                </span>
-              </button>
+                </button>
+              ))}
               <button
                 type="button"
-                onClick={() => choose("all")}
+                onClick={() => choose({ scope: "workspace", mode: "all" })}
                 className="w-full px-4 py-2 text-center text-xs text-muted underline underline-offset-2"
               >
                 チーム全体のやること・予定をまとめて拾う
               </button>
               <p className="pt-1 text-[11px] leading-relaxed text-muted">
-                選ぶと、みかんがあなたの参加しているチャンネルのこの1週間の会話を読みます。数秒〜十数秒かかります。
+                選ぶと、みかんが会話を読みます。数秒〜十数秒かかります。
               </p>
             </div>
           )}
@@ -503,7 +533,7 @@ export function MikanOrganizeModal({ scope, currentUserId, onEventCreated, onReg
             </>
           ) : (
             <>
-              {isAll && phase !== "menu" && phase !== "loading" && (
+              {phase !== "menu" && phase !== "loading" && (
                 <button onClick={backToMenu} className="px-4 py-2 text-sm text-muted">
                   ほかを確認する
                 </button>
