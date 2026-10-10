@@ -93,7 +93,7 @@ export default function ChannelInvitePage() {
     return (
       <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "var(--color-background)", padding: 16 }}>
         <div style={{ textAlign: "center" }}>
-          <h1 style={{ fontSize: 28, fontWeight: 700, color: "var(--color-accent)" }}>Huddle</h1>
+          <h1 style={{ fontSize: 28, fontWeight: 700, color: "var(--color-foreground)" }}>Huddle</h1>
           <p style={{ marginTop: 16, color: "var(--color-muted)" }}>読み込み中...</p>
         </div>
       </div>
@@ -104,11 +104,11 @@ export default function ChannelInvitePage() {
     return (
       <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "var(--color-background)", padding: 16 }}>
         <div style={{ width: "100%", maxWidth: 360, textAlign: "center" }}>
-          <h1 style={{ fontSize: 28, fontWeight: 700, color: "var(--color-accent)" }}>Huddle</h1>
+          <h1 style={{ fontSize: 28, fontWeight: 700, color: "var(--color-foreground)" }}>Huddle</h1>
           <div style={{ marginTop: 24, borderRadius: 12, background: "rgba(239,68,68,0.1)", padding: 16, fontSize: 14, color: "#ef4444" }}>
             {error}
           </div>
-          <a href="/login" style={{ display: "inline-block", marginTop: 16, fontSize: 14, color: "var(--color-accent)" }}>
+          <a href="/login" style={{ display: "inline-block", marginTop: 16, fontSize: 14, color: "var(--home-accent-ink)" }}>
             ログインページへ
           </a>
         </div>
@@ -119,7 +119,7 @@ export default function ChannelInvitePage() {
   return (
     <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "var(--color-background)", padding: 16 }}>
       <div style={{ width: "100%", maxWidth: 360, textAlign: "center" }}>
-        <h1 style={{ fontSize: 28, fontWeight: 700, color: "var(--color-accent)" }}>Huddle</h1>
+        <h1 style={{ fontSize: 28, fontWeight: 700, color: "var(--color-foreground)" }}>Huddle</h1>
         <div style={{ marginTop: 24 }}>
           <p style={{ fontSize: 18, color: "var(--color-foreground)" }}>
             <span style={{ fontWeight: 600 }}>{info?.workspace_name}</span>
@@ -144,7 +144,7 @@ export default function ChannelInvitePage() {
               disabled={joining}
               style={{
                 width: "100%", borderRadius: 12, padding: "12px 24px",
-                fontSize: 16, fontWeight: 600, color: "#fff",
+                fontSize: 16, fontWeight: 600, color: "var(--home-on-accent)",
                 background: "var(--color-accent)", border: "none", cursor: "pointer",
                 opacity: joining ? 0.5 : 1,
               }}
@@ -157,7 +157,7 @@ export default function ChannelInvitePage() {
                 href={`/signup?invite_channel=${token}`}
                 style={{
                   display: "block", width: "100%", borderRadius: 12, padding: "12px 24px",
-                  fontSize: 16, fontWeight: 600, color: "#fff", textAlign: "center",
+                  fontSize: 16, fontWeight: 600, color: "var(--home-on-accent)", textAlign: "center",
                   background: "var(--color-accent)", textDecoration: "none",
                 }}
               >

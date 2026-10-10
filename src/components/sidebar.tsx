@@ -904,19 +904,19 @@ export function Sidebar({
           style={{ padding: "12px 16px", height: 56, background: isDesktop ? "var(--color-sidebar)" : "var(--color-surface)" }}
         >
           {/* 左: WS名 + シェブロン */}
-          <div className="relative" style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }} ref={wsSwitcherRef}>
+          <div className="relative" style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 1, minWidth: 0 }} ref={wsSwitcherRef}>
             <button
               onClick={() => setShowWsSwitcher((prev) => !prev)}
-              style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer" }}
+              style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", minWidth: 0, maxWidth: "100%" }}
             >
               {/* ロゴアイコン（PCのみ。モバイルモックにはない） */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              {isDesktop && <img src="/icons/icon-192.png" alt="Huddle" style={{ width: 28, height: 28, borderRadius: 7 }} />}
-              <span style={{ fontSize: isDesktop ? 14 : 17, fontWeight: isDesktop ? 700 : 650, color: "var(--color-foreground)", whiteSpace: "nowrap" }}>{workspace.name}</span>
+              {isDesktop && <img src="/icons/icon-192.png" alt="Huddle" style={{ width: 28, height: 28, borderRadius: 7, flexShrink: 0 }} />}
+              <span style={{ fontSize: isDesktop ? 14 : 17, fontWeight: isDesktop ? 700 : 650, color: "var(--color-foreground)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{workspace.name}</span>
               {Object.keys(unreadByWorkspace).length > 0 && (
                 <span style={{ width: 10, height: 10, borderRadius: "50%", background: "var(--color-mention)", flexShrink: 0 }} />
               )}
-              <svg style={{ width: 16, height: 16, color: "var(--color-muted)" }} fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+              <svg style={{ width: 16, height: 16, color: "var(--color-muted)", flexShrink: 0 }} fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
               </svg>
             </button>
@@ -1027,31 +1027,31 @@ export function Sidebar({
           </div>
 
           {/* 中: モバイルのみ進行中/決定チップ（ヘッダー行内、モック準拠） */}
-          <div className="flex lg:hidden" style={{ gap: 4, marginLeft: "auto", marginRight: 2 }}>
+          <div className="flex lg:hidden" style={{ gap: 4, marginLeft: "auto", marginRight: 2, flexShrink: 0 }}>
             <Link
               href={`/${workspaceSlug}/in-progress`}
               onClick={() => setSidebarOpen(false)}
-              style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", height: 28, borderRadius: 999, border: "none", cursor: "pointer", background: "#EAF8FF", textDecoration: "none" }}
+              style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", height: 28, borderRadius: 999, border: "none", cursor: "pointer", background: "var(--color-surface)", boxShadow: "inset 0 0 0 1px var(--color-border)", textDecoration: "none" }}
             >
-              <span style={{ fontSize: 11, fontWeight: 600, color: "var(--color-foreground)" }}>進行中</span>
-              <span style={{ fontSize: 9, fontWeight: 700, color: "var(--color-sky)", width: 16, height: 16, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", background: "#fff" }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: "var(--color-foreground)", whiteSpace: "nowrap" }}>進行中</span>
+              <span style={{ fontSize: 9, fontWeight: 700, color: "var(--color-muted)", width: 16, height: 16, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--color-input-bg)" }}>
                 {inProgressCount}
               </span>
             </Link>
             <Link
               href={`/${workspaceSlug}/dashboard`}
               onClick={() => setSidebarOpen(false)}
-              style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", height: 28, borderRadius: 999, border: "none", cursor: "pointer", background: "#FFF1EA", textDecoration: "none" }}
+              style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", height: 28, borderRadius: 999, border: "none", cursor: "pointer", background: "var(--color-surface)", boxShadow: "inset 0 0 0 1px var(--color-border)", textDecoration: "none" }}
             >
-              <span style={{ fontSize: 11, fontWeight: 600, color: "var(--color-foreground)" }}>決定</span>
-              <span style={{ fontSize: 9, fontWeight: 700, color: "var(--color-accent)", width: 16, height: 16, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", background: "#fff" }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: "var(--color-foreground)", whiteSpace: "nowrap" }}>決定</span>
+              <span style={{ fontSize: 9, fontWeight: 700, color: decisionUnreadCount > 0 ? "var(--home-on-accent)" : "var(--color-muted)", width: 16, height: 16, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", background: decisionUnreadCount > 0 ? "var(--home-accent)" : "var(--color-input-bg)" }}>
                 {decisionUnreadCount}
               </span>
             </Link>
           </div>
 
           {/* 右: アイコン群 — PC: 30px/18px/muted、モバイル: 44px/23px/fg */}
-          <div style={{ display: "flex", gap: 0, alignItems: "center", marginLeft: isDesktop ? "auto" : 6 }}>
+          <div style={{ display: "flex", gap: 0, alignItems: "center", marginLeft: isDesktop ? "auto" : 6, flexShrink: 0 }}>
             {/* 検索（PCのみ） */}
             {isDesktop && (
               <Link
@@ -1083,7 +1083,7 @@ export function Sidebar({
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
               </svg>
               {dmUnreadTotal > 0 && (
-                <span style={{ position: "absolute", top: 4, right: 2, width: 8, height: 8, borderRadius: "50%", background: "var(--color-accent)" }} />
+                <span style={{ position: "absolute", top: 4, right: 2, width: 8, height: 8, borderRadius: "50%", background: "var(--color-mention)" }} />
               )}
             </Link>
             {/* ベル */}
@@ -1104,14 +1104,14 @@ export function Sidebar({
                 <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
               </svg>
               {hasUnreadActivity && (
-                <span style={{ position: "absolute", top: 4, right: 4, width: 8, height: 8, borderRadius: "50%", background: "var(--color-accent)" }} />
+                <span style={{ position: "absolute", top: 4, right: 4, width: 8, height: 8, borderRadius: "50%", background: "var(--color-mention)" }} />
               )}
             </button>
           </div>
         </div>
 
         {/* グラデーションライン（モバイルモック準拠、PCにはない） */}
-        <div className="lg:hidden" style={{ height: 0.75, background: "linear-gradient(90deg, #E96832, #38BDF8)" }} />
+        <div className="lg:hidden" style={{ height: 1, background: "var(--color-border)" }} />
 
         {/* 固定エリア: 進行中・決定 + 独り言 + カレンダー等 */}
         <div className="shrink-0" style={{ padding: "8px 12px 0" }}>
@@ -1564,7 +1564,7 @@ export function Sidebar({
                 {dmShowUnreadStyle && (
                   <span style={{
                     width: 20, height: 20, borderRadius: "50%",
-                    fontSize: 10, fontWeight: 700, color: "#fff",
+                    fontSize: 10, fontWeight: 700, color: "var(--home-on-accent)",
                     display: "flex", alignItems: "center", justifyContent: "center",
                     background: "var(--color-accent)",
                   }}>
@@ -1970,7 +1970,7 @@ export function Sidebar({
                   disabled={!newCatLabel.trim() || catAdding}
                   style={{
                     flexShrink: 0, borderRadius: 10, padding: "8px 16px",
-                    fontSize: 13, fontWeight: 600, color: "#fff",
+                    fontSize: 13, fontWeight: 600, color: "var(--home-on-accent)",
                     background: "var(--color-accent)", border: "none", cursor: "pointer",
                     opacity: (!newCatLabel.trim() || catAdding) ? 0.5 : 1,
                   }}
@@ -2024,7 +2024,7 @@ export function Sidebar({
               }}
               style={{
                 width: "100%", marginTop: 16, borderRadius: 10, padding: "10px 0",
-                fontSize: 14, fontWeight: 600, color: "#fff",
+                fontSize: 14, fontWeight: 600, color: "var(--home-on-accent)",
                 background: "var(--color-accent)", border: "none", cursor: "pointer",
               }}
             >
@@ -2533,7 +2533,7 @@ function ChannelCategoryList({
               </svg>
               <span style={{ fontSize: isDesktop ? 12 : 14, fontWeight: 650, color: "var(--color-foreground)", opacity: 0.7, flex: 1, textAlign: "left" as const }}>{label}</span>
               {isCollapsedCat && unreadTotal > 0 && (
-                <span style={{ width: 18, height: 18, borderRadius: "50%", fontSize: 10, fontWeight: 700, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--color-accent)" }}>{unreadTotal > 99 ? "99+" : unreadTotal}</span>
+                <span style={{ width: 18, height: 18, borderRadius: "50%", fontSize: 10, fontWeight: 700, color: "var(--home-on-accent)", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--color-accent)" }}>{unreadTotal > 99 ? "99+" : unreadTotal}</span>
               )}
             </button>
             {!isCollapsedCat && list.map((channel) => renderChannelRow(channel, color))}

@@ -3,7 +3,7 @@
 /* デフォルトは Dawn（ライト）。data-theme 未設定でも初回ロード時にちらつかない。
    ダークモードに切り替える場合は [data-theme="midnight"] が下で上書きする。 */
 @theme {
-  /* Dawn — モノクロ基調 + オレンジ×水色アクセント */
+  /* Dawn — モノクロ基調 + 黄色アクセント */
   --color-background: #FAFAF8;
   --color-background-soft: #F5F5F2;
   --color-surface: #FFFFFF;
@@ -16,9 +16,9 @@
   --color-border-subtle: #F0F0EE;
   --color-foreground: #111111;
   --color-muted: #6B7280;
-  --color-accent: #E96832;
-  --color-accent-hover: #D55E2B;
-  --color-accent-soft: #FEF0E8;
+  --color-accent: #FFD233;
+  --color-accent-hover: #F5C400;
+  --color-accent-soft: #FFF6CF;
   --color-sky: #38BDF8;
   --color-sky-hover: #0EA5E9;
   --color-sky-soft: #EDF6FC;
@@ -117,6 +117,23 @@ html {
   --home-accent-ink: #FFD233;
   --home-accent-soft: rgba(255, 210, 51, 0.14);
   --home-accent-line: rgba(255, 210, 51, 0.3);
+}
+
+/* アクセント色を黄色にしたため、全画面共通で読みやすさを担保する。
+   - 黄色の面（bg-accent）の上は白文字ではなく濃い文字
+   - 文字として使うアクセント（text-accent）は琥珀色
+   レイヤー外に置くことで Tailwind のユーティリティ（text-white 等）より優先される */
+.bg-accent {
+  color: var(--home-on-accent);
+}
+.bg-accent .text-white {
+  color: inherit;
+}
+.text-accent,
+.hover\:text-accent:hover,
+.text-accent-hover,
+.hover\:text-accent-hover:hover {
+  color: var(--home-accent-ink);
 }
 
 /* ホームのカード: 下からスライド＋フェード */
@@ -407,9 +424,9 @@ html {
   --color-border-subtle: #1f1f2e;
   --color-foreground: #e4e4ed;
   --color-muted: #6b6b80;
-  --color-accent: #E96832;
-  --color-accent-hover: #FF9060;
-  --color-accent-soft: rgba(233, 104, 50, 0.15);
+  --color-accent: #FFD233;
+  --color-accent-hover: #FFDD5C;
+  --color-accent-soft: rgba(255, 210, 51, 0.14);
   --color-sky: #38BDF8;
   --color-sky-hover: #5CCCFA;
   --color-sky-soft: rgba(56, 189, 248, 0.12);
@@ -440,9 +457,9 @@ html {
   --color-border-subtle: #E8E2D6;
   --color-foreground: #2c2418;
   --color-muted: #8a7e6e;
-  --color-accent: #E96832;
-  --color-accent-hover: #D55E2B;
-  --color-accent-soft: #FEF0E8;
+  --color-accent: #FFD233;
+  --color-accent-hover: #F5C400;
+  --color-accent-soft: #FFF6CF;
   --color-sky: #38BDF8;
   --color-sky-hover: #0EA5E9;
   --color-sky-soft: #EAF8FF;
