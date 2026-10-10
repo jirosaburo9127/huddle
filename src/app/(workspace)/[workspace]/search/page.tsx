@@ -1,5 +1,6 @@
 "use client";
 
+import { stripSystemEmoji } from "@/lib/system-post-icons";
 import { useState, useRef, useEffect } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
@@ -167,7 +168,7 @@ export default function SearchPage() {
                   <span className="text-xs text-accent ml-auto shrink-0">#{r.channel_name.length > 10 ? r.channel_name.slice(0, 10) + "…" : r.channel_name}</span>
                 </div>
                 <div className="text-sm text-foreground/80 line-clamp-2 break-words">
-                  {renderHighlighted(r.content.replace(/\n/g, " ").slice(0, 150), query)}
+                  {renderHighlighted(stripSystemEmoji(r.content).replace(/\n/g, " ").slice(0, 150), query)}
                 </div>
               </button>
             ))}

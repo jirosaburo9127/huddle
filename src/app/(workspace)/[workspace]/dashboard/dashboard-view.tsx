@@ -1,5 +1,6 @@
 "use client";
 
+import { stripSystemEmoji } from "@/lib/system-post-icons";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
@@ -374,7 +375,7 @@ export function DashboardView({
                       WebkitLineClamp: 2,
                       WebkitBoxOrient: "vertical" as const,
                     }}>
-                      {d.content}
+                      {stripSystemEmoji(d.content)}
                     </div>
                   )}
 

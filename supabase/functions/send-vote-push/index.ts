@@ -161,7 +161,7 @@ Deno.serve(async (req) => {
     const optionLabel = options[record.option_index] || `選択肢${record.option_index + 1}`;
 
     const voterName = voter?.display_name || "メンバー";
-    const title = `📊 ${voterName} が投票 (#${channel.name})`;
+    const title = `${voterName} が投票 (#${channel.name})`;
     const body = `「${optionLabel}」に投票しました`;
     const showBanner = !isMuted;
 

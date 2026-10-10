@@ -152,7 +152,7 @@ Deno.serve(async (req) => {
     const actorName = actor?.display_name || "メンバー";
     const taskTitle = (task.title || "").replace(/\s+/g, " ").trim().slice(0, 40);
     const dueText = task.due_date ? `（期限 ${formatDue(task.due_date)}）` : "";
-    const title = `📋 ${actorName}がタスクを割り当て`;
+    const title = `${actorName}がタスクを割り当て`;
     const body = `「${taskTitle}」${dueText}`;
 
     // APNs送信

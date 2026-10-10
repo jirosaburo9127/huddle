@@ -272,7 +272,7 @@ async function processUrl(
   if (!summary) {
     // 取得失敗 → 概要依頼メッセージ + archive_pending 登録
     const requestText =
-      `<@${args.sourceMessage.user_id}> このページの中身を読み取れませんでした 🙏\n\n` +
+      `<@${args.sourceMessage.user_id}> このページの中身を読み取れませんでした\n\n` +
       `${args.url}\n\n` +
       `1〜2 行で概要を書いてもらえると、#みんなでお勉強 に転記します`;
 
@@ -316,7 +316,7 @@ async function archiveWithSummary(
   },
 ) {
   const content =
-    `📎 ${args.summary}\n${args.url}\n\n— ${args.userName} さんが #${args.channelName} に投稿`;
+    `${args.summary}\n${args.url}\n\n— ${args.userName} さんが #${args.channelName} に投稿`;
 
   await supabase.from("messages").insert({
     channel_id: LEARNING_CHANNEL_ID,

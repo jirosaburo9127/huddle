@@ -75,7 +75,8 @@ const SYSTEM_PROMPT_ACTIVE_DISCUSSION = `あなたは「みかん」というオ
 
 # 出力形式
 - 1回の返信は本文のみ。短く。
-- 返信先のメッセージへの引用は不要`;
+- 返信先のメッセージへの引用は不要
+- 絵文字は使わない（顔文字・記号の絵文字も含む）。文章だけで伝える`;
 
 // ファシリテーターとしての通常会話 + 予定登録 (mention 起点)
 const SYSTEM_PROMPT_MENTION = `あなたは「みかん」というオンラインチームチャットのファシリテーター AI です。
@@ -164,7 +165,7 @@ const SYSTEM_PROMPT_MENTION = `あなたは「みかん」というオンライ�
 ## 引用フォーマット (重要)
 返信の本文を書き終わったあと、参照した一次情報を文末にコンパクトに付けてください:
 
-📚 参考:
+参考:
 ・[出典名](URL)
 ・[出典名](URL)
 
@@ -192,7 +193,10 @@ const SYSTEM_PROMPT_MENTION = `あなたは「みかん」というオンライ�
 # 出力形式
 - 1回の返信は本文のみ。短く。
 - 名前を呼ぶ時は表示名をそのまま使う
-- 返信先のメッセージへの引用は不要（システム側で文脈付与する）`;
+- 返信先のメッセージへの引用は不要（システム側で文脈付与する）
+
+# 表記
+- 絵文字は使わない（顔文字・記号の絵文字も含む）。文章だけで伝える`;
 
 // =============================================================================
 // ツール定義
@@ -239,7 +243,7 @@ async function postEventProposal(
   const jaDate = formatDateTimeJa(startAt.toISOString());
   const locLine = args.location ? `\n📍 ${args.location}` : "";
   const proposalContent =
-    `📅 予定の登録を提案します\n\n「${args.title}」\n${jaDate}${locLine}\n\nこのメッセージにリアクションすると登録します ✅`;
+    `📅 予定の登録を提案します\n\n「${args.title}」\n${jaDate}${locLine}\n\nこのメッセージにリアクションすると登録します`;
 
   const { data: msgData, error: insertErr } = await supabase
     .from("messages")
@@ -769,7 +773,7 @@ Deno.serve(async (req) => {
         await supabase.from("messages").insert({
           channel_id: msg.channel_id,
           user_id: MIKAN_USER_ID,
-          content: `${reason} 🤔`,
+          content: reason,
         });
         return new Response("event not found", { status: 200 });
       }
@@ -799,7 +803,7 @@ Deno.serve(async (req) => {
         await supabase.from("messages").insert({
           channel_id: msg.channel_id,
           user_id: MIKAN_USER_ID,
-          content: "予定の更新に失敗しました 🙏",
+          content: "予定の更新に失敗しました",
         });
         return new Response("update failed", { status: 200 });
       }
@@ -846,7 +850,7 @@ Deno.serve(async (req) => {
         await supabase.from("messages").insert({
           channel_id: msg.channel_id,
           user_id: MIKAN_USER_ID,
-          content: "チャンネル名を教えてください 🤔",
+          content: "チャンネル名を教えてください",
         });
         return new Response("no channel name", { status: 200 });
       }
@@ -876,7 +880,7 @@ Deno.serve(async (req) => {
         await supabase.from("messages").insert({
           channel_id: msg.channel_id,
           user_id: MIKAN_USER_ID,
-          content: `「${channelName}」というチャンネルが見つかりませんでした ${workspaceName ? `(${workspaceName}内)` : ""} 🤔`,
+          content: `「${channelName}」というチャンネルが見つかりませんでした ${workspaceName ? `(${workspaceName}内)` : ""}`.trim(),
         });
         return new Response("channel not found", { status: 200 });
       }
@@ -937,7 +941,7 @@ Deno.serve(async (req) => {
         await supabase.from("messages").insert({
           channel_id: msg.channel_id,
           user_id: MIKAN_USER_ID,
-          content: "要約の生成に失敗しました 🙏",
+          content: "要約の生成に失敗しました",
         });
         return new Response("summary failed", { status: 200 });
       }
@@ -949,7 +953,7 @@ Deno.serve(async (req) => {
         .join("\n")
         .trim();
 
-      const header = `📝 **${targetChannel.name}**${wsName ? `（${wsName}）` : ""} の要約\n\n`;
+      const header = `**${targetChannel.name}**${wsName ? `（${wsName}）` : ""} の要約\n\n`;
       await supabase.from("messages").insert({
         channel_id: msg.channel_id,
         user_id: MIKAN_USER_ID,
@@ -980,7 +984,7 @@ Deno.serve(async (req) => {
         await supabase.from("messages").insert({
           channel_id: msg.channel_id,
           user_id: MIKAN_USER_ID,
-          content: "リマインドのオフセットがうまく解釈できませんでした 🙏",
+          content: "リマインドのオフセットがうまく解釈できませんでした",
         });
         return new Response("invalid offset", { status: 200 });
       }
@@ -1008,7 +1012,7 @@ Deno.serve(async (req) => {
         await supabase.from("messages").insert({
           channel_id: msg.channel_id,
           user_id: MIKAN_USER_ID,
-          content: `${reason} 🤔`,
+          content: reason,
         });
         return new Response("event not found", { status: 200 });
       }
@@ -1025,7 +1029,7 @@ Deno.serve(async (req) => {
         await supabase.from("messages").insert({
           channel_id: msg.channel_id,
           user_id: MIKAN_USER_ID,
-          content: "リマインドの設定変更に失敗しました 🙏",
+          content: "リマインドの設定変更に失敗しました",
         });
         return new Response("update failed", { status: 500 });
       }

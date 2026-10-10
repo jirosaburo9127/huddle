@@ -395,15 +395,20 @@ Deno.serve(async (req) => {
       if (systemEvent === "decision_marked") return "決定事項を登録しました";
       if (systemEvent === "member_joined") return "ワークスペースに参加しました";
       // @記号だけ除去して宛名は残す（「@田中太郎」→「田中太郎」）
-      const stripped = (content || "").replace(/(^|\s)@(\S{1,40})/g, "$1$2");
+      // 予定・アルバムの自動投稿は、行頭の目印の絵文字（📅📍📸）を通知文面から外す
+      const isSystemPost = /^\s*(📅|📸)/u.test(content || "");
+      const withoutMarks = isSystemPost
+        ? (content || "").replace(/(^|\n)(\s*)(?:📅|📍|📸)\uFE0F?\s*/gu, "$1$2")
+        : content || "";
+      const stripped = withoutMarks.replace(/(^|\s)@(\S{1,40})/g, "$1$2");
       const lines = stripped.split("\n");
       const transformed = lines
         .map((line) => {
           const t = line.trim();
           if (/^https:\/\/[^\s]*\/storage\/v1\/object\/public\/chat-files\//.test(t)) {
-            if (/\.(jpg|jpeg|png|gif|webp|svg|heic)(\?|#|$)/i.test(t)) return "📷 画像";
-            if (/\.(mp4|mov|webm|m4v)(\?|#|$)/i.test(t)) return "🎥 動画";
-            return "📎 ファイル";
+            if (/\.(jpg|jpeg|png|gif|webp|svg|heic)(\?|#|$)/i.test(t)) return "画像";
+            if (/\.(mp4|mov|webm|m4v)(\?|#|$)/i.test(t)) return "動画";
+            return "ファイル";
           }
           return line;
         })
@@ -419,21 +424,21 @@ Deno.serve(async (req) => {
     function buildTitle(isMentioned: boolean): string {
       // 投票作成 / 投票締切
       if (record.system_event === "poll_created") {
-        return `📊 ${senderName} が投票を作成 (#${channel.name})`;
+        return `${senderName} が投票を作成 (#${channel.name})`;
       }
       if (record.system_event === "poll_closed") {
-        return `📊 投票が締め切られました (#${channel.name})`;
+        return `投票が締め切られました (#${channel.name})`;
       }
       // 決定事項
       if (record.system_event === "decision_marked") {
-        return `✅ ${senderName} が決定事項を登録 (#${channel.name})`;
+        return `${senderName} が決定事項を登録 (#${channel.name})`;
       }
       // スレッド返信
       if (isThreadReply) {
-        return `💬 ${senderName} がスレッドに返信 (#${channel.name})`;
+        return `${senderName} がスレッドに返信 (#${channel.name})`;
       }
       // DM
-      if (channel.is_dm) return `✉️ ${senderName}`;
+      if (channel.is_dm) return senderName;
       // メンション
       if (isMentioned) {
         return `${senderName} があなたをメンション (#${channel.name})`;

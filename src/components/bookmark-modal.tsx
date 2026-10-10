@@ -1,5 +1,6 @@
 "use client";
 
+import { stripSystemEmoji } from "@/lib/system-post-icons";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -167,9 +168,8 @@ export function BookmarkModal({ currentUserId, workspaceSlug, onClose }: Props) 
                 minute: "2-digit",
               });
               // メッセージ内容のプレビュー（100文字まで）
-              const preview = bookmark.message.content.length > 100
-                ? bookmark.message.content.slice(0, 100) + "..."
-                : bookmark.message.content;
+              const bookmarkText = stripSystemEmoji(bookmark.message.content);
+              const preview = bookmarkText.length > 100 ? bookmarkText.slice(0, 100) + "..." : bookmarkText;
 
               return (
                 <div

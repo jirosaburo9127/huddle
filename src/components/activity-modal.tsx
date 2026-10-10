@@ -1,5 +1,6 @@
 "use client";
 
+import { stripSystemEmoji } from "@/lib/system-post-icons";
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -73,7 +74,7 @@ function formatRelative(iso: string): string {
 
 function previewContent(content: string): string {
   const firstLine =
-    content.split("\n").find((l) => l.trim().length > 0 && !l.startsWith("https://")) || "";
+    stripSystemEmoji(content).split("\n").find((l) => l.trim().length > 0 && !l.startsWith("https://")) || "";
   return firstLine.length > 40 ? firstLine.slice(0, 40) + "…" : firstLine;
 }
 

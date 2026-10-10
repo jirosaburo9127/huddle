@@ -1,5 +1,6 @@
 "use client";
 
+import { stripSystemEmoji } from "@/lib/system-post-icons";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
@@ -133,7 +134,7 @@ export default function DmListPage() {
             otherName: profile?.display_name || "DM",
             otherAvatar: profile?.avatar_url || null,
             isOnline,
-            lastMessage: lastMsg?.content?.replace(/\s+/g, " ").trim().slice(0, 50) || null,
+            lastMessage: (lastMsg?.content ? stripSystemEmoji(lastMsg.content) : "").replace(/\s+/g, " ").trim().slice(0, 50) || null,
             lastAt: lastMsg?.created_at || null,
             unreadCount: unreadMap.get(dm.id) || 0,
           });

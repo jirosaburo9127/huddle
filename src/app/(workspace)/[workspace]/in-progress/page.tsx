@@ -1,5 +1,6 @@
 "use client";
 
+import { stripSystemEmoji } from "@/lib/system-post-icons";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
@@ -414,7 +415,7 @@ export default function InProgressPage() {
                             textDecoration: "none",
                           }}
                         >
-                          {item.content.length > 30 ? item.content.slice(0, 30) + "…" : item.content}
+                          {((text) => (text.length > 30 ? text.slice(0, 30) + "…" : text))(stripSystemEmoji(item.content))}
                         </Link>
                         <span style={{
                           fontSize: 10, fontWeight: 600, color: "var(--color-sky)",
