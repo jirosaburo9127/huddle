@@ -313,20 +313,21 @@ export function HomeView({ workspaceId, workspaceSlug, currentUserId, me, messag
 
   const cardClass = "animate-home-card-in bg-surface mt-2 lg:rounded-2xl lg:border lg:border-border";
 
-  function renderRail() {
+  // side=true は PC の右カラム用（縦並び）。false はタイムライン内に差し込む横スクロール版
+  function renderRail(side = false) {
     if (railItems.length === 0) return null;
     return (
-      <section key="rail" className={`${cardClass} pt-3.5 pb-4`}>
+      <section key="rail" className={`${cardClass} pt-3.5 pb-4 ${side ? "" : "xl:hidden"}`}>
         <h2 className="px-4 text-[15px] font-extrabold text-foreground">今日の動き</h2>
-        <div className="mt-2.5 flex gap-2.5 overflow-x-auto px-4">
+        <div className={`mt-2.5 flex gap-2.5 px-4 ${side ? "flex-col" : "overflow-x-auto"}`}>
           {railItems.map((item) => (
             <Link
               key={item.key}
               href={item.href}
-              className="shrink-0 w-[168px] rounded-2xl border border-border p-3"
+              className={`rounded-2xl border border-border p-3 ${side ? "" : "shrink-0 w-[168px]"}`}
             >
               <p className="text-[11px] font-extrabold text-[var(--home-accent-ink)]">{item.label}</p>
-              <p className="mt-1 h-[38px] overflow-hidden text-[13px] font-bold leading-[1.45] text-foreground line-clamp-2">
+              <p className={`mt-1 overflow-hidden text-[13px] font-bold leading-[1.45] text-foreground line-clamp-2 ${side ? "" : "h-[38px]"}`}>
                 {item.title}
               </p>
               <p className="mt-2 flex items-center gap-1.5 text-[11px] text-muted">
@@ -577,15 +578,10 @@ export function HomeView({ workspaceId, workspaceSlug, currentUserId, me, messag
 
   return (
     <div className="home-tl flex flex-col h-full bg-[var(--home-band)]">
-      {/* ヘッダー */}
-      <header className="shrink-0 bg-surface border-b border-border">
-        <div className="mx-auto w-full max-w-2xl flex items-center justify-between px-4 py-2.5">
-          <button
-            type="button"
-            onClick={() => setSidebarOpen(true)}
-            className="lg:pointer-events-none"
-            aria-label="チャンネル一覧を開く"
-          >
+      {/* ヘッダー: スマホはロゴ＋検索の2段、PCはサイドバーにロゴ・検索があるので見出しとチップの1段 */}
+      <header className="shrink-0 bg-surface border-b border-border lg:flex lg:h-14 lg:items-center lg:gap-5 lg:px-9">
+        <div className="flex items-center justify-between px-4 py-2.5 lg:hidden">
+          <button type="button" onClick={() => setSidebarOpen(true)} aria-label="チャンネル一覧を開く">
             <Avatar person={me} size={34} />
           </button>
           <p className="flex items-center gap-2 text-lg font-extrabold tracking-wide text-foreground">
@@ -603,9 +599,10 @@ export function HomeView({ workspaceId, workspaceSlug, currentUserId, me, messag
             </svg>
           </Link>
         </div>
+        <h1 className="hidden lg:block shrink-0 text-[18px] font-[720] text-foreground">ホーム</h1>
         {/* 絞り込み */}
-        <div className="mx-auto w-full max-w-2xl flex items-center gap-2.5 overflow-x-auto px-4 pb-3 pt-1">
-          <span className="shrink-0 text-sm font-extrabold text-foreground">いまの動き</span>
+        <div className="flex items-center gap-2.5 overflow-x-auto px-4 pb-3 pt-1 lg:p-0">
+          <span className="shrink-0 text-sm font-extrabold text-foreground lg:hidden">いまの動き</span>
           {chips.map((chip) => (
             <button
               key={chip.key}
@@ -627,7 +624,8 @@ export function HomeView({ workspaceId, workspaceSlug, currentUserId, me, messag
       </header>
 
       <div className="flex-1 min-h-0 overflow-y-auto">
-        <div className="mx-auto w-full max-w-2xl pb-10 lg:px-4">
+        <div className="lg:flex lg:items-start lg:gap-6 lg:px-9 lg:pt-2">
+        <div className="mx-auto w-full max-w-2xl pb-10 lg:mx-0 lg:max-w-[680px] lg:flex-1 lg:min-w-0">
           {timeline.length === 0 && (
             <div className={`${cardClass} px-4 py-12 text-center`}>
               <p className="text-2xl mb-2">{filter === "all" ? "🌱" : "✅"}</p>
@@ -652,6 +650,11 @@ export function HomeView({ workspaceId, workspaceSlug, currentUserId, me, messag
           ))}
           {timeline.length > 0 && timeline.length <= RAIL_POSITION && rail}
           {timeline.length === 0 && rail}
+        </div>
+        {/* PC: 今日の動きは右カラムに固定表示 */}
+        {filter === "all" && railItems.length > 0 && (
+          <aside className="hidden xl:block sticky top-2 w-[300px] shrink-0">{renderRail(true)}</aside>
+        )}
         </div>
       </div>
 

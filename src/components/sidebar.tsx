@@ -1115,6 +1115,30 @@ export function Sidebar({
 
         {/* 固定エリア: 進行中・決定 + 独り言 + カレンダー等 */}
         <div className="shrink-0" style={{ padding: "8px 12px 0" }}>
+          {/* PC: ホーム（タイムライン）への導線。スマホは下タブの「ホーム」が担う */}
+          {(() => {
+            const homeHref = `/${workspaceSlug}`;
+            const isHome = pathname === homeHref || pathname === `${homeHref}/home`;
+            return (
+              <Link
+                href={homeHref}
+                className="hidden lg:flex"
+                style={{
+                  alignItems: "center", gap: 8, margin: "0 4px 8px", padding: "0 10px", height: 36,
+                  borderRadius: 8, textDecoration: "none", fontSize: 14,
+                  fontWeight: isHome ? 700 : 600,
+                  color: "var(--color-foreground)",
+                  background: isHome ? "var(--home-accent-soft)" : "none",
+                }}
+              >
+                <svg style={{ width: 18, height: 18, color: isHome ? "var(--home-accent-ink)" : "var(--color-muted)" }} fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 10.5L12 3l9 7.5V20a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1v-9.5z" />
+                </svg>
+                ホーム
+              </Link>
+            );
+          })()}
+
           {/* PC: 進行中・決定チップ（固定表示、独り言の上） */}
           <div className="hidden lg:flex" style={{ gap: 6, padding: "0 4px 6px", flexShrink: 0 }}>
             <Link
@@ -1124,16 +1148,16 @@ export function Sidebar({
                 flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
                 padding: "6px 0", height: 34,
                 borderRadius: 10, border: "none", cursor: "pointer",
-                background: "rgba(56,189,248,0.15)", fontSize: 13, fontWeight: 650, color: "var(--color-foreground)",
+                background: "var(--color-surface)", boxShadow: "inset 0 0 0 1px var(--color-border)", fontSize: 13, fontWeight: 650, color: "var(--color-foreground)",
                 textDecoration: "none",
               }}
             >
               進行中
               <span style={{
-                fontSize: 11, fontWeight: 700, color: "var(--color-sky)",
-                width: 18, height: 18, borderRadius: "50%",
+                fontSize: 11, fontWeight: 700, color: "var(--color-muted)",
+                minWidth: 18, height: 18, padding: "0 5px", borderRadius: 999,
                 display: "flex", alignItems: "center", justifyContent: "center",
-                background: "#fff",
+                background: "var(--color-input-bg)",
               }}>{inProgressCount}</span>
             </Link>
             <Link
@@ -1143,16 +1167,17 @@ export function Sidebar({
                 flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
                 padding: "6px 0", height: 34,
                 borderRadius: 10, border: "none", cursor: "pointer",
-                background: "rgba(233,104,50,0.12)", fontSize: 13, fontWeight: 650, color: "var(--color-foreground)",
+                background: "var(--color-surface)", boxShadow: "inset 0 0 0 1px var(--color-border)", fontSize: 13, fontWeight: 650, color: "var(--color-foreground)",
                 textDecoration: "none",
               }}
             >
               決定
               <span style={{
-                fontSize: 11, fontWeight: 700, color: "var(--color-accent)",
-                width: 18, height: 18, borderRadius: "50%",
+                fontSize: 11, fontWeight: 700,
+                color: decisionUnreadCount > 0 ? "var(--home-on-accent)" : "var(--color-muted)",
+                minWidth: 18, height: 18, padding: "0 5px", borderRadius: 999,
                 display: "flex", alignItems: "center", justifyContent: "center",
-                background: "#fff",
+                background: decisionUnreadCount > 0 ? "var(--home-accent)" : "var(--color-input-bg)",
               }}>{decisionUnreadCount}</span>
             </Link>
           </div>
@@ -1254,7 +1279,7 @@ export function Sidebar({
                   display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
                   padding: "6px 2px", borderRadius: 8,
                   fontSize: 9, fontWeight: 500, color: "var(--color-muted)",
-                  textDecoration: "none",
+                  textDecoration: "none", whiteSpace: "nowrap", letterSpacing: "-0.03em",
                 }}
               >
                 <svg style={{ width: 18, height: 18 }} fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
@@ -2441,7 +2466,7 @@ function ChannelCategoryList({
           padding: isDesktop ? "0 10px" : "0 10px 0 14px",
           height: isDesktop ? 36 : 38, borderRadius: 8,
           border: "none", cursor: "pointer", marginBottom: isDesktop ? 1 : 0,
-          background: (isDesktop && isActive) ? "var(--color-sky-soft)" : "none",
+          background: (isDesktop && isActive) ? "var(--home-accent-soft)" : "none",
           position: "relative" as const, zIndex: 1,
           color: isDesktop
             ? ((isActive || showUnreadStyle) ? "var(--color-foreground)" : "var(--color-muted)")
@@ -2461,11 +2486,11 @@ function ChannelCategoryList({
           // eslint-disable-next-line @next/next/no-img-element
           <img src={channel.icon_url} alt="" style={{ width: isDesktop ? 20 : 18, height: isDesktop ? 20 : 18, borderRadius: 4, objectFit: "cover", flexShrink: 0, opacity: 1 }} />
         ) : (
-          <span style={{ fontSize: isDesktop ? 16 : 15, color: (isDesktop && isActive) ? "var(--color-sky)" : (catColor || "var(--color-muted)"), opacity: (isDesktop && isActive) ? 1 : showUnreadStyle ? 0.7 : 0.4 }}>#</span>
+          <span style={{ fontSize: isDesktop ? 16 : 15, color: (isDesktop && isActive) ? "var(--home-accent-ink)" : (catColor || "var(--color-muted)"), opacity: (isDesktop && isActive) ? 1 : showUnreadStyle ? 0.7 : 0.4 }}>#</span>
         )}
         <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{channel.name}</span>
         {showUnreadStyle && (
-          <span style={{ width: isDesktop ? 20 : 16, height: isDesktop ? 20 : 16, borderRadius: "50%", fontSize: isDesktop ? 10 : 9, fontWeight: 700, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--color-accent)", opacity: isDesktop ? 1 : 0.85, flexShrink: 0, marginLeft: "auto" }}>{unreadCount > 99 ? "99+" : unreadCount}</span>
+          <span style={{ minWidth: isDesktop ? 20 : 16, height: isDesktop ? 20 : 16, padding: isDesktop ? "0 5px" : 0, borderRadius: 999, fontSize: isDesktop ? 10.5 : 9, fontWeight: 800, color: "var(--home-on-accent)", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--home-accent)", flexShrink: 0, marginLeft: "auto" }}>{unreadCount > 99 ? "99+" : unreadCount}</span>
         )}
       </Link>
     );
