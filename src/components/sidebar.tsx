@@ -1,5 +1,6 @@
 "use client";
 
+import { MikanFab } from "@/components/mikan/mikan-fab";
 import { stripSystemEmoji } from "@/lib/system-post-icons";
 import { UiIcon } from "@/components/ui-icon";
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
@@ -1691,6 +1692,16 @@ export function Sidebar({
               )}
             </div>
           </div>
+        )}
+        {/* スマホのトーク一覧にもみかんを出す（本文の枠は横に退いているので、こちらに別に置く） */}
+        {sidebarOpen && !isDesktop && (
+          <MikanFab
+            workspaceId={workspace.id}
+            workspaceSlug={workspaceSlug}
+            currentUserId={currentUserId}
+            channels={channels}
+            placement="list"
+          />
         )}
       </aside>
 

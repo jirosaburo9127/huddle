@@ -12,6 +12,12 @@ type Props = {
   currentUserId: string;
   /** 通常チャンネルの一覧（いま開いているチャンネルを URL から特定するため） */
   channels: Array<{ id: string; slug: string; name: string }>;
+  /**
+   * "page": 各画面の本文の枠に置く（既定）。
+   * "list": スマホのトーク一覧（サイドバー）の中に置く。URL は裏にある画面のままなので、
+   *         チャンネル固有のメニューは出さない
+   */
+  placement?: "page" | "list";
 };
 
 // 画面ごとの「みかんに頼めること」を決めるため、URL からいまの画面を判定する
@@ -22,18 +28,26 @@ const PAGE_CONTEXT: Record<string, MikanContext> = {
 };
 
 /** どの画面にもいる、みかんの浮遊ボタン。押すとその画面に合ったメニューが開く */
-export function MikanFab({ workspaceId, workspaceSlug, currentUserId, channels }: Props) {
+export function MikanFab({ workspaceId, workspaceSlug, currentUserId, channels, placement = "page" }: Props) {
   const pathname = usePathname();
   const router = useRouter();
   const messageInputFocused = useMobileNavStore((s) => s.messageInputFocused);
   const [open, setOpen] = useState(false);
 
   const segment = pathname.split("/").filter(Boolean)[1] || "";
+  const isList = placement === "list";
   const channel = useMemo(() => {
+    if (isList) return null;
     const hit = channels.find((c) => c.slug === segment);
     return hit ? { id: hit.id, name: hit.name } : null;
-  }, [channels, segment]);
-  const context: MikanContext = channel ? "channel" : !segment ? "home" : PAGE_CONTEXT[segment] || "other";
+  }, [channels, segment, isList]);
+  const context: MikanContext = isList
+    ? "other"
+    : channel
+      ? "channel"
+      : !segment
+        ? "home"
+        : PAGE_CONTEXT[segment] || "other";
 
   // 投稿欄のある画面（チャンネル・DM・独り言）では、送信ボタンに重ならないよう一段上に置く。
   // それ以外の一覧系の画面は URL が決まっているので、そこに無いものを投稿欄ありとみなす
@@ -47,10 +61,15 @@ export function MikanFab({ workspaceId, workspaceSlug, currentUserId, channels }
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={`fixed right-4 lg:right-8 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-surface border border-border shadow-lg animate-mikan-float transition-opacity ${
-          hasComposer
-            ? "bottom-[calc(150px+env(safe-area-inset-bottom,0px))] lg:bottom-28"
-            : "bottom-[calc(76px+env(safe-area-inset-bottom,0px))] lg:bottom-8"
+        className={`z-40 flex h-14 w-14 items-center justify-center rounded-full bg-surface border border-border shadow-lg animate-mikan-float transition-opacity ${
+          isList
+            ? // トーク一覧の枠は下タブの上で終わっているので、枠の右下に置けばよい
+              "absolute right-4 bottom-5 lg:hidden"
+            : `fixed right-4 lg:right-8 ${
+                hasComposer
+                  ? "bottom-[calc(150px+env(safe-area-inset-bottom,0px))] lg:bottom-28"
+                  : "bottom-[calc(76px+env(safe-area-inset-bottom,0px))] lg:bottom-8"
+              }`
         } ${messageInputFocused ? "opacity-0 pointer-events-none" : "opacity-100"}`}
         aria-label="みかんを開く"
         title="みかん"
