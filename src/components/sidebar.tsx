@@ -495,7 +495,12 @@ export function Sidebar({
   // タブタイトル + アプリバッジに未読数を反映
   // unreadStateは独り言除外済みなので安全
   useEffect(() => {
-    const channelTotal = Object.values(unreadState).reduce((sum, n) => sum + n, 0);
+    // unreadState には他ワークスペースのチャンネルも入っている（get_unread_counts は全WS分を返す）。
+    // そのまま合計すると otherWsTotal と二重に数えてしまうので、このWSのチャンネル分だけ数える。
+    const channelTotal = [...channels, ...dmChannels].reduce(
+      (sum, c) => sum + (unreadState[c.id] || 0),
+      0
+    );
     const otherWsTotal = Object.values(unreadByWorkspace).reduce((sum, n) => sum + n, 0);
     const total = channelTotal + otherWsTotal;
     document.title = total > 0 ? `(${total}) Huddle` : "Huddle";
@@ -506,7 +511,7 @@ export function Sidebar({
         Badge.set({ count: Math.max(0, total) }).catch(() => {});
       }).catch(() => {});
     }).catch(() => {});
-  }, [unreadState, unreadByWorkspace]);
+  }, [unreadState, unreadByWorkspace, channels, dmChannels]);
 
   // DM の未読合計を Zustand に書き出し、BottomTabBar の「その他」「DM」に
   // バッジ表示できるようにする
