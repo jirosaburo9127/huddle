@@ -6,7 +6,9 @@ import {
   type HomeMessage,
   type HomePerson,
   type HomeRailItem,
+  type HomeStory,
   type HomeTaskEvent,
+  type HomeWaitingTask,
 } from "./home-view";
 
 // タイムラインは開くたびに最新を出したいので静的キャッシュを無効化
@@ -17,6 +19,10 @@ export const dynamic = "force-dynamic";
 const FEED_LIMIT = 60;
 // 完了タスク・決定事項を「最近の動き」として拾う日数
 const RECENT_DAYS = 3;
+// 「あなた待ち」として拾う、自分宛てメンションの遡り日数
+const WAITING_DAYS = 7;
+// 独り言をホーム上部に並べる日数
+const STORY_DAYS = 3;
 const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
 
 type ChannelRow = {
@@ -47,7 +53,9 @@ function getTimeWindow() {
   const dayStart = new Date(`${todayJst}T00:00:00+09:00`);
   const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
   const recentSince = new Date(nowMs - RECENT_DAYS * 24 * 60 * 60 * 1000).toISOString();
-  return { todayJst, dayStart, dayEnd, recentSince };
+  const waitingSince = new Date(nowMs - WAITING_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  const storySince = new Date(nowMs - STORY_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  return { todayJst, dayStart, dayEnd, recentSince, waitingSince, storySince };
 }
 
 export default async function HomePage({
@@ -59,6 +67,7 @@ export default async function HomePage({
   const user = await getAuthUser();
   if (!user) redirect("/login");
 
+  const userId = user.id;
   const supabase = await createClient();
 
   const { data: workspace } = await supabase
@@ -83,13 +92,15 @@ export default async function HomePage({
     throw new Error(`ホームの読み込みに失敗しました: ${membershipsRes.error.message}`);
   }
 
-  const memberships = ((membershipsRes.data || []) as Array<{
+  const allMemberships = ((membershipsRes.data || []) as Array<{
     channel_id: string;
     last_read_at: string | null;
     joined_at: string;
     channels: ChannelRow | ChannelRow[];
-  }>)
-    .map((m) => ({ ...m, channel: one(m.channels) }))
+  }>).map((m) => ({ ...m, channel: one(m.channels) }));
+  // 独り言はタイムラインには混ぜず、上部の顔アイコンの列として別に出す
+  const hitorigoto = allMemberships.find((m) => m.channel?.is_hitorigoto && !m.channel.is_archived) || null;
+  const memberships = allMemberships
     .filter(
       (m): m is typeof m & { channel: ChannelRow } =>
         !!m.channel && !m.channel.is_hitorigoto && !m.channel.is_archived
@@ -108,20 +119,25 @@ export default async function HomePage({
         messages={[]}
         taskEvents={[]}
         railItems={[]}
+        waitingMessages={[]}
+        waitingTasks={[]}
+        stories={[]}
+        hitorigotoHref={null}
       />
     );
   }
 
-  const { todayJst, dayStart, dayEnd, recentSince } = getTimeWindow();
+  const { todayJst, dayStart, dayEnd, recentSince, waitingSince, storySince } = getTimeWindow();
 
   const dmIds = memberships.filter((m) => m.channel.is_dm).map((m) => m.channel_id);
 
-  const [feedRes, dmRes, eventsRes, doneTasksRes, dueTasksRes] = await Promise.all([
+  const messageSelect =
+    "id, content, created_at, user_id, channel_id, parent_id, is_decision, reply_count, profiles(display_name, avatar_url), reactions(id, emoji, user_id)";
+
+  const [feedRes, dmRes, eventsRes, doneTasksRes, dueTasksRes, waitingRes, myPostsRes, storyRes] = await Promise.all([
     supabase
       .from("messages")
-      .select(
-        "id, content, created_at, user_id, channel_id, parent_id, is_decision, reply_count, profiles(display_name, avatar_url), reactions(id, emoji, user_id)"
-      )
+      .select(messageSelect)
       .in("channel_id", channelIds)
       .is("deleted_at", null)
       .is("system_event", null)
@@ -158,6 +174,37 @@ export default async function HomePage({
       .lte("due_date", todayJst)
       .eq("task_assignees.user_id", user.id)
       .order("due_date", { ascending: true }),
+    // あなた待ち: 直近の「自分を名指ししたメンション」
+    supabase
+      .from("mentions")
+      .select(`message_id, messages!inner(${messageSelect}, deleted_at)`)
+      .eq("mentioned_user_id", user.id)
+      .eq("mention_type", "user")
+      .in("messages.channel_id", channelIds)
+      .is("messages.deleted_at", null)
+      .neq("messages.user_id", user.id)
+      .gte("messages.created_at", waitingSince),
+    // 同じ期間の自分の投稿（そのチャンネルで後から発言していれば「返した」とみなす）
+    supabase
+      .from("messages")
+      .select("channel_id, created_at")
+      .eq("user_id", user.id)
+      .in("channel_id", channelIds)
+      .is("deleted_at", null)
+      .gte("created_at", waitingSince)
+      .order("created_at", { ascending: false })
+      .limit(500),
+    hitorigoto
+      ? supabase
+          .from("messages")
+          .select("id, content, created_at, user_id, profiles(display_name, avatar_url)")
+          .eq("channel_id", hitorigoto.channel_id)
+          .is("deleted_at", null)
+          .is("system_event", null)
+          .gte("created_at", storySince)
+          .order("created_at", { ascending: false })
+          .limit(100)
+      : Promise.resolve({ data: [], error: null }),
   ]);
 
   if (feedRes.error) {
@@ -168,6 +215,9 @@ export default async function HomePage({
     ["events", eventsRes],
     ["done tasks", doneTasksRes],
     ["due tasks", dueTasksRes],
+    ["waiting", waitingRes],
+    ["my posts", myPostsRes],
+    ["stories", storyRes],
   ] as const) {
     if (res.error) console.error(`[home] ${label} fetch failed:`, res.error.message);
   }
@@ -194,7 +244,7 @@ export default async function HomePage({
     ])
   );
 
-  const feedRows = (feedRes.data || []) as Array<{
+  type MessageRow = {
     id: string;
     content: string;
     created_at: string;
@@ -205,7 +255,8 @@ export default async function HomePage({
     reply_count: number;
     profiles: ProfileRow | ProfileRow[] | null;
     reactions: Array<{ id: string; emoji: string; user_id: string }> | null;
-  }>;
+  };
+  const feedRows = (feedRes.data || []) as MessageRow[];
 
   // @自分 / @channel / @here の付いた投稿を判定
   const mentionedIds = new Set<string>();
@@ -228,10 +279,10 @@ export default async function HomePage({
     }
   }
 
-  const messages: HomeMessage[] = feedRows.flatMap((r) => {
+  function toHomeMessage(r: MessageRow, forceMention = false): HomeMessage[] {
     const ch = channelInfo.get(r.channel_id);
     if (!ch) return [];
-    const isMine = r.user_id === user.id;
+    const isMine = r.user_id === userId;
     return [
       {
         id: r.id,
@@ -246,12 +297,66 @@ export default async function HomePage({
         isMine,
         isDecision: r.is_decision,
         replyCount: r.reply_count || 0,
-        isMention: !isMine && mentionedIds.has(r.id),
+        isMention: !isMine && (forceMention || mentionedIds.has(r.id)),
         isUnread: !isMine && r.created_at > ch.since,
         reactions: (r.reactions || []).map((x) => ({ id: x.id, emoji: x.emoji, userId: x.user_id })),
       },
     ];
-  });
+  }
+
+  const messages: HomeMessage[] = feedRows.flatMap((r) => toHomeMessage(r));
+
+  // あなた待ち: 名指しされたのに、リアクションも、その後の発言もしていないもの
+  const myLatestPost = new Map<string, string>();
+  for (const row of (myPostsRes.data || []) as Array<{ channel_id: string; created_at: string }>) {
+    if (!myLatestPost.has(row.channel_id)) myLatestPost.set(row.channel_id, row.created_at);
+  }
+  const waitingMessages: HomeMessage[] = ((waitingRes.data || []) as unknown as Array<{
+    messages: MessageRow | MessageRow[];
+  }>)
+    .flatMap((row) => {
+      const m = one(row.messages);
+      if (!m) return [];
+      const reacted = (m.reactions || []).some((x) => x.user_id === user.id);
+      const repliedAfter = (myLatestPost.get(m.channel_id) || "") > m.created_at;
+      return reacted || repliedAfter ? [] : toHomeMessage(m, true);
+    })
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+  const waitingTasks: HomeWaitingTask[] = ((dueTasksRes.data || []) as Array<{
+    id: string;
+    title: string;
+    due_date: string;
+    channel_id: string;
+  }>).map((t) => ({
+    id: t.id,
+    title: t.title,
+    isOverdue: t.due_date < todayJst,
+    channelName: channelInfo.get(t.channel_id)?.name || "",
+  }));
+
+  // 独り言: 人ごとに最新の1件。自分が最後に見た時刻より新しければ「新着」
+  const stories: HomeStory[] = [];
+  const storySeen = new Set<string>();
+  const storyReadAt = hitorigoto ? hitorigoto.last_read_at || hitorigoto.joined_at : "";
+  for (const row of (storyRes.data || []) as Array<{
+    id: string;
+    content: string;
+    created_at: string;
+    user_id: string;
+    profiles: ProfileRow | ProfileRow[] | null;
+  }>) {
+    if (!hitorigoto?.channel || storySeen.has(row.user_id)) continue;
+    storySeen.add(row.user_id);
+    stories.push({
+      userId: row.user_id,
+      person: toPerson(one(row.profiles)),
+      at: row.created_at,
+      isNew: row.user_id !== user.id && row.created_at > storyReadAt,
+      href: `/${workspaceSlug}/${hitorigoto.channel.slug}?m=${row.id}`,
+    });
+  }
+  const hitorigotoHref = hitorigoto?.channel ? `/${workspaceSlug}/${hitorigoto.channel.slug}` : null;
 
   // 完了タスク・予定の作成者プロフィールをまとめて取得
   const doneTasks = (doneTasksRes.data || []) as Array<{
@@ -298,7 +403,7 @@ export default async function HomePage({
     ];
   });
 
-  // 「今日の動き」: 今日の予定 → 自分の締切 → 最近の決定事項
+  // 「今日の動き」: 今日の予定 → 最近の決定事項（自分の締切は「あなた待ち」に出す）
   const railItems: HomeRailItem[] = [];
   for (const e of events) {
     const ch = channelInfo.get(e.channel_id);
@@ -310,21 +415,6 @@ export default async function HomePage({
       sub: e.location || (ch ? `# ${ch.name}` : ""),
       person: creators.get(e.created_by) || null,
       href: `/${workspaceSlug}/calendar`,
-    });
-  }
-  for (const t of (dueTasksRes.data || []) as Array<{
-    id: string;
-    title: string;
-    due_date: string;
-    channel_id: string;
-  }>) {
-    railItems.push({
-      key: `task-${t.id}`,
-      label: t.due_date < todayJst ? "締切・期限切れ" : "締切・今日",
-      title: t.title,
-      sub: "あなたの担当",
-      person: me,
-      href: `/${workspaceSlug}/tasks`,
     });
   }
   for (const m of messages.filter((x) => x.isDecision && x.createdAt >= recentSince).slice(0, 5)) {
@@ -347,6 +437,10 @@ export default async function HomePage({
       messages={messages}
       taskEvents={taskEvents}
       railItems={railItems}
+      waitingMessages={waitingMessages}
+      waitingTasks={waitingTasks}
+      stories={stories}
+      hitorigotoHref={hitorigotoHref}
     />
   );
 }

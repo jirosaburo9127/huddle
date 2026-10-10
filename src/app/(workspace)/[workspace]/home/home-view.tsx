@@ -49,6 +49,23 @@ export type HomeRailItem = {
   href: string;
 };
 
+// あなた待ち: 自分が担当で、期限が今日まで（または過ぎた）のタスク
+export type HomeWaitingTask = {
+  id: string;
+  title: string;
+  isOverdue: boolean;
+  channelName: string;
+};
+
+// 独り言: 人ごとの最新1件
+export type HomeStory = {
+  userId: string;
+  person: HomePerson;
+  at: string;
+  isNew: boolean;
+  href: string;
+};
+
 type Props = {
   workspaceId: string;
   workspaceSlug: string;
@@ -57,6 +74,10 @@ type Props = {
   messages: HomeMessage[];
   taskEvents: HomeTaskEvent[];
   railItems: HomeRailItem[];
+  waitingMessages: HomeMessage[];
+  waitingTasks: HomeWaitingTask[];
+  stories: HomeStory[];
+  hitorigotoHref: string | null;
 };
 
 type Filter = "all" | "mention" | "unread" | "decision";
@@ -66,6 +87,8 @@ type TimelineItem =
   | { kind: "task"; at: string; task: HomeTaskEvent };
 
 const QUICK_REACTIONS = ["👍", "🙏", "🎉", "👀", "✅", "❤️"];
+// あなた待ちに一度に並べる件数（多すぎると読む気が失せるので絞る）
+const WAITING_LIMIT = 5;
 // 「今日の動き」をタイムラインの何件目の後ろに差し込むか
 const RAIL_POSITION = 2;
 const AVATAR_COLORS = ["#3E8E7E", "#5B7FD1", "#D9825B", "#8A6BBE", "#C2607F", "#4E9BB5"];
@@ -166,7 +189,19 @@ const ICON = {
   chevron: "M9 6l6 6-6 6",
 };
 
-export function HomeView({ workspaceId, workspaceSlug, currentUserId, me, messages, taskEvents, railItems }: Props) {
+export function HomeView({
+  workspaceId,
+  workspaceSlug,
+  currentUserId,
+  me,
+  messages,
+  taskEvents,
+  railItems,
+  waitingMessages,
+  waitingTasks,
+  stories,
+  hitorigotoHref,
+}: Props) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const setSidebarOpen = useMobileNavStore((s) => s.setSidebarOpen);
@@ -184,6 +219,10 @@ export function HomeView({ workspaceId, workspaceSlug, currentUserId, me, messag
   // 時刻依存の表示は SSR/CSR で食い違うので、マウント後に確定させる
   const [now, setNow] = useState<Date | null>(null);
   const replyInputRef = useRef<HTMLInputElement>(null);
+  // あなた待ちは、片付けた瞬間に行を消したいので手元で伏せる（サーバーから取り直せば元データからも消える）
+  const [cleared, setCleared] = useState<Set<string>>(new Set());
+  // この画面を開いている間に1件でもあなた待ちがあったか（全部片付けたときのねぎらい表示用）
+  const [hadWaiting, setHadWaiting] = useState(false);
 
   useEffect(() => {
     setSidebarOpen(false);
@@ -226,11 +265,25 @@ export function HomeView({ workspaceId, workspaceSlug, currentUserId, me, messag
     if (replyingId) replyInputRef.current?.focus();
   }, [replyingId]);
 
+  const openWaitingMessages = useMemo(
+    () => waitingMessages.filter((m) => !cleared.has(m.id)),
+    [waitingMessages, cleared]
+  );
+  const openWaitingTasks = useMemo(() => waitingTasks.filter((t) => !cleared.has(t.id)), [waitingTasks, cleared]);
+  const waitingCount = openWaitingMessages.length + openWaitingTasks.length;
+
+  useEffect(() => {
+    if (waitingCount > 0) setHadWaiting(true);
+  }, [waitingCount]);
+
   const mentionCount = useMemo(() => messages.filter((m) => m.isMention && m.isUnread).length, [messages]);
   const unreadCount = useMemo(() => messages.filter((m) => m.isUnread).length, [messages]);
 
   const timeline = useMemo<TimelineItem[]>(() => {
+    // 「すべて」では、上の「あなた待ち」に出している投稿をタイムラインに重ねて出さない
+    const waitingIds = new Set(openWaitingMessages.slice(0, WAITING_LIMIT).map((m) => m.id));
     const filtered = messages.filter((m) => {
+      if (filter === "all") return !waitingIds.has(m.id);
       if (filter === "mention") return m.isMention;
       if (filter === "unread") return m.isUnread;
       if (filter === "decision") return m.isDecision;
@@ -241,7 +294,7 @@ export function HomeView({ workspaceId, workspaceSlug, currentUserId, me, messag
       for (const task of taskEvents) items.push({ kind: "task", at: task.doneAt, task });
     }
     return items.sort((a, b) => b.at.localeCompare(a.at));
-  }, [messages, taskEvents, filter]);
+  }, [messages, taskEvents, filter, openWaitingMessages]);
 
   async function sendReply(message: HomeMessage) {
     const text = replyText.trim();
@@ -274,6 +327,7 @@ export function HomeView({ workspaceId, workspaceSlug, currentUserId, me, messag
       }
       setReplyText("");
       setReplyingId(null);
+      setCleared((prev) => new Set(prev).add(message.id));
       router.refresh();
     } finally {
       setSending(false);
@@ -302,6 +356,45 @@ export function HomeView({ workspaceId, workspaceSlug, currentUserId, me, messag
       console.error("[home] reaction insert failed:", error);
       setReactions((prev) => ({ ...prev, [messageId]: current }));
     }
+  }
+
+  // あなた待ち: 👍 ひとつで「見ました」を返す
+  async function ackWaiting(message: HomeMessage) {
+    setCleared((prev) => new Set(prev).add(message.id));
+    const { error } = await supabase
+      .from("reactions")
+      .insert({ message_id: message.id, user_id: currentUserId, emoji: "👍" });
+    if (error) {
+      console.error("[home] ack reaction failed:", error);
+      setCleared((prev) => {
+        const next = new Set(prev);
+        next.delete(message.id);
+        return next;
+      });
+      alert("リアクションに失敗しました: " + error.message);
+      return;
+    }
+    router.refresh();
+  }
+
+  // あなた待ち: タスクをその場で完了にする
+  async function completeWaitingTask(task: HomeWaitingTask) {
+    setCleared((prev) => new Set(prev).add(task.id));
+    const { error } = await supabase
+      .from("tasks")
+      .update({ status: "done", updated_at: new Date().toISOString() })
+      .eq("id", task.id);
+    if (error) {
+      console.error("[home] task complete failed:", error);
+      setCleared((prev) => {
+        const next = new Set(prev);
+        next.delete(task.id);
+        return next;
+      });
+      alert("完了にできませんでした: " + error.message);
+      return;
+    }
+    router.refresh();
   }
 
   const chips: Array<{ key: Filter; label: string; count?: number }> = [
@@ -337,6 +430,200 @@ export function HomeView({ workspaceId, workspaceSlug, currentUserId, me, messag
             </Link>
           ))}
         </div>
+      </section>
+    );
+  }
+
+  // 独り言: 顔アイコンの列。新しい独り言がある人は黄色い輪
+  function renderStories() {
+    if (!hitorigotoHref) return null;
+    const others = stories.filter((s) => s.userId !== currentUserId);
+    return (
+      <section className={`${cardClass} py-3`} aria-label="独り言">
+        <div className="flex gap-3.5 overflow-x-auto px-4">
+          <Link href={hitorigotoHref} className="shrink-0 w-[60px] text-center">
+            <span className="relative mx-auto block w-[54px] h-[54px] rounded-full p-[3px]">
+              <Avatar person={me} size={48} />
+              <span className="absolute -right-0.5 -bottom-0.5 w-[22px] h-[22px] rounded-full bg-[var(--home-accent)] text-[var(--home-on-accent)] border-2 border-surface flex items-center justify-center text-[15px] font-black leading-none">
+                +
+              </span>
+            </span>
+            <span className="mt-1 block truncate text-[11px] font-bold text-foreground">つぶやく</span>
+          </Link>
+          {others.map((story) => (
+            <Link key={story.userId} href={story.href} className="shrink-0 w-[60px] text-center">
+              <span
+                className={`mx-auto block w-[54px] h-[54px] rounded-full p-[3px] ${
+                  story.isNew ? "bg-[var(--home-accent)]" : "bg-border"
+                }`}
+              >
+                <span className="block rounded-full bg-surface p-[1.5px]">
+                  <Avatar person={story.person} size={45} />
+                </span>
+              </span>
+              <span className={`mt-1 block truncate text-[11px] ${story.isNew ? "font-bold text-foreground" : "text-muted"}`}>
+                {story.person.name}
+              </span>
+            </Link>
+          ))}
+          {others.length === 0 && (
+            <p className="self-center text-xs leading-relaxed text-muted">
+              最近の独り言はまだありません。
+              <br />
+              ひとこと書くと、ここに並びます。
+            </p>
+          )}
+        </div>
+      </section>
+    );
+  }
+
+  // あなた待ち: 自分が動かないと止まるものだけ。その場で返せる
+  function renderWaiting() {
+    if (waitingCount === 0) {
+      if (!hadWaiting) return null;
+      return (
+        <section className={`${cardClass} px-4 py-5 text-center`}>
+          <p className="text-2xl" aria-hidden="true">
+            🎉
+          </p>
+          <p className="mt-1 text-sm font-extrabold text-foreground">全部返しました</p>
+          <p className="mt-0.5 text-xs text-muted">あなた待ちの用件はありません</p>
+        </section>
+      );
+    }
+    const shownMessages = openWaitingMessages.slice(0, WAITING_LIMIT);
+    const shownTasks = openWaitingTasks.slice(0, Math.max(0, WAITING_LIMIT - shownMessages.length));
+    const rest = waitingCount - shownMessages.length - shownTasks.length;
+    const btn = "inline-flex items-center gap-1 rounded-full px-3.5 py-1.5 text-[12.5px] font-bold";
+    return (
+      <section className={`${cardClass} pt-3.5 pb-1`}>
+        <h2 className="flex items-center gap-2 px-4 text-[15px] font-extrabold text-foreground">
+          あなた待ち
+          <span className="rounded-full bg-mention px-2 py-px text-[11px] font-extrabold text-white">{waitingCount}</span>
+          <span className="text-[11.5px] font-normal text-muted">返すと消えます</span>
+        </h2>
+        <ul className="mt-1">
+          {shownMessages.map((message) => {
+            const { text, files } = splitContent(message.content);
+            const replyKey = `waiting:${message.id}`;
+            const isReplying = replyingId === replyKey;
+            return (
+              <li key={message.id} className="border-t border-border px-4 py-3 first:border-t-0">
+                <div className="flex items-start gap-2.5">
+                  <Avatar person={message.sender} size={36} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[12.5px] text-muted">
+                      <span className="font-bold text-foreground">{message.sender.name}</span>
+                      {" ・ "}
+                      {message.isDm ? "DM" : `# ${message.channelName}`}
+                      {now ? ` ・ ${formatTime(message.createdAt, now)}` : ""}
+                    </p>
+                    <p className="mt-0.5 text-[14px] leading-6 text-foreground break-words line-clamp-2">
+                      {text || (files.length > 0 ? "添付ファイル" : "")}
+                    </p>
+                  </div>
+                </div>
+                {isReplying ? (
+                  <form
+                    className="mt-2.5 flex items-center gap-2 rounded-[18px] border border-border bg-background pl-3.5 pr-1.5 py-1.5"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      void sendReply(message);
+                    }}
+                  >
+                    <input
+                      ref={replyInputRef}
+                      value={replyText}
+                      onChange={(e) => setReplyText(e.target.value)}
+                      onFocus={() => setMessageInputFocused(true)}
+                      onBlur={() => setMessageInputFocused(false)}
+                      onKeyDown={(e) => {
+                        // 日本語変換確定の Enter で送信しない
+                        if (e.key === "Enter" && e.nativeEvent.isComposing) e.preventDefault();
+                      }}
+                      placeholder={`${message.sender.name}さんに返信`}
+                      className="flex-1 min-w-0 bg-transparent text-[16px] lg:text-sm text-foreground outline-none placeholder:text-muted"
+                    />
+                    <button
+                      type="submit"
+                      disabled={!replyText.trim() || sending}
+                      className="w-8 h-8 shrink-0 rounded-full bg-[var(--home-accent)] text-[var(--home-on-accent)] flex items-center justify-center disabled:opacity-40"
+                      aria-label="送信"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M13 6l6 6-6 6" />
+                      </svg>
+                    </button>
+                  </form>
+                ) : (
+                  <div className="mt-2.5 flex flex-wrap items-center gap-2 pl-[46px]">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setReplyText("");
+                        setReplyingId(replyKey);
+                      }}
+                      className={`${btn} bg-[var(--home-accent)] text-[var(--home-on-accent)]`}
+                    >
+                      返信する
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void ackWaiting(message)}
+                      className={`${btn} border border-border bg-surface text-foreground`}
+                    >
+                      👍 見ました
+                    </button>
+                    <Link
+                      href={`/${workspaceSlug}/${message.channelSlug}?m=${message.id}`}
+                      className={`${btn} text-muted`}
+                    >
+                      開く
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d={ICON.chevron} />
+                      </svg>
+                    </Link>
+                  </div>
+                )}
+              </li>
+            );
+          })}
+          {shownTasks.map((task) => (
+            <li key={task.id} className="border-t border-border px-4 py-3 first:border-t-0">
+              <div className="flex items-start gap-2.5">
+                <span className="w-9 h-9 shrink-0 rounded-full bg-[var(--home-accent-soft)] flex items-center justify-center text-base" aria-hidden="true">
+                  ✅
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[12.5px] text-muted">
+                    <span className={`font-bold ${task.isOverdue ? "text-mention" : "text-foreground"}`}>
+                      {task.isOverdue ? "期限切れのタスク" : "今日が期限のタスク"}
+                    </span>
+                    {task.channelName ? ` ・ # ${task.channelName}` : ""}
+                  </p>
+                  <p className="mt-0.5 text-[14px] font-bold leading-6 text-foreground break-words line-clamp-2">{task.title}</p>
+                </div>
+              </div>
+              <div className="mt-2.5 flex flex-wrap items-center gap-2 pl-[46px]">
+                <button
+                  type="button"
+                  onClick={() => void completeWaitingTask(task)}
+                  className={`${btn} bg-[var(--home-accent)] text-[var(--home-on-accent)]`}
+                >
+                  完了にする
+                </button>
+                <Link href={`/${workspaceSlug}/tasks`} className={`${btn} text-muted`}>
+                  開く
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d={ICON.chevron} />
+                  </svg>
+                </Link>
+              </div>
+            </li>
+          ))}
+        </ul>
+        {rest > 0 && <p className="border-t border-border px-4 py-2.5 text-center text-xs text-muted">ほか {rest} 件</p>}
       </section>
     );
   }
@@ -626,6 +913,9 @@ export function HomeView({ workspaceId, workspaceSlug, currentUserId, me, messag
       <div className="flex-1 min-h-0 overflow-y-auto">
         <div className="lg:flex lg:items-start lg:gap-6 lg:px-9 lg:pt-2">
         <div className="mx-auto w-full max-w-2xl pb-10 lg:mx-0 lg:max-w-[680px] lg:flex-1 lg:min-w-0">
+          {filter === "all" && renderStories()}
+          {filter === "all" && renderWaiting()}
+
           {timeline.length === 0 && (
             <div className={`${cardClass} px-4 py-12 text-center`}>
               <p className="text-2xl mb-2">{filter === "all" ? "🌱" : "✅"}</p>
