@@ -130,13 +130,29 @@ Deno.serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       auth: { persistSession: false },
     });
-    const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
-    if (authErr || !user) {
-      console.error("[mikan-organize] auth failed:", authErr?.message);
-      return json({ error: "unauthorized" }, 401);
+    const body = await req.json();
+    // 調査用: service role キーで呼んだときだけ、対象ユーザーを指定でき、AI応答の概要(diag)を返す。
+    // service role はもともと全データを読めるので、権限は広がらない
+    // 署名は関数の手前（verify_jwt）で検証済みなので、ここでは role の確認だけ行う
+    let isService = false;
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+      isService = payload.role === "service_role";
+    } catch {
+      isService = false;
+    }
+    let user: { id: string } | null = null;
+    if (isService && typeof body.as_user_id === "string") {
+      user = { id: body.as_user_id };
+    } else {
+      const { data, error: authErr } = await supabase.auth.getUser(token);
+      if (authErr || !data.user) {
+        console.error("[mikan-organize] auth failed:", authErr?.message);
+        return json({ error: "unauthorized" }, 401);
+      }
+      user = data.user;
     }
 
-    const body = await req.json();
     const channelId = typeof body.channel_id === "string" ? body.channel_id : "";
     const workspaceId = typeof body.workspace_id === "string" ? body.workspace_id : "";
     if (!channelId && !workspaceId) return json({ error: "channel_id or workspace_id required" }, 400);
@@ -277,7 +293,11 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 3000,
+        // このモデルは既定で「考える」段階を持ち、その分も max_tokens から引かれる。
+        // 会話量が多いと考えるだけで上限を使い切り、答え（ツール呼び出し）に届かず失敗していたため、
+        // 考える段階を切り、上限にも余裕を持たせる
+        max_tokens: 8000,
+        thinking: { type: "between_tools" },
         tools: [REPORT_TOOL],
         // このモデルはツールの強制指定 (type: "tool") に対応していないため、指示で必ず呼ばせる
         tool_choice: { type: "auto" },
@@ -303,16 +323,21 @@ Deno.serve(async (req) => {
       console.error("[mikan-organize] AI failed:", aiRes.status, errText);
       // 利用残高切れは、再試行しても直らないので画面で区別して伝える
       if (errText.includes("credit balance")) return json({ error: "ai_credit" }, 402);
-      return json({ error: "AI failed" }, 502);
+      return json({ error: "AI failed", diag: isService ? { status: aiRes.status, body: errText.slice(0, 400) } : undefined }, 502);
     }
 
     const aiJson = await aiRes.json() as {
       content: Array<{ type: string; name?: string; input?: Record<string, unknown> }>;
+      stop_reason?: string;
+      usage?: { input_tokens?: number; output_tokens?: number };
     };
+    const diag = isService
+      ? { stop_reason: aiJson.stop_reason, blocks: aiJson.content.map((c) => c.type), usage: aiJson.usage }
+      : undefined;
     const input = aiJson.content.find((c) => c.type === "tool_use" && c.name === "report_items")?.input;
     if (!input) {
       console.error("[mikan-organize] no tool_use in response:", JSON.stringify(aiJson).slice(0, 500));
-      return json({ error: "AI returned no result" }, 502);
+      return json({ error: "AI returned no result", diag }, 502);
     }
 
     // 候補がどのチャンネルのものかは、根拠の発言から決める（モデルには答えさせない）
@@ -354,7 +379,7 @@ Deno.serve(async (req) => {
       return [{ title, start_at: start.toISOString(), location, ...target }];
     });
 
-    return json({ tasks, events, scanned: rows.length, channels: activeChannelIds.length });
+    return json({ tasks, events, scanned: rows.length, channels: activeChannelIds.length, diag });
   } catch (e) {
     console.error("[mikan-organize] unexpected:", e);
     return json({ error: "unexpected error" }, 500);

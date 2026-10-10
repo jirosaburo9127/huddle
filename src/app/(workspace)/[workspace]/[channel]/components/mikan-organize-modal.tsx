@@ -1,5 +1,6 @@
 "use client";
 
+import { UiIcon } from "@/components/ui-icon";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { createClient } from "@/lib/supabase/client";
@@ -257,8 +258,8 @@ export function MikanOrganizeModal({ scope, currentUserId, onEventCreated, onReg
 
           {(phase === "ready" || phase === "saving") && total === 0 && (
             <div className="py-10 text-center">
-              <p className="text-2xl" aria-hidden="true">
-                ✅
+              <p className="flex justify-center text-muted">
+                <UiIcon name="checkCircle" size={30} />
               </p>
               <p className="mt-2 text-sm font-bold text-foreground">新しく登録するものは見つかりませんでした</p>
               <p className="mt-1 text-xs text-muted">
@@ -347,8 +348,8 @@ export function MikanOrganizeModal({ scope, currentUserId, onEventCreated, onReg
 
           {phase === "done" && (
             <div className="py-8 text-center">
-              <p className="text-2xl" aria-hidden="true">
-                {result.failures.length === 0 ? "🎉" : "⚠️"}
+              <p className={`flex justify-center ${result.failures.length === 0 ? "text-accent" : "text-mention"}`}>
+                <UiIcon name={result.failures.length === 0 ? "checkCircle" : "alert"} size={30} />
               </p>
               <p className="mt-2 text-sm font-bold text-foreground">
                 タスク {result.tasks} 件・予定 {result.events} 件を登録しました

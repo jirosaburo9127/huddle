@@ -1,5 +1,6 @@
 "use client";
 
+import { UiIcon } from "@/components/ui-icon";
 import { useState, useCallback, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { generateVideoThumbnailFile, generateNativeVideoThumbnailDataUrl, dataUrlToFile } from "@/lib/video-thumbnail-generator";
@@ -407,7 +408,7 @@ export function CreateAlbumModal({ workspaceId, currentUserId, channels, addToAl
               }}
               className="w-full rounded-xl border-2 border-dashed border-border py-8 text-center text-sm text-muted hover:border-accent hover:text-accent transition-colors"
             >
-              📷 写真・動画を選択
+              写真・動画を選択
             </button>
             {videoCompressAvailable && (
               <button
@@ -415,7 +416,7 @@ export function CreateAlbumModal({ workspaceId, currentUserId, channels, addToAl
                 onClick={handleCompressedVideos}
                 className="mt-2 w-full rounded-xl border border-accent/40 py-2.5 text-center text-sm text-accent hover:bg-accent/5 transition-colors"
               >
-                🎬 動画を圧縮して追加（軽くして送る）
+                動画を圧縮して追加（軽くして送る）
               </button>
             )}
           </div>
@@ -430,7 +431,7 @@ export function CreateAlbumModal({ workspaceId, currentUserId, channels, addToAl
                     <img src={previews[i]} alt="" className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-xs text-muted">
-                      🎥
+                      <UiIcon name="video" size={22} />
                     </div>
                   )}
                   <button
@@ -453,7 +454,7 @@ export function CreateAlbumModal({ workspaceId, currentUserId, channels, addToAl
             <div className="grid grid-cols-4 gap-1.5">
               {preUploadedVideos.map((_, i) => (
                 <div key={`v${i}`} className="aspect-square bg-black/80 rounded-lg overflow-hidden relative flex items-center justify-center">
-                  <span className="text-white text-lg">🎬</span>
+                  <UiIcon name="video" size={20} className="text-white" />
                   <span className="absolute bottom-0.5 left-0 right-0 text-center text-[9px] text-white/80">圧縮済み</span>
                   <button
                     onClick={() => setPreUploadedVideos((prev) => prev.filter((_, j) => j !== i))}

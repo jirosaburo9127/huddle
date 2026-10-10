@@ -693,7 +693,7 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, onCr
       file.type.startsWith("video/") || /\.(mp4|mov|webm|m4v)$/i.test(file.name);
     setUploadNotice(
       isVideoFile && !isNativeApp
-        ? "動画はアプリから送ると自動で圧縮されて軽く送れます📱"
+        ? "動画はアプリから送ると自動で圧縮されて軽く送れます"
         : null
     );
 
@@ -701,7 +701,7 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, onCr
     if (file.size > MAX_FILE_SIZE) {
       setUploadError(
         isVideoFile && !isNativeApp
-          ? "この動画は大きすぎます。アプリから送ると自動で圧縮して送れます📱"
+          ? "この動画は大きすぎます。アプリから送ると自動で圧縮して送れます"
           : "ファイルサイズは500MB以下にしてください"
       );
       return;

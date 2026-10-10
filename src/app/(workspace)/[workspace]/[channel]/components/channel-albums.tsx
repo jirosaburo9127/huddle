@@ -1,5 +1,6 @@
 "use client";
 
+import { UiIcon } from "@/components/ui-icon";
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { AlbumSummary } from "@/lib/supabase/types";
@@ -71,7 +72,7 @@ export function ChannelAlbums({ channelId, channelName, workspaceId, currentUser
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 shrink-0">
-          <h2 className="text-base font-bold text-foreground">📸 #{channelName} のアルバム</h2>
+          <h2 className="text-base font-bold text-foreground">#{channelName} のアルバム</h2>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowCreate(true)}
@@ -114,7 +115,7 @@ export function ChannelAlbums({ channelId, channelName, workspaceId, currentUser
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={coverUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" loading="lazy" />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center text-2xl">📷</div>
+                        <div className="w-full h-full flex items-center justify-center text-muted"><UiIcon name="camera" size={26} /></div>
                       )}
                       <span className="absolute bottom-1 right-1 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded-full">
                         {album.item_count}

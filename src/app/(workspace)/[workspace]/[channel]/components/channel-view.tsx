@@ -1,5 +1,6 @@
 "use client";
 
+import { UiIcon } from "@/components/ui-icon";
 import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { RealtimePostgresInsertPayload, RealtimePostgresUpdatePayload, RealtimePostgresDeletePayload } from "@supabase/supabase-js";
@@ -1982,8 +1983,8 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                         mikanEnabled ? "text-accent" : "text-foreground"
                       }`}
                     >
-                      <span className="w-4 h-4 shrink-0 inline-flex items-center justify-center text-base leading-none">
-                        🍊
+                      <span className="w-4 h-4 shrink-0 inline-flex items-center justify-center">
+                        <HuddleMark size={13} />
                       </span>
                       {mikanEnabled ? "みかんを無効にする" : "みかんを有効にする"}
                     </button>
@@ -2063,7 +2064,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                       }}
                       className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-sidebar-hover transition-colors ${showMindmap ? "text-accent" : "text-foreground"}`}
                     >
-                      <span className="w-4 h-4 shrink-0 flex items-center justify-center text-sm">🧠</span>
+                      <UiIcon name="mindmap" size={16} />
                       {showMindmap ? "マインドマップを閉じる" : "マインドマップ"}
                     </button>
                   )}

@@ -1,5 +1,6 @@
 "use client";
 
+import { UiIcon } from "@/components/ui-icon";
 import { useEffect, useState, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
@@ -751,8 +752,9 @@ export default function CalendarPage() {
                         {ev.title}
                       </div>
                       {ev.location && (
-                        <div className="text-xs text-muted mb-1 truncate">
-                          📍 {ev.location}
+                        <div className="flex items-center gap-1 text-xs text-muted mb-1">
+                          <UiIcon name="pin" size={12} />
+                          <span className="truncate">{ev.location}</span>
                         </div>
                       )}
                       <div className="flex items-center gap-2">
@@ -1259,14 +1261,14 @@ export default function CalendarPage() {
                     href={webcalUrl}
                     className="block w-full text-center px-4 py-2.5 text-sm font-medium rounded-lg border border-border hover:bg-sidebar-hover transition-colors"
                   >
-                    📅 Apple カレンダーで開く
+                    Apple カレンダーで開く
                   </a>
                   <button
                     type="button"
                     onClick={openGoogleAddByUrl}
                     className="block w-full text-center px-4 py-2.5 text-sm font-medium rounded-lg border border-border hover:bg-sidebar-hover transition-colors"
                   >
-                    📅 Google カレンダーに追加
+                    Google カレンダーに追加
                   </button>
                   <p className="text-xs text-muted leading-relaxed pl-1">
                     Google を選ぶと URL がコピーされ、設定ページが開きます。

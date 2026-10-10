@@ -309,7 +309,7 @@ export default function TasksPage() {
       {/* ヘッダー */}
       <header className="flex items-center justify-between px-4 lg:px-6 py-3 border-b border-border bg-surface shrink-0">
         <div className="flex items-center gap-3 min-w-0">
-          <h1 className="text-lg font-bold text-foreground shrink-0">📋 タスク</h1>
+          <h1 className="text-lg font-bold text-foreground shrink-0">タスク</h1>
           {/* 表示切替: マイタスク / ボード */}
           <div className="flex items-center gap-0.5 rounded-lg bg-input-bg p-0.5">
             {([["mine", "マイタスク"], ["board", "ボード"]] as const).map(([val, label]) => (
@@ -359,7 +359,6 @@ export default function TasksPage() {
 
           {mineActiveCount === 0 && mineGrouped.done.length === 0 ? (
             <div className="text-center py-16 px-6">
-              <p className="text-4xl mb-3">🌱</p>
               <p className="text-sm text-muted">
                 {mineFilter === "assigned" ? "あなたに割り当てられたタスクはありません" : "あなたが依頼したタスクはありません"}
               </p>

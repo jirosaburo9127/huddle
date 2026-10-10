@@ -1,5 +1,6 @@
 "use client";
 
+import { HuddleMark } from "@/components/huddle-mark";
 import { memo, useState, useRef, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -1092,12 +1093,12 @@ export const MessageItem = memo(function MessageItem({
         ) : (
           <div
             className={`relative shrink-0 w-9 h-9 rounded-full flex items-center justify-center mt-0.5 ${
-              isBot ? "bg-[#ffedd5] text-base" : "text-white text-[13px] font-bold"
+              isBot ? "bg-[var(--home-accent-soft)]" : "text-white text-[13px] font-bold"
             }`}
             style={isBot ? undefined : { background: avatarColor(profile?.display_name || "?") }}
           >
             {isBot ? (
-              <span className="leading-none" aria-label={profile?.display_name}>🍊</span>
+              <HuddleMark size={18} />
             ) : profile?.avatar_url ? (
               <img
                 src={profile.avatar_url}
@@ -1222,8 +1223,8 @@ export const MessageItem = memo(function MessageItem({
                           />
                         </svg>
                         {parentMessage.profiles?.is_bot ? (
-                          <span className="shrink-0 w-5 h-5 rounded-full bg-[#ffedd5] flex items-center justify-center text-[11px] leading-none">
-                            🍊
+                          <span className="shrink-0 w-5 h-5 rounded-full bg-[var(--home-accent-soft)] flex items-center justify-center">
+                            <HuddleMark size={10} />
                           </span>
                         ) : parentMessage.profiles?.avatar_url ? (
                           // eslint-disable-next-line @next/next/no-img-element
@@ -1255,7 +1256,7 @@ export const MessageItem = memo(function MessageItem({
                         {parentMessage.deleted_at
                           ? "(削除されたメッセージ)"
                           : isStorageFileUrl(parentMessage.content)
-                            ? `📎 ${extractFileName(parentMessage.content.trim())}`
+                            ? `添付: ${extractFileName(parentMessage.content.trim())}`
                             : parentMessage.content.replace(/\s+/g, " ").trim()}
                       </div>
                     </>

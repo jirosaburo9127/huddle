@@ -188,12 +188,12 @@ export function ChannelMindmap({ channelId, channelName, onClose }: Props) {
     <div className="fixed inset-0 z-[60] bg-background flex flex-col" style={{ overflow: "hidden" }}>
       {/* ヘッダー */}
       <header className="flex items-center justify-between px-5 py-3 border-b border-border bg-surface shrink-0">
-        <h2 className="font-bold text-lg flex items-center gap-2">🧠 マインドマップ</h2>
+        <h2 className="font-bold text-lg flex items-center gap-2">マインドマップ</h2>
         <div className="flex items-center gap-3">
           {saving && <span className="text-xs text-muted">保存中...</span>}
           <button onClick={generate} disabled={generating}
             className="text-sm bg-accent/10 text-accent px-3 py-1.5 rounded-lg hover:bg-accent/20 disabled:opacity-50 transition-colors font-medium">
-            {generating ? "生成中..." : "🔄 AI再生成"}
+            {generating ? "生成中..." : "AI再生成"}
           </button>
           <button onClick={onClose} className="p-2 text-muted hover:text-foreground rounded-lg hover:bg-sidebar-hover transition-colors">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -228,7 +228,6 @@ export function ChannelMindmap({ channelId, channelName, onClose }: Props) {
                   background: "radial-gradient(circle, #FFFBEB 0%, #FEF3C7 50%, #FDE68A 100%)",
                   border: "4px solid #F59E0B", boxShadow: "0 8px 30px rgba(245,158,11,0.2)",
                 }}>
-                <div className="text-3xl mb-1">💡</div>
                 {renderLabel(root, 14, 800, "#78350F")}
               </div>
               <button onClick={() => addChild(root.id)} className="mt-3 text-xs text-muted hover:text-accent font-medium">+ トピック追加</button>

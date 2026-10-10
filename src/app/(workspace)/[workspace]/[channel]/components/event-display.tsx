@@ -4,6 +4,7 @@
 // - タイトル・日時・場所を表示
 // - 参加者のアバターを表示（最大5人 + 超過分は +N 表示）
 
+import { UiIcon } from "@/components/ui-icon";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -132,7 +133,7 @@ export function EventDisplay({ messageId, currentUserId }: Props) {
     >
       {/* ヘッダーラベル */}
       <div className="flex items-center gap-2 mb-2">
-        <span className="text-base">📅</span>
+        <UiIcon name="calendar" size={16} className="text-accent" />
         <span className="text-xs font-semibold text-accent uppercase tracking-wider">
           イベント
         </span>
@@ -148,14 +149,14 @@ export function EventDisplay({ messageId, currentUserId }: Props) {
 
       {/* 日時 */}
       <div className="flex items-center gap-1.5 text-xs text-muted mb-1">
-        <span>🕐</span>
+        <UiIcon name="clock" size={13} />
         <span>{formatDateTimeJa(event.start_at)}</span>
       </div>
 
       {/* 場所 */}
       {event.location && (
         <div className="flex items-center gap-1.5 text-xs text-muted mb-2">
-          <span>📍</span>
+          <UiIcon name="pin" size={13} />
           <span>{event.location}</span>
         </div>
       )}

@@ -1,5 +1,6 @@
 "use client";
 
+import { UiIcon } from "@/components/ui-icon";
 import type { AlbumSummary } from "@/lib/supabase/types";
 
 type Props = {
@@ -27,7 +28,7 @@ export function AlbumCard({ album, onClick }: Props) {
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <span className="text-3xl">📷</span>
+            <UiIcon name="camera" size={30} className="text-muted" />
           </div>
         )}
         {/* 枚数バッジ */}

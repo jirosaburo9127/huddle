@@ -6,6 +6,7 @@
 // - 締切/クローズ済みは読み取り専用
 // - 締切後に最多票の選択肢を「決定事項」化するボタン
 
+import { UiIcon } from "@/components/ui-icon";
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { RealtimePostgresInsertPayload, RealtimePostgresDeletePayload, RealtimePostgresUpdatePayload } from "@supabase/supabase-js";
@@ -348,8 +349,8 @@ export function PollDisplay({ messageId, currentUserId, onMarkDecision }: Props)
                     {opt}
                   </span>
                   {isTop && !isActive && (
-                    <span className="shrink-0 text-[10px] font-bold text-accent">
-                      👑
+                    <span className="shrink-0 text-accent">
+                      <UiIcon name="crown" size={13} />
                     </span>
                   )}
                 </div>

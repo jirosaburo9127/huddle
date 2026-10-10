@@ -1,5 +1,6 @@
 "use client";
 
+import { UiIcon } from "@/components/ui-icon";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -130,7 +131,6 @@ export default function AlbumsPage() {
       {/* ヘッダー */}
       <header className="flex items-center justify-between px-4 py-3 border-b border-border bg-header shrink-0">
         <div className="flex items-center gap-2">
-          <span className="text-lg">📸</span>
           <h1 className="text-base font-bold text-foreground">アルバム</h1>
           {albums.length > 0 && (
             <span className="text-xs bg-accent/10 text-accent rounded-full px-2 py-0.5">
@@ -151,7 +151,7 @@ export default function AlbumsPage() {
         {albums.length === 0 ? (
           <div className="flex items-center justify-center h-full text-muted">
             <div className="text-center">
-              <div className="text-5xl mb-4">📸</div>
+              <div className="mb-4 flex justify-center text-muted"><UiIcon name="camera" size={44} /></div>
               <p className="text-base font-medium text-foreground mb-2">アルバム</p>
               <p className="text-sm text-muted mb-4">
                 イベントや行事の写真をアルバムにまとめましょう

@@ -1,5 +1,6 @@
 "use client";
 
+import { UiIcon } from "@/components/ui-icon";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -430,8 +431,8 @@ export function HomeView({
       if (!hadWaiting) return null;
       return (
         <section className={`${cardClass} px-4 py-5 text-center`}>
-          <p className="text-2xl" aria-hidden="true">
-            🎉
+          <p className="flex justify-center text-[var(--home-accent-ink)]">
+            <UiIcon name="checkCircle" size={30} />
           </p>
           <p className="mt-1 text-sm font-extrabold text-foreground">全部返しました</p>
           <p className="mt-0.5 text-xs text-muted">あなた待ちの用件はありません</p>
@@ -538,8 +539,8 @@ export function HomeView({
           {shownTasks.map((task) => (
             <li key={task.id} className="border-t border-border px-4 py-3 first:border-t-0">
               <div className="flex items-start gap-2.5">
-                <span className="w-9 h-9 shrink-0 rounded-full bg-[var(--home-accent-soft)] flex items-center justify-center text-base" aria-hidden="true">
-                  ✅
+                <span className="w-9 h-9 shrink-0 rounded-full bg-[var(--home-accent-soft)] text-[var(--home-accent-ink)] flex items-center justify-center">
+                  <UiIcon name="checkSquare" size={19} />
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[12.5px] text-muted">
@@ -597,8 +598,8 @@ export function HomeView({
             <p className="mt-1.5 text-[12.5px] font-bold text-foreground">{assignee.name}</p>
             <p className="text-[10.5px] text-muted">担当</p>
           </div>
-          <span className="text-[26px]" aria-hidden="true">
-            🎉
+          <span className="w-9 h-9 rounded-full bg-[var(--home-accent)] text-[var(--home-on-accent)] flex items-center justify-center">
+            <UiIcon name="checkCircle" size={22} />
           </span>
           {showPair && (
             <div className="text-center">
@@ -686,8 +687,8 @@ export function HomeView({
             href={messageHref}
             className="mt-2.5 flex items-center gap-3 rounded-xl border border-border px-3 py-2.5"
           >
-            <span className="w-9 h-9 shrink-0 rounded-[10px] bg-[var(--home-accent-soft)] flex items-center justify-center text-base">
-              📎
+            <span className="w-9 h-9 shrink-0 rounded-[10px] bg-[var(--home-accent-soft)] text-[var(--home-accent-ink)] flex items-center justify-center">
+              <UiIcon name="paperclip" size={18} />
             </span>
             <span className="min-w-0 truncate text-[13px] font-bold text-foreground">
               {extractDisplayFileName(url)}
@@ -863,7 +864,9 @@ export function HomeView({
 
           {timeline.length === 0 && (
             <div className={`${cardClass} px-4 py-12 text-center`}>
-              <p className="text-2xl mb-2">{filter === "all" ? "🌱" : "✅"}</p>
+              <p className="mb-2 flex justify-center text-muted">
+                <UiIcon name={filter === "all" ? "inbox" : "checkCircle"} size={30} />
+              </p>
               <p className="text-sm font-bold text-foreground">
                 {filter === "mention"
                   ? "あなた宛ての投稿はありません"

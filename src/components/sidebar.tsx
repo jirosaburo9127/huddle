@@ -1,5 +1,6 @@
 "use client";
 
+import { UiIcon } from "@/components/ui-icon";
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -566,7 +567,7 @@ export function Sidebar({
         const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
         next[row.channel_id] = {
           sender: profile?.display_name || "",
-          text: row.content.replace(/https?:\/\/\S+/g, "📎 添付").replace(/\s+/g, " ").trim(),
+          text: row.content.replace(/https?:\/\/\S+/g, "添付").replace(/\s+/g, " ").trim(),
           at: row.created_at,
         };
       }
@@ -1252,7 +1253,7 @@ export function Sidebar({
                               WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
                             }}>{textContent.slice(0, 70)}</p>
                           ) : !imageUrl ? (
-                            <p style={{ fontSize: isDesktop ? 10.5 : 12, color: "var(--color-muted)", margin: 0 }}>📎 ファイル</p>
+                            <p style={{ fontSize: isDesktop ? 10.5 : 12, color: "var(--color-muted)", margin: 0 }}>添付ファイル</p>
                           ) : null}
                         </div>
                       </div>
@@ -1379,7 +1380,7 @@ export function Sidebar({
                               WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
                             }}>{textContent.slice(0, 70)}</p>
                           ) : !imageUrl ? (
-                            <p style={{ fontSize: 12, color: "var(--color-muted)", margin: 0 }}>📎 ファイル</p>
+                            <p style={{ fontSize: 12, color: "var(--color-muted)", margin: 0 }}>添付ファイル</p>
                           ) : null}
                         </div>
                       </div>
@@ -1636,7 +1637,7 @@ export function Sidebar({
                 title="マスター画面（全WS閲覧）"
                 aria-label="マスター画面を開く"
               >
-                <span className="text-base leading-none">🔑</span>
+                <UiIcon name="key" size={17} />
               </Link>
             )}
             {/* LP プレビュー（アプリ内から /about に直接ジャンプ） */}
