@@ -13,6 +13,7 @@ import { MessageInput, type MentionPayload } from "./message-input";
 import { CreatePollModal } from "./create-poll-modal";
 import { CreateEventModal } from "./create-event-modal";
 import { MikanOrganizeModal } from "./mikan-organize-modal";
+import { HuddleMark } from "@/components/huddle-mark";
 import { TaskModal } from "../../tasks/components/task-modal";
 import { EventDisplay } from "./event-display";
 import { DateSeparator } from "./date-separator";
@@ -1921,7 +1922,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                 className="flex items-center gap-1 rounded-full border border-border bg-surface px-2.5 py-1 text-xs font-bold text-foreground hover:bg-sidebar-hover transition-colors"
                 title="会話からタスクと予定を拾う"
               >
-                <span aria-hidden="true">🍊</span>
+                <HuddleMark size={13} />
                 整理
               </button>
             )}
@@ -2606,8 +2607,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
       {/* みかんに整理してもらうモーダル */}
       {showMikanOrganize && (
         <MikanOrganizeModal
-          channelId={channel.id}
-          channelName={channel.name}
+          scope={{ channelId: channel.id, channelName: channel.name }}
           currentUserId={currentUserId}
           onEventCreated={(messageId) => {
             setEventMessageIds((prev) => { const next = new Set(prev); next.add(messageId); return next; });

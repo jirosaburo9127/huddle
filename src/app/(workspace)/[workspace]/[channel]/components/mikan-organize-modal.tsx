@@ -3,10 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { createClient } from "@/lib/supabase/client";
+import { HuddleMark } from "@/components/huddle-mark";
 
 type Source = { message_id: string; author: string; excerpt: string } | null;
 
 type TaskCandidate = {
+  channel_id: string;
+  channel_name: string;
   title: string;
   assignees: Array<{ user_id: string; name: string }>;
   due_date: string | null;
@@ -14,6 +17,8 @@ type TaskCandidate = {
 };
 
 type EventCandidate = {
+  channel_id: string;
+  channel_name: string;
   title: string;
   start_at: string;
   location: string | null;
@@ -21,11 +26,13 @@ type EventCandidate = {
 };
 
 type Props = {
-  channelId: string;
-  channelName: string;
+  /** どこの会話を読むか。チャンネル1つ、または自分が参加しているチャンネル全部 */
+  scope: { channelId: string; channelName: string } | { workspaceId: string };
   currentUserId: string;
-  /** 予定を登録したとき、その予定カード用メッセージの ID を親に伝える */
-  onEventCreated: (messageId: string) => void;
+  /** 予定を登録したとき、その予定カード用メッセージの ID を親に伝える（チャンネル画面用） */
+  onEventCreated?: (messageId: string) => void;
+  /** 1件でも登録したら呼ぶ（ホームの取り直し用） */
+  onRegistered?: () => void;
   onClose: () => void;
 };
 
@@ -45,13 +52,17 @@ function formatDueJa(date: string): string {
 }
 
 /** みかんがチャンネルの会話から拾ったタスク・予定の候補を、選んで登録するモーダル */
-export function MikanOrganizeModal({ channelId, channelName, currentUserId, onEventCreated, onClose }: Props) {
+export function MikanOrganizeModal({ scope, currentUserId, onEventCreated, onRegistered, onClose }: Props) {
   const supabase = useMemo(() => createClient(), []);
+  const isAll = "workspaceId" in scope;
+  // 依存配列に入れるため、対象を文字列にしておく
+  const scopeKey = isAll ? `ws:${scope.workspaceId}` : `ch:${scope.channelId}`;
   const [phase, setPhase] = useState<"loading" | "ready" | "saving" | "done" | "error">("loading");
   const [errorMessage, setErrorMessage] = useState("");
   const [tasks, setTasks] = useState<TaskCandidate[]>([]);
   const [events, setEvents] = useState<EventCandidate[]>([]);
   const [scanned, setScanned] = useState(0);
+  const [channelCount, setChannelCount] = useState(0);
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [result, setResult] = useState<{ tasks: number; events: number; failures: string[] }>({
     tasks: 0,
@@ -71,7 +82,9 @@ export function MikanOrganizeModal({ channelId, channelName, currentUserId, onEv
         const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/mikan-organize`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ channel_id: channelId }),
+          body: JSON.stringify(
+            scopeKey.startsWith("ws:") ? { workspace_id: scopeKey.slice(3) } : { channel_id: scopeKey.slice(3) }
+          ),
         });
         if (!res.ok) {
           console.error("[mikan-organize] request failed:", res.status, await res.text());
@@ -80,11 +93,17 @@ export function MikanOrganizeModal({ channelId, channelName, currentUserId, onEv
           }
           throw new Error("みかんが会話を読み取れませんでした。時間をおいてもう一度お試しください");
         }
-        const json = (await res.json()) as { tasks: TaskCandidate[]; events: EventCandidate[]; scanned: number };
+        const json = (await res.json()) as {
+          tasks: TaskCandidate[];
+          events: EventCandidate[];
+          scanned: number;
+          channels?: number;
+        };
         if (cancelled) return;
         setTasks(json.tasks || []);
         setEvents(json.events || []);
         setScanned(json.scanned || 0);
+        setChannelCount(json.channels || 0);
         // 最初は全部にチェックを入れておき、要らないものだけ外してもらう
         setChecked(
           new Set([...(json.tasks || []).map((_, i) => `task-${i}`), ...(json.events || []).map((_, i) => `event-${i}`)])
@@ -99,7 +118,7 @@ export function MikanOrganizeModal({ channelId, channelName, currentUserId, onEv
     return () => {
       cancelled = true;
     };
-  }, [channelId, supabase]);
+  }, [scopeKey, supabase]);
 
   function toggle(key: string) {
     setChecked((prev) => {
@@ -121,7 +140,7 @@ export function MikanOrganizeModal({ channelId, channelName, currentUserId, onEv
       const { data, error } = await supabase
         .from("tasks")
         .insert({
-          channel_id: channelId,
+          channel_id: task.channel_id,
           title: task.title,
           status: "todo",
           due_date: task.due_date,
@@ -154,7 +173,7 @@ export function MikanOrganizeModal({ channelId, channelName, currentUserId, onEv
       const { data: msg, error: msgError } = await supabase
         .from("messages")
         .insert({
-          channel_id: channelId,
+          channel_id: event.channel_id,
           user_id: currentUserId,
           content: `📅 ${event.title}\n${formatDateTimeJa(event.start_at)}${locLine}`,
         })
@@ -167,7 +186,7 @@ export function MikanOrganizeModal({ channelId, channelName, currentUserId, onEv
       }
       const { error: rpcError } = await supabase.rpc("create_event", {
         p_message_id: msg.id,
-        p_channel_id: channelId,
+        p_channel_id: event.channel_id,
         p_title: event.title,
         p_start_at: event.start_at,
         p_location: event.location,
@@ -181,10 +200,11 @@ export function MikanOrganizeModal({ channelId, channelName, currentUserId, onEv
         continue;
       }
       eventCount += 1;
-      onEventCreated(msg.id as string);
+      onEventCreated?.(msg.id as string);
     }
 
     setResult({ tasks: taskCount, events: eventCount, failures });
+    if (taskCount + eventCount > 0) onRegistered?.();
     setPhase("done");
   }
 
@@ -202,8 +222,13 @@ export function MikanOrganizeModal({ channelId, channelName, currentUserId, onEv
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-border/50 shrink-0">
           <div className="min-w-0">
-            <h3 className="text-base font-bold">🍊 みかんに整理してもらう</h3>
-            <p className="mt-0.5 truncate text-xs text-muted"># {channelName} の最近の会話から</p>
+            <h3 className="flex items-center gap-2 text-base font-bold">
+              <HuddleMark size={18} />
+              みかんに整理してもらう
+            </h3>
+            <p className="mt-0.5 truncate text-xs text-muted">
+              {isAll ? "参加しているチャンネル全体の、この1週間の会話から" : `# ${scope.channelName} の最近の会話から`}
+            </p>
           </div>
           <button onClick={onClose} className="p-1.5 text-muted hover:text-foreground" aria-label="閉じる">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -215,8 +240,8 @@ export function MikanOrganizeModal({ channelId, channelName, currentUserId, onEv
         <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4">
           {phase === "loading" && (
             <div className="py-10 text-center">
-              <p className="text-3xl animate-pulse" aria-hidden="true">
-                🍊
+              <p className="flex justify-center animate-pulse">
+                <HuddleMark size={36} />
               </p>
               <p className="mt-3 text-sm font-bold text-foreground">会話を読んでいます…</p>
               <p className="mt-1 text-xs text-muted">やることと、日時の決まった予定を探しています</p>
@@ -236,13 +261,18 @@ export function MikanOrganizeModal({ channelId, channelName, currentUserId, onEv
                 ✅
               </p>
               <p className="mt-2 text-sm font-bold text-foreground">新しく登録するものは見つかりませんでした</p>
-              <p className="mt-1 text-xs text-muted">直近2週間の {scanned} 件の投稿を確認しました</p>
+              <p className="mt-1 text-xs text-muted">
+                {isAll
+                  ? `この1週間の ${channelCount} チャンネル・${scanned} 件の投稿を確認しました`
+                  : `直近2週間の ${scanned} 件の投稿を確認しました`}
+              </p>
             </div>
           )}
 
           {(phase === "ready" || phase === "saving") && total > 0 && (
             <>
               <p className="text-xs text-muted">
+                {isAll ? `${channelCount} チャンネル・` : ""}
                 {scanned} 件の投稿から {total} 件見つけました。登録するものにチェックを入れてください。
               </p>
 
@@ -261,6 +291,7 @@ export function MikanOrganizeModal({ channelId, channelName, currentUserId, onEv
                         <span className="min-w-0 flex-1">
                           <span className="block text-sm font-bold text-foreground break-words">{task.title}</span>
                           <span className="mt-0.5 block text-xs text-muted">
+                            {isAll && <span className="font-bold text-accent"># {task.channel_name} ・ </span>}
                             担当: {task.assignees.length > 0 ? task.assignees.map((a) => a.name).join("、") : "未定"}
                             {" ・ "}
                             期限: {task.due_date ? formatDueJa(task.due_date) : "なし"}
@@ -292,6 +323,7 @@ export function MikanOrganizeModal({ channelId, channelName, currentUserId, onEv
                         <span className="min-w-0 flex-1">
                           <span className="block text-sm font-bold text-foreground break-words">{event.title}</span>
                           <span className="mt-0.5 block text-xs text-muted">
+                            {isAll && <span className="font-bold text-accent"># {event.channel_name} ・ </span>}
                             {formatDateTimeJa(event.start_at)}
                             {event.location ? ` ・ ${event.location}` : ""}
                           </span>
@@ -308,7 +340,7 @@ export function MikanOrganizeModal({ channelId, channelName, currentUserId, onEv
               )}
 
               <p className="mt-4 text-[11px] leading-relaxed text-muted">
-                内容はAIが読み取ったものです。登録後にタスク・カレンダーの画面から直せます。予定を登録すると、このチャンネルに予定のカードが投稿されます。
+                内容はAIが読み取ったものです。登録後にタスク・カレンダーの画面から直せます。予定を登録すると、{isAll ? "その" : "この"}チャンネルに予定のカードが投稿されます。
               </p>
             </>
           )}

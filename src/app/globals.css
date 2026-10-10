@@ -136,6 +136,18 @@ html {
   color: var(--home-accent-ink);
 }
 
+/* ホーム右下のみかんボタン: ゆっくり上下にふよふよ浮く */
+@keyframes mikan-float {
+  0%, 100% { transform: translateY(0) rotate(-3deg); }
+  50% { transform: translateY(-7px) rotate(3deg); }
+}
+.animate-mikan-float {
+  animation: mikan-float 3.2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-mikan-float { animation: none; }
+}
+
 /* ホームのカード: 下からスライド＋フェード */
 @keyframes home-card-in {
   from { opacity: 0; transform: translateY(14px); }

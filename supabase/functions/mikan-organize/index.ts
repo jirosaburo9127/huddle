@@ -1,12 +1,16 @@
 // Edge Function: みかんに整理してもらう
 //
-// チャンネルの最近の会話から「やること(タスク候補)」と「日時の決まった予定候補」を
-// 拾って返す。登録はしない（画面でユーザーがチェックしたものだけクライアントが登録する）。
+// 最近の会話から「やること(タスク候補)」と「日時の決まった予定候補」を拾って返す。
+// 登録はしない（画面でユーザーがチェックしたものだけクライアントが登録する）。
+//
+// 対象は2通り:
+//   - channel_id 指定: そのチャンネルだけ（チャンネル画面の「整理」）
+//   - workspace_id 指定: 自分が参加している通常チャンネル全部（ホームのみかんボタン）
 //
 // 起点はユーザーがボタンを押したときだけ。投稿のたびに自動で動く見守りモードは
 // 過去に廃止しており（mikan-respond 冒頭のコメント参照）、ここでも持ち込まない。
 //
-// 認証: 呼び出し元ユーザーの JWT を検証し、対象チャンネルのメンバーであることを確認する。
+// 認証: 呼び出し元ユーザーの JWT を検証し、本人が参加しているチャンネルだけを読む。
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -19,6 +23,9 @@ const MIKAN_USER_ID = "00000000-0000-0000-0000-00000000aaaa";
 // 会話として読む範囲。期間で区切り、その中の新しい側から上限件数まで
 const LOOKBACK_DAYS = 14;
 const MAX_MESSAGES = 120;
+// ワークスペース全体のときは範囲を1週間に絞り、そのぶん件数の上限を広げる
+const WS_LOOKBACK_DAYS = 7;
+const WS_MAX_MESSAGES = 300;
 const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
 
 const corsHeaders = {
@@ -105,6 +112,8 @@ const SYSTEM_PROMPT = `あなたは業務チャット「Huddle」のアシスタ
 - 「◯曜まで」「◯曜に」と週の指定が無いときは、発言日より後で最も近いその曜日
 - 会話に書かれていないことを補わない。担当・期限・場所は分からなければ空/null
 - 「登録済み」に挙げたタスク・予定と同じ用件は報告しない
+- 複数チャンネルの会話が並ぶ場合、発言の頭の #チャンネル名 が同じもの同士が1つの会話。別のチャンネルの話を混ぜない
+- 担当者は、その発言があったチャンネルのメンバーからだけ選ぶ
 - 同じ用件を重複して報告しない。後の発言で内容が変更・取り消しされていたら最新の内容に従う
 - 該当が無ければ空配列で報告する。無理に拾わない
 
@@ -128,37 +137,55 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const channelId = body.channel_id as string;
-    if (!channelId) return json({ error: "channel_id required" }, 400);
+    const channelId = typeof body.channel_id === "string" ? body.channel_id : "";
+    const workspaceId = typeof body.workspace_id === "string" ? body.workspace_id : "";
+    if (!channelId && !workspaceId) return json({ error: "channel_id or workspace_id required" }, 400);
 
-    const { data: membership } = await supabase
+    // 読んでよいチャンネル = 本人が参加しているもの。全体のときは DM・独り言・アーカイブ済みを除く
+    type ChannelRow = { id: string; name: string; is_dm: boolean; is_hitorigoto: boolean; is_archived: boolean; workspace_id: string };
+    let membershipQuery = supabase
       .from("channel_members")
-      .select("user_id")
-      .eq("channel_id", channelId)
-      .eq("user_id", user.id)
-      .maybeSingle();
-    if (!membership) return json({ error: "not a member" }, 403);
+      .select("channel_id, channels!inner(id, name, is_dm, is_hitorigoto, is_archived, workspace_id)")
+      .eq("user_id", user.id);
+    membershipQuery = channelId
+      ? membershipQuery.eq("channel_id", channelId)
+      : membershipQuery.eq("channels.workspace_id", workspaceId);
+    const { data: membershipRows, error: membershipErr } = await membershipQuery;
+    if (membershipErr) {
+      console.error("[mikan-organize] membership fetch error:", membershipErr);
+      return json({ error: "fetch failed" }, 500);
+    }
+    const channels = ((membershipRows || []) as unknown as Array<{ channels: ChannelRow | ChannelRow[] }>)
+      .map((m) => (Array.isArray(m.channels) ? m.channels[0] : m.channels))
+      .filter((c): c is ChannelRow => !!c && (!!channelId || (!c.is_dm && !c.is_hitorigoto && !c.is_archived)));
+    if (channelId && channels.length === 0) return json({ error: "not a member" }, 403);
+    if (channels.length === 0) return json({ tasks: [], events: [], scanned: 0 });
 
-    const since = new Date(Date.now() - LOOKBACK_DAYS * 24 * 60 * 60 * 1000).toISOString();
+    const channelIds = channels.map((c) => c.id);
+    const channelNames = new Map(channels.map((c) => [c.id, c.name]));
+    const multi = !channelId;
+
+    const lookbackDays = multi ? WS_LOOKBACK_DAYS : LOOKBACK_DAYS;
+    const since = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000).toISOString();
     const nowIso = new Date().toISOString();
 
     const [messagesRes, membersRes, tasksRes, eventsRes] = await Promise.all([
       supabase
         .from("messages")
-        .select("id, content, created_at, user_id, profiles(display_name)")
-        .eq("channel_id", channelId)
+        .select("id, content, created_at, user_id, channel_id, profiles(display_name)")
+        .in("channel_id", channelIds)
         .is("deleted_at", null)
         .is("system_event", null)
         .neq("user_id", MIKAN_USER_ID)
         .gte("created_at", since)
         .order("created_at", { ascending: false })
-        .limit(MAX_MESSAGES),
+        .limit(multi ? WS_MAX_MESSAGES : MAX_MESSAGES),
       supabase
         .from("channel_members")
-        .select("user_id, profiles(display_name)")
-        .eq("channel_id", channelId),
-      supabase.from("tasks").select("title").eq("channel_id", channelId).neq("status", "done"),
-      supabase.from("events").select("title, start_at").eq("channel_id", channelId).gte("start_at", nowIso),
+        .select("channel_id, user_id, profiles(display_name)")
+        .in("channel_id", channelIds),
+      supabase.from("tasks").select("title, channel_id").in("channel_id", channelIds).neq("status", "done"),
+      supabase.from("events").select("title, start_at, channel_id").in("channel_id", channelIds).gte("start_at", nowIso),
     ]);
 
     if (messagesRes.error) {
@@ -171,17 +198,34 @@ Deno.serve(async (req) => {
       content: string;
       created_at: string;
       user_id: string;
+      channel_id: string;
       profiles: { display_name: string } | { display_name: string }[] | null;
     };
     const nameOf = (p: Row["profiles"]) => (Array.isArray(p) ? p[0]?.display_name : p?.display_name) || "?";
+    // 古い順。全体のときはチャンネルごとにまとめて、会話の流れを追いやすくする
     const rows = ((messagesRes.data || []) as Row[]).reverse();
+    if (multi) {
+      const order = new Map(channelIds.map((id, i) => [id, i]));
+      rows.sort((a, b) =>
+        a.channel_id === b.channel_id
+          ? a.created_at.localeCompare(b.created_at)
+          : (order.get(a.channel_id) ?? 0) - (order.get(b.channel_id) ?? 0)
+      );
+    }
     if (rows.length === 0) {
       return json({ tasks: [], events: [], scanned: 0 });
     }
 
-    const members = ((membersRes.data || []) as Array<{ user_id: string; profiles: Row["profiles"] }>)
-      .filter((m) => m.user_id !== MIKAN_USER_ID)
-      .map((m) => ({ user_id: m.user_id, name: nameOf(m.profiles) }));
+    // 担当者は「その発言があったチャンネルのメンバー」からだけ選ぶ
+    const membersByChannel = new Map<string, Array<{ user_id: string; name: string }>>();
+    for (const m of (membersRes.data || []) as Array<{ channel_id: string; user_id: string; profiles: Row["profiles"] }>) {
+      if (m.user_id === MIKAN_USER_ID) continue;
+      const list = membersByChannel.get(m.channel_id) || [];
+      list.push({ user_id: m.user_id, name: nameOf(m.profiles) });
+      membersByChannel.set(m.channel_id, list);
+    }
+    // 会話に出てくるチャンネルだけを対象にする
+    const activeChannelIds = channelIds.filter((id) => rows.some((r) => r.channel_id === id));
 
     // 曜日も添える（「金曜まで」「来週火曜」を日付に直すとき、モデルに曜日計算をさせない）
     const toJst = (iso: string) => {
@@ -209,13 +253,20 @@ Deno.serve(async (req) => {
     }
     const conversation = rows
       // 添付ファイルのURLは読んでも意味がないので落とす
-      .map((m, i) => `[${i + 1}] ${toJst(m.created_at)} ${nameOf(m.profiles)}: ${m.content.replace(/https?:\/\/\S+\/storage\/v1\/object\/\S+/g, "(添付)")}`)
+      .map((m, i) => `[${i + 1}] ${multi ? `#${channelNames.get(m.channel_id)} ` : ""}${toJst(m.created_at)} ${nameOf(m.profiles)}: ${m.content.replace(/https?:\/\/\S+\/storage\/v1\/object\/\S+/g, "(添付)")}`)
       .join("\n");
 
     const registered = [
-      ...((tasksRes.data || []) as Array<{ title: string }>).map((t) => `タスク: ${t.title}`),
-      ...((eventsRes.data || []) as Array<{ title: string; start_at: string }>).map((e) => `予定: ${e.title} (${toJst(e.start_at)})`),
+      ...((tasksRes.data || []) as Array<{ title: string; channel_id: string }>).map(
+        (t) => `タスク: ${t.title}${multi ? ` (#${channelNames.get(t.channel_id)})` : ""}`
+      ),
+      ...((eventsRes.data || []) as Array<{ title: string; start_at: string; channel_id: string }>).map(
+        (e) => `予定: ${e.title} (${toJst(e.start_at)})${multi ? ` (#${channelNames.get(e.channel_id)})` : ""}`
+      ),
     ];
+    const memberLines = activeChannelIds
+      .map((id) => `${multi ? `#${channelNames.get(id)}: ` : ""}${(membersByChannel.get(id) || []).map((m) => m.name).join(" / ")}`)
+      .join("\n");
 
     const aiRes = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -238,10 +289,10 @@ Deno.serve(async (req) => {
           {
             role: "user",
             content:
-              `メンバー一覧: ${members.map((m) => m.name).join(" / ")}\n\n` +
+              `メンバー一覧${multi ? " (チャンネルごと)" : ""}:\n${memberLines}\n\n` +
               `カレンダー (1行が1週間・月曜始まり):\n${calendarLines.join("\n")}\n\n` +
               `登録済み:\n${registered.length > 0 ? registered.join("\n") : "(なし)"}\n\n` +
-              `会話 (番号 日時 発言者: 本文):\n${conversation}`,
+              `会話 (番号 ${multi ? "#チャンネル " : ""}日時 発言者: 本文):\n${conversation}`,
           },
         ],
       }),
@@ -264,36 +315,46 @@ Deno.serve(async (req) => {
       return json({ error: "AI returned no result" }, 502);
     }
 
-    const sourceOf = (n: unknown) => {
+    // 候補がどのチャンネルのものかは、根拠の発言から決める（モデルには答えさせない）
+    const resolve = (n: unknown) => {
       const row = typeof n === "number" ? rows[n - 1] : undefined;
-      return row
-        ? { message_id: row.id, author: nameOf(row.profiles), excerpt: row.content.replace(/\s+/g, " ").trim().slice(0, 80) }
-        : null;
+      const targetChannelId = row?.channel_id || channelId;
+      if (!targetChannelId) return null;
+      return {
+        channel_id: targetChannelId,
+        channel_name: channelNames.get(targetChannelId) || "",
+        source: row
+          ? { message_id: row.id, author: nameOf(row.profiles), excerpt: row.content.replace(/\s+/g, " ").trim().slice(0, 80) }
+          : null,
+      };
     };
 
     const tasks = (Array.isArray(input.tasks) ? input.tasks : []).flatMap((t: Record<string, unknown>) => {
       const title = typeof t.title === "string" ? t.title.trim() : "";
-      if (!title) return [];
+      const target = resolve(t.source);
+      if (!title || !target) return [];
+      const members = membersByChannel.get(target.channel_id) || [];
       const names = Array.isArray(t.assignee_names) ? t.assignee_names.filter((n): n is string => typeof n === "string") : [];
       const assignees = names.flatMap((n) => {
         const hit = members.find((m) => m.name === n.trim());
         return hit ? [{ user_id: hit.user_id, name: hit.name }] : [];
       });
       const due = typeof t.due_date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(t.due_date) ? t.due_date : null;
-      return [{ title, assignees, due_date: due, source: sourceOf(t.source) }];
+      return [{ title, assignees, due_date: due, ...target }];
     });
 
     const events = (Array.isArray(input.events) ? input.events : []).flatMap((e: Record<string, unknown>) => {
       const title = typeof e.title === "string" ? e.title.trim() : "";
       const startRaw = typeof e.start_at === "string" ? e.start_at : "";
-      if (!title || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(startRaw)) return [];
+      const target = resolve(e.source);
+      if (!title || !target || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(startRaw)) return [];
       const start = new Date(`${startRaw.slice(0, 16)}:00+09:00`);
       if (Number.isNaN(start.getTime())) return [];
       const location = typeof e.location === "string" && e.location.trim() ? e.location.trim() : null;
-      return [{ title, start_at: start.toISOString(), location, source: sourceOf(e.source) }];
+      return [{ title, start_at: start.toISOString(), location, ...target }];
     });
 
-    return json({ tasks, events, scanned: rows.length });
+    return json({ tasks, events, scanned: rows.length, channels: activeChannelIds.length });
   } catch (e) {
     console.error("[mikan-organize] unexpected:", e);
     return json({ error: "unexpected error" }, 500);
