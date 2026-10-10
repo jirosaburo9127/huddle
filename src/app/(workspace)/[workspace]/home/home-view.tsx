@@ -57,15 +57,6 @@ export type HomeWaitingTask = {
   channelName: string;
 };
 
-// 独り言: 人ごとの最新1件
-export type HomeStory = {
-  userId: string;
-  person: HomePerson;
-  at: string;
-  isNew: boolean;
-  href: string;
-};
-
 type Props = {
   workspaceId: string;
   workspaceSlug: string;
@@ -76,8 +67,6 @@ type Props = {
   railItems: HomeRailItem[];
   waitingMessages: HomeMessage[];
   waitingTasks: HomeWaitingTask[];
-  stories: HomeStory[];
-  hitorigotoHref: string | null;
 };
 
 type Filter = "all" | "mention" | "unread" | "decision";
@@ -199,8 +188,6 @@ export function HomeView({
   railItems,
   waitingMessages,
   waitingTasks,
-  stories,
-  hitorigotoHref,
 }: Props) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -429,50 +416,6 @@ export function HomeView({
               </p>
             </Link>
           ))}
-        </div>
-      </section>
-    );
-  }
-
-  // 独り言: 顔アイコンの列。新しい独り言がある人は黄色い輪
-  function renderStories() {
-    if (!hitorigotoHref) return null;
-    const others = stories.filter((s) => s.userId !== currentUserId);
-    return (
-      <section className={`${cardClass} py-3`} aria-label="独り言">
-        <div className="flex gap-3.5 overflow-x-auto px-4">
-          <Link href={hitorigotoHref} className="shrink-0 w-[60px] text-center">
-            <span className="relative mx-auto block w-[54px] h-[54px] rounded-full p-[3px]">
-              <Avatar person={me} size={48} />
-              <span className="absolute -right-0.5 -bottom-0.5 w-[22px] h-[22px] rounded-full bg-[var(--home-accent)] text-[var(--home-on-accent)] border-2 border-surface flex items-center justify-center text-[15px] font-black leading-none">
-                +
-              </span>
-            </span>
-            <span className="mt-1 block truncate text-[11px] font-bold text-foreground">つぶやく</span>
-          </Link>
-          {others.map((story) => (
-            <Link key={story.userId} href={story.href} className="shrink-0 w-[60px] text-center">
-              <span
-                className={`mx-auto block w-[54px] h-[54px] rounded-full p-[3px] ${
-                  story.isNew ? "bg-[var(--home-accent)]" : "bg-border"
-                }`}
-              >
-                <span className="block rounded-full bg-surface p-[1.5px]">
-                  <Avatar person={story.person} size={45} />
-                </span>
-              </span>
-              <span className={`mt-1 block truncate text-[11px] ${story.isNew ? "font-bold text-foreground" : "text-muted"}`}>
-                {story.person.name}
-              </span>
-            </Link>
-          ))}
-          {others.length === 0 && (
-            <p className="self-center text-xs leading-relaxed text-muted">
-              最近の独り言はまだありません。
-              <br />
-              ひとこと書くと、ここに並びます。
-            </p>
-          )}
         </div>
       </section>
     );
@@ -913,7 +856,6 @@ export function HomeView({
       <div className="flex-1 min-h-0 overflow-y-auto">
         <div className="lg:flex lg:items-start lg:gap-6 lg:px-9 lg:pt-2">
         <div className="mx-auto w-full max-w-2xl pb-10 lg:mx-0 lg:max-w-[680px] lg:flex-1 lg:min-w-0">
-          {filter === "all" && renderStories()}
           {filter === "all" && renderWaiting()}
 
           {timeline.length === 0 && (

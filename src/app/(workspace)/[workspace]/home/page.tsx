@@ -6,7 +6,6 @@ import {
   type HomeMessage,
   type HomePerson,
   type HomeRailItem,
-  type HomeStory,
   type HomeTaskEvent,
   type HomeWaitingTask,
 } from "./home-view";
@@ -21,8 +20,6 @@ const FEED_LIMIT = 60;
 const RECENT_DAYS = 3;
 // 「あなた待ち」として拾う、自分宛てメンションの遡り日数
 const WAITING_DAYS = 7;
-// 独り言をホーム上部に並べる日数
-const STORY_DAYS = 3;
 const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
 
 type ChannelRow = {
@@ -54,8 +51,7 @@ function getTimeWindow() {
   const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
   const recentSince = new Date(nowMs - RECENT_DAYS * 24 * 60 * 60 * 1000).toISOString();
   const waitingSince = new Date(nowMs - WAITING_DAYS * 24 * 60 * 60 * 1000).toISOString();
-  const storySince = new Date(nowMs - STORY_DAYS * 24 * 60 * 60 * 1000).toISOString();
-  return { todayJst, dayStart, dayEnd, recentSince, waitingSince, storySince };
+  return { todayJst, dayStart, dayEnd, recentSince, waitingSince };
 }
 
 export default async function HomePage({
@@ -92,15 +88,13 @@ export default async function HomePage({
     throw new Error(`ホームの読み込みに失敗しました: ${membershipsRes.error.message}`);
   }
 
-  const allMemberships = ((membershipsRes.data || []) as Array<{
+  const memberships = ((membershipsRes.data || []) as Array<{
     channel_id: string;
     last_read_at: string | null;
     joined_at: string;
     channels: ChannelRow | ChannelRow[];
-  }>).map((m) => ({ ...m, channel: one(m.channels) }));
-  // 独り言はタイムラインには混ぜず、上部の顔アイコンの列として別に出す
-  const hitorigoto = allMemberships.find((m) => m.channel?.is_hitorigoto && !m.channel.is_archived) || null;
-  const memberships = allMemberships
+  }>)
+    .map((m) => ({ ...m, channel: one(m.channels) }))
     .filter(
       (m): m is typeof m & { channel: ChannelRow } =>
         !!m.channel && !m.channel.is_hitorigoto && !m.channel.is_archived
@@ -121,20 +115,18 @@ export default async function HomePage({
         railItems={[]}
         waitingMessages={[]}
         waitingTasks={[]}
-        stories={[]}
-        hitorigotoHref={null}
       />
     );
   }
 
-  const { todayJst, dayStart, dayEnd, recentSince, waitingSince, storySince } = getTimeWindow();
+  const { todayJst, dayStart, dayEnd, recentSince, waitingSince } = getTimeWindow();
 
   const dmIds = memberships.filter((m) => m.channel.is_dm).map((m) => m.channel_id);
 
   const messageSelect =
     "id, content, created_at, user_id, channel_id, parent_id, is_decision, reply_count, profiles(display_name, avatar_url), reactions(id, emoji, user_id)";
 
-  const [feedRes, dmRes, eventsRes, doneTasksRes, dueTasksRes, waitingRes, myPostsRes, storyRes] = await Promise.all([
+  const [feedRes, dmRes, eventsRes, doneTasksRes, dueTasksRes, waitingRes, myPostsRes] = await Promise.all([
     supabase
       .from("messages")
       .select(messageSelect)
@@ -194,17 +186,6 @@ export default async function HomePage({
       .gte("created_at", waitingSince)
       .order("created_at", { ascending: false })
       .limit(500),
-    hitorigoto
-      ? supabase
-          .from("messages")
-          .select("id, content, created_at, user_id, profiles(display_name, avatar_url)")
-          .eq("channel_id", hitorigoto.channel_id)
-          .is("deleted_at", null)
-          .is("system_event", null)
-          .gte("created_at", storySince)
-          .order("created_at", { ascending: false })
-          .limit(100)
-      : Promise.resolve({ data: [], error: null }),
   ]);
 
   if (feedRes.error) {
@@ -217,7 +198,6 @@ export default async function HomePage({
     ["due tasks", dueTasksRes],
     ["waiting", waitingRes],
     ["my posts", myPostsRes],
-    ["stories", storyRes],
   ] as const) {
     if (res.error) console.error(`[home] ${label} fetch failed:`, res.error.message);
   }
@@ -335,29 +315,6 @@ export default async function HomePage({
     channelName: channelInfo.get(t.channel_id)?.name || "",
   }));
 
-  // 独り言: 人ごとに最新の1件。自分が最後に見た時刻より新しければ「新着」
-  const stories: HomeStory[] = [];
-  const storySeen = new Set<string>();
-  const storyReadAt = hitorigoto ? hitorigoto.last_read_at || hitorigoto.joined_at : "";
-  for (const row of (storyRes.data || []) as Array<{
-    id: string;
-    content: string;
-    created_at: string;
-    user_id: string;
-    profiles: ProfileRow | ProfileRow[] | null;
-  }>) {
-    if (!hitorigoto?.channel || storySeen.has(row.user_id)) continue;
-    storySeen.add(row.user_id);
-    stories.push({
-      userId: row.user_id,
-      person: toPerson(one(row.profiles)),
-      at: row.created_at,
-      isNew: row.user_id !== user.id && row.created_at > storyReadAt,
-      href: `/${workspaceSlug}/${hitorigoto.channel.slug}?m=${row.id}`,
-    });
-  }
-  const hitorigotoHref = hitorigoto?.channel ? `/${workspaceSlug}/${hitorigoto.channel.slug}` : null;
-
   // 完了タスク・予定の作成者プロフィールをまとめて取得
   const doneTasks = (doneTasksRes.data || []) as Array<{
     id: string;
@@ -439,8 +396,6 @@ export default async function HomePage({
       railItems={railItems}
       waitingMessages={waitingMessages}
       waitingTasks={waitingTasks}
-      stories={stories}
-      hitorigotoHref={hitorigotoHref}
     />
   );
 }
