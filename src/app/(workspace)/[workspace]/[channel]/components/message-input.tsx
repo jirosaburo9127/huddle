@@ -1066,7 +1066,7 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, onCr
       <form
         onSubmit={handleSubmit}
         className="relative flex flex-col overflow-visible"
-        style={{ borderRadius: 14, background: "var(--color-sidebar)", border: "1px solid var(--color-border)" }}
+        style={{ borderRadius: 14, background: "var(--color-surface)", border: "1px solid var(--color-border)" }}
       >
         {/* メンションサジェストリスト (form の上端基準で配置 = 入力 box の真上に固定) */}
         {showMention && filteredMentionMembers.length > 0 && (
@@ -1340,7 +1340,7 @@ export function MessageInput({ channelName, onSend, placeholder, channelId, onCr
             style={{
               width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
               borderRadius: 17, border: "none", cursor: "pointer", flexShrink: 0,
-              background: "var(--color-accent)", color: "#FFFFFF",
+              background: "var(--home-accent)", color: "var(--home-on-accent)",
               opacity: (!content.trim() && pendingAttachments.length === 0) ? 0.3 : 1,
               transition: "opacity 150ms",
             }}

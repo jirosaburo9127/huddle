@@ -107,6 +107,7 @@ html {
   --home-on-accent: #2A2410;
   --home-accent-ink: #8A6100;
   --home-accent-soft: #FFF6CF;
+  --home-accent-line: #F3E3A0;
 }
 [data-theme="warm"] {
   --home-band: #F0EBE3;
@@ -115,6 +116,7 @@ html {
   --home-band: #0C0C10;
   --home-accent-ink: #FFD233;
   --home-accent-soft: rgba(255, 210, 51, 0.14);
+  --home-accent-line: rgba(255, 210, 51, 0.3);
 }
 
 /* ホームのカード: 下からスライド＋フェード */

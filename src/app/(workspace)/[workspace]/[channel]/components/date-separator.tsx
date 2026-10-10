@@ -16,7 +16,7 @@ export function DateSeparator({ date }: Props) {
   return (
     <div className="flex items-center gap-4 my-6">
       <div className="flex-1 h-px bg-border/50" />
-      <span className="text-[11px] font-medium text-muted bg-background px-3 py-1 rounded-full border border-border/30">
+      <span className="text-[11px] font-medium text-muted bg-surface px-3 py-1 rounded-full border border-border/30">
         {label}
       </span>
       <div className="flex-1 h-px bg-border/50" />

@@ -1835,11 +1835,11 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
         </div>
       )}
       {/* チャンネルエリア */}
-      <div className="relative flex flex-col h-full flex-1 min-w-0 bg-surface">
+      <div className="relative flex flex-col h-full flex-1 min-w-0 bg-[var(--home-band)]">
         {/* チャンネルヘッダー */}
         <header
           onClick={handleHeaderTap}
-          className="flex items-center gap-2 px-3 sm:px-4 lg:px-9 py-3 lg:py-0 lg:h-14 bg-surface shrink-0 cursor-pointer"
+          className="flex items-center gap-2 px-3 sm:px-4 lg:px-9 py-3 lg:py-0 lg:h-14 bg-surface border-b border-border shrink-0 cursor-pointer"
         >
           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
             {/* モバイル戻るボタン。
@@ -1885,7 +1885,7 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
               </>
             ) : (
               <>
-                <span className="text-sky font-medium shrink-0 lg:text-lg">#</span>
+                <span className="shrink-0 w-8 h-8 rounded-[10px] bg-[var(--home-accent)] text-[var(--home-on-accent)] font-black flex items-center justify-center">#</span>
                 <h1 className="font-bold text-base sm:text-lg lg:text-[18px] lg:font-[720] truncate min-w-0">
                   {channel.name}
                 </h1>
@@ -2480,9 +2480,9 @@ export function ChannelView({ channel, initialMessages, currentUserId, initialLa
                             unreadLineState === "fading" ? "opacity-0" : "opacity-100"
                           }`}
                         >
-                          <div className="flex-1 border-t-2 border-accent" />
-                          <span className="text-[11px] font-bold text-white bg-accent rounded-full px-2.5 py-0.5 shrink-0">ここから未読</span>
-                          <div className="flex-1 border-t-2 border-accent" />
+                          <div className="flex-1 border-t-2 border-[var(--home-accent)]" />
+                          <span className="text-[11px] font-extrabold text-[var(--home-on-accent)] bg-[var(--home-accent)] rounded-full px-2.5 py-0.5 shrink-0">ここから未読</span>
+                          <div className="flex-1 border-t-2 border-[var(--home-accent)]" />
                         </div>
                       )}
                       {showDateSeparator && (

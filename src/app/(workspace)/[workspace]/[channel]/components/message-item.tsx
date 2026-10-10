@@ -395,6 +395,14 @@ function MessageContent({
 // タップ: 同じ絵文字を追加/解除（Zoom方式）
 // 長押し: 誰がリアクションしたか表示
 // ＋ボタン: 絵文字ピッカーを開く（LINE方式）
+// アバター画像が無い人の背景色（名前から決まる固定色）
+const AVATAR_COLORS = ["#3E8E7E", "#5B7FD1", "#D9825B", "#8A6BBE", "#C2607F", "#4E9BB5"];
+function avatarColor(name: string): string {
+  let hash = 0;
+  for (const ch of name) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return AVATAR_COLORS[hash % AVATAR_COLORS.length];
+}
+
 function ReactionBadges({
   reactions,
   onReact,
@@ -443,8 +451,8 @@ function ReactionBadges({
               onContextMenu={(e) => e.preventDefault()}
               className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm cursor-pointer transition-colors select-none ${
                 reacted
-                  ? "bg-accent/[0.12] text-accent"
-                  : "bg-foreground/[0.035] text-muted hover:bg-foreground/[0.06]"
+                  ? "bg-[var(--home-accent-soft)] text-[var(--home-accent-ink)] shadow-[inset_0_0_0_1px_var(--home-accent-line)]"
+                  : "bg-surface text-muted shadow-[0_1px_1px_rgba(0,0,0,0.05)] hover:text-foreground"
               }`}
             >
               {emoji.length <= 2 ? (
@@ -472,7 +480,7 @@ function ReactionBadges({
                 e.stopPropagation();
                 setShowQuickPicker((v) => !v);
               }}
-              className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-foreground/[0.035] text-muted hover:bg-foreground/[0.06] hover:text-accent transition-colors"
+              className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-surface text-muted shadow-[0_1px_1px_rgba(0,0,0,0.05)] hover:text-foreground transition-colors"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -1056,7 +1064,7 @@ export const MessageItem = memo(function MessageItem({
           gap: 12, paddingTop: 6, paddingBottom: 6,
           marginTop: isBot
             ? 10
-            : (isConsecutive ? 10 : 32),
+            : (isConsecutive ? 4 : 18),
         }}
         onClick={(e) => {
           // テキストをドラッグ選択した直後の click は無視する
@@ -1082,9 +1090,12 @@ export const MessageItem = memo(function MessageItem({
             </span>
           </div>
         ) : (
-          <div className={`relative shrink-0 w-9 h-9 rounded-full flex items-center justify-center mt-0.5 ${
-            isBot ? "bg-[#ffedd5] text-base" : "bg-muted/20 text-muted text-[13px] font-bold"
-          }`}>
+          <div
+            className={`relative shrink-0 w-9 h-9 rounded-full flex items-center justify-center mt-0.5 ${
+              isBot ? "bg-[#ffedd5] text-base" : "text-white text-[13px] font-bold"
+            }`}
+            style={isBot ? undefined : { background: avatarColor(profile?.display_name || "?") }}
+          >
             {isBot ? (
               <span className="leading-none" aria-label={profile?.display_name}>🍊</span>
             ) : profile?.avatar_url ? (
@@ -1108,6 +1119,11 @@ export const MessageItem = memo(function MessageItem({
           {/* ユーザー名と時刻（先頭メッセージのみ） */}
           {!isConsecutive && (
             <div className="flex items-baseline gap-2 flex-wrap mb-1">
+              {isOwn && (
+                <span className="self-center rounded-full bg-[var(--home-accent)] px-1.5 py-px text-[10px] font-extrabold text-[var(--home-on-accent)]">
+                  自分
+                </span>
+              )}
               <span className="text-sm font-[680] text-foreground">
                 {profile?.display_name || "不明なユーザー"}
               </span>
@@ -1116,7 +1132,7 @@ export const MessageItem = memo(function MessageItem({
                 <span className="text-xs text-muted/70">(編集済み)</span>
               )}
               {message.is_decision && (
-                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-red-400/15 text-[11px] font-semibold text-red-400">
+                <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-[var(--home-accent)] text-[11px] font-extrabold text-[var(--home-on-accent)]">
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
@@ -1134,6 +1150,14 @@ export const MessageItem = memo(function MessageItem({
             </div>
           )}
 
+          {/* 吹き出し: 全員左寄せ・幅いっぱい。自分の発言は淡い黄色で区別する */}
+          <div
+            className={`rounded-[4px_16px_16px_16px] px-3.5 py-2 ${
+              isOwn
+                ? "bg-[var(--home-accent-soft)] shadow-[inset_0_0_0_1px_var(--home-accent-line)]"
+                : "bg-surface shadow-[0_1px_1px_rgba(0,0,0,0.04)]"
+            }`}
+          >
           {isEditing ? (
             <div className="mt-1">
               <textarea
@@ -1270,6 +1294,7 @@ export const MessageItem = memo(function MessageItem({
               )}
             </>
           )}
+          </div>
 
 
           {/* 決定事項 Why/Due 編集モーダル */}
