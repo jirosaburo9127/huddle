@@ -23,6 +23,7 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
   const setSidebarOpen = useMobileNavStore((s) => s.setSidebarOpen);
   const messageInputFocused = useMobileNavStore((s) => s.messageInputFocused);
   const dmUnreadCount = useUnreadStore((s) => s.dmUnreadCount);
+  const totalUnreadCount = useUnreadStore((s) => s.totalUnreadCount);
   const [showMore, setShowMore] = useState(false);
   const [showBookmark, setShowBookmark] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
@@ -69,12 +70,12 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
     return () => document.removeEventListener("pointerdown", onDown);
   }, [showMore]);
 
-  // ホームはWSトップ or サイドバー表示中の時アクティブ
+  // トーク = チャンネル一覧（サイドバー）表示中。ホーム = WSトップのタイムライン表示中
   const sidebarOpen = useMobileNavStore((s) => s.sidebarOpen);
   const pathParts = pathname.split("/").filter(Boolean);
-  const isHome = pathParts.length <= 1 || sidebarOpen;
-  const isCalendar = pathname.includes("/calendar");
-  const isSearch = pathname.includes("/search");
+  const isTalk = sidebarOpen;
+  const isHome = !sidebarOpen && (pathParts.length <= 1 || pathParts[1] === "home");
+  const isCalendar = !sidebarOpen && pathname.includes("/calendar");
   const [showQuickPost, setShowQuickPost] = useState(false);
   const currentUserProfile = useMemo(() => {
     const me = members.find((m) => m.user_id === currentUserId);
@@ -101,11 +102,12 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
         }`}
         aria-hidden={messageInputFocused}
       >
-        <div style={{ height: 0.75, background: "linear-gradient(90deg, #E96832, #38BDF8)" }} />
+        <div style={{ height: 1, background: "var(--color-border)" }} />
         <div className="flex items-center justify-around h-14 px-2 pt-2 pb-1">
-          {/* ホーム */}
-          <button
-            onClick={() => setSidebarOpen(true)}
+          {/* ホーム（タイムライン） */}
+          <Link
+            href={`/${workspaceSlug}`}
+            onClick={() => setSidebarOpen(false)}
             className={`relative flex flex-col items-center gap-0.5 py-1 px-3 rounded-lg transition-colors ${
               isHome ? "text-foreground" : "text-muted"
             }`}
@@ -115,6 +117,40 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
             </svg>
             <span className="text-[10px]">ホーム</span>
             {isHome && <span className="absolute bottom-0 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-foreground" />}
+          </Link>
+
+          {/* トーク（チャンネル一覧） */}
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className={`relative flex flex-col items-center gap-0.5 py-1 px-3 rounded-lg transition-colors ${
+              isTalk ? "text-foreground" : "text-muted"
+            }`}
+          >
+            <span className="relative">
+              <svg className="w-[23px] h-[23px]" fill="none" stroke="currentColor" strokeWidth={isTalk ? 2 : 1.2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+              {totalUnreadCount > 0 && (
+                <span className="absolute -top-1 -right-2 min-w-[16px] h-[16px] px-1 rounded-full bg-mention text-white text-[10px] font-bold leading-[16px] text-center">
+                  {totalUnreadCount > 99 ? "99+" : totalUnreadCount}
+                </span>
+              )}
+            </span>
+            <span className="text-[10px]">トーク</span>
+            {isTalk && <span className="absolute bottom-0 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-foreground" />}
+          </button>
+
+          {/* ＋ボタン（クイック投稿） */}
+          <button
+            onClick={() => setShowQuickPost(true)}
+            className="flex items-center justify-center -mt-1"
+            aria-label="クイック投稿"
+          >
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--home-accent)] text-[var(--home-on-accent)] shadow-[0_2px_8px_rgba(255,210,51,0.45)] active:scale-90 transition-transform">
+              <svg className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+            </span>
           </button>
 
           {/* カレンダー */}
@@ -130,33 +166,6 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
             </svg>
             <span className="text-[10px]">カレンダー</span>
             {isCalendar && <span className="absolute bottom-0 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-foreground" />}
-          </Link>
-
-          {/* ＋ボタン（クイック投稿） */}
-          <button
-            onClick={() => setShowQuickPost(true)}
-            className="flex items-center justify-center -mt-1"
-          >
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-sky text-white shadow-[0_1px_4px_rgba(56,189,248,0.20)] active:scale-90 transition-transform">
-              <svg className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-              </svg>
-            </span>
-          </button>
-
-          {/* 検索 */}
-          <Link
-            href={`/${workspaceSlug}/search`}
-            onClick={() => setSidebarOpen(false)}
-            className={`relative flex flex-col items-center gap-0.5 py-1 px-3 rounded-lg transition-colors ${
-              isSearch ? "text-foreground" : "text-muted"
-            }`}
-          >
-            <svg className="w-[23px] h-[23px]" fill="none" stroke="currentColor" strokeWidth={isSearch ? 2 : 1.2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <span className="text-[10px]">検索</span>
-            {isSearch && <span className="absolute bottom-0 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-foreground" />}
           </Link>
 
           {/* その他 (DM 未読があればアイコン右上にバッジ) */}
@@ -201,7 +210,22 @@ export function BottomTabBar({ workspaceSlug, workspaceId, currentUserId, member
           showMore ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
         }`}
       >
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-4 gap-1">
+              <Link
+                href={`/${workspaceSlug}/search`}
+                onClick={() => {
+                  setShowMore(false);
+                  setSidebarOpen(false);
+                }}
+                className="flex flex-col items-center gap-2 py-3 rounded-lg hover:bg-sidebar-hover transition-colors"
+              >
+                <span className="w-12 h-12 rounded-full border-2 border-muted/40 flex items-center justify-center">
+                  <svg className="w-5 h-5 text-foreground" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </span>
+                <span className="text-xs text-foreground">検索</span>
+              </Link>
               <Link
                 href={`/${workspaceSlug}/albums`}
                 onClick={() => {

@@ -1,14 +1,7 @@
-import { WorkspaceLobby } from "./workspace-lobby";
+import HomePage from "./home/page";
 
-// ワークスペースのトップページ。
-// サイドバーにチャンネル/DM一覧はすでに出ているので、メイン領域には
-// ウェルカムメッセージと「チャンネルを選択してください」の案内を出す。
-// モバイルではサイドバーを自動で開いて、一覧画面として機能させる。
-export default async function WorkspacePage({
-  params,
-}: {
-  params: Promise<{ workspace: string }>;
-}) {
-  const { workspace: workspaceSlug } = await params;
-  return <WorkspaceLobby workspaceSlug={workspaceSlug} />;
-}
+// ワークスペースのトップページ = ホーム（タイムライン）。
+// 以前のロビー表示は workspace-lobby.tsx に残してある（戻す場合はここを差し替える）。
+export const dynamic = "force-dynamic";
+
+export default HomePage;

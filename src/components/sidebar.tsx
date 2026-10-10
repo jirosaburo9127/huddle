@@ -34,6 +34,21 @@ type MemberProfile = {
   status: string | null;
 };
 
+// 一覧のプレビュー行に出す最新メッセージ
+type ChannelPreview = { sender: string; text: string; at: string };
+
+function formatPreviewTime(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const diffMin = Math.floor((now.getTime() - d.getTime()) / 60000);
+  if (diffMin < 1) return "たった今";
+  if (diffMin < 60) return `${diffMin}分前`;
+  if (d.toDateString() === now.toDateString()) {
+    return `${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
+  }
+  return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+
 type WorkspaceMember = {
   user_id: string;
   profiles: MemberProfile | MemberProfile[];
@@ -504,6 +519,59 @@ export function Sidebar({
     );
     setDmUnreadCount(dmTotal);
   }, [unreadState, dmChannels, setDmUnreadCount]);
+
+  // 未読合計を BottomTabBar の「トーク」バッジ用に書き出す
+  const setTotalUnreadCount = useUnreadStore((s) => s.setTotalUnreadCount);
+  useEffect(() => {
+    // unreadState には他ワークスペースのチャンネルも入るので、このWSの分だけ数える
+    const ids = [...channels, ...dmChannels].map((c) => c.id);
+    setTotalUnreadCount(ids.reduce((sum, id) => sum + (unreadState[id] || 0), 0));
+  }, [unreadState, channels, dmChannels, setTotalUnreadCount]);
+
+  // チャンネルごとの最新メッセージ（モバイルの一覧のプレビュー行用）。
+  // 表示専用で、取得のたびに丸ごと置き換える（蓄積マージしない）。
+  const [previews, setPreviews] = useState<Record<string, ChannelPreview>>({});
+  const previewChannelKey = useMemo(() => channels.map((c) => c.id).join(","), [channels]);
+  useEffect(() => {
+    if (!previewChannelKey) return;
+    let cancelled = false;
+    // 新着が続いても1回にまとめる
+    const timer = setTimeout(async () => {
+      const { data, error } = await sidebarSupabaseRef.current
+        .from("messages")
+        .select("channel_id, content, created_at, profiles(display_name)")
+        .in("channel_id", previewChannelKey.split(","))
+        .is("deleted_at", null)
+        .is("system_event", null)
+        .order("created_at", { ascending: false })
+        .limit(300);
+      if (cancelled) return;
+      if (error) {
+        console.error("[sidebar] preview fetch failed:", error.message);
+        return;
+      }
+      const next: Record<string, ChannelPreview> = {};
+      for (const row of (data || []) as Array<{
+        channel_id: string;
+        content: string;
+        created_at: string;
+        profiles: { display_name: string } | Array<{ display_name: string }> | null;
+      }>) {
+        if (next[row.channel_id]) continue;
+        const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
+        next[row.channel_id] = {
+          sender: profile?.display_name || "",
+          text: row.content.replace(/https?:\/\/\S+/g, "📎 添付").replace(/\s+/g, " ").trim(),
+          at: row.created_at,
+        };
+      }
+      setPreviews(next);
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [previewChannelKey, activityBump]);
 
   // フォアグラウンド復帰時 / マウント時 / ワークスペース切替時に未読カウントを再同期
   // モバイルで画面オフ→復帰した際にRealtime取りこぼしを補完するのと、
@@ -1354,6 +1422,7 @@ export function Sidebar({
             workspaceMembers={members}
             onOpenMembers={(id) => setMembersModalChannelId(id)}
             categoryOverrides={categoryOverrides}
+            previews={previews}
           />
 
           {/* 独り言チャンネルはプレビューカードから開く。個別リンク行は不要 */}
@@ -2175,6 +2244,7 @@ type ChannelCategoryListProps = {
   workspaceMembers: WorkspaceMember[];
   onOpenMembers: (channelId: string) => void;
   categoryOverrides: Record<string, string | null>;
+  previews: Record<string, ChannelPreview>;
 };
 
 const COLLAPSED_KEY = "huddle:sidebar:collapsedCategories";
@@ -2191,6 +2261,7 @@ function ChannelCategoryList({
   workspaceMembers,
   onOpenMembers,
   categoryOverrides,
+  previews,
 }: ChannelCategoryListProps) {
   // PC/モバイル判定（モックのスタイル差分を切り替えるため）
   const [isDesktop, setIsDesktop] = useState(false);
@@ -2293,6 +2364,68 @@ function ChannelCategoryList({
     const isActive = pathname === href;
     const unreadCount = unreadState[channel.id] || 0;
     const showUnreadStyle = unreadCount > 0 && !isActive;
+    // モバイル: アイコン＋名前＋最新メッセージの2行。未読は黄色のアイコンとバッジで示す
+    if (!isDesktop) {
+      const preview = previews[channel.id];
+      return (
+        <Link
+          key={channel.id}
+          href={href}
+          onClick={() => onNavigate(isActive, channel.name)}
+          style={{
+            display: "flex", alignItems: "center", gap: 12,
+            padding: "8px 8px 8px 10px", minHeight: 62,
+            textDecoration: "none", color: "var(--color-foreground)",
+            position: "relative" as const, zIndex: 1,
+          }}
+        >
+          {channel.icon_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={channel.icon_url} alt="" style={{ width: 44, height: 44, borderRadius: 14, objectFit: "cover", flexShrink: 0 }} />
+          ) : (
+            <span
+              style={{
+                width: 44, height: 44, borderRadius: 14, flexShrink: 0,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 19, fontWeight: 900,
+                background: showUnreadStyle ? "var(--home-accent)" : "var(--color-input-bg)",
+                color: showUnreadStyle ? "var(--home-on-accent)" : (catColor || "var(--color-muted)"),
+              }}
+            >
+              #
+            </span>
+          )}
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              {sortMode === "activity" && catColor && (
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: catColor, flexShrink: 0 }} />
+              )}
+              <span style={{ fontSize: 15.5, fontWeight: showUnreadStyle ? 800 : 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
+                {channel.name}
+              </span>
+            </span>
+            <span style={{ display: "block", fontSize: 12.5, color: "var(--color-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const, marginTop: 1 }}>
+              {preview ? (
+                <>
+                  {preview.sender && <span style={{ fontWeight: 700, color: showUnreadStyle ? "var(--color-foreground)" : "var(--color-muted)" }}>{preview.sender}: </span>}
+                  {preview.text}
+                </>
+              ) : (
+                channel.topic || "まだ投稿がありません"
+              )}
+            </span>
+          </span>
+          <span style={{ display: "flex", flexDirection: "column" as const, alignItems: "flex-end", gap: 5, flexShrink: 0 }}>
+            <span style={{ fontSize: 11, color: "var(--color-muted)" }}>{preview ? formatPreviewTime(preview.at) : ""}</span>
+            {showUnreadStyle && (
+              <span style={{ minWidth: 20, height: 20, padding: "0 6px", borderRadius: 999, fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--home-accent)", color: "var(--home-on-accent)" }}>
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </span>
+            )}
+          </span>
+        </Link>
+      );
+    }
     return (
       <Link
         key={channel.id}

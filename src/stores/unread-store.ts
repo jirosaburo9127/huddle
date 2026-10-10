@@ -7,9 +7,14 @@ type UnreadStore = {
   // 「その他」ボタンと中の DM アイコンにバッジ表示するのに使う
   dmUnreadCount: number;
   setDmUnreadCount: (count: number) => void;
+  // このワークスペースの未読件数合計（チャンネル + DM）。下タブ「トーク」のバッジ用
+  totalUnreadCount: number;
+  setTotalUnreadCount: (count: number) => void;
 };
 
 export const useUnreadStore = create<UnreadStore>((set) => ({
   dmUnreadCount: 0,
   setDmUnreadCount: (count) => set({ dmUnreadCount: count }),
+  totalUnreadCount: 0,
+  setTotalUnreadCount: (count) => set({ totalUnreadCount: count }),
 }));

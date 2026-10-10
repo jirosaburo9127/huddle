@@ -99,19 +99,19 @@ html {
   animation: slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* ホーム（タイムライン）専用の配色。黄色の面には濃い文字を載せ、
-   文字として使うアクセントは読みやすい琥珀色にする */
-.home-tl {
+/* 黄色系アクセント（ホーム・トーク一覧・下タブ・チャンネル内で共通）。
+   黄色の面には濃い文字を載せ、文字として使うアクセントは読みやすい琥珀色にする */
+:root {
   --home-band: #F0F2F2;
   --home-accent: #FFD233;
   --home-on-accent: #2A2410;
   --home-accent-ink: #8A6100;
   --home-accent-soft: #FFF6CF;
 }
-[data-theme="warm"] .home-tl {
+[data-theme="warm"] {
   --home-band: #F0EBE3;
 }
-[data-theme="midnight"] .home-tl {
+[data-theme="midnight"] {
   --home-band: #0C0C10;
   --home-accent-ink: #FFD233;
   --home-accent-soft: rgba(255, 210, 51, 0.14);
