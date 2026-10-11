@@ -79,6 +79,7 @@ export function MikanFab({ workspaceId, workspaceSlug, currentUserId, channels, 
       {open && (
         <MikanModal
           workspaceId={workspaceId}
+          workspaceSlug={workspaceSlug}
           channel={channel}
           context={context}
           currentUserId={currentUserId}

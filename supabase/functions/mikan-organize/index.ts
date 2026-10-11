@@ -17,6 +17,12 @@
 // 起点はユーザーがボタンを押したときだけ。投稿のたびに自動で動く見守りモードは
 // 過去に廃止しており（mikan-respond 冒頭のコメント参照）、ここでも持ち込まない。
 //
+// 回数上限: AI を呼ぶ直前に1回と数える（1人1日 DAILY_LIMIT 回、全体で月 MONTHLY_LIMIT 回）。
+//   超えていたら 429（本人の1日分）/ 503（全体の月間分）を返す。AI が失敗したら数えた分は戻す。
+//   応答には今日の残り回数 (remaining) を必ず入れる。
+// 新着だけ読む: 前回 AI に読ませた時刻を「人 × 範囲 × mode」ごとに覚え、それより後の投稿だけを渡す。
+//   新着が無ければ AI を呼ばず、回数も減らさない (no_new: true)。rescan: true で最初から読み直す。
+//
 // 認証: 呼び出し元ユーザーの JWT を検証し、本人が参加しているチャンネルだけを読む。
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -34,6 +40,13 @@ const MAX_MESSAGES = 120;
 const WS_LOOKBACK_DAYS = 7;
 const WS_MAX_MESSAGES = 300;
 const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
+// AI の利用料を固定するための上限。1人1日の回数（日本時間で切り替え）と、全員合計の月間回数
+const DAILY_LIMIT = 3;
+const MONTHLY_LIMIT = 30000;
+// 1回に AI へ渡す会話の量（本文の文字数の合計）。超えたら古い側から落とす
+const MAX_CONVERSATION_CHARS = 30000;
+// 1件の投稿が長すぎるとき、AI に渡すのはここまで
+const MAX_MESSAGE_CHARS = 1500;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -130,6 +143,8 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+  // 回数を数えたあとに想定外の失敗が起きたとき、数えた分を戻すための控え
+  let refundOnError: (() => Promise<void>) | null = null;
   try {
     const token = (req.headers.get("Authorization") ?? "").replace("Bearer ", "");
     if (!token) return json({ error: "no token" }, 401);
@@ -160,17 +175,45 @@ Deno.serve(async (req) => {
       user = data.user;
     }
 
+    // 今日の残り回数。調査用の呼び出し (service role) は回数に数えない
+    const quota = async (consume: boolean): Promise<{ ok: boolean; reason: "daily" | "monthly" | null; remaining: number }> => {
+      if (isService) return { ok: true, reason: null, remaining: DAILY_LIMIT };
+      const { data, error } = await supabase.rpc("mikan_quota", {
+        p_user_id: user!.id,
+        p_daily_limit: DAILY_LIMIT,
+        p_monthly_limit: MONTHLY_LIMIT,
+        p_consume: consume,
+      });
+      if (error || !data) {
+        console.error("[mikan-organize] quota check failed:", error);
+        throw new Error("quota check failed");
+      }
+      return data as { ok: boolean; reason: "daily" | "monthly" | null; remaining: number };
+    };
+    const refund = async () => {
+      if (isService) return;
+      const { error } = await supabase.rpc("mikan_quota_refund", { p_user_id: user!.id });
+      if (error) console.error("[mikan-organize] quota refund failed:", error);
+    };
+
+    // メニューを開いたときの残り回数の問い合わせ（数えない）
+    if (body.action === "status") {
+      const status = await quota(false);
+      return json({ remaining: status.remaining, daily_limit: DAILY_LIMIT, limit_reason: status.ok ? null : status.reason });
+    }
+
     const channelId = typeof body.channel_id === "string" ? body.channel_id : "";
+    const rescan = body.rescan === true;
     const workspaceId = typeof body.workspace_id === "string" ? body.workspace_id : "";
     const mode: "my_tasks" | "week_events" | "all" =
       body.mode === "my_tasks" || body.mode === "week_events" ? body.mode : "all";
     if (!channelId && !workspaceId) return json({ error: "channel_id or workspace_id required" }, 400);
 
     // 読んでよいチャンネル = 本人が参加しているもの。全体のときは DM・独り言・アーカイブ済みを除く
-    type ChannelRow = { id: string; name: string; is_dm: boolean; is_hitorigoto: boolean; is_archived: boolean; workspace_id: string };
+    type ChannelRow = { id: string; name: string; slug: string; is_dm: boolean; is_hitorigoto: boolean; is_archived: boolean; workspace_id: string };
     let membershipQuery = supabase
       .from("channel_members")
-      .select("channel_id, channels!inner(id, name, is_dm, is_hitorigoto, is_archived, workspace_id)")
+      .select("channel_id, channels!inner(id, name, slug, is_dm, is_hitorigoto, is_archived, workspace_id)")
       .eq("user_id", user.id);
     membershipQuery = channelId
       ? membershipQuery.eq("channel_id", channelId)
@@ -185,16 +228,35 @@ Deno.serve(async (req) => {
       .filter((c): c is ChannelRow => !!c && (!!channelId || (!c.is_dm && !c.is_hitorigoto && !c.is_archived)));
     if (channelId && channels.length === 0) return json({ error: "not a member" }, 403);
     if (channels.length === 0) {
-      return json({ tasks: [], events: [], existing_tasks: [], existing_events: [], scanned: 0, channels: 0 });
+      const status = await quota(false);
+      return json({ tasks: [], events: [], existing_tasks: [], existing_events: [], scanned: 0, channels: 0, remaining: status.remaining, daily_limit: DAILY_LIMIT });
     }
 
     const channelIds = channels.map((c) => c.id);
     const channelNames = new Map(channels.map((c) => [c.id, c.name]));
+    const channelSlugs = new Map(channels.map((c) => [c.id, c.slug]));
     const multi = !channelId;
 
     const lookbackDays = multi ? WS_LOOKBACK_DAYS : LOOKBACK_DAYS;
-    const since = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000).toISOString();
+    const lookbackSince = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000).toISOString();
     const nowIso = new Date().toISOString();
+
+    // 前回 AI に読ませた時刻。あれば、それより後の投稿だけを読む（読み直しの指定と調査用の呼び出しは除く）
+    const scanScope = channelId ? `ch:${channelId}` : `ws:${workspaceId}`;
+    let lastScannedAt: string | null = null;
+    if (!rescan && !isService) {
+      const { data: scanRow, error: scanErr } = await supabase
+        .from("mikan_scan_state")
+        .select("last_scanned_at")
+        .eq("user_id", user.id)
+        .eq("scope", scanScope)
+        .eq("mode", mode)
+        .maybeSingle();
+      if (scanErr) console.error("[mikan-organize] scan state fetch error:", scanErr);
+      lastScannedAt = (scanRow as { last_scanned_at?: string } | null)?.last_scanned_at ?? null;
+    }
+    const sinceLast = !!lastScannedAt && lastScannedAt > lookbackSince;
+    const since = sinceLast ? lastScannedAt! : lookbackSince;
 
     const weekEndIso = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
@@ -206,7 +268,8 @@ Deno.serve(async (req) => {
         .is("deleted_at", null)
         .is("system_event", null)
         .neq("user_id", MIKAN_USER_ID)
-        .gte("created_at", since)
+        // 前回の続きのときは、前回読んだ時刻ちょうどの投稿を読み直さない
+        [sinceLast ? "gt" : "gte"]("created_at", since)
         .order("created_at", { ascending: false })
         .limit(multi ? WS_MAX_MESSAGES : MAX_MESSAGES),
       supabase
@@ -268,8 +331,17 @@ Deno.serve(async (req) => {
       profiles: { display_name: string } | { display_name: string }[] | null;
     };
     const nameOf = (p: Row["profiles"]) => (Array.isArray(p) ? p[0]?.display_name : p?.display_name) || "?";
+    // 渡す量の上限。新しい側から本文の文字数を足していき、上限を超えたところより古い投稿は落とす
+    const kept: Row[] = [];
+    let totalChars = 0;
+    for (const m of (messagesRes.data || []) as Row[]) {
+      const length = Math.min(m.content.length, MAX_MESSAGE_CHARS);
+      if (kept.length > 0 && totalChars + length > MAX_CONVERSATION_CHARS) break;
+      totalChars += length;
+      kept.push(m);
+    }
     // 古い順。全体のときはチャンネルごとにまとめて、会話の流れを追いやすくする
-    const rows = ((messagesRes.data || []) as Row[]).reverse();
+    const rows = kept.reverse();
     if (multi) {
       const order = new Map(channelIds.map((id, i) => [id, i]));
       rows.sort((a, b) =>
@@ -279,7 +351,19 @@ Deno.serve(async (req) => {
       );
     }
     if (rows.length === 0) {
-      return json({ tasks: [], events: [], existing_tasks: existingTasks, existing_events: existingEvents, scanned: 0, channels: 0 });
+      // 読む投稿が無いので AI は呼ばない。回数も減らさない
+      const status = await quota(false);
+      return json({
+        tasks: [],
+        events: [],
+        existing_tasks: existingTasks,
+        existing_events: existingEvents,
+        scanned: 0,
+        channels: 0,
+        no_new: sinceLast,
+        remaining: status.remaining,
+        daily_limit: DAILY_LIMIT,
+      });
     }
 
     // 担当者は「その発言があったチャンネルのメンバー」からだけ選ぶ
@@ -319,7 +403,7 @@ Deno.serve(async (req) => {
     }
     const conversation = rows
       // 添付ファイルのURLは読んでも意味がないので落とす
-      .map((m, i) => `[${i + 1}] ${multi ? `#${channelNames.get(m.channel_id)} ` : ""}${toJst(m.created_at)} ${nameOf(m.profiles)}: ${m.content.replace(/https?:\/\/\S+\/storage\/v1\/object\/\S+/g, "(添付)")}`)
+      .map((m, i) => `[${i + 1}] ${multi ? `#${channelNames.get(m.channel_id)} ` : ""}${toJst(m.created_at)} ${nameOf(m.profiles)}: ${m.content.slice(0, MAX_MESSAGE_CHARS).replace(/https?:\/\/\S+\/storage\/v1\/object\/\S+/g, "(添付)")}`)
       .join("\n");
 
     const registered = [
@@ -345,6 +429,17 @@ Deno.serve(async (req) => {
           ? `\n\n今回の依頼: 開始日時が今から7日以内（${toJst(nowIso)} 〜 ${toJst(weekEndIso)}）の予定候補だけを報告する。` +
             `タスクは報告しない（tasks は空配列）。`
           : "";
+
+    // ここから AI を呼ぶので、1回と数える。上限を超えていたら呼ばずに返す
+    const consumed = await quota(true);
+    if (!consumed.ok) {
+      return json(
+        { error: consumed.reason === "monthly" ? "monthly_limit" : "daily_limit", remaining: consumed.remaining, daily_limit: DAILY_LIMIT },
+        consumed.reason === "monthly" ? 503 : 429
+      );
+    }
+    const remaining = consumed.remaining;
+    refundOnError = refund;
 
     const aiRes = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -384,6 +479,9 @@ Deno.serve(async (req) => {
     if (!aiRes.ok) {
       const errText = await aiRes.text();
       console.error("[mikan-organize] AI failed:", aiRes.status, errText);
+      // 結果を返せなかった分は数えない
+      refundOnError = null;
+      await refund();
       // 利用残高切れは、再試行しても直らないので画面で区別して伝える
       if (errText.includes("credit balance")) return json({ error: "ai_credit" }, 402);
       return json({ error: "AI failed", diag: isService ? { status: aiRes.status, body: errText.slice(0, 400) } : undefined }, 502);
@@ -400,6 +498,8 @@ Deno.serve(async (req) => {
     const input = aiJson.content.find((c) => c.type === "tool_use" && c.name === "report_items")?.input;
     if (!input) {
       console.error("[mikan-organize] no tool_use in response:", JSON.stringify(aiJson).slice(0, 500));
+      refundOnError = null;
+      await refund();
       return json({ error: "AI returned no result", diag }, 502);
     }
 
@@ -411,6 +511,7 @@ Deno.serve(async (req) => {
       return {
         channel_id: targetChannelId,
         channel_name: channelNames.get(targetChannelId) || "",
+        channel_slug: channelSlugs.get(targetChannelId) || "",
         source: row
           ? { message_id: row.id, author: nameOf(row.profiles), excerpt: row.content.replace(/\s+/g, " ").trim().slice(0, 80) }
           : null,
@@ -456,6 +557,15 @@ Deno.serve(async (req) => {
           ? events.filter((e) => e.start_at >= nowIso && e.start_at < weekEndIso)
           : events;
 
+    // 次回はここより後の投稿だけを読む（取得を始めた時刻を記録するので、処理中に来た投稿は次回に回る）
+    if (!isService) {
+      const { error: scanSaveErr } = await supabase
+        .from("mikan_scan_state")
+        .upsert({ user_id: user.id, scope: scanScope, mode, last_scanned_at: nowIso }, { onConflict: "user_id,scope,mode" });
+      if (scanSaveErr) console.error("[mikan-organize] scan state save error:", scanSaveErr);
+    }
+
+    refundOnError = null;
     return json({
       tasks: finalTasks,
       events: finalEvents,
@@ -463,10 +573,14 @@ Deno.serve(async (req) => {
       existing_events: existingEvents,
       scanned: rows.length,
       channels: activeChannelIds.length,
+      since_last: sinceLast,
+      remaining,
+      daily_limit: DAILY_LIMIT,
       diag,
     });
   } catch (e) {
     console.error("[mikan-organize] unexpected:", e);
+    if (refundOnError) await refundOnError();
     return json({ error: "unexpected error" }, 500);
   }
 });

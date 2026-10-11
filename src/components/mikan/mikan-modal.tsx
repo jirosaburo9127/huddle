@@ -3,6 +3,7 @@
 import { UiIcon } from "@/components/ui-icon";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { HuddleMark } from "@/components/huddle-mark";
 
@@ -11,6 +12,7 @@ type Source = { message_id: string; author: string; excerpt: string } | null;
 type TaskCandidate = {
   channel_id: string;
   channel_name: string;
+  channel_slug: string;
   title: string;
   assignees: Array<{ user_id: string; name: string }>;
   due_date: string | null;
@@ -20,6 +22,7 @@ type TaskCandidate = {
 type EventCandidate = {
   channel_id: string;
   channel_name: string;
+  channel_slug: string;
   title: string;
   start_at: string;
   location: string | null;
@@ -40,6 +43,7 @@ type Choice = { scope: "channel" | "workspace"; mode: Mode };
 
 type Props = {
   workspaceId: string;
+  workspaceSlug: string;
   /** いま開いているチャンネル（通常チャンネルを開いているときだけ） */
   channel: { id: string; name: string } | null;
   context: MikanContext;
@@ -66,9 +70,52 @@ function formatDueJa(date: string): string {
   return `${d.getMonth() + 1}月${d.getDate()}日(${DAY_NAMES[d.getDay()]})まで`;
 }
 
+// まだ登録していない候補の控え（端末内）。みかんは前回読んだあとの新しい投稿だけを読むので、
+// 前回見つけて登録しなかった候補はここから出し直す。元の投稿を見に行って戻ってきたときにも使う
+type Pending = { at: number; tasks: TaskCandidate[]; events: EventCandidate[] };
+const PENDING_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
+
+function pendingKey(userId: string, scopeKey: string, mode: Mode): string {
+  return `huddle:mikan-pending:${userId}:${scopeKey}:${mode}`;
+}
+
+function loadPending(key: string): Pending | null {
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Pending;
+    if (!Array.isArray(parsed.tasks) || !Array.isArray(parsed.events)) return null;
+    if (Date.now() - parsed.at > PENDING_MAX_AGE_MS) return null;
+    return parsed;
+  } catch {
+    // 保存領域が使えない端末では控え無しで動かす
+    return null;
+  }
+}
+
+function savePending(key: string, tasks: TaskCandidate[], events: EventCandidate[]) {
+  try {
+    if (tasks.length + events.length === 0) window.localStorage.removeItem(key);
+    else window.localStorage.setItem(key, JSON.stringify({ at: Date.now(), tasks, events } satisfies Pending));
+  } catch {
+    // 保存できなくても、今回の表示には影響しない
+  }
+}
+
+/** 同じ候補かどうかの目印（根拠の投稿とタイトルが同じなら同じ候補） */
+function candidateKey(c: { title: string; source: Source }): string {
+  return `${c.source?.message_id ?? ""}|${c.title}`;
+}
+
+function mergeCandidates<T extends { title: string; source: Source }>(older: T[], newer: T[]): T[] {
+  const seen = new Set(newer.map(candidateKey));
+  return [...newer, ...older.filter((c) => !seen.has(candidateKey(c)))];
+}
+
 /** みかん: 何を確認するか選んでもらい、会話から拾ったタスク・予定の候補を選んで登録するモーダル */
-export function MikanModal({ workspaceId, channel, context, currentUserId, onEventCreated, onRegistered, onClose }: Props) {
+export function MikanModal({ workspaceId, workspaceSlug, channel, context, currentUserId, onEventCreated, onRegistered, onClose }: Props) {
   const supabase = useMemo(() => createClient(), []);
+  const router = useRouter();
   // 必ず選択画面から始め、選んでから AI が会話を読む
   const [choice, setChoice] = useState<Choice | null>(null);
   const mode = choice?.mode ?? null;
@@ -77,7 +124,17 @@ export function MikanModal({ workspaceId, channel, context, currentUserId, onEve
   const [phase, setPhase] = useState<"menu" | "loading" | "ready" | "saving" | "done" | "error">("menu");
   const [existingTasks, setExistingTasks] = useState<ExistingTask[]>([]);
   const [existingEvents, setExistingEvents] = useState<ExistingEvent[]>([]);
+  const [errorTitle, setErrorTitle] = useState("読み取れませんでした");
   const [errorMessage, setErrorMessage] = useState("");
+  // 今日あと何回みかんに読んでもらえるか（分かるまで null）
+  const [remaining, setRemaining] = useState<number | null>(null);
+  const [dailyLimit, setDailyLimit] = useState<number | null>(null);
+  // 前回読んだあとに新しい投稿が無く、AI を呼ばなかった
+  const [noNew, setNoNew] = useState(false);
+  // 一覧に、前回見つけて登録していなかった候補が混ざっている
+  const [hasCarried, setHasCarried] = useState(false);
+  // 最初から読み直すか（選び直すたびに決める）
+  const [rescan, setRescan] = useState(false);
   const [tasks, setTasks] = useState<TaskCandidate[]>([]);
   const [events, setEvents] = useState<EventCandidate[]>([]);
   const [scanned, setScanned] = useState(0);
@@ -88,6 +145,41 @@ export function MikanModal({ workspaceId, channel, context, currentUserId, onEve
     events: 0,
     failures: [],
   });
+
+  // 開いたときに、今日の残り回数だけ先に聞く（回数には数えない）
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        if (!token) return;
+        const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/mikan-organize`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ action: "status" }),
+        });
+        if (!res.ok) {
+          console.error("[mikan-organize] status request failed:", res.status, await res.text());
+          return;
+        }
+        const json = (await res.json()) as { remaining: number; daily_limit: number };
+        if (cancelled) return;
+        setRemaining(json.remaining);
+        setDailyLimit(json.daily_limit);
+      } catch (e) {
+        // 残り回数が出せないだけで、機能は使える
+        console.error("[mikan-organize] status request error:", e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase]);
+
+  const scopeKey = choice ? (choice.scope === "channel" && channel ? `ch:${channel.id}` : `ws:${workspaceId}`) : "";
 
   useEffect(() => {
     if (!choice) return;
@@ -105,10 +197,32 @@ export function MikanModal({ workspaceId, channel, context, currentUserId, onEve
           body: JSON.stringify({
             ...(choice.scope === "channel" && channel ? { channel_id: channel.id } : { workspace_id: workspaceId }),
             mode: choice.mode,
+            rescan,
           }),
         });
         if (!res.ok) {
-          console.error("[mikan-organize] request failed:", res.status, await res.text());
+          const errText = await res.text();
+          console.error("[mikan-organize] request failed:", res.status, errText);
+          if (res.status === 429 || res.status === 503) {
+            // 上限に達した。回数は戻らないので、時間をおいての再試行は案内しない
+            let limit: { remaining?: number; daily_limit?: number } = {};
+            try {
+              limit = JSON.parse(errText) as { remaining?: number; daily_limit?: number };
+            } catch {
+              limit = {};
+            }
+            if (cancelled) return;
+            if (typeof limit.remaining === "number") setRemaining(limit.remaining);
+            if (typeof limit.daily_limit === "number") setDailyLimit(limit.daily_limit);
+            setErrorTitle(res.status === 429 ? "本日の上限に達しました" : "今月の上限に達しました");
+            setErrorMessage(
+              res.status === 429
+                ? `みかんに会話を読んでもらえるのは1日${limit.daily_limit ?? 3}回までです。明日になるとまた使えます`
+                : "ワークスペース全体での今月の利用回数が上限に達したため、みかんは来月まで会話を読めません"
+            );
+            setPhase("error");
+            return;
+          }
           if (res.status === 402) {
             throw new Error("AIの利用残高が不足しているため、みかんが動けません。ワークスペースの管理者に知らせてください");
           }
@@ -121,8 +235,24 @@ export function MikanModal({ workspaceId, channel, context, currentUserId, onEve
           channels?: number;
           existing_tasks?: ExistingTask[];
           existing_events?: ExistingEvent[];
+          no_new?: boolean;
+          since_last?: boolean;
+          remaining?: number;
+          daily_limit?: number;
         };
         if (cancelled) return;
+        // 前回の続きを読んだとき（新着なしも含む）は、前回登録しなかった候補を出し直す
+        const key = pendingKey(currentUserId, scopeKey, choice.mode);
+        const carried = json.no_new || json.since_last ? loadPending(key) : null;
+        const nextTasks = mergeCandidates(carried?.tasks || [], json.tasks || []);
+        const nextEvents = mergeCandidates(carried?.events || [], json.events || []);
+        savePending(key, nextTasks, nextEvents);
+        setNoNew(!!json.no_new);
+        setHasCarried(!!carried && carried.tasks.length + carried.events.length > 0);
+        if (typeof json.remaining === "number") setRemaining(json.remaining);
+        if (typeof json.daily_limit === "number") setDailyLimit(json.daily_limit);
+        json.tasks = nextTasks;
+        json.events = nextEvents;
         setTasks(json.tasks || []);
         setEvents(json.events || []);
         setScanned(json.scanned || 0);
@@ -136,6 +266,7 @@ export function MikanModal({ workspaceId, channel, context, currentUserId, onEve
         setPhase("ready");
       } catch (e) {
         if (cancelled) return;
+        setErrorTitle("読み取れませんでした");
         setErrorMessage(e instanceof Error ? e.message : "エラーが発生しました");
         setPhase("error");
       }
@@ -145,16 +276,27 @@ export function MikanModal({ workspaceId, channel, context, currentUserId, onEve
     };
     // channel は親が毎回作り直すオブジェクトなので、ID だけを依存に入れる
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [choice, workspaceId, channel?.id, supabase]);
+  }, [choice, rescan, workspaceId, channel?.id, supabase]);
 
-  function choose(next: Choice) {
+  function choose(next: Choice, fromStart = false) {
+    setRescan(fromStart);
+    setNoNew(false);
+    setHasCarried(false);
     setTasks([]);
     setEvents([]);
     setExistingTasks([]);
     setExistingEvents([]);
     setChecked(new Set());
     setPhase("loading");
-    setChoice(next);
+    // 同じ内容を選び直したときも読みに行くよう、毎回新しいオブジェクトにする
+    setChoice({ ...next });
+  }
+
+  /** 候補の根拠になった投稿へ移動する（一覧は控えてあるので、開き直せば続きから見られる） */
+  function openSource(candidate: { channel_slug: string; source: Source }) {
+    if (!candidate.source || !candidate.channel_slug) return;
+    router.push(`/${workspaceSlug}/${candidate.channel_slug}?m=${candidate.source.message_id}`);
+    onClose();
   }
 
   function backToMenu() {
@@ -176,6 +318,7 @@ export function MikanModal({ workspaceId, channel, context, currentUserId, onEve
     const failures: string[] = [];
     let taskCount = 0;
     let eventCount = 0;
+    const registeredKeys = new Set<string>();
 
     for (const [i, task] of tasks.entries()) {
       if (!checked.has(`task-${i}`)) continue;
@@ -197,6 +340,7 @@ export function MikanModal({ workspaceId, channel, context, currentUserId, onEve
         continue;
       }
       taskCount += 1;
+      registeredKeys.add(`task|${candidateKey(task)}`);
       if (task.assignees.length > 0) {
         const { error: assignError } = await supabase
           .from("task_assignees")
@@ -242,9 +386,18 @@ export function MikanModal({ workspaceId, channel, context, currentUserId, onEve
         continue;
       }
       eventCount += 1;
+      registeredKeys.add(`event|${candidateKey(event)}`);
       onEventCreated?.(msg.id as string);
     }
 
+    // 登録できたものを控えから外す（登録しなかった候補は次回も出す）
+    if (choice) {
+      savePending(
+        pendingKey(currentUserId, scopeKey, choice.mode),
+        tasks.filter((t) => !registeredKeys.has(`task|${candidateKey(t)}`)),
+        events.filter((e) => !registeredKeys.has(`event|${candidateKey(e)}`))
+      );
+    }
     setResult({ tasks: taskCount, events: eventCount, failures });
     if (taskCount + eventCount > 0) onRegistered?.();
     setPhase("done");
@@ -296,6 +449,13 @@ export function MikanModal({ workspaceId, channel, context, currentUserId, onEve
         ? [weekEventsItem, myTasksItem, channelItem]
         : [myTasksItem, weekEventsItem, channelItem]
   ).filter((item): item is MenuItem => !!item);
+
+  const remainingLabel =
+    remaining === null
+      ? null
+      : remaining > 0
+        ? `今日はあと${remaining}回、みかんに会話を読んでもらえます${dailyLimit ? `（1日${dailyLimit}回まで）` : ""}`
+        : "本日の上限に達しました。明日になるとまた会話を読んでもらえます";
 
   const checkbox = "mt-0.5 h-[18px] w-[18px] shrink-0 accent-accent";
   const row = "flex items-start gap-3 rounded-xl border border-border px-3 py-2.5 cursor-pointer";
@@ -352,8 +512,13 @@ export function MikanModal({ workspaceId, channel, context, currentUserId, onEve
                 チーム全体のやること・予定をまとめて拾う
               </button>
               <p className="pt-1 text-[11px] leading-relaxed text-muted">
-                選ぶと、みかんが会話を読みます。数秒〜十数秒かかります。
+                選ぶと、みかんが前回のあとの新しい投稿を読みます。数秒〜十数秒かかります。
               </p>
+              {remainingLabel && (
+                <p className={`text-[11px] font-bold leading-relaxed ${remaining === 0 ? "text-mention" : "text-muted"}`}>
+                  {remainingLabel}
+                </p>
+              )}
             </div>
           )}
 
@@ -369,7 +534,7 @@ export function MikanModal({ workspaceId, channel, context, currentUserId, onEve
 
           {phase === "error" && (
             <div className="py-10 text-center">
-              <p className="text-sm font-bold text-foreground">読み取れませんでした</p>
+              <p className="text-sm font-bold text-foreground">{errorTitle}</p>
               <p className="mt-1 text-xs text-muted">{errorMessage}</p>
             </div>
           )}
@@ -407,16 +572,20 @@ export function MikanModal({ workspaceId, channel, context, currentUserId, onEve
                 <UiIcon name="checkCircle" size={30} />
               </p>
               <p className="mt-2 text-sm font-bold text-foreground">
-                {mode === "my_tasks"
+                {noNew
+                  ? "前回確認したあと、新しい投稿はありません"
+                  : mode === "my_tasks"
                   ? "会話の中に、まだ登録していないあなたのタスクはありませんでした"
                   : mode === "week_events"
                     ? "会話の中に、まだ登録していない予定はありませんでした"
                     : "新しく登録するものは見つかりませんでした"}
               </p>
               <p className="mt-1 text-xs text-muted">
-                {isAll
-                  ? `この1週間の ${channelCount} チャンネル・${scanned} 件の投稿を確認しました`
-                  : `直近2週間の ${scanned} 件の投稿を確認しました`}
+                {noNew
+                  ? "会話は読んでいないので、回数は減っていません"
+                  : isAll
+                    ? `${channelCount} チャンネル・${scanned} 件の投稿を確認しました`
+                    : `${scanned} 件の投稿を確認しました`}
               </p>
             </div>
           )}
@@ -425,8 +594,12 @@ export function MikanModal({ workspaceId, channel, context, currentUserId, onEve
             <>
               <h4 className="text-[13px] font-extrabold text-foreground">会話から見つけた、まだ登録していないもの（{total}件）</h4>
               <p className="mt-1 text-xs text-muted">
-                {isAll ? `${channelCount} チャンネル・` : ""}
-                {scanned} 件の投稿を読みました。登録するものにチェックを入れてください。
+                {noNew
+                  ? "前回のあと新しい投稿はありません。前回見つけて、まだ登録していない候補です。"
+                  : `${isAll ? `${channelCount} チャンネル・` : ""}${scanned} 件の新しい投稿を読みました。${
+                      hasCarried ? "前回見つけて登録していない候補も並べています。" : ""
+                    }`}
+                登録するものにチェックを入れてください。
               </p>
 
               {tasks.length > 0 && (
@@ -450,9 +623,19 @@ export function MikanModal({ workspaceId, channel, context, currentUserId, onEve
                             期限: {task.due_date ? formatDueJa(task.due_date) : "なし"}
                           </span>
                           {task.source && (
-                            <span className="mt-1 block truncate text-[11px] text-muted/80">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                // 行全体がチェックの切り替えなので、ここでは切り替えずに移動だけする
+                                e.preventDefault();
+                                e.stopPropagation();
+                                openSource(task);
+                              }}
+                              className="mt-1 block w-full truncate text-left text-[11px] text-muted/80 underline underline-offset-2"
+                              title="元の投稿を開く"
+                            >
                               「{task.source.excerpt}」— {task.source.author}
-                            </span>
+                            </button>
                           )}
                         </span>
                       </label>
@@ -481,9 +664,19 @@ export function MikanModal({ workspaceId, channel, context, currentUserId, onEve
                             {event.location ? ` ・ ${event.location}` : ""}
                           </span>
                           {event.source && (
-                            <span className="mt-1 block truncate text-[11px] text-muted/80">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                // 行全体がチェックの切り替えなので、ここでは切り替えずに移動だけする
+                                e.preventDefault();
+                                e.stopPropagation();
+                                openSource(event);
+                              }}
+                              className="mt-1 block w-full truncate text-left text-[11px] text-muted/80 underline underline-offset-2"
+                              title="元の投稿を開く"
+                            >
                               「{event.source.excerpt}」— {event.source.author}
-                            </span>
+                            </button>
                           )}
                         </span>
                       </label>
@@ -517,7 +710,12 @@ export function MikanModal({ workspaceId, channel, context, currentUserId, onEve
           )}
         </div>
 
-        <div className="flex justify-end gap-2 px-5 py-3 border-t border-border/50 shrink-0">
+        {phase !== "menu" && phase !== "loading" && remainingLabel && (
+          <p className={`px-5 pb-2 text-[11px] font-bold shrink-0 ${remaining === 0 ? "text-mention" : "text-muted"}`}>
+            {remainingLabel}
+          </p>
+        )}
+        <div className="flex flex-wrap justify-end gap-2 px-5 py-3 border-t border-border/50 shrink-0">
           {(phase === "ready" || phase === "saving") && total > 0 ? (
             <>
               <button onClick={onClose} className="px-4 py-2 text-sm text-muted">
@@ -533,6 +731,11 @@ export function MikanModal({ workspaceId, channel, context, currentUserId, onEve
             </>
           ) : (
             <>
+              {(phase === "ready" || phase === "done") && choice && remaining !== 0 && (
+                <button onClick={() => choose(choice, true)} className="px-4 py-2 text-sm text-muted">
+                  最初から読み直す
+                </button>
+              )}
               {phase !== "menu" && phase !== "loading" && (
                 <button onClick={backToMenu} className="px-4 py-2 text-sm text-muted">
                   ほかを確認する
