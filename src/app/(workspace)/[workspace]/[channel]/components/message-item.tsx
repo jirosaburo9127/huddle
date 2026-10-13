@@ -5,7 +5,7 @@ import { HuddleMark } from "@/components/huddle-mark";
 import { memo, useState, useRef, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { MessageWithProfile, Reaction } from "@/lib/supabase/types";
+import type { MessageWithProfile } from "@/lib/supabase/types";
 import { EmojiPicker, MobileReactionSheet } from "./emoji-picker";
 import { PollDisplay } from "./poll-display";
 import { EventDisplay } from "./event-display";
@@ -13,7 +13,7 @@ import { ImageLightbox } from "@/components/image-lightbox";
 import { VideoThumbnail } from "@/components/video-thumbnail";
 import { openFileViewer } from "@/components/file-viewer";
 import { downloadFileWithName } from "@/lib/file-download";
-import { useReactorNames } from "@/lib/use-reactor-names";
+import { ReactionBar } from "@/components/reaction-bar";
 import {
   appendFileMetadataToUrl,
   extractDisplayFileName,
@@ -393,162 +393,12 @@ function MessageContent({
   );
 }
 
-// リアクションバッジコンポーネント
-// タップ: 同じ絵文字を追加/解除（Zoom方式）
-// 長押し: 誰がリアクションしたか表示
-// ＋ボタン: 絵文字ピッカーを開く（LINE方式）
 // アバター画像が無い人の背景色（名前から決まる固定色）
 const AVATAR_COLORS = ["#3E8E7E", "#5B7FD1", "#D9825B", "#8A6BBE", "#C2607F", "#4E9BB5"];
 function avatarColor(name: string): string {
   let hash = 0;
   for (const ch of name) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
   return AVATAR_COLORS[hash % AVATAR_COLORS.length];
-}
-
-function ReactionBadges({
-  reactions,
-  onReact,
-}: {
-  reactions: Array<{ emoji: string; count: number; reacted: boolean; names: string[] }>;
-  onReact?: (emoji: string) => void;
-}) {
-  const [longPressNames, setLongPressNames] = useState<{ emoji: string; names: string[]; reacted: boolean } | null>(null);
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [showQuickPicker, setShowQuickPicker] = useState(false);
-  // PCピッカーをモバイルで常時マウントすると、ピッカーの外側クリック検知が
-  // モバイル側モーダルの絵文字タップを「外側クリック」扱いでモーダルを閉じてしまい
-  // 結果として onReact が発火しない。デバイス幅で排他的にマウントする。
-  const [isDesktop, setIsDesktop] = useState(false);
-  useEffect(() => {
-    const check = () => setIsDesktop(typeof window !== "undefined" && window.innerWidth >= 1024);
-    check();
-    window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
-  }, []);
-
-  // タップで誰がリアクションしたかモーダル表示
-  function handleTap(emoji: string, _names: string[], reacted: boolean) {
-    setLongPressNames({ emoji, names: _names, reacted });
-  }
-
-  // モーダル表示中、reactions propsから最新のnamesを取得
-  const liveReactorNames = useMemo(() => {
-    if (!longPressNames) return [];
-    const match = reactions.find((r) => r.emoji === longPressNames.emoji);
-    return match?.names ?? longPressNames.names;
-  }, [longPressNames, reactions]);
-
-  return (
-    <>
-      <div className="flex flex-wrap items-center gap-1.5 mt-2 mb-1">
-        {reactions.map(({ emoji, count, reacted, names }) => (
-          <div key={emoji} className="relative group/reaction">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                // PC/モバイル共通: タップで誰がリアクションしたかモーダル表示
-                handleTap(emoji, names, reacted);
-              }}
-              onContextMenu={(e) => e.preventDefault()}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm cursor-pointer transition-colors select-none ${
-                reacted
-                  ? "bg-[var(--home-accent-soft)] text-[var(--home-accent-ink)] shadow-[inset_0_0_0_1px_var(--home-accent-line)]"
-                  : "bg-surface text-muted shadow-[0_1px_1px_rgba(0,0,0,0.05)] hover:text-foreground"
-              }`}
-            >
-              {emoji.length <= 2 ? (
-                <span className="text-base">{emoji}</span>
-              ) : (
-                <span className="text-xs font-medium">{emoji}</span>
-              )}
-              <span>{count}</span>
-            </button>
-            {/* PC: ホバーツールチップ */}
-            {names.length > 0 && (
-              <div className="hidden lg:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 rounded-lg bg-foreground text-background text-xs font-medium whitespace-nowrap opacity-0 group-hover/reaction:opacity-100 pointer-events-none transition-opacity duration-100 z-20">
-                {names.join("、")}
-                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-foreground" />
-              </div>
-            )}
-          </div>
-        ))}
-        {/* ＋ボタン: 新しいリアクションを追加 */}
-        {onReact && (
-          <div className="relative">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowQuickPicker((v) => !v);
-              }}
-              className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-surface text-muted shadow-[0_1px_1px_rgba(0,0,0,0.05)] hover:text-foreground transition-colors"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-              </svg>
-            </button>
-            {showQuickPicker && !isDesktop && (
-              /* モバイル: 画面下からスライドアップ（編集UI付き・個別カスタマイズ対応） */
-              <MobileReactionSheet
-                onSelect={(em) => { setShowQuickPicker(false); onReact(em); }}
-                onClose={() => setShowQuickPicker(false)}
-              />
-            )}
-            {showQuickPicker && isDesktop && onReact && (
-              /* PC: 上方向に表示（モバイルでは一切マウントしない） */
-              <EmojiPicker
-                onSelect={(em) => { setShowQuickPicker(false); onReact(em); }}
-                onClose={() => setShowQuickPicker(false)}
-                position="above"
-              />
-            )}
-          </div>
-        )}
-      </div>
-      {/* 長押し: リアクターモーダル */}
-      {longPressNames && (
-        <div
-          className="fixed inset-0 z-[60] flex items-end sm:items-center sm:justify-center"
-          onClick={() => setLongPressNames(null)}
-        >
-          <div className="absolute inset-0 bg-black/40" />
-          <div className="relative w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl bg-surface border-t sm:border border-border px-5 pt-4 pb-20 sm:pb-5 animate-slide-up" onClick={(e) => e.stopPropagation()}>
-            <div className="w-10 h-1 rounded-full bg-muted/30 mx-auto mb-4" />
-            <div className="flex items-center gap-2 mb-3">
-              {longPressNames.emoji.length <= 2 ? (
-                <span className="text-2xl">{longPressNames.emoji}</span>
-              ) : (
-                <span className="text-sm font-semibold bg-accent/10 border border-accent/30 rounded-full px-2.5 py-0.5">{longPressNames.emoji}</span>
-              )}
-              <span className="text-base font-semibold text-foreground">リアクションした人</span>
-            </div>
-            <div className="space-y-2.5 mb-4">
-              {liveReactorNames.length > 0 ? (
-                liveReactorNames.map((name) => (
-                  <div key={name} className="text-sm text-foreground">{name}</div>
-                ))
-              ) : (
-                <div className="text-sm text-muted">読み込み中...</div>
-              )}
-            </div>
-            {onReact && (
-              <button
-                onClick={() => { onReact(longPressNames.emoji); setLongPressNames(null); }}
-                className={`w-full py-2.5 text-sm font-medium rounded-xl border transition-colors ${
-                  longPressNames.reacted
-                    ? "text-red-400 border-red-400/30 hover:bg-red-400/10"
-                    : "text-accent border-accent/30 hover:bg-accent/10"
-                }`}
-              >
-                {longPressNames.reacted ? "取り消す" : "追加する"}
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-    </>
-  );
 }
 
 export const MessageItem = memo(function MessageItem({
@@ -626,32 +476,11 @@ export const MessageItem = memo(function MessageItem({
   const [metaSaving, setMetaSaving] = useState(false);
   const editTextareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // リアクションしたユーザーIDから display_name を解決（キャッシュ経由）
-  const reactionUserIds = useMemo(() => {
-    const set = new Set<string>();
-    for (const r of message.reactions || []) set.add(r.user_id);
-    return Array.from(set);
-  }, [message.reactions]);
-  const reactorNames = useReactorNames(reactionUserIds);
-
-  // リアクションを絵文字ごとにグループ化
-  const groupedReactions = useMemo(() => {
-    const reactions = message.reactions || [];
-    const map = new Map<string, Reaction[]>();
-    for (const r of reactions) {
-      const list = map.get(r.emoji) || [];
-      list.push(r);
-      map.set(r.emoji, list);
-    }
-    return Array.from(map.entries()).map(([emoji, list]) => ({
-      emoji,
-      count: list.length,
-      reacted: list.some((r) => r.user_id === currentUserId),
-      names: list
-        .map((r) => reactorNames[r.user_id] || r.display_name || "")
-        .filter(Boolean),
-    }));
-  }, [message.reactions, currentUserId, reactorNames]);
+  // リアクションの表示用（誰がどれを付けたかは ReactionBar が名前とアイコンを引いて出す）
+  const reactionEntries = useMemo(
+    () => (message.reactions || []).map((r) => ({ emoji: r.emoji, userId: r.user_id })),
+    [message.reactions]
+  );
 
   // 絵文字ピッカーで選択時
   function handleEmojiSelect(emoji: string) {
@@ -877,10 +706,12 @@ export const MessageItem = memo(function MessageItem({
               )}
             </div>
             {/* リアクションバッジ */}
-            {groupedReactions.length > 0 && !isEditing && (
-              <ReactionBadges
-                reactions={groupedReactions}
-                onReact={onReact ? (emoji: string) => onReact(message.id, emoji) : undefined}
+            {reactionEntries.length > 0 && !isEditing && (
+              <ReactionBar
+                className="mt-2 mb-1"
+                reactions={reactionEntries}
+                currentUserId={currentUserId}
+                onToggle={onReact ? (emoji: string) => onReact(message.id, emoji) : undefined}
               />
             )}
             {/* 時刻 + 既読 */}
@@ -1380,10 +1211,12 @@ export const MessageItem = memo(function MessageItem({
           )}
 
           {/* リアクションバッジ */}
-          {groupedReactions.length > 0 && !isEditing && (
-            <ReactionBadges
-              reactions={groupedReactions}
-              onReact={onReact ? (emoji: string) => onReact(message.id, emoji) : undefined}
+          {reactionEntries.length > 0 && !isEditing && (
+            <ReactionBar
+              className="mt-2 mb-1"
+              reactions={reactionEntries}
+              currentUserId={currentUserId}
+              onToggle={onReact ? (emoji: string) => onReact(message.id, emoji) : undefined}
             />
           )}
 

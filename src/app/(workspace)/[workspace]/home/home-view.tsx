@@ -9,6 +9,8 @@ import { useMobileNavStore } from "@/stores/mobile-nav-store";
 import { extractDisplayFileName } from "@/lib/file-name";
 import { TaskModal } from "../tasks/components/task-modal";
 import { HuddleMark } from "@/components/huddle-mark";
+import { ReactionBar } from "@/components/reaction-bar";
+import { EmojiPicker, MobileReactionSheet } from "../[channel]/components/emoji-picker";
 import { isSystemPost, leadingSystemIcon, stripSystemEmoji } from "@/lib/system-post-icons";
 
 export type HomePerson = { name: string; avatarUrl: string | null };
@@ -78,7 +80,6 @@ type TimelineItem =
   | { kind: "message"; at: string; message: HomeMessage }
   | { kind: "task"; at: string; task: HomeTaskEvent };
 
-const QUICK_REACTIONS = ["👍", "🙏", "🎉", "👀", "✅", "❤️"];
 // あなた待ちに一度に並べる件数（多すぎると読む気が失せるので絞る）
 const WAITING_LIMIT = 5;
 // 「今日の動き」をタイムラインの何件目の後ろに差し込むか
@@ -219,6 +220,14 @@ export function HomeView({
   const [replyText, setReplyText] = useState("");
   const [sending, setSending] = useState(false);
   const [pickerId, setPickerId] = useState<string | null>(null);
+  // リアクションの候補は、PC とスマホで出し方が違う（両方置くと PC 用の「外側を押したら閉じる」がスマホ用を閉じてしまう）
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => {
+    const check = () => setIsDesktop(window.innerWidth >= 1024);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
   const [taskSource, setTaskSource] = useState<HomeMessage | null>(null);
   // リアクションだけは押した瞬間に反映したいので手元に持つ。
   // サーバーから取り直すたびに丸ごと置き換える（マージしない）。
@@ -646,11 +655,6 @@ export function HomeView({
   function renderMessage(message: HomeMessage) {
     const { text, files } = splitContent(message.content);
     const list = reactions[message.id] || [];
-    const grouped = new Map<string, { count: number; mine: boolean }>();
-    for (const r of list) {
-      const g = grouped.get(r.emoji) || { count: 0, mine: false };
-      grouped.set(r.emoji, { count: g.count + 1, mine: g.mine || r.userId === currentUserId });
-    }
     const isReplying = replyingId === message.id;
     const channelHref = `/${workspaceSlug}/${message.channelSlug}`;
     // チャンネル内のこの投稿の位置へ直接飛ぶリンク
@@ -712,40 +716,12 @@ export function HomeView({
           </Link>
         ))}
 
-        {grouped.size > 0 && (
-          <div className="mt-2.5 flex flex-wrap gap-1.5">
-            {[...grouped.entries()].map(([emoji, g]) => (
-              <button
-                key={emoji}
-                type="button"
-                onClick={() => void toggleReaction(message.id, emoji)}
-                className={`rounded-full px-2.5 py-0.5 text-[12.5px] font-bold ${
-                  g.mine
-                    ? "bg-[var(--home-accent-soft)] text-[var(--home-accent-ink)]"
-                    : "bg-input-bg text-muted"
-                }`}
-              >
-                {emoji} {g.count}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {pickerId === message.id && (
-          <div className="mt-2.5 flex gap-1.5">
-            {QUICK_REACTIONS.map((emoji) => (
-              <button
-                key={emoji}
-                type="button"
-                onClick={() => void toggleReaction(message.id, emoji)}
-                className="w-10 h-10 rounded-full bg-input-bg text-lg"
-                aria-label={`${emoji} でリアクション`}
-              >
-                {emoji}
-              </button>
-            ))}
-          </div>
-        )}
+        <ReactionBar
+          className="mt-2.5"
+          reactions={list}
+          currentUserId={currentUserId}
+          onToggle={(emoji) => void toggleReaction(message.id, emoji)}
+        />
 
         {isReplying && (
           <form
@@ -797,6 +773,18 @@ export function HomeView({
             </svg>
             {message.replyCount > 0 ? `返信 ${message.replyCount}` : "返信する"}
           </button>
+          <div className="relative flex-1 flex">
+          {/* PC はボタンのすぐ上に候補を出す（スマホは画面下のシート。画面の末尾でまとめて描く） */}
+          {pickerId === message.id && isDesktop && (
+            <EmojiPicker
+              onSelect={(emoji) => {
+                setPickerId(null);
+                void toggleReaction(message.id, emoji);
+              }}
+              onClose={() => setPickerId(null)}
+              position="above"
+            />
+          )}
           <button
             type="button"
             onClick={() => setPickerId(pickerId === message.id ? null : message.id)}
@@ -808,6 +796,7 @@ export function HomeView({
             </svg>
             リアクション
           </button>
+          </div>
           <button
             type="button"
             onClick={() => setTaskSource(message)}
@@ -911,6 +900,18 @@ export function HomeView({
         )}
         </div>
       </div>
+
+      {/* スマホのリアクション候補（チャンネル画面と同じシート。絵文字のほか短文の定型リアクションも選べる） */}
+      {pickerId && !isDesktop && (
+        <MobileReactionSheet
+          onSelect={(emoji) => {
+            const target = pickerId;
+            setPickerId(null);
+            void toggleReaction(target, emoji);
+          }}
+          onClose={() => setPickerId(null)}
+        />
+      )}
 
       {/* メッセージからのタスク化（チャンネル画面と同じモーダル） */}
       {taskSource && (
