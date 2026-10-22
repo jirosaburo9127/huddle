@@ -12,7 +12,7 @@ import { Capacitor } from "@capacitor/core";
 const LATEST_IOS_BUILD = 23;
 
 // 更新バナーの表示ON/OFF。一旦非表示にする場合は false。戻す時は true に。
-const BANNER_ENABLED = false;
+const BANNER_ENABLED = true;
 
 // TestFlight アプリを開く URL スキーム
 const TESTFLIGHT_URL = "itms-beta://";
