@@ -14,8 +14,10 @@ const LATEST_IOS_BUILD = 23;
 // 更新バナーの表示ON/OFF。一旦非表示にする場合は false。戻す時は true に。
 const BANNER_ENABLED = true;
 
-// TestFlight アプリを開く URL スキーム
-const TESTFLIGHT_URL = "itms-beta://";
+// TestFlight の公開リンク（外部グループ「huddle test1」）。
+// itms-beta:// だとTestFlightのトップが開くだけで、Huddle未登録のApple IDだと
+// 「招待コードを入力」画面になってしまう。公開リンクならHuddleの画面が直接開く。
+const TESTFLIGHT_URL = "https://testflight.apple.com/join/x3JUj94W";
 
 /**
  * ネイティブ(iOS)アプリで、現在のビルドが最新より古い時に
