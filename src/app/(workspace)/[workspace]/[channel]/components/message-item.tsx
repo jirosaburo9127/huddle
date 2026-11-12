@@ -26,6 +26,7 @@ import {
   generateVideoThumbnailFile,
 } from "@/lib/video-thumbnail-generator";
 import { createClient } from "@/lib/supabase/client";
+import { copyText } from "@/lib/copy-text";
 
 type Props = {
   message: MessageWithProfile;
@@ -457,6 +458,20 @@ export const MessageItem = memo(function MessageItem({
   const [imageError, setImageError] = useState(false);
   const [showActions, setShowActions] = useState(false);
   const [mobileEmojiOpen, setMobileEmojiOpen] = useState(false);
+  // テキスト選択シート（部分コピー用）とコピー完了トースト
+  const [showSelectText, setShowSelectText] = useState(false);
+  const [copyToast, setCopyToast] = useState<string | null>(null);
+  // コピー対象の本文（添付ファイルURL行を除いたテキスト。メンション用NBSPは通常スペースに戻す）
+  const copyableText = useMemo(
+    () => splitContentAndFiles(message.content || "").textLines.join("\n").replace(/\u00A0/g, " ").trim(),
+    [message.content]
+  );
+
+  async function handleCopy(text: string) {
+    const ok = await copyText(text);
+    setCopyToast(ok ? "コピーしました" : "コピーできませんでした。テキスト選択からコピーしてください");
+    window.setTimeout(() => setCopyToast(null), 1800);
+  }
 
   // 他所で「すべてのアクションメニューを閉じて」と言われたら閉じる。
   // スレッドを開いた瞬間にアクションシート/絵文字ピッカーを自動で畳むのに使う。
@@ -499,6 +514,56 @@ export const MessageItem = memo(function MessageItem({
       el.style.height = Math.min(el.scrollHeight, window.innerHeight * 0.6) + "px";
     }
   }, [isEditing]);
+
+  // コピー系オーバーレイ（DM・通常の両方で使う）
+  const copyOverlays = (
+    <>
+      {showSelectText && (
+        <div
+          className="fixed inset-0 z-[70] flex items-end justify-center"
+          onClick={(e) => { e.stopPropagation(); setShowSelectText(false); }}
+        >
+          <div className="absolute inset-0 bg-black/40" />
+          <div
+            className="relative w-full max-w-lg mx-3 mb-20 rounded-2xl bg-surface border border-border flex flex-col max-h-[70vh] animate-slide-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 pt-4 pb-2 shrink-0">
+              <h3 className="text-sm font-bold text-foreground">テキストを選択</h3>
+              <p className="text-xs text-muted mt-0.5">長押しして範囲を選び、コピーしてください</p>
+            </div>
+            <div
+              className="flex-1 min-h-0 overflow-y-auto mx-5 rounded-lg bg-background/60 p-3 text-[15px] leading-relaxed text-foreground whitespace-pre-wrap break-words cursor-text"
+              style={{ userSelect: "text", WebkitUserSelect: "text", WebkitTouchCallout: "default" } as React.CSSProperties}
+            >
+              {copyableText}
+            </div>
+            <div className="px-5 pt-3 pb-4 shrink-0 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowSelectText(false)}
+                className="px-4 py-2 text-sm text-muted rounded-lg"
+              >
+                閉じる
+              </button>
+              <button
+                type="button"
+                onClick={() => { void handleCopy(copyableText); }}
+                className="px-4 py-2 text-sm font-semibold rounded-lg bg-[var(--home-accent)] text-[var(--home-on-accent)]"
+              >
+                全文コピー
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {copyToast && (
+        <div className="fixed left-1/2 -translate-x-1/2 top-20 z-[80] max-w-[90vw] rounded-full bg-black/80 px-4 py-2 text-xs text-white text-center pointer-events-none">
+          {copyToast}
+        </div>
+      )}
+    </>
+  );
 
   // アルバム更新通知 — サムネイル付きカード表示
   if (message.system_event && message.system_event.includes('"album_update"')) {
@@ -790,6 +855,34 @@ export const MessageItem = memo(function MessageItem({
               onClick={(e) => e.stopPropagation()}
             >
               <div className="grid grid-cols-3 gap-3">
+                {/* コピー（全文） */}
+                {copyableText && (
+                  <button
+                    onClick={() => { setShowActions(false); void handleCopy(copyableText); }}
+                    style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "12px 0", borderRadius: 8, border: "none", background: "none", cursor: "pointer" }}
+                  >
+                    <span style={{ width: 48, height: 48, borderRadius: 24, border: "2px solid var(--color-muted)", opacity: 0.4, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <svg style={{ width: 20, height: 20, color: "var(--color-foreground)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                    </span>
+                    <span style={{ fontSize: 12, color: "var(--color-foreground)" }}>コピー</span>
+                  </button>
+                )}
+                {/* テキスト選択（部分コピー） */}
+                {copyableText && (
+                  <button
+                    onClick={() => { setShowActions(false); setShowSelectText(true); }}
+                    style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "12px 0", borderRadius: 8, border: "none", background: "none", cursor: "pointer" }}
+                  >
+                    <span style={{ width: 48, height: 48, borderRadius: 24, border: "2px solid var(--color-muted)", opacity: 0.4, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <svg style={{ width: 20, height: 20, color: "var(--color-foreground)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7V4h3M17 4h3v3M20 17v3h-3M7 20H4v-3M9 9h6M9 12h6M9 15h4" />
+                      </svg>
+                    </span>
+                    <span style={{ fontSize: 12, color: "var(--color-foreground)" }}>テキスト選択</span>
+                  </button>
+                )}
                 {/* リアクション */}
                 {onReact && (
                   <button
@@ -869,6 +962,8 @@ export const MessageItem = memo(function MessageItem({
             onClose={() => setMobileEmojiOpen(false)}
           />
         )}
+
+        {copyOverlays}
 
         {lightboxState && (
           <ImageLightbox
@@ -1367,6 +1462,34 @@ export const MessageItem = memo(function MessageItem({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="grid grid-cols-3 gap-3">
+              {/* コピー（全文） */}
+              {copyableText && (
+                <button
+                  onClick={() => { setShowActions(false); void handleCopy(copyableText); }}
+                  className="flex flex-col items-center gap-2 py-3 rounded-lg hover:bg-sidebar-hover transition-colors"
+                >
+                  <span className="w-12 h-12 rounded-full border-2 border-muted/40 flex items-center justify-center">
+                    <svg className="w-5 h-5 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                  </span>
+                  <span className="text-xs text-foreground">コピー</span>
+                </button>
+              )}
+              {/* テキスト選択（部分コピー） */}
+              {copyableText && (
+                <button
+                  onClick={() => { setShowActions(false); setShowSelectText(true); }}
+                  className="flex flex-col items-center gap-2 py-3 rounded-lg hover:bg-sidebar-hover transition-colors"
+                >
+                  <span className="w-12 h-12 rounded-full border-2 border-muted/40 flex items-center justify-center">
+                    <svg className="w-5 h-5 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7V4h3M17 4h3v3M20 17v3h-3M7 20H4v-3M9 9h6M9 12h6M9 15h4" />
+                    </svg>
+                  </span>
+                  <span className="text-xs text-foreground">テキスト選択</span>
+                </button>
+              )}
               {/* 返信 */}
               {onReply && (
                 <button
@@ -1530,6 +1653,8 @@ export const MessageItem = memo(function MessageItem({
           onClose={() => setMobileEmojiOpen(false)}
         />
       )}
+
+      {copyOverlays}
 
       {lightboxState && (
         <ImageLightbox
