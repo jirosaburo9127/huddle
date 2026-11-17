@@ -6,6 +6,9 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useMobileNavStore } from "@/stores/mobile-nav-store";
 import { createClient } from "@/lib/supabase/client";
 
+// 1回の取得件数（RPC 側の上限は100）
+const PAGE_SIZE = 50;
+
 type SearchResult = {
   id: string;
   content: string;
@@ -28,6 +31,11 @@ export default function SearchPage() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  // 続きがあるか / 続きを読み込み中か
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  // 入力が速いと古い検索の応答が後から返ってくるため、最新の検索だけ反映する
+  const requestIdRef = useRef(0);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initialSearchDone = useRef(false);
 
@@ -40,26 +48,54 @@ export default function SearchPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialQuery]);
 
-  async function doSearch(q: string) {
-    if (!q.trim()) { setResults([]); setSearched(false); return; }
-    setLoading(true);
-    setSearched(true);
+  // 検索RPCを1ページ分呼ぶ。失敗時は null
+  async function fetchPage(q: string, offset: number): Promise<SearchResult[] | null> {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { setLoading(false); return; }
+    if (!user) return null;
     const { data: ws } = await supabase.from("workspaces").select("id").eq("slug", params.workspace).maybeSingle();
-    if (!ws) { setLoading(false); return; }
-    const { data } = await supabase.rpc("search_messages", {
+    if (!ws) return null;
+    const { data, error } = await supabase.rpc("search_messages", {
       p_user_id: user.id,
       p_workspace_id: ws.id,
-      p_query: q.trim(),
+      p_query: q,
+      p_limit: PAGE_SIZE,
+      p_offset: offset,
     });
-    if (data && Array.isArray(data)) {
-      setResults(data as SearchResult[]);
-    } else {
-      setResults([]);
+    if (error) {
+      console.error("search_messages failed", error);
+      return null;
     }
+    return Array.isArray(data) ? (data as SearchResult[]) : [];
+  }
+
+  async function doSearch(q: string) {
+    const reqId = ++requestIdRef.current;
+    if (!q.trim()) { setResults([]); setSearched(false); setHasMore(false); setLoading(false); return; }
+    setLoading(true);
+    setSearched(true);
+    const page = await fetchPage(q.trim(), 0);
+    if (reqId !== requestIdRef.current) return;
+    setResults(page ?? []);
+    setHasMore((page?.length ?? 0) === PAGE_SIZE);
     setLoading(false);
+  }
+
+  // 「さらに表示」: 今の件数を offset にして続き（より古い投稿）を取得
+  async function loadMore() {
+    if (loadingMore || !query.trim()) return;
+    const reqId = requestIdRef.current;
+    setLoadingMore(true);
+    const page = await fetchPage(query.trim(), results.length);
+    if (reqId !== requestIdRef.current) { setLoadingMore(false); return; }
+    if (page) {
+      setResults((prev) => {
+        const ids = new Set(prev.map((r) => r.id));
+        return [...prev, ...page.filter((r) => !ids.has(r.id))];
+      });
+      setHasMore(page.length === PAGE_SIZE);
+    }
+    setLoadingMore(false);
   }
 
   function handleInput(value: string) {
@@ -142,7 +178,7 @@ export default function SearchPage() {
           </div>
         ) : (
           <div>
-            <p className="px-4 py-2 text-xs text-muted">{results.length}件の結果</p>
+            <p className="px-4 py-2 text-xs text-muted">{results.length}{hasMore ? "件以上" : "件"}の結果</p>
             {results.map((r) => (
               <button
                 key={r.id}
@@ -172,6 +208,18 @@ export default function SearchPage() {
                 </div>
               </button>
             ))}
+            {hasMore && (
+              <div className="px-4 py-4 flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => { void loadMore(); }}
+                  disabled={loadingMore}
+                  className="px-5 py-2 rounded-full border border-border text-sm text-foreground hover:bg-sidebar-hover disabled:opacity-50 transition-colors"
+                >
+                  {loadingMore ? "読み込み中..." : "さらに表示（もっと前の投稿）"}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
